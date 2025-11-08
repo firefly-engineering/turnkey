@@ -1,0 +1,5 @@
+# Claude Code local settings
+.claude/
+
+# devenv local state
+.devenv/

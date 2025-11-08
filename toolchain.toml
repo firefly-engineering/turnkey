@@ -1,0 +1,6 @@
+# Turnkey toolchain declaration
+# This is a minimal example showing buck2 and nix in the devshell
+
+[toolchains]
+buck2 = {}
+nix = {}
