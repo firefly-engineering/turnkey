@@ -7,11 +7,14 @@
     devenv.url = "github:cachix/devenv";
   };
 
-  outputs = inputs@{ self, flake-parts, nixpkgs, ... }:
-    flake-parts.lib.mkFlake { inherit inputs; } (
-      let
-        inherit (nixpkgs) lib;
-      in {
+  outputs =
+    inputs@{
+      self,
+      flake-parts,
+      nixpkgs,
+      ...
+    }:
+    flake-parts.lib.mkFlake { inherit inputs; } {
       # Export the turnkey flake-parts module
       flake.flakeModules = {
         turnkey = ./nix/flake-parts/turnkey;
@@ -24,14 +27,26 @@
         ./nix/flake-parts/turnkey
       ];
 
-      systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "aarch64-darwin"
+      ];
 
-      perSystem = { config, pkgs, system, ... }: {
-        # Configure turnkey to use our local toolchain.toml
-        turnkey.toolchains = {
-          enable = true;
-          declarationFile = ./toolchain.toml;
+      perSystem =
+        {
+          config,
+          pkgs,
+          system,
+          ...
+        }:
+        {
+          # Configure turnkey to use our local toolchain.toml
+          turnkey.toolchains = {
+            enable = true;
+            declarationFile = ./toolchain.toml;
+          };
         };
-      };
-    });
+    };
 }
