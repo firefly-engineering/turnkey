@@ -42,10 +42,14 @@
           ...
         }:
         {
-          # Configure turnkey to use our local toolchain.toml
+          # Configure turnkey to use our local toolchain files
+          # Each file creates a corresponding shell
           turnkey.toolchains = {
             enable = true;
-            declarationFile = ./toolchain.toml;
+            declarationFiles = {
+              default = ./toolchain.toml; # Creates devShells.default with buck2 + nix
+              ci = ./toolchain.ci.toml; # Creates devShells.ci with just nix
+            };
           };
         };
     };

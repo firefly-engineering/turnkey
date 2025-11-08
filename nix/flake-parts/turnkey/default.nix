@@ -24,10 +24,20 @@ in
           description = "Enable turnkey toolchain management";
         };
 
-        declarationFile = mkOption {
-          type = types.nullOr types.path;
-          default = null;
-          description = "Path to toolchain.toml declaration file for the default shell (convenience option)";
+        declarationFiles = mkOption {
+          type = types.attrsOf types.path;
+          default = { };
+          example = lib.literalExpression ''
+            {
+              default = ./toolchain.toml;
+              ci = ./toolchain.ci.toml;
+            }
+          '';
+          description = ''
+            Attribute set mapping shell names to toolchain declaration files.
+            Each file will create a corresponding devenv shell.
+            The shell name "default" maps to the default shell.
+          '';
         };
 
         registry = mkOption {
@@ -54,17 +64,22 @@ in
       defaultRegistry = import ../../registry { inherit pkgs; };
       registry = if cfg.registry == { } then defaultRegistry else cfg.registry;
 
-    in
-    lib.mkIf cfg.enable {
-      # Configure the default shell with turnkey
-      # Users can create additional shells and manually import the turnkey devenv module
-      devenv.shells.default = {
+      # Create a shell configuration for each declaration file
+      mkShellConfig = shellName: declarationFile: {
         imports = [ ../../devenv/turnkey ];
 
         turnkey = {
           registry = lib.mkDefault registry;
-          declarationFile = lib.mkIf (cfg.declarationFile != null) cfg.declarationFile;
+          declarationFile = declarationFile;
         };
       };
+
+      # Generate shell configurations from declarationFiles
+      shellConfigs = lib.mapAttrs mkShellConfig cfg.declarationFiles;
+
+    in
+    lib.mkIf cfg.enable {
+      # Create all shells from declaration files
+      devenv.shells = shellConfigs;
     };
 }
