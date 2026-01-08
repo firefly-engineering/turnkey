@@ -159,8 +159,7 @@ ${generateTargets finalToolchains}
   # Go deps cell paths and config
   godepsCellPath = ".turnkey/godeps";
   hasGodeps = cfg.godeps != null;
-  godepsCellConfig = lib.optionalString hasGodeps ''
-        godeps = ${godepsCellPath}'';
+  godepsCellConfig = lib.optionalString hasGodeps "    godeps = ${godepsCellPath}";
 
   # Generate buckconfig content
   buckconfigContent = ''
