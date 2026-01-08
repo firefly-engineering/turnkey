@@ -69,8 +69,8 @@ in
 
             path = mkOption {
               type = types.either types.path types.str;
-              default = "prelude";
-              description = "Path to the prelude cell";
+              default = "bundled://";
+              description = "Path to the prelude cell (use 'bundled://' for Buck2's built-in prelude)";
             };
           };
         };
