@@ -4,6 +4,7 @@
 # This tool is used to create declarative Go dependency files for Buck2 integration.
 #
 # Uses the monorepo pattern: src points to repo root, subPackages selects the tool.
+# Wraps the binary with prefetcher tools (nix-prefetch-github, nix) in PATH.
 { pkgs, lib }:
 
 pkgs.buildGoModule {
@@ -17,6 +18,20 @@ pkgs.buildGoModule {
   # Hash of vendored dependencies (golang.org/x/mod)
   # To update: run `nix build` and copy the expected hash from error
   vendorHash = "sha256-n9TLT4c8V+I+uEg4MMUJvW451wpIYIfro2sZRtFe9ig=";
+
+  # For wrapping the binary with prefetcher tools
+  nativeBuildInputs = [ pkgs.makeWrapper ];
+
+  # Wrap the binary to include prefetcher tools in PATH
+  # - nix-prefetch-github: for GitHub, golang.org/x, gopkg.in, go.uber.org modules
+  # - nix: for nix-prefetch-url (GoProxy fallback) and nix hash to-sri
+  postInstall = ''
+    wrapProgram $out/bin/godeps-gen \
+      --prefix PATH : ${lib.makeBinPath [
+        pkgs.nix-prefetch-github
+        pkgs.nix
+      ]}
+  '';
 
   meta = {
     description = "Generate go-deps.toml from go.mod and go.sum for Buck2 integration";
