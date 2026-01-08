@@ -65,8 +65,12 @@
           ...
         }:
         let
-          # Build the Go dependencies cell for examples/hello-deps
-          godepsCell = import ./nix/buck2/go-deps-example.nix { inherit pkgs lib; };
+          # Load Go deps registry and build cell
+          defaultGoDepsRegistry = import ./nix/buck2/go-deps-registry.nix { inherit pkgs; };
+          godepsCell = import ./nix/buck2/go-deps-cell.nix {
+            inherit pkgs lib;
+            registry = defaultGoDepsRegistry;
+          };
         in
         {
           # Configure turnkey to use our local toolchain files
