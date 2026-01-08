@@ -1,0 +1,9 @@
+# Local database and state files
+beads.db
+beads.db-shm
+beads.db-wal
+.local_version
+last-touched
+state.json
+metadata.json
+.bv.lock
