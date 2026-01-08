@@ -1,8 +1,14 @@
 # Turnkey toolchain declaration
-# This is a minimal example showing buck2 and nix in the devshell
+# This demonstrates the full Buck2 + Nix integration with Go toolchain
 
 [toolchains]
+# Build tools
 buck2 = {}
+
+# Language toolchains (used by Buck2)
+go = {}
+
+# Development utilities (not Buck2 toolchains)
 nix = {}
 beads = {}
 beads_viewer = {}

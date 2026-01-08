@@ -69,7 +69,7 @@
           turnkey.toolchains = {
             enable = true;
             declarationFiles = {
-              default = ./toolchain.toml; # Creates devShells.default with buck2 + nix + beads
+              default = ./toolchain.toml; # Creates devShells.default with buck2 + nix + beads + go
               ci = ./toolchain.ci.toml; # Creates devShells.ci with just nix
             };
             # Extend the default registry with packages from flake inputs
@@ -79,6 +79,15 @@
               beads = inputs.beads.packages.${system}.default;
               beads_viewer = inputs.beads_viewer.packages.${system}.default;
               jj = inputs.jj.packages.${system}.default;
+              # Language toolchains for Buck2 integration
+              go = pkgs.go;
+              python = pkgs.python3;
+              cxx = pkgs.stdenv.cc;
+            };
+            # Enable Buck2 toolchain generation
+            buck2 = {
+              enable = true;
+              prelude.strategy = "bundled";
             };
           };
         };
