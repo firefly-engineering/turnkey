@@ -17,6 +17,12 @@
       url = "github:Dicklesworthstone/beads_viewer/v0.12.1";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Jujutsu - Git-compatible VCS
+    jj = {
+      url = "github:jj-vcs/jj/v0.37.0";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -62,12 +68,13 @@
               default = ./toolchain.toml; # Creates devShells.default with buck2 + nix + beads
               ci = ./toolchain.ci.toml; # Creates devShells.ci with just nix
             };
-            # Extend the default registry with beads packages from flake inputs
+            # Extend the default registry with packages from flake inputs
             registry = {
               buck2 = pkgs.buck2;
               nix = pkgs.nix;
               beads = inputs.beads.packages.${system}.default;
               beads_viewer = inputs.beads_viewer.packages.${system}.default;
+              jj = inputs.jj.packages.${system}.default;
             };
           };
         };
