@@ -98,6 +98,34 @@ in
               See go-deps.toml in the turnkey repo for format documentation.
             '';
           };
+
+          goModFile = mkOption {
+            type = types.str;
+            default = "go.mod";
+            description = ''
+              Relative path to go.mod file (for staleness checking and regeneration).
+            '';
+          };
+
+          goSumFile = mkOption {
+            type = types.str;
+            default = "go.sum";
+            description = ''
+              Relative path to go.sum file (for staleness checking and regeneration).
+            '';
+          };
+
+          autoRegenerate = mkOption {
+            type = types.bool;
+            default = false;
+            description = ''
+              Enable automatic go-deps.toml regeneration via pre-commit hook.
+              When enabled, go-deps.toml will be regenerated when go.mod or go.sum
+              are staged for commit.
+
+              Requires godeps-gen in the toolchain registry.
+            '';
+          };
         };
       };
     }
@@ -143,6 +171,15 @@ in
               path = cfg.buck2.prelude.path;
             };
             godeps = godepsCell;
+            # Pass through paths for staleness checking and regeneration
+            # Extract filename from path for runtime staleness checking
+            goDepsFile =
+              if cfg.buck2.goDepsFile != null
+              then builtins.baseNameOf cfg.buck2.goDepsFile
+              else "go-deps.toml";
+            goModFile = cfg.buck2.goModFile;
+            goSumFile = cfg.buck2.goSumFile;
+            autoRegenerate = cfg.buck2.autoRegenerate;
           };
         };
       };

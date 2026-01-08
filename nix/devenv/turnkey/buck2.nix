@@ -261,6 +261,46 @@ in
         and symlinked to .turnkey/godeps.
       '';
     };
+
+    goDepsFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "go-deps.toml";
+      description = ''
+        Relative path to go-deps.toml file (for staleness checking).
+        Used to warn when go-deps.toml needs regeneration.
+      '';
+    };
+
+    goModFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "go.mod";
+      description = ''
+        Relative path to go.mod file (for staleness checking).
+        Used to warn when go-deps.toml needs regeneration.
+      '';
+    };
+
+    goSumFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "go.sum";
+      description = ''
+        Relative path to go.sum file (for staleness checking).
+        Used to warn when go-deps.toml needs regeneration.
+      '';
+    };
+
+    autoRegenerate = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Enable automatic go-deps.toml regeneration via pre-commit hook.
+        When enabled, go-deps.toml will be regenerated when go.mod or go.sum
+        are staged for commit.
+
+        Note: Requires godeps-gen in the shell's packages and nix-prefetch-github
+        available for hash fetching.
+      '';
+    };
   };
 
   config = lib.mkIf (cfg.enable && turnkeyCfg.enable) {
@@ -321,6 +361,27 @@ in
         ln -s "${cfg.godeps}" .turnkey/godeps
         echo "turnkey: Created godeps cell symlink"
       fi
+
+      # Check if go-deps.toml is stale (older than go.mod or go.sum)
+      _go_deps_file="${cfg.goDepsFile}"
+      _go_mod_file="${cfg.goModFile}"
+      _go_sum_file="${cfg.goSumFile}"
+      if [ -f "$_go_deps_file" ] && [ -f "$_go_mod_file" ]; then
+        _stale=0
+        if [ "$_go_mod_file" -nt "$_go_deps_file" ]; then
+          _stale=1
+        fi
+        if [ -f "$_go_sum_file" ] && [ "$_go_sum_file" -nt "$_go_deps_file" ]; then
+          _stale=1
+        fi
+        if [ "$_stale" = "1" ]; then
+          echo ""
+          echo "⚠️  turnkey: go-deps.toml may be stale!"
+          echo "   go.mod or go.sum is newer than go-deps.toml"
+          echo "   Regenerate with: godeps-gen --go-mod $_go_mod_file --go-sum $_go_sum_file --prefetch > $_go_deps_file"
+          echo ""
+        fi
+      fi
       ''}
 
       echo "Buck2 configured by turnkey"
@@ -329,5 +390,27 @@ in
       ${lib.optionalString hasGodeps ''echo "  Go deps: ${cfg.godeps}"''}
       echo "  Cell: $TURNKEY_BUCK2_TOOLCHAINS_CELL"
     '';
+
+    # Pre-commit hook for automatic go-deps.toml regeneration
+    pre-commit.hooks = lib.mkIf (hasGodeps && cfg.autoRegenerate) {
+      godeps-gen = {
+        enable = true;
+        name = "godeps-gen";
+        description = "Regenerate go-deps.toml when go.mod or go.sum changes";
+        files = "(go\\.mod|go\\.sum)$";
+        pass_filenames = false;
+        entry = ''
+          sh -c '
+            if command -v godeps-gen >/dev/null 2>&1; then
+              echo "Regenerating ${cfg.goDepsFile}..."
+              godeps-gen --go-mod "${cfg.goModFile}" --go-sum "${cfg.goSumFile}" --prefetch > "${cfg.goDepsFile}"
+              git add "${cfg.goDepsFile}"
+            else
+              echo "Warning: godeps-gen not found in PATH, skipping regeneration"
+            fi
+          '
+        '';
+      };
+    };
   };
 }
