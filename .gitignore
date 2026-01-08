@@ -14,3 +14,4 @@ buck-out/
 examples/hello-deps/hello-deps
 result
 tools/godeps-gen/godeps-gen
+go-deps.toml

@@ -89,13 +89,14 @@ in
           goDepsFile = mkOption {
             type = types.nullOr types.path;
             default = null;
-            example = lib.literalExpression "./go-deps.toml";
+            example = lib.literalExpression "./.turnkey/go-deps.toml";
             description = ''
               Path to go-deps.toml file declaring Go dependencies.
               When set, turnkey will build the godeps cell automatically.
 
-              This is the recommended way to declare Go dependencies.
-              See go-deps.toml in the turnkey repo for format documentation.
+              Recommended: use ./.turnkey/go-deps.toml with the turnkey .envrc
+              pattern, which auto-generates the file to the Nix store before
+              flake evaluation. The .turnkey/ directory should be gitignored.
             '';
           };
 
@@ -160,9 +161,10 @@ in
       defaultRegistry = import ../../registry { inherit pkgs lib; };
       registry = if cfg.registry == { } then defaultRegistry else cfg.registry;
 
-      # Build godeps cell from goDepsFile if specified, otherwise use godeps directly
+      # Build godeps cell from goDepsFile if specified and exists
+      # The file may not exist on first run (before .envrc generates it)
       godepsCell =
-        if cfg.buck2.goDepsFile != null then
+        if cfg.buck2.goDepsFile != null && builtins.pathExists cfg.buck2.goDepsFile then
           import ../../buck2/go-deps-cell.nix {
             inherit pkgs lib;
             depsFile = cfg.buck2.goDepsFile;
