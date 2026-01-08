@@ -1,9 +1,11 @@
-{ lib, config, ... }:
+{ lib, config, pkgs, ... }:
 
 let
   cfg = config.turnkey;
 in
 {
+  # Import the Buck2 generation sub-module
+  imports = [ ./buck2.nix ];
   options.turnkey = {
     enable = lib.mkOption {
       type = lib.types.bool;
