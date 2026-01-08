@@ -6,3 +6,8 @@
 
 # bv (beads viewer) local config and caches
 .bv/
+
+# Buck2 generated files
+buck-out/
+.buckconfig
+.turnkey/
