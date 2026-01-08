@@ -60,9 +60,14 @@
         {
           config,
           pkgs,
+          lib,
           system,
           ...
         }:
+        let
+          # Build the Go dependencies cell for examples/hello-deps
+          godepsCell = import ./nix/buck2/go-deps-example.nix { inherit pkgs lib; };
+        in
         {
           # Configure turnkey to use our local toolchain files
           # Each file creates a corresponding shell
@@ -89,6 +94,7 @@
             buck2 = {
               enable = true;
               prelude.strategy = "bundled";
+              godeps = godepsCell;
             };
           };
         };
