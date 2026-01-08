@@ -2,6 +2,13 @@
 #
 # Maps turnkey toolchain names to Buck2 toolchain rule specifications.
 # Used by the buck2.nix module to generate the toolchains cell.
+#
+# Each toolchain can specify:
+#   - targets: Buck2 toolchain rules to generate in the toolchains cell
+#   - implicitDependencies: Other toolchains that must also be included
+#   - runtimeDependencies: Packages needed in PATH for Buck2 action execution
+#   - skip: true if this is not a Buck2 toolchain (just a dev tool)
+#   - alwaysInclude: true if this toolchain should always be generated
 
 { lib }:
 
@@ -71,6 +78,8 @@
       }
     ];
     implicitDependencies = [ ];
+    # clang must be in PATH for Buck2 actions that use the cxx toolchain
+    runtimeDependencies = [ "clang" ];
   };
 
   # ==========================================================================

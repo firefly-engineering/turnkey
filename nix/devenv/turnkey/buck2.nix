@@ -58,6 +58,19 @@ let
 
   finalToolchains = lib.unique (allToolchains ++ alwaysIncluded);
 
+  # Collect runtime dependencies from all active toolchains
+  # These are packages that must be in PATH for Buck2 actions (e.g., clang for cxx)
+  runtimeDeps = lib.unique (
+    builtins.concatMap (
+      name: mappings.${name}.runtimeDependencies or [ ]
+    ) finalToolchains
+  );
+
+  # Resolve runtime dependencies to actual packages from registry
+  runtimePackages = builtins.filter (p: p != null) (
+    map (name: turnkeyCfg.registry.${name} or null) runtimeDeps
+  );
+
   # Generate load statements for BUCK file
   generateLoads =
     toolchains:
@@ -235,11 +248,15 @@ in
   };
 
   config = lib.mkIf (cfg.enable && turnkeyCfg.enable) {
+    # Add runtime dependencies to shell (e.g., clang for cxx toolchain)
+    packages = runtimePackages;
+
     # Export paths for debugging and inspection
     env = {
       TURNKEY_BUCK2_TOOLCHAINS_CELL = "${toolchainsCell}";
       TURNKEY_BUCK2_CONFIG = "${buckconfig}";
       TURNKEY_BUCK2_TOOLCHAINS = lib.concatStringsSep "," finalToolchains;
+      TURNKEY_BUCK2_RUNTIME_DEPS = lib.concatStringsSep "," runtimeDeps;
     };
 
     # Create symlinks on shell entry
@@ -277,6 +294,7 @@ in
 
       echo "Buck2 configured by turnkey"
       echo "  Toolchains: ${lib.concatStringsSep ", " finalToolchains}"
+      echo "  Runtime deps: ${lib.concatStringsSep ", " runtimeDeps}"
       echo "  Cell: $TURNKEY_BUCK2_TOOLCHAINS_CELL"
     '';
   };

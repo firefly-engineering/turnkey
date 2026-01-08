@@ -6,10 +6,8 @@
 buck2 = {}
 
 # Language toolchains (used by Buck2)
+# Note: clang is automatically included via cxx's runtimeDependencies
 go = {}
-
-# Compilers needed by Buck2 actions
-clang = {}
 
 # Development utilities (not Buck2 toolchains)
 nix = {}
