@@ -73,6 +73,16 @@ in
               description = "Path to the prelude cell (use 'bundled://' for Buck2's built-in prelude)";
             };
           };
+
+          godeps = mkOption {
+            type = types.nullOr types.package;
+            default = null;
+            description = ''
+              Nix derivation containing the Go dependencies cell.
+              When set, a 'godeps' cell will be added to .buckconfig
+              and symlinked to .turnkey/godeps.
+            '';
+          };
         };
       };
     }
@@ -107,6 +117,7 @@ in
               strategy = cfg.buck2.prelude.strategy;
               path = cfg.buck2.prelude.path;
             };
+            godeps = cfg.buck2.godeps;
           };
         };
       };
