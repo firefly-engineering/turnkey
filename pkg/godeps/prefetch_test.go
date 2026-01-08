@@ -285,6 +285,161 @@ func TestParseGitHubPath(t *testing.T) {
 	}
 }
 
+func TestGopkgInPrefetcher_Supports(t *testing.T) {
+	p := &GopkgInPrefetcher{}
+
+	tests := []struct {
+		path     string
+		expected bool
+	}{
+		{"gopkg.in/yaml.v3", true},
+		{"gopkg.in/check.v1", true},
+		{"gopkg.in/user/pkg.v2", true},
+		{"github.com/foo/bar", false},
+		{"golang.org/x/mod", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			if p.Supports(tt.path) != tt.expected {
+				t.Errorf("Supports(%s) = %v, want %v", tt.path, !tt.expected, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseGopkgInPath(t *testing.T) {
+	tests := []struct {
+		path          string
+		expectedOwner string
+		expectedRepo  string
+		expectError   bool
+	}{
+		// Single-element paths: gopkg.in/name.vN -> go-name/name
+		{"gopkg.in/yaml.v3", "go-yaml", "yaml", false},
+		{"gopkg.in/check.v1", "go-check", "check", false},
+		{"gopkg.in/ini.v1", "go-ini", "ini", false},
+		// Two-element paths: gopkg.in/user/pkg.vN -> user/pkg
+		{"gopkg.in/user/pkg.v2", "user", "pkg", false},
+		{"gopkg.in/natefinch/lumberjack.v2", "natefinch", "lumberjack", false},
+		// Subpackages
+		{"gopkg.in/user/pkg.v2/subpkg", "user", "pkg", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			owner, repo, err := parseGopkgInPath(tt.path)
+			if tt.expectError {
+				if err == nil {
+					t.Error("expected error")
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if owner != tt.expectedOwner {
+					t.Errorf("owner: expected %s, got %s", tt.expectedOwner, owner)
+				}
+				if repo != tt.expectedRepo {
+					t.Errorf("repo: expected %s, got %s", tt.expectedRepo, repo)
+				}
+			}
+		})
+	}
+}
+
+func TestStripVersionSuffix(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"yaml.v3", "yaml"},
+		{"check.v1", "check"},
+		{"pkg.v10", "pkg"},
+		{"lumberjack.v2", "lumberjack"},
+		{"noversion", "noversion"},
+		{"has.dot", "has.dot"},
+		{"pkg.vx", "pkg.vx"}, // 'x' is not a digit
+		{".v1", ""},          // Edge case: just version suffix
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := stripVersionSuffix(tt.input)
+			if result != tt.expected {
+				t.Errorf("stripVersionSuffix(%s) = %s, want %s", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestUberGoPrefetcher_Supports(t *testing.T) {
+	p := &UberGoPrefetcher{}
+
+	tests := []struct {
+		path     string
+		expected bool
+	}{
+		{"go.uber.org/zap", true},
+		{"go.uber.org/atomic", true},
+		{"go.uber.org/multierr", true},
+		{"github.com/uber-go/zap", false},
+		{"golang.org/x/mod", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			if p.Supports(tt.path) != tt.expected {
+				t.Errorf("Supports(%s) = %v, want %v", tt.path, !tt.expected, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGoProxyPrefetcher_Supports(t *testing.T) {
+	p := &GoProxyPrefetcher{}
+
+	// GoProxyPrefetcher is a fallback and supports everything
+	tests := []string{
+		"github.com/foo/bar",
+		"golang.org/x/mod",
+		"gopkg.in/yaml.v3",
+		"example.com/anything",
+		"bitbucket.org/user/repo",
+		"gitlab.com/user/repo",
+	}
+
+	for _, path := range tests {
+		t.Run(path, func(t *testing.T) {
+			if !p.Supports(path) {
+				t.Errorf("Supports(%s) = false, want true (fallback prefetcher)", path)
+			}
+		})
+	}
+}
+
+func TestEscapeModulePath(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"github.com/foo/bar", "github.com/foo/bar"},
+		{"github.com/Azure/azure-sdk", "github.com/!azure/azure-sdk"},
+		{"github.com/BurntSushi/toml", "github.com/!burnt!sushi/toml"},
+		{"ALLCAPS", "!a!l!l!c!a!p!s"},
+		{"MixedCase/Path", "!mixed!case/!path"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := escapeModulePath(tt.input)
+			if result != tt.expected {
+				t.Errorf("escapeModulePath(%s) = %s, want %s", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestDefaultPrefetcher(t *testing.T) {
 	var buf bytes.Buffer
 	p := DefaultPrefetcher(&buf)
@@ -299,8 +454,18 @@ func TestDefaultPrefetcher(t *testing.T) {
 		t.Error("should support github.com/*")
 	}
 
-	// Should not support random paths (no GoProxy yet)
-	if p.Supports("example.com/pkg") {
-		t.Error("should not support example.com/* (no GoProxy prefetcher)")
+	// Should support gopkg.in paths
+	if !p.Supports("gopkg.in/yaml.v3") {
+		t.Error("should support gopkg.in/*")
+	}
+
+	// Should support go.uber.org paths
+	if !p.Supports("go.uber.org/zap") {
+		t.Error("should support go.uber.org/*")
+	}
+
+	// Should now support any path via GoProxy fallback
+	if !p.Supports("example.com/pkg") {
+		t.Error("should support example.com/* via GoProxy fallback")
 	}
 }

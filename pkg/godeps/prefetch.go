@@ -115,6 +115,168 @@ func (p *GolangOrgPrefetcher) Prefetch(importPath, version string) (string, erro
 	return runNixPrefetchGitHub("golang", repo, version)
 }
 
+// GopkgInPrefetcher handles gopkg.in/* modules by mapping to GitHub.
+// gopkg.in/yaml.v3 -> github.com/go-yaml/yaml
+// gopkg.in/user/pkg.v3 -> github.com/user/pkg
+type GopkgInPrefetcher struct {
+	Logger io.Writer
+}
+
+// Supports returns true for gopkg.in/* import paths.
+func (p *GopkgInPrefetcher) Supports(importPath string) bool {
+	return strings.HasPrefix(importPath, "gopkg.in/")
+}
+
+// Prefetch maps gopkg.in paths to GitHub and fetches.
+func (p *GopkgInPrefetcher) Prefetch(importPath, version string) (string, error) {
+	owner, repo, err := parseGopkgInPath(importPath)
+	if err != nil {
+		return "", err
+	}
+
+	if p.Logger != nil {
+		fmt.Fprintf(p.Logger, "prefetching %s/%s@%s (from %s)...\n", owner, repo, version, importPath)
+	}
+
+	return runNixPrefetchGitHub(owner, repo, version)
+}
+
+// parseGopkgInPath parses gopkg.in import paths into GitHub owner/repo.
+// gopkg.in/yaml.v3 -> go-yaml/yaml
+// gopkg.in/user/pkg.v3 -> user/pkg
+func parseGopkgInPath(importPath string) (owner, repo string, err error) {
+	// Remove gopkg.in/ prefix
+	path := strings.TrimPrefix(importPath, "gopkg.in/")
+	parts := strings.Split(path, "/")
+
+	if len(parts) == 1 {
+		// gopkg.in/yaml.v3 -> go-yaml/yaml
+		// Strip version suffix (.v3, .v2, etc.)
+		repo = stripVersionSuffix(parts[0])
+		owner = "go-" + repo
+		return owner, repo, nil
+	}
+
+	if len(parts) >= 2 {
+		// gopkg.in/user/pkg.v3 -> user/pkg
+		owner = parts[0]
+		repo = stripVersionSuffix(parts[1])
+		return owner, repo, nil
+	}
+
+	return "", "", fmt.Errorf("invalid gopkg.in path: %s", importPath)
+}
+
+// stripVersionSuffix removes .v1, .v2, etc. from package names.
+func stripVersionSuffix(name string) string {
+	// Find last dot followed by 'v' and digits
+	for i := len(name) - 1; i >= 0; i-- {
+		if name[i] == '.' && i+1 < len(name) && name[i+1] == 'v' {
+			// Check remaining chars are digits
+			allDigits := true
+			for j := i + 2; j < len(name); j++ {
+				if name[j] < '0' || name[j] > '9' {
+					allDigits = false
+					break
+				}
+			}
+			if allDigits && i+2 < len(name) {
+				return name[:i]
+			}
+		}
+	}
+	return name
+}
+
+// UberGoPrefetcher handles go.uber.org/* modules by mapping to github.com/uber-go/*.
+type UberGoPrefetcher struct {
+	Logger io.Writer
+}
+
+// Supports returns true for go.uber.org/* import paths.
+func (p *UberGoPrefetcher) Supports(importPath string) bool {
+	return strings.HasPrefix(importPath, "go.uber.org/")
+}
+
+// Prefetch maps go.uber.org/foo to github.com/uber-go/foo and fetches.
+func (p *UberGoPrefetcher) Prefetch(importPath, version string) (string, error) {
+	parts := strings.Split(importPath, "/")
+	if len(parts) < 2 {
+		return "", fmt.Errorf("invalid go.uber.org path: %s", importPath)
+	}
+	repo := parts[1]
+
+	if p.Logger != nil {
+		fmt.Fprintf(p.Logger, "prefetching uber-go/%s@%s (from %s)...\n", repo, version, importPath)
+	}
+
+	return runNixPrefetchGitHub("uber-go", repo, version)
+}
+
+// GoProxyPrefetcher fetches modules from proxy.golang.org as a fallback.
+// This works for any public Go module but produces zip-based hashes.
+type GoProxyPrefetcher struct {
+	Logger io.Writer
+}
+
+// Supports returns true for any import path (fallback prefetcher).
+func (p *GoProxyPrefetcher) Supports(importPath string) bool {
+	return true
+}
+
+// Prefetch downloads the module zip from proxy.golang.org and computes the hash.
+func (p *GoProxyPrefetcher) Prefetch(importPath, version string) (string, error) {
+	// URL encode the module path (replace / with !)
+	escapedPath := strings.ReplaceAll(importPath, "/", "!")
+	// Handle uppercase letters in module paths (rare but possible)
+	escapedPath = escapeModulePath(importPath)
+
+	url := fmt.Sprintf("https://proxy.golang.org/%s/@v/%s.zip", escapedPath, version)
+
+	if p.Logger != nil {
+		fmt.Fprintf(p.Logger, "prefetching %s@%s from proxy.golang.org...\n", importPath, version)
+	}
+
+	return runNixPrefetchURL(url)
+}
+
+// escapeModulePath escapes a module path for use in proxy.golang.org URLs.
+// Uppercase letters become !(lowercase) per the module proxy protocol.
+func escapeModulePath(path string) string {
+	var result strings.Builder
+	for _, r := range path {
+		if r >= 'A' && r <= 'Z' {
+			result.WriteByte('!')
+			result.WriteRune(r + 32) // lowercase
+		} else {
+			result.WriteRune(r)
+		}
+	}
+	return result.String()
+}
+
+// runNixPrefetchURL runs nix-prefetch-url and returns the SRI hash.
+func runNixPrefetchURL(url string) (string, error) {
+	// Use nix-prefetch-url with --type sha256 to get the hash
+	cmd := exec.Command("nix-prefetch-url", "--type", "sha256", url)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("nix-prefetch-url failed: %w", err)
+	}
+
+	// nix-prefetch-url outputs the hash in base32 format
+	// Convert to SRI format using nix hash to-sri
+	base32Hash := strings.TrimSpace(string(output))
+	cmd = exec.Command("nix", "hash", "to-sri", "--type", "sha256", base32Hash)
+	sriOutput, err := cmd.Output()
+	if err != nil {
+		// Fallback: return the base32 hash if conversion fails
+		return base32Hash, nil
+	}
+
+	return strings.TrimSpace(string(sriOutput)), nil
+}
+
 // parseGitHubPath extracts owner and repo from a GitHub import path.
 func parseGitHubPath(importPath string) (owner, repo string, err error) {
 	parts := strings.Split(importPath, "/")
@@ -143,11 +305,14 @@ func runNixPrefetchGitHub(owner, repo, version string) (string, error) {
 }
 
 // DefaultPrefetcher returns a ChainPrefetcher with the standard prefetchers.
+// Order matters: more specific prefetchers come first, with GoProxy as fallback.
 func DefaultPrefetcher(logger io.Writer) Prefetcher {
 	return ChainPrefetcher{
-		&GolangOrgPrefetcher{Logger: logger},
-		&GitHubPrefetcher{Logger: logger},
-		// TODO: Add GoProxyPrefetcher as fallback
+		&GolangOrgPrefetcher{Logger: logger}, // golang.org/x/* -> github.com/golang/*
+		&GopkgInPrefetcher{Logger: logger},   // gopkg.in/* -> github.com/*
+		&UberGoPrefetcher{Logger: logger},    // go.uber.org/* -> github.com/uber-go/*
+		&GitHubPrefetcher{Logger: logger},    // github.com/*
+		&GoProxyPrefetcher{Logger: logger},   // Fallback for any public module
 	}
 }
 
