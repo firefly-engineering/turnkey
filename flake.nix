@@ -60,18 +60,9 @@
         {
           config,
           pkgs,
-          lib,
           system,
           ...
         }:
-        let
-          # Load Go deps registry and build cell
-          defaultGoDepsRegistry = import ./nix/buck2/go-deps-registry.nix { inherit pkgs; };
-          godepsCell = import ./nix/buck2/go-deps-cell.nix {
-            inherit pkgs lib;
-            registry = defaultGoDepsRegistry;
-          };
-        in
         {
           # Configure turnkey to use our local toolchain files
           # Each file creates a corresponding shell
@@ -98,7 +89,7 @@
             buck2 = {
               enable = true;
               prelude.strategy = "bundled";
-              godeps = godepsCell;
+              goDepsFile = ./go-deps.toml; # Declarative Go dependencies
             };
           };
         };

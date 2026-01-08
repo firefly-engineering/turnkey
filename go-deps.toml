@@ -1,0 +1,18 @@
+# Go dependencies declaration
+#
+# Declares Go module dependencies for Buck2 builds.
+# This file is read by turnkey's Nix code to generate the godeps cell.
+#
+# Format:
+#   [deps."import/path"]
+#   version = "vX.Y.Z"
+#   hash = "sha256-..."        # Nix SRI hash of the source
+#   # Optional fields:
+#   # type = "github"          # Source type (default: inferred from import path)
+#   # owner = "..."            # GitHub owner (default: from import path)
+#   # repo = "..."             # GitHub repo (default: from import path)
+#   # deps = ["other/path"]    # Go dependencies (for transitive resolution)
+
+[deps."github.com/google/uuid"]
+version = "v1.6.0"
+hash = "sha256-VWl9sqUzdOuhW0KzQlv0gwwUQClYkmZwSydHG2sALYw="

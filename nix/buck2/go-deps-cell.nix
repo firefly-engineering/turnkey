@@ -1,9 +1,45 @@
 # Go dependencies cell builder
 #
-# Takes a Go deps registry and builds a Buck2 cell containing
+# Reads a go-deps.toml file and builds a Buck2 cell containing
 # all dependencies with generated BUCK files.
+#
+# The TOML file format:
+#   [deps."github.com/foo/bar"]
+#   version = "v1.0.0"
+#   hash = "sha256-..."
+#
+# This allows downstream repos to declare deps in pure data files.
 
-{ pkgs, lib, registry }:
+{ pkgs, lib, depsFile }:
+
+let
+  # Parse the TOML file
+  depsToml = builtins.fromTOML (builtins.readFile depsFile);
+
+  # Convert TOML deps to registry format
+  registry = lib.mapAttrs (importPath: dep: {
+    inherit (dep) version;
+    deps = dep.deps or [ ];
+    src = fetchSource importPath dep;
+  }) (depsToml.deps or { });
+
+  # Fetch source based on import path pattern
+  fetchSource = importPath: dep:
+    let
+      parts = lib.splitString "/" importPath;
+      host = lib.elemAt parts 0;
+    in
+    if host == "github.com" then
+      pkgs.fetchFromGitHub {
+        owner = dep.owner or (lib.elemAt parts 1);
+        repo = dep.repo or (lib.elemAt parts 2);
+        rev = dep.version;
+        sha256 = dep.hash;
+      }
+    else
+      throw "Unsupported import path host: ${host}. Only github.com is currently supported.";
+
+in
 
 let
   # Convert import path to vendor directory path
