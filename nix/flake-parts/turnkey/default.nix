@@ -126,6 +126,21 @@ in
               Requires godeps-gen in the toolchain registry.
             '';
           };
+
+          generateOnShellEntry = mkOption {
+            type = types.bool;
+            default = true;
+            description = ''
+              Automatically generate/regenerate go-deps.toml when entering the shell
+              if it's missing or stale (older than go.mod or go.sum).
+
+              This enables a workflow where go-deps.toml doesn't need to be committed:
+              1. First shell entry: go-deps.toml is generated (godeps cell skipped)
+              2. Subsequent entries: Nix uses the generated file
+
+              Requires godeps-gen to be available in PATH.
+            '';
+          };
         };
       };
     }
@@ -142,7 +157,7 @@ in
       cfg = config.turnkey.toolchains;
 
       # Load default registry if user didn't provide one
-      defaultRegistry = import ../../registry { inherit pkgs; };
+      defaultRegistry = import ../../registry { inherit pkgs lib; };
       registry = if cfg.registry == { } then defaultRegistry else cfg.registry;
 
       # Build godeps cell from goDepsFile if specified, otherwise use godeps directly
@@ -180,6 +195,7 @@ in
             goModFile = cfg.buck2.goModFile;
             goSumFile = cfg.buck2.goSumFile;
             autoRegenerate = cfg.buck2.autoRegenerate;
+            generateOnShellEntry = cfg.buck2.generateOnShellEntry;
           };
         };
       };

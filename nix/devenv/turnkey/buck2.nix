@@ -301,6 +301,21 @@ in
         available for hash fetching.
       '';
     };
+
+    generateOnShellEntry = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Automatically generate/regenerate go-deps.toml when entering the shell
+        if it's missing or stale (older than go.mod or go.sum).
+
+        This enables a workflow where go-deps.toml is generated on-demand:
+        1. First shell entry: go-deps.toml is generated (godeps cell skipped)
+        2. Subsequent entries: Nix uses the generated file
+
+        Requires godeps-gen to be available in PATH (add to registry or packages).
+      '';
+    };
   };
 
   config = lib.mkIf (cfg.enable && turnkeyCfg.enable) {
@@ -361,28 +376,78 @@ in
         ln -s "${cfg.godeps}" .turnkey/godeps
         echo "turnkey: Created godeps cell symlink"
       fi
+      ''}
 
-      # Check if go-deps.toml is stale (older than go.mod or go.sum)
+      # Auto-generate or check staleness of go-deps.toml
       _go_deps_file="${cfg.goDepsFile}"
       _go_mod_file="${cfg.goModFile}"
       _go_sum_file="${cfg.goSumFile}"
-      if [ -f "$_go_deps_file" ] && [ -f "$_go_mod_file" ]; then
-        _stale=0
-        if [ "$_go_mod_file" -nt "$_go_deps_file" ]; then
-          _stale=1
+      _should_generate=0
+      _generate_enabled=${if cfg.generateOnShellEntry then "1" else "0"}
+
+      if [ -f "$_go_mod_file" ]; then
+        if [ ! -f "$_go_deps_file" ]; then
+          # go-deps.toml doesn't exist
+          if [ "$_generate_enabled" = "1" ]; then
+            _should_generate=1
+            echo "turnkey: go-deps.toml not found, will generate..."
+          else
+            echo ""
+            echo "⚠️  turnkey: go-deps.toml not found!"
+            echo "   Generate with: godeps-gen --go-mod $_go_mod_file --go-sum $_go_sum_file --prefetch > $_go_deps_file"
+            echo ""
+          fi
+        else
+          # Check if stale
+          _stale=0
+          if [ "$_go_mod_file" -nt "$_go_deps_file" ]; then
+            _stale=1
+          fi
+          if [ -f "$_go_sum_file" ] && [ "$_go_sum_file" -nt "$_go_deps_file" ]; then
+            _stale=1
+          fi
+          if [ "$_stale" = "1" ]; then
+            if [ "$_generate_enabled" = "1" ]; then
+              _should_generate=1
+              echo "turnkey: go-deps.toml is stale, will regenerate..."
+            else
+              echo ""
+              echo "⚠️  turnkey: go-deps.toml may be stale!"
+              echo "   go.mod or go.sum is newer than go-deps.toml"
+              echo "   Regenerate with: godeps-gen --go-mod $_go_mod_file --go-sum $_go_sum_file --prefetch > $_go_deps_file"
+              echo ""
+            fi
+          fi
         fi
-        if [ -f "$_go_sum_file" ] && [ "$_go_sum_file" -nt "$_go_deps_file" ]; then
-          _stale=1
-        fi
-        if [ "$_stale" = "1" ]; then
-          echo ""
-          echo "⚠️  turnkey: go-deps.toml may be stale!"
-          echo "   go.mod or go.sum is newer than go-deps.toml"
-          echo "   Regenerate with: godeps-gen --go-mod $_go_mod_file --go-sum $_go_sum_file --prefetch > $_go_deps_file"
-          echo ""
+
+        # Generate if needed
+        if [ "$_should_generate" = "1" ]; then
+          if command -v godeps-gen >/dev/null 2>&1; then
+            echo "turnkey: Running godeps-gen --prefetch..."
+            if godeps-gen --go-mod "$_go_mod_file" --go-sum "$_go_sum_file" --prefetch > "$_go_deps_file.tmp"; then
+              mv "$_go_deps_file.tmp" "$_go_deps_file"
+              echo "turnkey: Generated $_go_deps_file"
+              echo ""
+              echo "ℹ️  Note: The godeps cell will be available on next shell entry."
+              echo "   Run 'exit' and 'nix develop' again to use the new dependencies."
+              echo ""
+            else
+              rm -f "$_go_deps_file.tmp"
+              echo ""
+              echo "❌ turnkey: Failed to generate go-deps.toml"
+              echo "   Check the error above and try manually:"
+              echo "   godeps-gen --go-mod $_go_mod_file --go-sum $_go_sum_file --prefetch > $_go_deps_file"
+              echo ""
+            fi
+          else
+            echo ""
+            echo "⚠️  turnkey: godeps-gen not found in PATH"
+            echo "   Add 'godeps-gen' to your toolchain.toml or packages to enable auto-generation"
+            echo "   Or generate manually: nix run .#godeps-gen -- --go-mod $_go_mod_file --go-sum $_go_sum_file --prefetch > $_go_deps_file"
+            echo ""
+          fi
         fi
       fi
-      ''}
 
       echo "Buck2 configured by turnkey"
       echo "  Toolchains: ${lib.concatStringsSep ", " finalToolchains}"
