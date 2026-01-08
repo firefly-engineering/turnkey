@@ -26,8 +26,8 @@
         visibility = [ "PUBLIC" ];
       }
     ];
-    # Go needs python_bootstrap for some build scripts
-    implicitDependencies = [ "python_bootstrap" ];
+    # Go needs python for bootstrap scripts and cxx for linking
+    implicitDependencies = [ "python" "cxx" ];
   };
 
   rust = {
@@ -43,8 +43,8 @@
         };
       }
     ];
-    # Rust needs CXX for linking and python_bootstrap for build scripts
-    implicitDependencies = [ "cxx" "python_bootstrap" ];
+    # Rust needs CXX for linking and python for build scripts
+    implicitDependencies = [ "cxx" "python" ];
   };
 
   python = {
@@ -122,5 +122,10 @@
   jj = {
     skip = true;
     reason = "Jujutsu VCS tool";
+  };
+
+  clang = {
+    skip = true;
+    reason = "C/C++ compiler, needed in PATH for Buck2 actions but not a toolchain rule";
   };
 }
