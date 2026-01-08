@@ -8,6 +8,9 @@ buck2 = {}
 # Language toolchains (used by Buck2)
 go = {}
 
+# Compilers needed by Buck2 actions
+clang = {}
+
 # Development utilities (not Buck2 toolchains)
 nix = {}
 beads = {}

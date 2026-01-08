@@ -83,6 +83,7 @@
               go = pkgs.go;
               python = pkgs.python3;
               cxx = pkgs.stdenv.cc;
+              clang = pkgs.clang;
             };
             # Enable Buck2 toolchain generation
             buck2 = {
