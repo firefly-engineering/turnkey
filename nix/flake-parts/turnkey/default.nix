@@ -46,6 +46,34 @@ in
           defaultText = "Default registry from nix/registry";
           description = "Default registry mapping toolchain names to packages (inherited by all shells)";
         };
+
+        buck2 = {
+          enable = mkOption {
+            type = types.bool;
+            default = false;
+            description = "Enable Buck2 toolchain generation from toolchain.toml";
+          };
+
+          prelude = {
+            strategy = mkOption {
+              type = types.enum [ "bundled" "git" "nix" "path" ];
+              default = "bundled";
+              description = ''
+                How to provide the Buck2 prelude cell:
+                - bundled: Use Buck2's built-in bundled prelude
+                - git: Use a git external cell
+                - nix: Use a Nix derivation
+                - path: Use an explicit filesystem path
+              '';
+            };
+
+            path = mkOption {
+              type = types.either types.path types.str;
+              default = "prelude";
+              description = "Path to the prelude cell";
+            };
+          };
+        };
       };
     }
   );
@@ -71,6 +99,15 @@ in
         turnkey = {
           registry = lib.mkDefault registry;
           declarationFile = declarationFile;
+
+          # Pass through Buck2 configuration
+          buck2 = {
+            enable = cfg.buck2.enable;
+            prelude = {
+              strategy = cfg.buck2.prelude.strategy;
+              path = cfg.buck2.prelude.path;
+            };
+          };
         };
       };
 
