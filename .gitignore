@@ -11,3 +11,4 @@
 buck-out/
 .buckconfig
 .turnkey/
+examples/hello-deps/hello-deps
