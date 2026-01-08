@@ -7,3 +7,8 @@
 version = "v1.6.0"
 hash = "sha256-VWl9sqUzdOuhW0KzQlv0gwwUQClYkmZwSydHG2sALYw="
 
+[deps."golang.org/x/mod"]
+version = "v0.31.0"
+hash = "sha256-eOvJXcF3QYztJxlBzHXPweJYG08YsLzPXXM8Px3IXA4="
+indirect = true
+

@@ -15,14 +15,17 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"regexp"
+	"sort"
 	"strings"
+
+	"golang.org/x/mod/modfile"
 )
 
 // Dependency represents a Go module dependency
 type Dependency struct {
 	ImportPath string
 	Version    string
+	Indirect   bool   // true if this is an indirect (transitive) dependency
 	Hash       string // h1: hash from go.sum (for reference)
 	NixHash    string // Nix SRI hash from nix-prefetch-github
 }
@@ -31,10 +34,11 @@ func main() {
 	goModPath := flag.String("go-mod", "go.mod", "path to go.mod file")
 	goSumPath := flag.String("go-sum", "go.sum", "path to go.sum file")
 	prefetch := flag.Bool("prefetch", false, "fetch Nix hashes using nix-prefetch-github (requires nix)")
+	includeIndirect := flag.Bool("indirect", true, "include indirect (transitive) dependencies")
 	flag.Parse()
 
 	// Parse go.mod for dependencies
-	deps, err := parseGoMod(*goModPath)
+	deps, err := parseGoMod(*goModPath, *includeIndirect)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error parsing go.mod: %v\n", err)
 		os.Exit(1)
@@ -74,63 +78,38 @@ func main() {
 	}
 }
 
-// parseGoMod extracts require directives from go.mod
-func parseGoMod(path string) ([]Dependency, error) {
-	file, err := os.Open(path)
+// parseGoMod extracts require directives from go.mod using the official Go module parser.
+func parseGoMod(path string, includeIndirect bool) ([]Dependency, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading go.mod: %w", err)
 	}
-	defer file.Close()
+
+	f, err := modfile.Parse(path, data, nil)
+	if err != nil {
+		return nil, fmt.Errorf("parsing go.mod: %w", err)
+	}
 
 	var deps []Dependency
-	inRequireBlock := false
-	scanner := bufio.NewScanner(file)
-
-	// Regex for single-line require: require github.com/foo/bar v1.0.0
-	singleRequire := regexp.MustCompile(`^require\s+(\S+)\s+(\S+)`)
-	// Regex for require block entry: \tgithub.com/foo/bar v1.0.0
-	blockEntry := regexp.MustCompile(`^\s+(\S+)\s+(\S+)`)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Check for require block start
-		if strings.HasPrefix(line, "require (") {
-			inRequireBlock = true
+	for _, req := range f.Require {
+		// Skip indirect dependencies if not requested
+		if req.Indirect && !includeIndirect {
 			continue
 		}
 
-		// Check for require block end
-		if inRequireBlock && strings.HasPrefix(line, ")") {
-			inRequireBlock = false
-			continue
-		}
-
-		// Parse single-line require
-		if matches := singleRequire.FindStringSubmatch(line); matches != nil {
-			deps = append(deps, Dependency{
-				ImportPath: matches[1],
-				Version:    matches[2],
-			})
-			continue
-		}
-
-		// Parse require block entry
-		if inRequireBlock {
-			if matches := blockEntry.FindStringSubmatch(line); matches != nil {
-				// Skip indirect dependencies (have // indirect comment)
-				if strings.Contains(line, "// indirect") {
-					continue
-				}
-				deps = append(deps, Dependency{
-					ImportPath: matches[1],
-					Version:    matches[2],
-				})
-			}
-		}
+		deps = append(deps, Dependency{
+			ImportPath: req.Mod.Path,
+			Version:    req.Mod.Version,
+			Indirect:   req.Indirect,
+		})
 	}
 
-	return deps, scanner.Err()
+	// Sort by import path for consistent output
+	sort.Slice(deps, func(i, j int) bool {
+		return deps[i].ImportPath < deps[j].ImportPath
+	})
+
+	return deps, nil
 }
 
 // parseGoSum extracts h1: hashes from go.sum
@@ -193,6 +172,9 @@ func outputTOML(deps []Dependency, prefetched bool) error {
 			fmt.Printf("hash = \"%s\"\n", dep.NixHash)
 		} else {
 			fmt.Printf("hash = \"\"%s\n", formatHashComment(dep.Hash))
+		}
+		if dep.Indirect {
+			fmt.Println("indirect = true")
 		}
 		fmt.Println()
 	}

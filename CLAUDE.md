@@ -190,6 +190,64 @@ resolvedPackages = map (name: cfg.registry.${name}) toolchainNames;
 ```
 Declarative configuration → runtime resolution.
 
+## Go Module Layout (Monorepo)
+
+This repository uses a **single go.mod at the root** for all Go code. This is a monorepo pattern where all Go tools and examples share the same module.
+
+### Key Principles
+
+1. **Single go.mod at repo root** - All Go code shares one module: `github.com/firefly-engineering/turnkey`
+2. **No nested go.mod files** - Tools like `tools/godeps-gen` do NOT have their own go.mod
+3. **Shared dependencies** - All Go dependencies are declared in the root go.mod/go.sum
+4. **Subpackage imports** - Internal packages use full import paths like `github.com/firefly-engineering/turnkey/tools/godeps-gen`
+
+### Directory Structure
+```
+/turnkey/
+├── go.mod                    # Single module declaration
+├── go.sum                    # All dependency hashes
+├── go-deps.toml              # Generated Nix dependency declarations
+├── tools/
+│   └── godeps-gen/
+│       └── main.go           # Tool code (no go.mod here!)
+└── examples/
+    └── hello-deps/
+        └── main.go           # Example code (no go.mod here!)
+```
+
+### Building Go Tools
+
+```bash
+# From repo root - builds tools/godeps-gen/main.go
+go build -o godeps-gen ./tools/godeps-gen
+
+# Run directly
+go run ./tools/godeps-gen --help
+```
+
+### Nix Packaging Considerations
+
+When packaging Go tools with Nix's `buildGoModule`:
+- Point `src` to the repo root (not the tool subdirectory)
+- Use `subPackages` to specify which package to build
+- The `vendorHash` covers all dependencies in root go.mod
+
+```nix
+pkgs.buildGoModule {
+  pname = "godeps-gen";
+  src = ./.;  # Repo root
+  subPackages = [ "tools/godeps-gen" ];
+  vendorHash = "sha256-...";  # Hash of all go.mod deps
+}
+```
+
+### Why Monorepo?
+
+1. **Consistency** - All code uses same dependency versions
+2. **Simplicity** - One place to manage deps, one go.sum to update
+3. **Buck2 alignment** - Matches Buck2's cell-based monorepo model
+4. **Dogfooding** - Tools can depend on library code in the same repo
+
 ## Development Workflows
 
 ### Git Workflow
