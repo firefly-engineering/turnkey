@@ -36,8 +36,42 @@ let
         rev = dep.version;
         sha256 = dep.hash;
       }
+    # golang.org/x/* -> github.com/golang/*
+    else if host == "golang.org" && lib.elemAt parts 1 == "x" then
+      pkgs.fetchFromGitHub {
+        owner = "golang";
+        repo = lib.elemAt parts 2;
+        rev = dep.version;
+        sha256 = dep.hash;
+      }
+    # gopkg.in/yaml.v3 -> github.com/go-yaml/yaml
+    # gopkg.in/user/pkg.v2 -> github.com/user/pkg
+    else if host == "gopkg.in" then
+      let
+        # Remove .vN suffix from package name
+        stripVersion = name:
+          let m = builtins.match "(.+)\\.v[0-9]+" name;
+          in if m != null then lib.elemAt m 0 else name;
+        # gopkg.in/yaml.v3 (single element) vs gopkg.in/user/pkg.v2 (two elements)
+        isSingleElement = lib.length parts == 2;
+        owner = if isSingleElement then "go-${stripVersion (lib.elemAt parts 1)}" else lib.elemAt parts 1;
+        repo = if isSingleElement then stripVersion (lib.elemAt parts 1) else stripVersion (lib.elemAt parts 2);
+      in
+      pkgs.fetchFromGitHub {
+        inherit owner repo;
+        rev = dep.version;
+        sha256 = dep.hash;
+      }
+    # go.uber.org/* -> github.com/uber-go/*
+    else if host == "go.uber.org" then
+      pkgs.fetchFromGitHub {
+        owner = "uber-go";
+        repo = lib.elemAt parts 1;
+        rev = dep.version;
+        sha256 = dep.hash;
+      }
     else
-      throw "Unsupported import path host: ${host}. Only github.com is currently supported.";
+      throw "Unsupported import path host: ${host}. Supported: github.com, golang.org/x, gopkg.in, go.uber.org";
 
 in
 
