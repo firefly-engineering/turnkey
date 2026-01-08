@@ -36,7 +36,11 @@
       # Export the turnkey flake-parts module
       flake.flakeModules = {
         turnkey = ./nix/flake-parts/turnkey;
-        turnkey-devenv = ./nix/devenv/turnkey;
+      };
+
+      # Export the turnkey devenv module separately
+      flake.devenvModules = {
+        turnkey = ./nix/devenv/turnkey;
       };
 
       # Use the module ourselves as a working example

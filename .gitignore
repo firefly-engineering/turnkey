@@ -3,3 +3,6 @@
 
 # devenv local state
 .devenv/
+
+# bv (beads viewer) local config and caches
+.bv/
