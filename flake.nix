@@ -5,6 +5,18 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
     devenv.url = "github:cachix/devenv";
+
+    # Beads - distributed git-backed graph issue tracker for AI agents
+    beads = {
+      url = "github:steveyegge/beads/v0.46.0";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Beads Viewer - visualization tool for beads graphs
+    beads_viewer = {
+      url = "github:Dicklesworthstone/beads_viewer/v0.12.1";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -47,8 +59,15 @@
           turnkey.toolchains = {
             enable = true;
             declarationFiles = {
-              default = ./toolchain.toml; # Creates devShells.default with buck2 + nix
+              default = ./toolchain.toml; # Creates devShells.default with buck2 + nix + beads
               ci = ./toolchain.ci.toml; # Creates devShells.ci with just nix
+            };
+            # Extend the default registry with beads packages from flake inputs
+            registry = {
+              buck2 = pkgs.buck2;
+              nix = pkgs.nix;
+              beads = inputs.beads.packages.${system}.default;
+              beads_viewer = inputs.beads_viewer.packages.${system}.default;
             };
           };
         };
