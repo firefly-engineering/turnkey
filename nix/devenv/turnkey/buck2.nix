@@ -478,6 +478,20 @@ in
         '';
       };
     };
+
+    quiet = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Suppress verbose shell entry messages.
+
+        When true (default), shell entry shows minimal output.
+        When false, shows detailed toolchain and cell information.
+
+        Set TURNKEY_VERBOSE=1 in your environment to see verbose
+        output even when quiet mode is enabled.
+      '';
+    };
   };
 
   config = lib.mkIf (cfg.enable && turnkeyCfg.enable) {
@@ -614,11 +628,14 @@ in
         fi
       fi
 
-      echo "Buck2 configured by turnkey"
-      echo "  Toolchains: ${lib.concatStringsSep ", " finalToolchains}"
-      echo "  Runtime deps: ${lib.concatStringsSep ", " runtimeDeps}"
-      ${nixCellsInfo}
-      echo "  Cell: $TURNKEY_BUCK2_TOOLCHAINS_CELL"
+      # Verbose output (shown when quiet=false or TURNKEY_VERBOSE=1)
+      if [ -n "''${TURNKEY_VERBOSE:-}" ]${lib.optionalString (!cfg.quiet) " || true"}; then
+        echo "Buck2 configured by turnkey"
+        echo "  Toolchains: ${lib.concatStringsSep ", " finalToolchains}"
+        echo "  Runtime deps: ${lib.concatStringsSep ", " runtimeDeps}"
+        ${nixCellsInfo}
+        echo "  Cell: $TURNKEY_BUCK2_TOOLCHAINS_CELL"
+      fi
 
       # tk sync on shell entry (if enabled and tk is available)
       ${lib.optionalString cfg.tk.syncOnShellEntry ''
@@ -634,7 +651,9 @@ in
         if [ -z "''${TURNKEY_NO_ALIAS:-}" ]; then
           if command -v tk >/dev/null 2>&1; then
             alias buck2='tk'
-            echo "turnkey: buck2 is aliased to tk (set TURNKEY_NO_ALIAS=1 to disable)"
+            if [ -n "''${TURNKEY_VERBOSE:-}" ]${lib.optionalString (!cfg.quiet) " || true"}; then
+              echo "turnkey: buck2 is aliased to tk (set TURNKEY_NO_ALIAS=1 to disable)"
+            fi
           fi
         fi
       ''}
