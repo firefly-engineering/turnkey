@@ -1,23 +1,15 @@
-# Python example with external package dependencies
+# Python example with external package dependencies via pydeps cell
 #
-# NOTE: External Python packages require third-party setup.
-# Buck2 doesn't have built-in pip integration - you need to either:
-# 1. Vendor packages in a third-party directory
-# 2. Use prebuilt wheel targets
-# 3. Use a pip-to-buck tool to generate targets
-#
-# Meta's internal tooling for this isn't fully open-sourced.
-# Community options include rules_python patterns or custom pip integration.
+# Dependencies are declared in python-deps.toml and vendored by Nix.
+# The pydeps cell is auto-generated and symlinked to .turnkey/pydeps
 
 load("@prelude//:rules.bzl", "python_binary")
 
-# This target will fail until third-party packages are available
 python_binary(
     name = "python-hello-deps",
     main = "hello.py",
-    # Uncomment when third-party packages are available:
-    # deps = [
-    #     "//third-party/python:click",
-    # ],
+    deps = [
+        "pydeps//vendor/six:six",
+    ],
     visibility = ["PUBLIC"],
 )

@@ -201,6 +201,12 @@ ${generateTargets finalToolchains}
       derivation = cfg.rustdeps;
       description = "Rust deps";
     };
+    pydeps = {
+      name = "pydeps";
+      path = ".turnkey/pydeps";
+      derivation = cfg.pydeps;
+      description = "Python deps";
+    };
   } // lib.optionalAttrs (cfg.prelude.strategy == "nix") {
     # Prelude cell (only when using nix strategy)
     prelude = {
@@ -363,6 +369,16 @@ in
         Nix derivation containing the Rust dependencies cell.
         When set, a 'rustdeps' cell will be added to .buckconfig
         and symlinked to .turnkey/rustdeps.
+      '';
+    };
+
+    pydeps = lib.mkOption {
+      type = lib.types.nullOr lib.types.package;
+      default = null;
+      description = ''
+        Nix derivation containing the Python dependencies cell.
+        When set, a 'pydeps' cell will be added to .buckconfig
+        and symlinked to .turnkey/pydeps.
       '';
     };
 

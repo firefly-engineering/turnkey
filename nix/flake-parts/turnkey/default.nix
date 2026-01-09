@@ -165,6 +165,29 @@ in
               When set, turnkey will build the rustdeps cell automatically.
             '';
           };
+
+          # Python dependencies
+          pydeps = mkOption {
+            type = types.nullOr types.package;
+            default = null;
+            description = ''
+              Nix derivation containing the Python dependencies cell.
+              When set, a 'pydeps' cell will be added to .buckconfig
+              and symlinked to .turnkey/pydeps.
+
+              Prefer using pythonDepsFile instead for declarative configuration.
+            '';
+          };
+
+          pythonDepsFile = mkOption {
+            type = types.nullOr types.path;
+            default = null;
+            example = lib.literalExpression "./python-deps.toml";
+            description = ''
+              Path to python-deps.toml file declaring Python package dependencies.
+              When set, turnkey will build the pydeps cell automatically.
+            '';
+          };
         };
       };
     }
@@ -208,6 +231,16 @@ in
         else
           cfg.buck2.rustdeps;
 
+      # Build pydeps cell from pythonDepsFile if specified and exists
+      pydepsCell =
+        if cfg.buck2.pythonDepsFile != null && builtins.pathExists cfg.buck2.pythonDepsFile then
+          import ../../buck2/python-deps-cell.nix {
+            inherit pkgs lib;
+            depsFile = cfg.buck2.pythonDepsFile;
+          }
+        else
+          cfg.buck2.pydeps;
+
       # Create a shell configuration for each declaration file
       mkShellConfig = shellName: declarationFile: {
         imports = [ ../../devenv/turnkey ];
@@ -225,6 +258,7 @@ in
             };
             godeps = godepsCell;
             rustdeps = rustdepsCell;
+            pydeps = pydepsCell;
             # Pass through paths for staleness checking and regeneration
             # Extract filename from path for runtime staleness checking
             goDepsFile =
