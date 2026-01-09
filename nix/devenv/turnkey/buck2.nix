@@ -490,10 +490,19 @@ in
       TURNKEY_BUCK2_CONFIG = "${buckconfig}";
       TURNKEY_BUCK2_TOOLCHAINS = lib.concatStringsSep "," finalToolchains;
       TURNKEY_BUCK2_RUNTIME_DEPS = lib.concatStringsSep "," runtimeDeps;
-    } // nixCellsEnvVars;
+    } // nixCellsEnvVars
+      # Store tk's share path for shell completion setup
+      // lib.optionalAttrs (turnkeyCfg.registry ? tk) {
+        TURNKEY_TK_SHARE = "${turnkeyCfg.registry.tk}/share";
+      };
 
     # Create symlinks on shell entry
     enterShell = ''
+      # Add tk completions to XDG_DATA_DIRS for fish/bash/zsh completion discovery
+      if [ -n "''${TURNKEY_TK_SHARE:-}" ]; then
+        export XDG_DATA_DIRS="''${TURNKEY_TK_SHARE}:''${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+      fi
+
       # Create .turnkey directory for turnkey-managed symlinks
       mkdir -p .turnkey
 
