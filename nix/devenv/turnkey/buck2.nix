@@ -162,11 +162,72 @@ ${generateTargets finalToolchains}
   # Toolchains cell is accessed via a symlink at .turnkey/toolchains
   toolchainsCellPath = ".turnkey/toolchains";
 
-  # Go deps cell paths and config
-  godepsCellPath = ".turnkey/godeps";
+  # ==========================================================================
+  # Nix-backed cells registry
+  # ==========================================================================
+  # Define all Nix-backed cells here. Each cell needs:
+  #   - name: Buck2 cell name (used in .buckconfig and targets)
+  #   - path: Symlink path under .turnkey/
+  #   - derivation: The Nix derivation containing the cell
+  #   - description: Human-readable description for logging
+  #
+  # The registry automatically handles:
+  #   - [cells] section in .buckconfig
+  #   - Platform detector specs
+  #   - Symlink creation in enterShell
+  # ==========================================================================
+
+  nixCells = lib.filterAttrs (_: cell: cell.derivation != null) {
+    godeps = {
+      name = "godeps";
+      path = ".turnkey/godeps";
+      derivation = cfg.godeps;
+      description = "Go deps";
+    };
+    # Future cells can be added here, e.g.:
+    # rustdeps = {
+    #   name = "rustdeps";
+    #   path = ".turnkey/rustdeps";
+    #   derivation = cfg.rustdeps;
+    #   description = "Rust deps";
+    # };
+  };
+
+  # Generate [cells] config entries for all Nix-backed cells
+  nixCellsConfig = lib.concatStringsSep "\n" (
+    lib.mapAttrsToList (_: cell: "    ${cell.name} = ${cell.path}") nixCells
+  );
+
+  # Generate platform detector specs for all Nix-backed cells
+  nixCellsPlatformDetectors = lib.concatMapStringsSep "" (
+    cell: " target:${cell.name}//...->prelude//platforms:default"
+  ) (lib.attrValues nixCells);
+
+  # Generate symlink creation script for all Nix-backed cells
+  nixCellsSymlinkScript = lib.concatStringsSep "\n" (
+    lib.mapAttrsToList (_: cell: ''
+      # Ensure ${cell.path} points to the ${cell.description} cell
+      if [ -L ${cell.path} ]; then
+        if [ "$(readlink ${cell.path})" != "${cell.derivation}" ]; then
+          ln -sfn "${cell.derivation}" ${cell.path}
+          echo "turnkey: Updated ${cell.name} cell symlink"
+        fi
+      elif [ -e ${cell.path} ]; then
+        echo "turnkey: Warning: ${cell.path} exists and is not a symlink"
+      else
+        ln -s "${cell.derivation}" ${cell.path}
+        echo "turnkey: Created ${cell.name} cell symlink"
+      fi
+    '') nixCells
+  );
+
+  # Generate info output for all Nix-backed cells
+  nixCellsInfo = lib.concatStringsSep "\n" (
+    lib.mapAttrsToList (_: cell: ''echo "  ${cell.description}: ${cell.derivation}"'') nixCells
+  );
+
+  # For backward compatibility
   hasGodeps = cfg.godeps != null;
-  godepsCellConfig = lib.optionalString hasGodeps "    godeps = ${godepsCellPath}";
-  godepsPlatformDetector = lib.optionalString hasGodeps " target:godeps//...->prelude//platforms:default";
 
   # Generate buckconfig content
   buckconfigContent = ''
@@ -176,7 +237,7 @@ ${generateTargets finalToolchains}
         toolchains = ${toolchainsCellPath}
         prelude = ${preludeCellPath}
         none = none
-    ${godepsCellConfig}
+    ${nixCellsConfig}
 
     [cell_aliases]
         config = prelude
@@ -188,7 +249,7 @@ ${generateTargets finalToolchains}
 
     ${externalCellsSection}
     [parser]
-        target_platform_detector_spec = target:root//...->prelude//platforms:default target:toolchains//...->prelude//platforms:default${godepsPlatformDetector}
+        target_platform_detector_spec = target:root//...->prelude//platforms:default target:toolchains//...->prelude//platforms:default${nixCellsPlatformDetectors}
 
     [buildfile]
         name = BUCK
@@ -370,20 +431,8 @@ in
         echo "turnkey: Created toolchains cell symlink"
       fi
 
-      ${lib.optionalString hasGodeps ''
-      # Ensure .turnkey/godeps points to the Go dependencies cell
-      if [ -L .turnkey/godeps ]; then
-        if [ "$(readlink .turnkey/godeps)" != "${cfg.godeps}" ]; then
-          ln -sfn "${cfg.godeps}" .turnkey/godeps
-          echo "turnkey: Updated godeps cell symlink"
-        fi
-      elif [ -e .turnkey/godeps ]; then
-        echo "turnkey: Warning: .turnkey/godeps exists and is not a symlink"
-      else
-        ln -s "${cfg.godeps}" .turnkey/godeps
-        echo "turnkey: Created godeps cell symlink"
-      fi
-      ''}
+      # Create symlinks for all Nix-backed cells
+      ${nixCellsSymlinkScript}
 
       # Auto-generate or check staleness of go-deps.toml
       _go_deps_file="${cfg.goDepsFile}"
@@ -459,7 +508,7 @@ in
       echo "Buck2 configured by turnkey"
       echo "  Toolchains: ${lib.concatStringsSep ", " finalToolchains}"
       echo "  Runtime deps: ${lib.concatStringsSep ", " runtimeDeps}"
-      ${lib.optionalString hasGodeps ''echo "  Go deps: ${cfg.godeps}"''}
+      ${nixCellsInfo}
       echo "  Cell: $TURNKEY_BUCK2_TOOLCHAINS_CELL"
     '';
 
