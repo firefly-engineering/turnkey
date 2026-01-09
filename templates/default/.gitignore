@@ -1,0 +1,12 @@
+# Turnkey managed files (symlinks to Nix store)
+.buckconfig
+.turnkey/
+
+# Buck2 build outputs
+buck-out/
+
+# direnv
+.direnv/
+
+# devenv
+.devenv/

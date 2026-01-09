@@ -152,12 +152,23 @@ ${generateTargets finalToolchains}
     if cfg.prelude.strategy == "bundled" then ''
       [external_cells]
           prelude = bundled
-    '' else "";
+    ''
+    else if cfg.prelude.strategy == "git" then ''
+      [external_cells]
+          prelude = git
+
+      [external_cell_prelude]
+          git_origin = ${cfg.prelude.gitOrigin}
+          commit_hash = ${cfg.prelude.commitHash}
+    ''
+    else ""; # path and nix strategies use cells section directly
 
   # Prelude path in cells section
   preludeCellPath =
     if cfg.prelude.strategy == "bundled" then "prelude"
-    else cfg.prelude.path;
+    else if cfg.prelude.strategy == "git" then "prelude"  # git uses external_cells
+    else if cfg.prelude.strategy == "nix" then ".turnkey/prelude"  # symlinked derivation
+    else cfg.prelude.path;  # path strategy uses direct path
 
   # Toolchains cell is accessed via a symlink at .turnkey/toolchains
   toolchainsCellPath = ".turnkey/toolchains";
@@ -177,7 +188,7 @@ ${generateTargets finalToolchains}
   #   - Symlink creation in enterShell
   # ==========================================================================
 
-  nixCells = lib.filterAttrs (_: cell: cell.derivation != null) {
+  nixCells = lib.filterAttrs (_: cell: cell.derivation != null) ({
     godeps = {
       name = "godeps";
       path = ".turnkey/godeps";
@@ -191,7 +202,15 @@ ${generateTargets finalToolchains}
     #   derivation = cfg.rustdeps;
     #   description = "Rust deps";
     # };
-  };
+  } // lib.optionalAttrs (cfg.prelude.strategy == "nix") {
+    # Prelude cell (only when using nix strategy)
+    prelude = {
+      name = "prelude";
+      path = ".turnkey/prelude";
+      derivation = cfg.prelude.path;
+      description = "Prelude";
+    };
+  });
 
   # Generate [cells] config entries for all Nix-backed cells
   nixCellsConfig = lib.concatStringsSep "\n" (
@@ -424,6 +443,12 @@ in
       else
         ln -s "${buckconfig}" .buckconfig
         echo "turnkey: Created .buckconfig symlink"
+      fi
+
+      # Ensure .buckroot exists (marks project boundary for Buck2)
+      if [ ! -e .buckroot ]; then
+        touch .buckroot
+        echo "turnkey: Created .buckroot file"
       fi
 
       # Ensure .turnkey/toolchains points to the generated toolchains cell

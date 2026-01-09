@@ -1,0 +1,11 @@
+# Turnkey toolchain declaration
+# Add toolchains you need for your project
+
+[toolchains]
+# Go toolchain for Buck2 Go builds
+go = {}
+
+# Uncomment to add more toolchains:
+# rust = {}
+# python = {}
+# cxx = {}

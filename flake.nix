@@ -43,6 +43,14 @@
         turnkey = ./nix/devenv/turnkey;
       };
 
+      # Flake templates for project initialization
+      flake.templates = {
+        default = {
+          path = ./templates/default;
+          description = "Buck2 project with turnkey toolchain management";
+        };
+      };
+
       # Use the module ourselves as a working example
       imports = [
         inputs.devenv.flakeModule
