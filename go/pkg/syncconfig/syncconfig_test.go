@@ -41,8 +41,8 @@ enabled = false
 	if cfg.Deps[0].Target != "go-deps.toml" {
 		t.Errorf("expected target 'go-deps.toml', got %q", cfg.Deps[0].Target)
 	}
-	if len(cfg.Deps[0].Generator) != 4 {
-		t.Errorf("expected 4 generator args, got %d", len(cfg.Deps[0].Generator))
+	if len(cfg.Deps[0].Generator) != 5 {
+		t.Errorf("expected 5 generator args, got %d", len(cfg.Deps[0].Generator))
 	}
 	if !cfg.Deps[0].IsEnabled() {
 		t.Error("expected first rule to be enabled")
