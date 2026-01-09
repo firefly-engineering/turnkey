@@ -1,6 +1,18 @@
+diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -56,6 +56,7 @@ func main() {
+
+ 	wg := sync.WaitGroup{}
+ 	for _, p := range cfg.Platforms {
++		p := p // Capture loop variable to avoid closure race condition
+ 		wg.Add(1)
+ 		go func() {
+ 			defer wg.Done()
+diff --git a/render.go b/render.go
 --- a/render.go
 +++ b/render.go
-@@ -101,9 +101,10 @@ func renderBuckFiles(cfg *Config, thirdPartyDir string, buckTargets BuckTargets)
+@@ -101,6 +101,7 @@ func renderBuckFiles(cfg *Config, thirdPartyDir string, buckTargets BuckTargets)
  	wg := sync.WaitGroup{}
  	sem := make(chan struct{}, 50) // limit IO concurrency to some reasonable number
  	for _, target := range buckTargets {
@@ -8,6 +20,3 @@
  		wg.Add(1)
  		go func() {
  			defer wg.Done()
-
- 			target.Normalise(len(cfg.Platforms))
-
