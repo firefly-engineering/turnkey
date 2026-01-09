@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/firefly-engineering/turnkey/pkg/godeps"
+	"github.com/firefly-engineering/turnkey/go/pkg/godeps"
 )
 
 func main() {

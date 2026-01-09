@@ -13,7 +13,7 @@ pkgs.buildGoModule {
 
   # Monorepo: use repo root as source, select subpackage
   src = ../..;
-  subPackages = [ "tools/godeps-gen" ];
+  subPackages = [ "cmd/godeps-gen" ];
 
   # Hash of vendored dependencies (golang.org/x/mod)
   # To update: run `nix build` and copy the expected hash from error
