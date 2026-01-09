@@ -463,7 +463,7 @@ in
     '';
 
     # Pre-commit hook for automatic go-deps.toml regeneration
-    pre-commit.hooks = lib.mkIf (hasGodeps && cfg.autoRegenerate) {
+    git-hooks.hooks = lib.mkIf (hasGodeps && cfg.autoRegenerate) {
       godeps-gen = {
         enable = true;
         name = "godeps-gen";
