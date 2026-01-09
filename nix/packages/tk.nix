@@ -33,6 +33,17 @@ pkgs.buildGoModule {
 
   vendorHash = "sha256-6JdnoCmu3KvG3pNbzMS2Xo0igMAcIZjpeA0S8a4MPWY=";
 
+  # buck2 is needed at build time to generate shell completions
+  nativeBuildInputs = [ pkgs.buck2 pkgs.installShellFiles ];
+
+  postInstall = ''
+    # Generate and install shell completions
+    installShellCompletion --cmd tk \
+      --bash <($out/bin/tk completion bash) \
+      --zsh <($out/bin/tk completion zsh) \
+      --fish <($out/bin/tk completion fish)
+  '';
+
   meta = {
     description = "Turnkey CLI wrapper for buck2 with auto-sync";
     homepage = "https://github.com/firefly-engineering/turnkey";
