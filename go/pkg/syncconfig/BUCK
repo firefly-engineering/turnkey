@@ -1,0 +1,15 @@
+# Sync configuration management for tk
+load("@prelude//:rules.bzl", "go_library", "go_test")
+
+go_library(
+    name = "syncconfig",
+    srcs = ["syncconfig.go"],
+    deps = ["@godeps//github.com/pelletier/go-toml/v2:go-toml"],
+    visibility = ["PUBLIC"],
+)
+
+go_test(
+    name = "syncconfig_test",
+    srcs = ["syncconfig_test.go"],
+    target_under_test = ":syncconfig",
+)
