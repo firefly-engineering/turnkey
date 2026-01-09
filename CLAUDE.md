@@ -248,6 +248,91 @@ pkgs.buildGoModule {
 3. **Buck2 alignment** - Matches Buck2's cell-based monorepo model
 4. **Dogfooding** - Tools can depend on library code in the same repo
 
+## Importing External Software
+
+When incorporating external tools that need modifications, **never duplicate source code locally**. Instead, use Nix to fetch from upstream and apply patches.
+
+### Directory Structure
+
+```
+nix/
+├── packages/
+│   └── gobuckify.nix      # Package definition (fetches + patches)
+└── patches/
+    └── gobuckify/         # One directory per patched software
+        └── use-go-directly.patch
+```
+
+### Pattern: Fetch and Patch
+
+```nix
+{ pkgs, lib }:
+
+let
+  # Pin to specific commit for reproducibility
+  version = "2025-01-01";
+  rev = "abc123...";
+  hash = "sha256-...";
+
+  src = pkgs.fetchFromGitHub {
+    owner = "upstream-org";
+    repo = "upstream-repo";
+    inherit rev hash;
+    # Optional: fetch only needed subdirectory
+    sparseCheckout = [ "path/to/tool" ];
+  };
+
+in
+pkgs.buildGoModule {  # or stdenv.mkDerivation, etc.
+  pname = "tool-name";
+  inherit version src;
+  sourceRoot = "${src.name}/path/to/tool";
+
+  patches = [
+    ../patches/tool-name/my-modification.patch
+  ];
+
+  # ... rest of build config
+}
+```
+
+### Key Principles
+
+1. **Upstream is source of truth** - We only maintain patches, not copies
+2. **Pin versions explicitly** - Use specific commits/tags, not branches
+3. **Document patches** - Each patch file should explain what it changes and why
+4. **Organize by software** - `nix/patches/<software-name>/<patch-name>.patch`
+5. **Minimal patches** - Only change what's necessary, avoid unrelated modifications
+
+### Creating Patches
+
+```bash
+# Clone upstream, make changes, generate patch
+git clone https://github.com/upstream/repo
+cd repo
+# ... make your changes ...
+git diff > /path/to/turnkey/nix/patches/tool-name/description.patch
+```
+
+### Example: gobuckify
+
+gobuckify is fetched from facebook/buck2 and patched to use `go` directly:
+
+```nix
+# nix/packages/gobuckify.nix
+src = pkgs.fetchFromGitHub {
+  owner = "facebook";
+  repo = "buck2";
+  rev = "54ad016...";
+  hash = "sha256-...";
+  sparseCheckout = [ "prelude/go/tools/gobuckify" ];
+};
+
+patches = [ ../patches/gobuckify/use-go-directly.patch ];
+```
+
+The patch modifies one function to use `$GO_BINARY` or `go` instead of `buck2 run`.
+
 ## Development Workflows
 
 ### Git Workflow

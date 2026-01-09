@@ -1,0 +1,18 @@
+--- a/golist.go
++++ b/golist.go
+@@ -38,8 +38,14 @@
+ 	go func() {
+ 		defer close(pkgChan)
+ 		defer close(errChan)
++		// Use GO_BINARY env var if set, otherwise default to "go"
++		// This allows running in Nix derivations where buck2 isn't available
++		goBinary := os.Getenv("GO_BINARY")
++		if goBinary == "" {
++			goBinary = "go"
++		}
+ 		cmdArgs := slices.Concat(
+-			[]string{"buck2", "run", "toolchains//:go[go]", "--", "list", "-C", workDir, "-e", "-json=Name,ImportPath,Imports,EmbedFiles,Standard,Module"},
++			[]string{goBinary, "list", "-C", workDir, "-e", "-json=Name,ImportPath,Imports,EmbedFiles,Standard,Module"},
+ 			extraArgs,
+ 			[]string{"all"},
+ 		)

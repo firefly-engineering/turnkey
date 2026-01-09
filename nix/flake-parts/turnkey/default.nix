@@ -161,12 +161,15 @@ in
       defaultRegistry = import ../../registry { inherit pkgs lib; };
       registry = if cfg.registry == { } then defaultRegistry else cfg.registry;
 
+      # Build gobuckify for generating BUCK files
+      gobuckify = import ../../packages/gobuckify.nix { inherit pkgs lib; };
+
       # Build godeps cell from goDepsFile if specified and exists
       # The file may not exist on first run (before .envrc generates it)
       godepsCell =
         if cfg.buck2.goDepsFile != null && builtins.pathExists cfg.buck2.goDepsFile then
           import ../../buck2/go-deps-cell.nix {
-            inherit pkgs lib;
+            inherit pkgs lib gobuckify;
             depsFile = cfg.buck2.goDepsFile;
           }
         else

@@ -65,8 +65,9 @@
           ...
         }:
         {
-          # Export godeps-gen as a package
+          # Export tools as packages
           packages.godeps-gen = import ./nix/packages/godeps-gen.nix { inherit pkgs lib; };
+          packages.gobuckify = import ./nix/packages/gobuckify.nix { inherit pkgs lib; };
 
           # Configure turnkey to use our local toolchain files
           # Each file creates a corresponding shell
@@ -90,6 +91,7 @@
               clang = pkgs.clang;
               # Internal tools
               godeps-gen = config.packages.godeps-gen;
+              gobuckify = config.packages.gobuckify;
             };
             # Enable Buck2 toolchain generation
             buck2 = {
