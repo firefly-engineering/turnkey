@@ -20,6 +20,7 @@ func main() {
 	goModPath := flag.String("go-mod", "go.mod", "path to go.mod file")
 	goSumPath := flag.String("go-sum", "go.sum", "path to go.sum file")
 	prefetch := flag.Bool("prefetch", false, "fetch Nix hashes using nix-prefetch-github (requires nix)")
+	vendorHash := flag.Bool("vendor-hash", false, "compute vendorHash for buildGoModule (requires go and nix)")
 	includeIndirect := flag.Bool("indirect", true, "include indirect (transitive) dependencies")
 	flag.Parse()
 
@@ -62,8 +63,18 @@ func main() {
 		})
 	}
 
-	// Output TOML
+	// Compute vendorHash if requested
 	outputOpts := godeps.DefaultOutputOptions()
+	if *vendorHash {
+		hash, err := godeps.ComputeVendorHash(*goModPath, *goSumPath, os.Stderr)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error computing vendorHash: %v\n", err)
+			os.Exit(1)
+		}
+		outputOpts.Meta = &godeps.Meta{VendorHash: hash}
+	}
+
+	// Output TOML
 	if err := godeps.WriteTOML(os.Stdout, deps, outputOpts); err != nil {
 		fmt.Fprintf(os.Stderr, "error writing output: %v\n", err)
 		os.Exit(1)

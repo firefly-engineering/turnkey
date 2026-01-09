@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -336,4 +338,82 @@ func PrefetchAll(deps []Dependency, p Prefetcher, errHandler func(dep Dependency
 		}
 		deps[i].NixHash = hash
 	}
+}
+
+// ComputeVendorHash computes the vendorHash for buildGoModule by:
+// 1. Running `go mod vendor` in the project directory
+// 2. Computing the NAR hash of the vendor directory using `nix hash path`
+// 3. Cleaning up the vendor directory
+//
+// This matches exactly what buildGoModule does internally.
+// The goModPath should point to the go.mod file in the project root.
+func ComputeVendorHash(goModPath, goSumPath string, logger io.Writer) (string, error) {
+	// Get the project directory (where go.mod is)
+	projectDir := filepath.Dir(goModPath)
+	if projectDir == "" || projectDir == "." {
+		var err error
+		projectDir, err = os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("failed to get working directory: %w", err)
+		}
+	}
+
+	absProjectDir, err := filepath.Abs(projectDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	vendorDir := filepath.Join(absProjectDir, "vendor")
+
+	// Check if vendor directory already exists
+	vendorExisted := false
+	if _, err := os.Stat(vendorDir); err == nil {
+		vendorExisted = true
+	}
+
+	if logger != nil {
+		fmt.Fprintln(logger, "vendoring Go modules...")
+	}
+
+	// Run `go mod vendor` in the project directory
+	cmd := exec.Command("go", "mod", "vendor")
+	cmd.Dir = absProjectDir
+	cmd.Env = append(os.Environ(),
+		"GOPROXY=https://proxy.golang.org,direct",
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return "", fmt.Errorf("go mod vendor failed: %w\n%s", err, output)
+	}
+
+	if logger != nil {
+		fmt.Fprintln(logger, "computing NAR hash...")
+	}
+
+	// Compute the NAR hash using `nix hash path`
+	cmd = exec.Command("nix", "hash", "path", "--sri", vendorDir)
+	output, err := cmd.Output()
+	if err != nil {
+		// Clean up vendor dir before returning error
+		if !vendorExisted {
+			os.RemoveAll(vendorDir)
+		}
+		return "", fmt.Errorf("nix hash path failed: %w", err)
+	}
+
+	hash := strings.TrimSpace(string(output))
+
+	// Clean up vendor directory if it didn't exist before
+	if !vendorExisted {
+		if err := os.RemoveAll(vendorDir); err != nil {
+			if logger != nil {
+				fmt.Fprintf(logger, "warning: failed to remove vendor directory: %v\n", err)
+			}
+		}
+	}
+
+	if logger != nil {
+		fmt.Fprintf(logger, "vendorHash: %s\n", hash)
+	}
+
+	return hash, nil
 }

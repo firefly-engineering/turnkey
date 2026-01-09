@@ -20,6 +20,13 @@ type Dependency struct {
 	NixHash string
 }
 
+// Meta contains metadata for the go-deps.toml file.
+type Meta struct {
+	// VendorHash is the combined hash of all dependencies for buildGoModule.
+	// This is computed by `go mod download` + `nix hash path`.
+	VendorHash string
+}
+
 // ParseOptions configures the behavior of ParseGoMod.
 type ParseOptions struct {
 	// IncludeIndirect controls whether indirect dependencies are included.
