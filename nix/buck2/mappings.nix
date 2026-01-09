@@ -112,6 +112,27 @@
     implicitDependencies = [ ];
   };
 
+  # test toolchain is needed for go_test, rust_test, python_test etc.
+  test = {
+    skip = false;
+    alwaysInclude = true;
+    targets = [
+      {
+        name = "test";
+        rule = "noop_test_toolchain";
+        load = "@prelude//tests:test_toolchain.bzl";
+        visibility = [ "PUBLIC" ];
+      }
+      {
+        name = "remote_test_execution";
+        rule = "remote_test_execution_toolchain";
+        load = "@prelude//toolchains:remote_test_execution.bzl";
+        visibility = [ "PUBLIC" ];
+      }
+    ];
+    implicitDependencies = [ ];
+  };
+
   # ==========================================================================
   # Non-Buck2 Tools (skipped)
   # ==========================================================================
