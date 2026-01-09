@@ -3,6 +3,7 @@ load("@prelude//:rules.bzl", "go_library", "go_test")
 
 go_library(
     name = "syncconfig",
+    package_name = "github.com/firefly-engineering/turnkey/go/pkg/syncconfig",
     srcs = ["syncconfig.go"],
     deps = ["@godeps//vendor/github.com/pelletier/go-toml/v2:v2"],
     visibility = ["PUBLIC"],
