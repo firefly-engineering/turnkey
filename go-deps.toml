@@ -4,15 +4,13 @@
 # Meta section for Nix buildGoModule
 [meta]
 # Combined hash for all dependencies (used by buildGoModule)
-# To update: run `nix build .#godeps-gen 2>&1 | grep 'got:'`
 vendorHash = "sha256-qzjcuSUg5mPONQZnxz1kltrEhwtkwljCTEssULMAa78="
 
-#
 # IMPORTANT: Nix hashes must be obtained separately.
 # Run with --prefetch to automatically fetch hashes, or manually run:
 # nix-prefetch-github --owner OWNER --repo REPO --rev VERSION
 #
-# To regenerate: godeps-gen --go-mod go.mod --go-sum go.sum --prefetch > go-deps.toml
+# To regenerate: godeps-gen --go-mod go.mod --go-sum go.sum --vendor-hash > go-deps.toml
 
 [deps."github.com/google/uuid"]
 version = "v1.6.0"
