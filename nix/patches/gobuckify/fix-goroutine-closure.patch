@@ -1,0 +1,13 @@
+--- a/render.go
++++ b/render.go
+@@ -101,9 +101,10 @@ func renderBuckFiles(cfg *Config, thirdPartyDir string, buckTargets BuckTargets)
+ 	wg := sync.WaitGroup{}
+ 	sem := make(chan struct{}, 50) // limit IO concurrency to some reasonable number
+ 	for _, target := range buckTargets {
++		target := target // Capture loop variable to avoid race condition
+ 		wg.Add(1)
+ 		go func() {
+ 			defer wg.Done()
+
+ 			target.Normalise(len(cfg.Platforms))
+
