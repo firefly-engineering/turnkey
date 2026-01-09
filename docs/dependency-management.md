@@ -161,13 +161,16 @@ godeps-gen --prefetch > go-deps.toml
 # The .turnkey/godeps symlink will point to new store path
 ```
 
-## Bootstrap Considerations
+## Building Tools vs Dependency Cells
 
-Tools like `godeps-gen` themselves have dependencies. For these bootstrap tools:
+There's an important distinction between:
 
-1. Dependencies are hardcoded in the Nix package definition
-2. Each dependency is fetched individually (same per-module pattern)
-3. A vendor directory is assembled ephemerally during the Nix build
-4. The tool is built with `go build -mod=vendor`
+1. **Building tools** (like `godeps-gen`) - Use standard `buildGoModule` with `vendorHash`
+2. **Dependency cells** (like `go-deps-cell.nix`) - Use per-module fetching
 
-This vendor directory only exists during the Nix build - it's never committed to the repo.
+For tools, `buildGoModule` is the standard Nix pattern. The vendoring happens ephemerally in the Nix build (not in-repo), and the `vendorHash` is deterministic for a given go.mod/go.sum. To get the hash, let the build fail once and copy the expected value.
+
+For dependency cells consumed by Buck2, we use per-module fetching because:
+- Buck2 needs to reference individual modules as targets
+- Each module's hash should be independently verifiable
+- The cell structure must match Buck2's expectations

@@ -227,22 +227,18 @@ go run ./tools/godeps-gen --help
 
 ### Nix Packaging Considerations
 
-For Go tools in this repo, we use **per-module fetching** instead of `buildGoModule` with `vendorHash`. See `docs/dependency-management.md` for the rationale.
+For Go tools, use standard `buildGoModule` with `vendorHash`:
 
 ```nix
-# Each dependency fetched individually
-deps = {
-  "github.com/foo/bar" = {
-    version = "v1.0.0";
-    hash = "sha256-...";  # Hash of this module's source
-  };
-};
-
-# Assembled into vendor dir during build
-pkgs.stdenv.mkDerivation {
-  # ... fetch deps, create vendor/, build with -mod=vendor
+pkgs.buildGoModule {
+  pname = "godeps-gen";
+  src = ./.;  # Repo root
+  subPackages = [ "cmd/godeps-gen" ];
+  vendorHash = "sha256-...";  # Let build fail once to get this
 }
 ```
+
+For **dependency cells** (consumed by Buck2), use per-module fetching - see `docs/dependency-management.md`.
 
 ### Why Monorepo?
 
