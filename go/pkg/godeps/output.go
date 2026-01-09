@@ -15,9 +15,6 @@ type OutputOptions struct {
 
 	// IncludeRegenerateHint adds the regeneration command hint.
 	IncludeRegenerateHint bool
-
-	// Meta contains optional metadata like vendorHash.
-	Meta *Meta
 }
 
 // DefaultOutputOptions returns the default output options.
@@ -47,15 +44,6 @@ func WriteTOML(w io.Writer, deps []Dependency, opts OutputOptions) error {
 		fmt.Fprintln(w, "#")
 	}
 
-	// Write meta section if provided
-	if opts.Meta != nil && opts.Meta.VendorHash != "" {
-		fmt.Fprintln(w, "# Meta section for Nix buildGoModule")
-		fmt.Fprintln(w, "[meta]")
-		fmt.Fprintln(w, "# Combined hash for all dependencies (used by buildGoModule)")
-		fmt.Fprintf(w, "vendorHash = \"%s\"\n", opts.Meta.VendorHash)
-		fmt.Fprintln(w)
-	}
-
 	if opts.IncludeHashWarning && hasMissingHashes {
 		fmt.Fprintln(w, "# IMPORTANT: Nix hashes must be obtained separately.")
 		fmt.Fprintln(w, "# Run with --prefetch to automatically fetch hashes, or manually run:")
@@ -64,7 +52,7 @@ func WriteTOML(w io.Writer, deps []Dependency, opts OutputOptions) error {
 	}
 
 	if opts.IncludeRegenerateHint {
-		fmt.Fprintln(w, "# To regenerate: godeps-gen --go-mod go.mod --go-sum go.sum --vendor-hash > go-deps.toml")
+		fmt.Fprintln(w, "# To regenerate: godeps-gen --prefetch > go-deps.toml")
 		fmt.Fprintln(w)
 	}
 
