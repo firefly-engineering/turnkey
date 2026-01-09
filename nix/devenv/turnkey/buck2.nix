@@ -187,7 +187,7 @@ ${generateTargets finalToolchains}
 
     ${externalCellsSection}
     [parser]
-        target_platform_detector_spec = target:root//...->prelude//platforms:default
+        target_platform_detector_spec = target:root//...->prelude//platforms:default target:toolchains//...->prelude//platforms:default
 
     [buildfile]
         name = BUCK
