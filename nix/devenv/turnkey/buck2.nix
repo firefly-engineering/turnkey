@@ -436,6 +436,48 @@ in
         Requires godeps-gen to be available in PATH (add to registry or packages).
       '';
     };
+
+    tk = {
+      aliasBuck2 = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Alias buck2 to tk in the devenv shell.
+          This allows users to continue using `buck2 build` etc. while
+          getting automatic sync before build-graph-reading commands.
+
+          Set TURNKEY_NO_ALIAS=1 in your environment to bypass the alias
+          and use raw buck2 directly (useful for debugging).
+        '';
+      };
+
+      syncOnShellEntry = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Run `tk sync` automatically when entering the devenv shell.
+          This ensures the workspace is always in sync when starting development.
+
+          The sync is fast when nothing is stale (just timestamp checks).
+          Output is only shown if something needs to be regenerated.
+
+          Requires tk to be available in PATH (add 'tk' to your toolchain.toml).
+        '';
+      };
+
+      preCommitCheck = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Add a pre-commit hook that runs `tk check` before commits.
+          Prevents committing when BUCK files or deps are out of sync.
+
+          On failure, suggests running `tk sync` to fix.
+
+          Requires tk to be available in PATH (add 'tk' to your toolchain.toml).
+        '';
+      };
+    };
   };
 
   config = lib.mkIf (cfg.enable && turnkeyCfg.enable) {
@@ -568,11 +610,31 @@ in
       echo "  Runtime deps: ${lib.concatStringsSep ", " runtimeDeps}"
       ${nixCellsInfo}
       echo "  Cell: $TURNKEY_BUCK2_TOOLCHAINS_CELL"
+
+      # tk sync on shell entry (if enabled and tk is available)
+      ${lib.optionalString cfg.tk.syncOnShellEntry ''
+        if command -v tk >/dev/null 2>&1; then
+          # Run tk sync - it will output only if something was synced
+          tk sync || echo "turnkey: tk sync failed (continuing anyway)"
+        fi
+      ''}
+
+      # buck2 alias to tk (if enabled)
+      # Users can set TURNKEY_NO_ALIAS=1 to bypass the alias
+      ${lib.optionalString cfg.tk.aliasBuck2 ''
+        if [ -z "''${TURNKEY_NO_ALIAS:-}" ]; then
+          if command -v tk >/dev/null 2>&1; then
+            alias buck2='tk'
+            echo "turnkey: buck2 is aliased to tk (set TURNKEY_NO_ALIAS=1 to disable)"
+          fi
+        fi
+      ''}
     '';
 
-    # Pre-commit hook for automatic go-deps.toml regeneration
-    git-hooks.hooks = lib.mkIf (hasGodeps && cfg.autoRegenerate) {
-      godeps-gen = {
+    # Pre-commit hooks
+    git-hooks.hooks = {
+      # Automatic go-deps.toml regeneration
+      godeps-gen = lib.mkIf (hasGodeps && cfg.autoRegenerate) {
         enable = true;
         name = "godeps-gen";
         description = "Regenerate go-deps.toml when go.mod or go.sum changes";
@@ -586,6 +648,29 @@ in
               git add "${cfg.goDepsFile}"
             else
               echo "Warning: godeps-gen not found in PATH, skipping regeneration"
+            fi
+          '
+        '';
+      };
+
+      # tk check - verify BUCK files and deps are in sync
+      turnkey-check = lib.mkIf cfg.tk.preCommitCheck {
+        enable = true;
+        name = "turnkey-check";
+        description = "Check that BUCK files and deps are in sync";
+        # Run on any file change - tk check uses its own staleness detection
+        always_run = true;
+        pass_filenames = false;
+        entry = ''
+          sh -c '
+            if command -v tk >/dev/null 2>&1; then
+              tk check || {
+                echo ""
+                echo "Files out of sync. Run: tk sync"
+                exit 1
+              }
+            else
+              echo "Warning: tk not found in PATH, skipping sync check"
             fi
           '
         '';

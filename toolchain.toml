@@ -22,3 +22,4 @@ beads = {}
 beads_viewer = {}
 jj = {}
 godeps-gen = {}  # Tool for generating go-deps.toml from go.mod/go.sum
+tk = {}          # Turnkey CLI wrapper for buck2 with auto-sync
