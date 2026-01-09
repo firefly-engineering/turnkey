@@ -226,6 +226,14 @@ ${generateTargets finalToolchains}
     lib.mapAttrsToList (_: cell: ''echo "  ${cell.description}: ${cell.derivation}"'') nixCells
   );
 
+  # Generate env vars for all Nix-backed cells (for .envrc symlink sync)
+  # Format: TURNKEY_CELL_<NAME> = "<path>:<derivation>"
+  nixCellsEnvVars = lib.mapAttrs' (_: cell:
+    lib.nameValuePair
+      "TURNKEY_CELL_${lib.toUpper cell.name}"
+      "${cell.path}:${cell.derivation}"
+  ) nixCells;
+
   # For backward compatibility
   hasGodeps = cfg.godeps != null;
 
@@ -396,7 +404,7 @@ in
       TURNKEY_BUCK2_CONFIG = "${buckconfig}";
       TURNKEY_BUCK2_TOOLCHAINS = lib.concatStringsSep "," finalToolchains;
       TURNKEY_BUCK2_RUNTIME_DEPS = lib.concatStringsSep "," runtimeDeps;
-    };
+    } // nixCellsEnvVars;
 
     # Create symlinks on shell entry
     enterShell = ''
