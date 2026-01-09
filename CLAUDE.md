@@ -227,17 +227,20 @@ go run ./tools/godeps-gen --help
 
 ### Nix Packaging Considerations
 
-When packaging Go tools with Nix's `buildGoModule`:
-- Point `src` to the repo root (not the tool subdirectory)
-- Use `subPackages` to specify which package to build
-- The `vendorHash` covers all dependencies in root go.mod
+For Go tools in this repo, we use **per-module fetching** instead of `buildGoModule` with `vendorHash`. See `docs/dependency-management.md` for the rationale.
 
 ```nix
-pkgs.buildGoModule {
-  pname = "godeps-gen";
-  src = ./.;  # Repo root
-  subPackages = [ "tools/godeps-gen" ];
-  vendorHash = "sha256-...";  # Hash of all go.mod deps
+# Each dependency fetched individually
+deps = {
+  "github.com/foo/bar" = {
+    version = "v1.0.0";
+    hash = "sha256-...";  # Hash of this module's source
+  };
+};
+
+# Assembled into vendor dir during build
+pkgs.stdenv.mkDerivation {
+  # ... fetch deps, create vendor/, build with -mod=vendor
 }
 ```
 
@@ -528,6 +531,7 @@ When adding functionality, ensure it works across all platforms.
 2. **Self-usage is the primary test** - The `flake.nix` uses itself as an example
 3. **Simplicity is a feature** - Don't over-engineer solutions
 4. **Buck2 integration is a key use case** - But the design is generic
+5. **Dependencies live in Nix, not the repo** - See `docs/dependency-management.md` for the core principles. Never vendor in-repo, always use per-module fetching with deterministic hashes.
 
 ### When Making Changes
 1. **Preserve the layered architecture** - Don't blur the lines between modules
@@ -567,6 +571,7 @@ When adding functionality, ensure it works across all platforms.
 
 ## Related Resources
 
+- **Dependency Management**: See `docs/dependency-management.md` for core principles on how dependencies flow from language-native declarations through Nix to Buck2 cells. **Read this before working on any dependency-related code.**
 - **Buck2 Cell Resolution**: See `docs/buck2_cell_resolution.md` for deep dive
 - **flake-parts**: https://flake.parts/
 - **devenv**: https://devenv.sh/
