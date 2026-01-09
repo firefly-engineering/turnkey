@@ -5,7 +5,7 @@
 [meta]
 # Combined hash for all dependencies (used by buildGoModule)
 # To update: run `nix build .#godeps-gen 2>&1 | grep 'got:'`
-vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+vendorHash = "sha256-qzjcuSUg5mPONQZnxz1kltrEhwtkwljCTEssULMAa78="
 
 #
 # IMPORTANT: Nix hashes must be obtained separately.
