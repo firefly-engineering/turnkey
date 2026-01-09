@@ -11,5 +11,5 @@ go_library(
 go_test(
     name = "staleness_test",
     srcs = ["staleness_test.go"],
-    deps = [":staleness"],
+    target_under_test = ":staleness",
 )
