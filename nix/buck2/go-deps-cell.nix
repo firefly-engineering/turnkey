@@ -122,6 +122,10 @@ let
       go_library_rule = "go_library";
       deps_target_label_prefix = "godeps//vendor/";
       deps_attr = "deps";
+      # Constraint prefixes for platform-specific select() statements
+      # These must match the constraint targets defined in the prelude
+      os_constraint_prefix = "config//os:";
+      arch_constraint_prefix = "config//cpu:";
     };
     platforms = [
       { go_os = "linux"; go_arch = "amd64"; buck_os = "linux"; buck_arch = "x86_64"; }
