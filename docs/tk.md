@@ -75,6 +75,31 @@ tk sync --dry-run    # show what would be synced without doing it
 - Reports number of files synced when files are regenerated
 - Shows errors if sync fails
 
+### tk completion
+
+Generate shell completion scripts for bash, zsh, or fish.
+
+```bash
+tk completion bash    # output bash completion script
+tk completion zsh     # output zsh completion script
+tk completion fish    # output fish completion script
+```
+
+**Enable completions:**
+
+```bash
+# Bash (add to ~/.bashrc)
+eval "$(tk completion bash)"
+
+# Zsh (add to ~/.zshrc)
+eval "$(tk completion zsh)"
+
+# Fish (run once)
+tk completion fish > ~/.config/fish/completions/tk.fish
+```
+
+The completion scripts are based on buck2's completions with tk-specific additions for `sync`, `check`, `--no-sync`, and `--dry-run`.
+
 ### tk check
 
 Check if any files are stale without regenerating them. Useful for CI validation.
