@@ -1,0 +1,22 @@
+# TypeScript example
+#
+# Note: Buck2 bundled prelude lacks native TypeScript toolchain.
+# This uses genrule to compile TS → JS, then runs with node.
+# Requires nodejs in PATH (provided via turnkey registry).
+
+load("@prelude//:rules.bzl", "genrule", "command_alias")
+
+# Compile TypeScript to JavaScript
+genrule(
+    name = "compile",
+    srcs = ["hello.ts"],
+    out = "hello.js",
+    cmd = "tsc $(location :hello.ts) --outFile $OUT --target ES2020",
+    visibility = ["PUBLIC"],
+)
+
+# Note: To run this, use:
+#   buck2 build //examples/typescript-hello:compile
+#   node buck-out/v2/gen/root/.../examples/typescript-hello/__compile__/hello.js
+#
+# A proper typescript_binary rule would need custom implementation.

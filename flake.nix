@@ -94,9 +94,14 @@
               jj = inputs.jj.packages.${system}.default;
               # Language toolchains for Buck2 integration
               go = pkgs.go;
+              rust = pkgs.rustc;
+              cargo = pkgs.cargo;
               python = pkgs.python3;
               cxx = pkgs.stdenv.cc;
               clang = pkgs.clang;
+              # JavaScript/TypeScript (no Buck2 toolchain, but available in shell for genrule)
+              nodejs = pkgs.nodejs;
+              typescript = pkgs.nodePackages.typescript;
               # Internal tools
               godeps-gen = config.packages.godeps-gen;
               gobuckify = config.packages.gobuckify;

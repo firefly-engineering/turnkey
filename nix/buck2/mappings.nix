@@ -63,6 +63,12 @@
         load = "@prelude//toolchains:python.bzl";
         visibility = [ "PUBLIC" ];
       }
+      {
+        name = "python";
+        rule = "system_python_toolchain";
+        load = "@prelude//toolchains:python.bzl";
+        visibility = [ "PUBLIC" ];
+      }
     ];
     implicitDependencies = [ ];
   };
@@ -141,5 +147,16 @@
   clang = {
     skip = true;
     reason = "C/C++ compiler, needed in PATH for Buck2 actions but not a toolchain rule";
+  };
+
+  # JavaScript/TypeScript - no Buck2 toolchain rule, used via genrule
+  nodejs = {
+    skip = true;
+    reason = "Node.js runtime, used for JS/TS builds via genrule but not a Buck2 toolchain rule";
+  };
+
+  typescript = {
+    skip = true;
+    reason = "TypeScript compiler, used for TS builds via genrule but not a Buck2 toolchain rule";
   };
 }

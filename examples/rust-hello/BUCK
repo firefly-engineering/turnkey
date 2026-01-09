@@ -1,0 +1,8 @@
+# Test to find rust rules
+load("@prelude//:rules.bzl", "rust_binary")
+
+rust_binary(
+    name = "hello",
+    srcs = ["main.rs"],
+    visibility = ["PUBLIC"],
+)

@@ -8,6 +8,12 @@ buck2 = {}
 # Language toolchains (used by Buck2)
 # Note: clang is automatically included via cxx's runtimeDependencies
 go = {}
+rust = {}
+python = {}
+
+# JavaScript/TypeScript (no Buck2 toolchain, but available for genrule builds)
+nodejs = {}
+typescript = {}
 
 # Development utilities (not Buck2 toolchains)
 nix = {}
