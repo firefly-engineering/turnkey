@@ -8,11 +8,23 @@
 # use per-module fetching as described in docs/dependency-management.md.
 { pkgs, lib }:
 
+let
+  fs = lib.fileset;
+  root = ../..;
+in
 pkgs.buildGoModule {
   pname = "godeps-gen";
   version = "0.1.0";
 
-  src = ../..;
+  src = fs.toSource {
+    inherit root;
+    fileset = fs.unions [
+      (root + "/go.mod")
+      (root + "/go.sum")
+      (root + "/cmd/godeps-gen")
+      (root + "/go/pkg/godeps")
+    ];
+  };
   subPackages = [ "cmd/godeps-gen" ];
 
   vendorHash = "sha256-qzjcuSUg5mPONQZnxz1kltrEhwtkwljCTEssULMAa78=";
