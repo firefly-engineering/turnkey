@@ -7,6 +7,19 @@
 # Wraps the binary with prefetcher tools (nix-prefetch-github, nix) in PATH.
 { pkgs, lib }:
 
+let
+  # Read vendorHash from go-deps.toml (data-driven, not hardcoded)
+  depsToml = builtins.fromTOML (builtins.readFile ../../go-deps.toml);
+  vendorHash = depsToml.meta.vendorHash or (throw ''
+    go-deps.toml is missing [meta] vendorHash field.
+    Add the following to go-deps.toml:
+
+    [meta]
+    vendorHash = "sha256-XXXX..."
+
+    To get the hash, run: nix build .#godeps-gen 2>&1 | grep 'got:'
+  '');
+in
 pkgs.buildGoModule {
   pname = "godeps-gen";
   version = "0.1.0";
@@ -15,9 +28,8 @@ pkgs.buildGoModule {
   src = ../..;
   subPackages = [ "cmd/godeps-gen" ];
 
-  # Hash of vendored dependencies
-  # To update: run `nix build` and copy the expected hash from error
-  vendorHash = lib.fakeHash;
+  # Hash from go-deps.toml [meta] section
+  inherit vendorHash;
 
   # For wrapping the binary with prefetcher tools
   nativeBuildInputs = [ pkgs.makeWrapper ];
