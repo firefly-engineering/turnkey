@@ -52,6 +52,8 @@
     ];
     # Rust needs CXX for linking and python for build scripts
     implicitDependencies = [ "cxx" "python" ];
+    # lld is needed in PATH for rustc to find it when using -fuse-ld=lld
+    runtimeDependencies = [ "lld" ];
   };
 
   python = {
@@ -168,6 +170,11 @@
   clang = {
     skip = true;
     reason = "C/C++ compiler, needed in PATH for Buck2 actions but not a toolchain rule";
+  };
+
+  lld = {
+    skip = true;
+    reason = "LLVM linker, needed in PATH for rustc linking but not a toolchain rule";
   };
 
   # Rust dependency tool

@@ -100,7 +100,9 @@
               reindeer = pkgs.reindeer;
               python = pkgs.python3;
               cxx = pkgs.stdenv.cc;
-              clang = pkgs.clang;
+              # Use clangUseLLVM which has lld integration for -fuse-ld=lld to work
+              clang = pkgs.llvmPackages.clangUseLLVM;
+              lld = pkgs.lld;
               # JavaScript/TypeScript (no Buck2 toolchain, but available in shell for genrule)
               nodejs = pkgs.nodejs;
               typescript = pkgs.nodePackages.typescript;
