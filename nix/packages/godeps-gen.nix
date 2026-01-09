@@ -15,9 +15,9 @@ pkgs.buildGoModule {
   src = ../..;
   subPackages = [ "cmd/godeps-gen" ];
 
-  # Hash of vendored dependencies (golang.org/x/mod)
+  # Hash of vendored dependencies
   # To update: run `nix build` and copy the expected hash from error
-  vendorHash = "sha256-n9TLT4c8V+I+uEg4MMUJvW451wpIYIfro2sZRtFe9ig=";
+  vendorHash = lib.fakeHash;
 
   # For wrapping the binary with prefetcher tools
   nativeBuildInputs = [ pkgs.makeWrapper ];
