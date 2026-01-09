@@ -75,11 +75,16 @@
         rule = "system_cxx_toolchain";
         load = "@prelude//toolchains:cxx.bzl";
         visibility = [ "PUBLIC" ];
+        # Dynamic attrs resolved at build time from registry
+        # Uses absolute paths so Buck2 can find compilers without PATH
+        dynamicAttrs = registry: {
+          compiler = "${registry.clang}/bin/clang";
+          cxx_compiler = "${registry.clang}/bin/clang++";
+          linker = "${registry.clang}/bin/clang++";
+        };
       }
     ];
     implicitDependencies = [ ];
-    # clang must be in PATH for Buck2 actions that use the cxx toolchain
-    runtimeDependencies = [ "clang" ];
   };
 
   # ==========================================================================

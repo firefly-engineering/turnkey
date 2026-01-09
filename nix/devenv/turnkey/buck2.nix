@@ -102,7 +102,13 @@ let
         map (
           t:
           let
-            attrs = t.attrs or { };
+            # Static attrs defined in the mapping
+            staticAttrs = t.attrs or { };
+            # Dynamic attrs resolved from registry (e.g., absolute paths to compilers)
+            dynamicAttrs =
+              if t ? dynamicAttrs then t.dynamicAttrs turnkeyCfg.registry else { };
+            # Merge: dynamic attrs override static attrs
+            attrs = staticAttrs // dynamicAttrs;
             attrLines =
               [ "    name = \"${t.name}\"," ]
               ++ [ "    visibility = ${builtins.toJSON t.visibility}," ]
