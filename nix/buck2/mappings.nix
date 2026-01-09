@@ -149,6 +149,12 @@
     reason = "C/C++ compiler, needed in PATH for Buck2 actions but not a toolchain rule";
   };
 
+  # Rust dependency tool
+  reindeer = {
+    skip = true;
+    reason = "Rust dependency generator, creates Buck2 targets from Cargo.toml but not a toolchain rule";
+  };
+
   # JavaScript/TypeScript - no Buck2 toolchain rule, used via genrule
   nodejs = {
     skip = true;

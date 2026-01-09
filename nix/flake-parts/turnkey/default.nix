@@ -142,6 +142,29 @@ in
               Requires godeps-gen to be available in PATH.
             '';
           };
+
+          # Rust dependencies
+          rustdeps = mkOption {
+            type = types.nullOr types.package;
+            default = null;
+            description = ''
+              Nix derivation containing the Rust dependencies cell.
+              When set, a 'rustdeps' cell will be added to .buckconfig
+              and symlinked to .turnkey/rustdeps.
+
+              Prefer using rustDepsFile instead for declarative configuration.
+            '';
+          };
+
+          rustDepsFile = mkOption {
+            type = types.nullOr types.path;
+            default = null;
+            example = lib.literalExpression "./rust-deps.toml";
+            description = ''
+              Path to rust-deps.toml file declaring Rust crate dependencies.
+              When set, turnkey will build the rustdeps cell automatically.
+            '';
+          };
         };
       };
     }
@@ -175,6 +198,16 @@ in
         else
           cfg.buck2.godeps;
 
+      # Build rustdeps cell from rustDepsFile if specified and exists
+      rustdepsCell =
+        if cfg.buck2.rustDepsFile != null && builtins.pathExists cfg.buck2.rustDepsFile then
+          import ../../buck2/rust-deps-cell.nix {
+            inherit pkgs lib;
+            depsFile = cfg.buck2.rustDepsFile;
+          }
+        else
+          cfg.buck2.rustdeps;
+
       # Create a shell configuration for each declaration file
       mkShellConfig = shellName: declarationFile: {
         imports = [ ../../devenv/turnkey ];
@@ -191,6 +224,7 @@ in
               path = cfg.buck2.prelude.path;
             };
             godeps = godepsCell;
+            rustdeps = rustdepsCell;
             # Pass through paths for staleness checking and regeneration
             # Extract filename from path for runtime staleness checking
             goDepsFile =
