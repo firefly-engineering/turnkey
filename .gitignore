@@ -3,6 +3,7 @@
 
 # devenv local state
 .devenv/
+.pre-commit-config.yaml
 
 # bv (beads viewer) local config and caches
 .bv/
