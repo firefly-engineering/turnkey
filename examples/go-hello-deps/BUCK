@@ -1,11 +1,11 @@
 # Example Go binary with external dependency
 # This target should build with both:
 #   go build .              (native Go toolchain using go.mod)
-#   buck2 build :hello-deps (Buck2 using Nix-managed deps cell)
+#   buck2 build :go-hello-deps (Buck2 using Nix-managed deps cell)
 
 # go_binary is auto-loaded from the prelude
 go_binary(
-    name = "hello-deps",
+    name = "go-hello-deps",
     srcs = ["main.go"],
     deps = [
         "godeps//vendor/github.com/google/uuid:uuid",

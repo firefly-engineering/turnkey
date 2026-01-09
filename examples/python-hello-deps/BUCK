@@ -13,7 +13,7 @@ load("@prelude//:rules.bzl", "python_binary")
 
 # This target will fail until third-party packages are available
 python_binary(
-    name = "hello-deps",
+    name = "python-hello-deps",
     main = "hello.py",
     # Uncomment when third-party packages are available:
     # deps = [

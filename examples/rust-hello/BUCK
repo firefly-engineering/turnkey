@@ -2,7 +2,7 @@
 load("@prelude//:rules.bzl", "rust_binary")
 
 rust_binary(
-    name = "hello",
+    name = "rust-hello",
     srcs = ["main.rs"],
     visibility = ["PUBLIC"],
 )

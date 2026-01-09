@@ -16,7 +16,7 @@ load("@prelude//:rules.bzl", "rust_binary")
 
 # This target will fail until reindeer generates third-party crates
 rust_binary(
-    name = "hello-deps",
+    name = "rust-hello-deps",
     srcs = ["main.rs"],
     edition = "2021",
     # Uncomment when third-party crates are available:

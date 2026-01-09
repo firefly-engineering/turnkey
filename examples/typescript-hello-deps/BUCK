@@ -15,7 +15,7 @@ load("@prelude//:rules.bzl", "genrule")
 
 # Placeholder - would need proper npm/worker integration
 genrule(
-    name = "compile",
+    name = "typescript-hello-deps",
     srcs = ["hello.ts"],
     out = "hello.js",
     # This won't work without chalk installed - placeholder only
