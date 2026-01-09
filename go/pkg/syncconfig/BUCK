@@ -4,7 +4,7 @@ load("@prelude//:rules.bzl", "go_library", "go_test")
 go_library(
     name = "syncconfig",
     srcs = ["syncconfig.go"],
-    deps = ["@godeps//github.com/pelletier/go-toml/v2:go-toml"],
+    deps = ["@godeps//vendor/github.com/pelletier/go-toml/v2:v2"],
     visibility = ["PUBLIC"],
 )
 
