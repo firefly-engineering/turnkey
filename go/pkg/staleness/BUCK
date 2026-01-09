@@ -1,0 +1,15 @@
+# Staleness detection library for turnkey sync
+
+load("@prelude//:rules.bzl", "go_library", "go_test")
+
+go_library(
+    name = "staleness",
+    srcs = ["staleness.go"],
+    visibility = ["PUBLIC"],
+)
+
+go_test(
+    name = "staleness_test",
+    srcs = ["staleness_test.go"],
+    deps = [":staleness"],
+)
