@@ -19,7 +19,11 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strings"
 	"syscall"
+
+	"github.com/firefly-engineering/turnkey/go/pkg/syncconfig"
+	"github.com/firefly-engineering/turnkey/go/pkg/syncer"
 )
 
 // syncFirstCommands are buck2 subcommands that read the build graph.
@@ -55,6 +59,7 @@ var passThroughCommands = []string{
 var (
 	noSync  bool
 	verbose bool
+	dryRun  bool
 )
 
 func main() {
@@ -74,11 +79,11 @@ func main() {
 	// Handle tk-specific subcommands
 	switch subcommand {
 	case "sync":
-		runSync()
-		return
+		exitCode := runSync()
+		os.Exit(exitCode)
 	case "check":
-		runCheck()
-		return
+		exitCode := runCheck()
+		os.Exit(exitCode)
 	}
 
 	// Determine if this command needs sync first
@@ -88,7 +93,9 @@ func main() {
 		if verbose {
 			fmt.Fprintf(os.Stderr, "tk: syncing before %s...\n", subcommand)
 		}
-		runSync()
+		if exitCode := runSync(); exitCode != 0 {
+			os.Exit(exitCode)
+		}
 	}
 
 	// Delegate to buck2
@@ -105,6 +112,9 @@ func parseFlags(args []string) []string {
 			args = args[1:]
 		case "--verbose", "-v":
 			verbose = true
+			args = args[1:]
+		case "--dry-run", "-n":
+			dryRun = true
 			args = args[1:]
 		case "--help", "-h":
 			printHelp()
@@ -131,35 +141,127 @@ func shouldSync(subcommand string) bool {
 }
 
 // runSync runs the turnkey sync operation.
-func runSync() {
-	if verbose {
-		fmt.Fprintln(os.Stderr, "tk: running sync...")
+// Returns exit code (0 for success, non-zero for failure).
+func runSync() int {
+	// Find project root (where .buckconfig is)
+	root, err := findProjectRoot()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tk: %v\n", err)
+		return 1
 	}
 
-	// TODO: Implement actual sync logic
-	// This will call into the staleness package and regenerate
-	// files as needed.
-	//
-	// For now, this is a stub that does nothing.
-
-	if verbose {
-		fmt.Fprintln(os.Stderr, "tk: sync complete (stub)")
+	// Load configuration
+	cfg, err := syncconfig.LoadDefaultFrom(root)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tk: failed to load sync config: %v\n", err)
+		return 1
 	}
+
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "tk: invalid sync config: %v\n", err)
+		return 1
+	}
+
+	// Run sync
+	s := syncer.New(cfg, root)
+	s.Verbose = verbose
+	s.DryRun = dryRun
+	s.Output = os.Stderr
+
+	result, err := s.SyncDeps()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tk: sync failed: %v\n", err)
+		return 1
+	}
+
+	// Report results
+	if len(result.Errors) > 0 {
+		fmt.Fprintf(os.Stderr, "tk: sync completed with %d error(s):\n", len(result.Errors))
+		for _, e := range result.Errors {
+			fmt.Fprintf(os.Stderr, "  - %v\n", e)
+		}
+		return 1
+	}
+
+	if result.Synced > 0 {
+		fmt.Fprintf(os.Stderr, "tk: synced %d file(s)\n", result.Synced)
+	} else if verbose {
+		fmt.Fprintln(os.Stderr, "tk: nothing to sync, all files up-to-date")
+	}
+
+	return 0
 }
 
 // runCheck checks if any files are stale without regenerating them.
-func runCheck() {
-	if verbose {
-		fmt.Fprintln(os.Stderr, "tk: checking staleness...")
+// Returns exit code (0 if all up-to-date, 1 if stale).
+func runCheck() int {
+	// Find project root
+	root, err := findProjectRoot()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tk: %v\n", err)
+		return 1
 	}
 
-	// TODO: Implement actual check logic
-	// This will call into the staleness package to report
-	// which files need regeneration.
-	//
-	// For now, this is a stub.
+	// Load configuration
+	cfg, err := syncconfig.LoadDefaultFrom(root)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tk: failed to load sync config: %v\n", err)
+		return 1
+	}
 
-	fmt.Println("tk check: all files up-to-date (stub)")
+	// Run check
+	s := syncer.New(cfg, root)
+	s.Verbose = verbose
+	s.Output = os.Stderr
+
+	result, anyStale, err := s.Check()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tk: check failed: %v\n", err)
+		return 1
+	}
+
+	// Report results
+	if len(result.Errors) > 0 {
+		fmt.Fprintf(os.Stderr, "tk: check completed with %d error(s):\n", len(result.Errors))
+		for _, e := range result.Errors {
+			fmt.Fprintf(os.Stderr, "  - %v\n", e)
+		}
+		return 1
+	}
+
+	if anyStale {
+		fmt.Fprintln(os.Stderr, "tk: some files are stale, run 'tk sync' to update")
+		return 1
+	}
+
+	fmt.Fprintln(os.Stderr, "tk: all files up-to-date")
+	return 0
+}
+
+// findProjectRoot walks up from cwd to find the project root.
+// The project root is identified by the presence of .buckconfig.
+func findProjectRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	for {
+		if _, err := os.Stat(dir + "/.buckconfig"); err == nil {
+			return dir, nil
+		}
+
+		parent := dir[:max(0, len(dir)-len("/"+dir[strings.LastIndex(dir, "/")+1:]))]
+		if parent == dir || parent == "" {
+			break
+		}
+		dir = parent
+	}
+
+	// Fallback to current directory
+	cwd, _ := os.Getwd()
+	return cwd, nil
 }
 
 // delegateToBuck2 executes buck2 with the given arguments.
@@ -196,6 +298,8 @@ tk-specific flags (must come before subcommand):
   --no-sync    Skip sync, run buck2 directly
   --verbose    Show what tk is doing
   -v           Same as --verbose
+  --dry-run    Show what would be synced without doing it
+  -n           Same as --dry-run
   --help       Show this help
   -h           Same as --help
 
@@ -213,6 +317,9 @@ Commands that pass through directly (no sync):
 
 Unknown commands default to syncing first (safe default).
 
+Configuration:
+  tk reads .turnkey/sync.toml for staleness rules.
+
 Examples:
   tk build //some:target          # sync then build
   tk test //some:target           # sync then test
@@ -220,5 +327,6 @@ Examples:
   tk sync                         # just run sync
   tk check                        # check staleness
   tk clean                        # clean (no sync needed)
+  tk --dry-run sync               # show what would be synced
 `)
 }
