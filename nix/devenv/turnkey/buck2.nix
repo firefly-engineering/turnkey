@@ -166,6 +166,7 @@ ${generateTargets finalToolchains}
   godepsCellPath = ".turnkey/godeps";
   hasGodeps = cfg.godeps != null;
   godepsCellConfig = lib.optionalString hasGodeps "    godeps = ${godepsCellPath}";
+  godepsPlatformDetector = lib.optionalString hasGodeps " target:godeps//...->prelude//platforms:default";
 
   # Generate buckconfig content
   buckconfigContent = ''
@@ -187,7 +188,7 @@ ${generateTargets finalToolchains}
 
     ${externalCellsSection}
     [parser]
-        target_platform_detector_spec = target:root//...->prelude//platforms:default target:toolchains//...->prelude//platforms:default
+        target_platform_detector_spec = target:root//...->prelude//platforms:default target:toolchains//...->prelude//platforms:default${godepsPlatformDetector}
 
     [buildfile]
         name = BUCK
