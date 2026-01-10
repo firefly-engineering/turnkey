@@ -101,6 +101,7 @@
               cargo = pkgs.cargo;
               reindeer = pkgs.reindeer;
               python = pkgs.python3;
+              uv = pkgs.uv;  # Python package manager for lock file generation
               cxx = pkgs.stdenv.cc;
               # Use clangUseLLVM which has lld integration for -fuse-ld=lld to work
               clang = pkgs.llvmPackages.clangUseLLVM;

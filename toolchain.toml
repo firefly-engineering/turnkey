@@ -9,6 +9,7 @@ buck2 = {}
 go = {}
 rust = {}
 python = {}
+uv = {}        # Python package manager for lock file generation
 reindeer = {}  # Tool for generating Buck2 targets from Cargo.toml
 
 # JavaScript/TypeScript (no Buck2 toolchain, but available for genrule builds)

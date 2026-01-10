@@ -1,7 +1,12 @@
-//! pydeps-gen: Generate python-deps.toml from pyproject.toml or requirements.txt
+//! pydeps-gen: Generate python-deps.toml from pylock.toml, pyproject.toml, or requirements.txt
 //!
 //! This tool reads Python dependency declarations and generates a python-deps.toml
 //! file with Nix-compatible SRI hashes for use with Buck2/Nix integration.
+//!
+//! Recommended workflow for reproducible builds:
+//!   1. uv lock                                    # Generate uv.lock from pyproject.toml
+//!   2. uv export --format pylock.toml -o pylock.toml  # Export to PEP 751 format
+//!   3. pydeps-gen --lock pylock.toml -o python-deps.toml
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::Parser;
@@ -12,17 +17,25 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 
-/// Generate python-deps.toml from pyproject.toml or requirements.txt
+/// Generate python-deps.toml from Python dependency files
 #[derive(Parser, Debug)]
 #[command(name = "pydeps-gen")]
 #[command(about = "Generate python-deps.toml from Python dependency files")]
+#[command(after_help = "RECOMMENDED WORKFLOW:\n  \
+    1. uv lock                                        # Generate uv.lock\n  \
+    2. uv export --format pylock.toml -o pylock.toml  # Export to PEP 751\n  \
+    3. pydeps-gen --lock pylock.toml -o python-deps.toml")]
 struct Args {
-    /// Path to pyproject.toml file
-    #[arg(long, conflicts_with = "requirements")]
+    /// Path to pylock.toml file (PEP 751 lock file - recommended for reproducibility)
+    #[arg(long, conflicts_with_all = ["pyproject", "requirements"])]
+    lock: Option<PathBuf>,
+
+    /// Path to pyproject.toml file (non-reproducible without lock file)
+    #[arg(long, conflicts_with_all = ["lock", "requirements"])]
     pyproject: Option<PathBuf>,
 
     /// Path to requirements.txt file
-    #[arg(long, conflicts_with = "pyproject")]
+    #[arg(long, conflicts_with_all = ["lock", "pyproject"])]
     requirements: Option<PathBuf>,
 
     /// Output file path (default: stdout)
@@ -77,6 +90,55 @@ struct PyPIDigests {
     sha256: String,
 }
 
+/// PEP 751 pylock.toml structure
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct PyLock {
+    lock_version: String,
+    #[allow(dead_code)]
+    created_by: Option<String>,
+    #[allow(dead_code)]
+    requires_python: Option<String>,
+    #[serde(default)]
+    packages: Vec<PyLockPackage>,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct PyLockPackage {
+    name: String,
+    version: String,
+    #[serde(default)]
+    index: Option<String>,
+    sdist: Option<PyLockSdist>,
+    #[serde(default)]
+    wheels: Vec<PyLockWheel>,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct PyLockSdist {
+    url: String,
+    #[serde(default)]
+    hashes: PyLockHashes,
+    #[serde(default)]
+    size: Option<u64>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[allow(dead_code)]
+struct PyLockWheel {
+    url: String,
+    #[serde(default)]
+    hashes: PyLockHashes,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[allow(dead_code)]
+struct PyLockHashes {
+    sha256: Option<String>,
+}
+
 /// pyproject.toml structure (partial)
 #[derive(Debug, Deserialize)]
 struct PyProject {
@@ -107,11 +169,37 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     // Require at least one input
-    if args.pyproject.is_none() && args.requirements.is_none() {
-        bail!("Must specify either --pyproject or --requirements");
+    if args.lock.is_none() && args.pyproject.is_none() && args.requirements.is_none() {
+        bail!("Must specify one of: --lock, --pyproject, or --requirements");
     }
 
-    // Parse dependencies from input file
+    // Handle pylock.toml (recommended path - has exact versions and URLs)
+    if let Some(path) = &args.lock {
+        let resolved = parse_pylock(path, args.no_prefetch)?;
+
+        if resolved.is_empty() {
+            eprintln!("Warning: No dependencies found in lock file");
+            return Ok(());
+        }
+
+        eprintln!("Found {} dependencies", resolved.len());
+
+        let output = generate_toml(&resolved, "pylock.toml");
+
+        // Write output
+        if let Some(out_path) = &args.output {
+            let mut file = fs::File::create(out_path)
+                .with_context(|| format!("Failed to create output file: {}", out_path.display()))?;
+            file.write_all(output.as_bytes())?;
+            eprintln!("Wrote {}", out_path.display());
+        } else {
+            print!("{}", output);
+        }
+
+        return Ok(());
+    }
+
+    // Parse dependencies from input file (legacy path - version ranges)
     let deps = if let Some(path) = &args.pyproject {
         parse_pyproject(path, args.include_dev)?
     } else if let Some(path) = &args.requirements {
@@ -304,6 +392,68 @@ fn parse_requirements(path: &PathBuf) -> Result<Vec<(String, Option<String>)>> {
     Ok(deps)
 }
 
+/// Parse pylock.toml (PEP 751 lock file) and extract resolved dependencies
+/// This is the recommended path for reproducible builds since it has exact versions and URLs
+fn parse_pylock(path: &PathBuf, no_prefetch: bool) -> Result<Vec<PythonDep>> {
+    let content = fs::read_to_string(path)
+        .with_context(|| format!("Failed to read {}", path.display()))?;
+
+    let pylock: PyLock = toml::from_str(&content)
+        .with_context(|| format!("Failed to parse {}", path.display()))?;
+
+    eprintln!("Parsed pylock.toml (lock-version: {})", pylock.lock_version);
+
+    let mut resolved = Vec::new();
+
+    for (i, pkg) in pylock.packages.iter().enumerate() {
+        eprintln!(
+            "[{}/{}] Processing {} {}",
+            i + 1,
+            pylock.packages.len(),
+            pkg.name,
+            pkg.version
+        );
+
+        // Prefer sdist (source distribution) for Nix builds
+        let (url, _archive_hash) = if let Some(sdist) = &pkg.sdist {
+            (sdist.url.clone(), sdist.hashes.sha256.clone())
+        } else if let Some(wheel) = pkg.wheels.first() {
+            // Fall back to wheel if no sdist
+            eprintln!("  Warning: No sdist for {}, using wheel", pkg.name);
+            (wheel.url.clone(), wheel.hashes.sha256.clone())
+        } else {
+            eprintln!("  Warning: No sdist or wheel for {}, skipping", pkg.name);
+            continue;
+        };
+
+        // Get the Nix hash (for unpacked content)
+        // Note: pylock.toml hash is for the archive file, but Nix needs hash of unpacked content
+        let hash = if no_prefetch {
+            "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string()
+        } else {
+            match prefetch_url(&url) {
+                Ok(h) => h,
+                Err(e) => {
+                    eprintln!("  Warning: Failed to prefetch {}: {}", pkg.name, e);
+                    continue;
+                }
+            }
+        };
+
+        resolved.push(PythonDep {
+            name: pkg.name.clone(),
+            version: pkg.version.clone(),
+            url,
+            hash,
+        });
+    }
+
+    // Sort by name
+    resolved.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(resolved)
+}
+
 /// Resolve dependencies: fetch version info from PyPI and compute hashes
 fn resolve_dependencies(
     deps: &[(String, Option<String>)],
@@ -427,7 +577,15 @@ fn generate_toml(deps: &[PythonDep], source: &str) -> String {
     output.push_str("# Auto-generated by pydeps-gen\n");
     output.push_str(&format!("# Source: {}\n", source));
     output.push_str("#\n");
-    output.push_str("# To regenerate: pydeps-gen --pyproject pyproject.toml -o python-deps.toml\n");
+
+    // Show appropriate regeneration command based on source
+    let regen_cmd = match source {
+        "pylock.toml" => "pydeps-gen --lock pylock.toml -o python-deps.toml",
+        "pyproject.toml" => "pydeps-gen --pyproject pyproject.toml -o python-deps.toml",
+        "requirements.txt" => "pydeps-gen --requirements requirements.txt -o python-deps.toml",
+        _ => "pydeps-gen --lock pylock.toml -o python-deps.toml",
+    };
+    output.push_str(&format!("# To regenerate: {}\n", regen_cmd));
     output.push('\n');
 
     for dep in deps {
