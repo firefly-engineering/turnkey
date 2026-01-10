@@ -1,0 +1,22 @@
+# Turnkey Python workspace
+#
+# This is a monorepo that declares Python dependencies for Buck2 builds.
+# Run `pydeps-gen --pyproject pyproject.toml -o python-deps.toml` to regenerate
+# the dependency file after modifying this file.
+
+[project]
+name = "turnkey"
+version = "0.1.0"
+description = "Turnkey toolchain management for Nix flakes"
+requires-python = ">=3.11"
+
+# Dependencies used by Python code in this monorepo
+dependencies = [
+    "six>=1.16.0",
+]
+
+[project.optional-dependencies]
+# Development dependencies
+dev = [
+    "pytest>=7.0",
+]
