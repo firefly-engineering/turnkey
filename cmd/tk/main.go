@@ -60,6 +60,7 @@ var (
 	noSync  bool
 	verbose bool
 	dryRun  bool
+	quiet   bool
 )
 
 func main() {
@@ -119,6 +120,9 @@ func parseFlags(args []string) []string {
 		case "--dry-run", "-n":
 			dryRun = true
 			args = args[1:]
+		case "--quiet", "-q":
+			quiet = true
+			args = args[1:]
 		case "--help", "-h":
 			printHelp()
 			os.Exit(0)
@@ -169,6 +173,7 @@ func runSync() int {
 	// Run sync
 	s := syncer.New(cfg, root)
 	s.Verbose = verbose
+	s.Quiet = quiet
 	s.DryRun = dryRun
 	s.Output = os.Stderr
 
@@ -189,7 +194,7 @@ func runSync() int {
 
 	if result.Synced > 0 {
 		fmt.Fprintf(os.Stderr, "tk: synced %d file(s)\n", result.Synced)
-	} else if verbose {
+	} else if verbose && !quiet {
 		fmt.Fprintln(os.Stderr, "tk: nothing to sync, all files up-to-date")
 	}
 
@@ -216,6 +221,7 @@ func runCheck() int {
 	// Run check
 	s := syncer.New(cfg, root)
 	s.Verbose = verbose
+	s.Quiet = quiet
 	s.Output = os.Stderr
 
 	result, anyStale, err := s.Check()
@@ -238,7 +244,9 @@ func runCheck() int {
 		return 1
 	}
 
-	fmt.Fprintln(os.Stderr, "tk: all files up-to-date")
+	if !quiet {
+		fmt.Fprintln(os.Stderr, "tk: all files up-to-date")
+	}
 	return 0
 }
 
@@ -488,6 +496,8 @@ tk-specific flags (must come before subcommand):
   --no-sync    Skip sync, run buck2 directly
   --verbose    Show what tk is doing
   -v           Same as --verbose
+  --quiet      Suppress non-error output
+  -q           Same as --quiet
   --dry-run    Show what would be synced without doing it
   -n           Same as --dry-run
   --help       Show this help

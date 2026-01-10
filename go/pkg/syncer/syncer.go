@@ -36,6 +36,8 @@ type Syncer struct {
 	Root string
 	// Verbose enables verbose output.
 	Verbose bool
+	// Quiet suppresses non-error output (only shows errors and changes).
+	Quiet bool
 	// DryRun skips actual regeneration.
 	DryRun bool
 	// Output is where to write status messages.
@@ -66,11 +68,15 @@ func (s *Syncer) SyncDeps() (*Result, error) {
 		}
 
 		if !stale {
-			s.printf("Checking %s... ok\n", rule.Target)
+			if !s.Quiet {
+				s.printf("Checking %s... ok\n", rule.Target)
+			}
 			continue
 		}
 
-		s.printf("Checking %s... stale\n", rule.Target)
+		if !s.Quiet {
+			s.printf("Checking %s... stale\n", rule.Target)
+		}
 
 		if s.DryRun {
 			s.printf("  Would regenerate %s (dry run)\n", rule.Target)

@@ -143,6 +143,25 @@ in
             '';
           };
 
+          welcomeMessage = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            example = "Welcome to MyProject turnkey shell";
+            description = ''
+              Custom welcome message to display when entering the shell.
+              If null (default), no welcome message is shown.
+            '';
+          };
+
+          quiet = mkOption {
+            type = types.bool;
+            default = true;
+            description = ''
+              Suppress verbose shell entry messages.
+              Set TURNKEY_VERBOSE=1 in your environment to see verbose output.
+            '';
+          };
+
           # Rust dependencies
           rustdeps = mkOption {
             type = types.nullOr types.package;
@@ -269,6 +288,9 @@ in
             goSumFile = cfg.buck2.goSumFile;
             autoRegenerate = cfg.buck2.autoRegenerate;
             generateOnShellEntry = cfg.buck2.generateOnShellEntry;
+            # Shell entry options
+            welcomeMessage = cfg.buck2.welcomeMessage;
+            quiet = cfg.buck2.quiet;
           };
         };
       };

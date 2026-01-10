@@ -492,6 +492,20 @@ in
         output even when quiet mode is enabled.
       '';
     };
+
+    welcomeMessage = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "Welcome to MyProject turnkey shell";
+      description = ''
+        Custom welcome message to display when entering the shell.
+
+        If null (default), no welcome message is shown.
+        Set to a string to display a custom message on shell entry.
+
+        The message can include shell variables like $PWD.
+      '';
+    };
   };
 
   config = lib.mkIf (cfg.enable && turnkeyCfg.enable) {
@@ -628,6 +642,11 @@ in
         fi
       fi
 
+      # Welcome message (if configured)
+      ${lib.optionalString (cfg.welcomeMessage != null) ''
+        echo "${cfg.welcomeMessage}"
+      ''}
+
       # Verbose output (shown when quiet=false or TURNKEY_VERBOSE=1)
       if [ -n "''${TURNKEY_VERBOSE:-}" ]${lib.optionalString (!cfg.quiet) " || true"}; then
         echo "Buck2 configured by turnkey"
@@ -640,8 +659,13 @@ in
       # tk sync on shell entry (if enabled and tk is available)
       ${lib.optionalString cfg.tk.syncOnShellEntry ''
         if command -v tk >/dev/null 2>&1; then
-          # Run tk sync - it will output only if something was synced
-          tk sync || echo "turnkey: tk sync failed (continuing anyway)"
+          # Run tk sync - use --quiet unless TURNKEY_VERBOSE is set
+          # Note: flags must come before subcommand (tk --quiet sync, not tk sync --quiet)
+          if [ -n "''${TURNKEY_VERBOSE:-}" ]; then
+            tk sync || echo "turnkey: tk sync failed (continuing anyway)"
+          else
+            tk --quiet sync || echo "turnkey: tk sync failed (continuing anyway)"
+          fi
         fi
       ''}
 

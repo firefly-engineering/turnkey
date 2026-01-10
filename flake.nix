@@ -119,6 +119,7 @@
               rustDepsFile = ./rust-deps.toml; # Rust crate dependencies
               pythonDepsFile = ./python-deps.toml; # Python package dependencies
               generateOnShellEntry = false; # .envrc handles generation
+              welcomeMessage = "Welcome to turnkey dev shell";
             };
           };
         };
