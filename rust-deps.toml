@@ -3,6 +3,10 @@
 #
 # To regenerate: rustdeps-gen -o rust-deps.toml
 
+[deps.adler2]
+version = "2.0.1"
+hash = "sha256-m2FCS1KYVPuEQGVfcXtV4OaglqfrHH7zh4T41Ea7wyQ="
+
 [deps.anstream]
 version = "0.6.21"
 hash = "sha256-e79f6xlTO5+8n3XHgQB4KYX+NCkRHKRsXqPmO+qEtl4="
@@ -35,6 +39,14 @@ hash = "sha256-Rbg3/6Ixc0vx6y62Qcd/OxGYQ8G2w0UKBurtTZ02Z5c="
 version = "10.1.0"
 hash = "sha256-D5DpUgvKxJSVQwsLzpwX3AA/qIG5lcX7catc1O0oxX4="
 
+[deps.cc]
+version = "1.2.52"
+hash = "sha256-Lz223SuI32Kzv2KlzWnrsuG9FQmXwG/mcA6SmxM3Fj8="
+
+[deps.cfg-if]
+version = "1.0.4"
+hash = "sha256-JOncw/XcmX/jgZbQr0KNQKBa2Kw8dZDnIvBokD95Zm8="
+
 [deps.clap]
 version = "4.5.54"
 hash = "sha256-iPegyZYrVDHfe64Mo39ALJ1/SKD4xN6ZXoKWAZp0Kw4="
@@ -55,6 +67,10 @@ hash = "sha256-sxF92/uaArtYzIi/5yCaGrzNTD64MtPa3oJP99QQ9lE="
 version = "1.0.4"
 hash = "sha256-pj4NbMr2xXv2IHlSEDvRmmmbGpM78YKjVrzbI3y5bmw="
 
+[deps.crc32fast]
+version = "1.5.0"
+hash = "sha256-1fpDY2g/wunCXWmIpsRqNiHbWoiBZpdvAwAWlwxbhaE="
+
 [deps.displaydoc]
 version = "0.2.5"
 hash = "sha256-8oyaH88aXETb78VOTS2AzrdHAcq5QTGaLwn41AUH1cM="
@@ -63,9 +79,21 @@ hash = "sha256-8oyaH88aXETb78VOTS2AzrdHAcq5QTGaLwn41AUH1cM="
 version = "1.0.2"
 hash = "sha256-uTefUNYrF+m59vVl+AHTdkPVQ6x/qC2rCfMwrE/71VU="
 
+[deps.find-msvc-tools]
+version = "0.1.7"
+hash = "sha256-BqlMwksL3gKqCdz947DsYy4egVMzdODjk1J6rcXxGcE="
+
+[deps.flate2]
+version = "1.1.5"
+hash = "sha256-+5to47i8FuGYCbZ6vf57xqzqZ3hQGvaVwG9HoBNsrUY="
+
 [deps.form_urlencoded]
 version = "1.2.2"
 hash = "sha256-W+74FXbvzNFqCUqMn+MCjip7I6Z6BHZ8e/FotnXHsY4="
+
+[deps.getrandom]
+version = "0.2.16"
+hash = "sha256-xSCuE+b7CPPPCwvyF0yqq3pebvNW47XatGx+4ehKdbo="
 
 [deps.hashbrown]
 version = "0.16.1"
@@ -123,13 +151,29 @@ hash = "sha256-Vu3w/R5fOvlv74BYClKfP+q03lxvPlIaufJC0+OnwhE="
 version = "1.0.17"
 hash = "sha256-QPSdCDvRBK4/QdeAA3hk3qwVILhy8d1ADckxTBcf0S4="
 
+[deps.libc]
+version = "0.2.180"
+hash = "sha256-ytVMYvY3PNF/XFyV9llyXy6/Ro77NROMs5XQ3tqPkFk="
+
 [deps.litemap]
 version = "0.8.1"
 hash = "sha256-AyYQHlD9WGEPpHlKQ1z+OfngdnXyROn8jUV0Akasp5o="
 
+[deps.log]
+version = "0.4.29"
+hash = "sha256-YMp2un3Gy++ePbjMSCy0Or79C5iipZUPiXWuqGsMYdE="
+
 [deps.memchr]
 version = "2.7.6"
 hash = "sha256-l/ki8GnJL7IF0Wr2Q4J/NLNp/dm0iZXdrgj3mPbHeMc="
+
+[deps.miniz_oxide]
+version = "0.8.9"
+hash = "sha256-5qDEpg82Ff7UyOP7Cjw98hIVqavGlO/+0Zf1PPvuKWg="
+
+[deps.once_cell]
+version = "1.21.3"
+hash = "sha256-cGcqplIEBDBQuhoS61S0nPbpxp6i4ZuhIjHS5v/yUMs="
 
 [deps.once_cell_polyfill]
 version = "1.70.2"
@@ -151,6 +195,22 @@ hash = "sha256-8oAd3DXvyzoipak9N0gntxmsn2uocl906xkU7KTmjJk="
 version = "1.0.43"
 hash = "sha256-fNJ4zKU6jvo15tih9QkrClVeHkOBqWzWAR/bfq1CIOU="
 
+[deps.ring]
+version = "0.17.14"
+hash = "sha256-futu7T06hlsGEpEqoKMW35GJC7Srz8C3OH4Sw+7XBDw="
+
+[deps.rustls]
+version = "0.23.36"
+hash = "sha256-XY/R9zIBi954gzgEADTuUhCxwWckgOtjxZ+YgfL0YmM="
+
+[deps.rustls-pki-types]
+version = "1.13.2"
+hash = "sha256-dFYf6hXsDdBxFtOHSxfa4fJ8tihzJMUPEBP2XJ76VV0="
+
+[deps.rustls-webpki]
+version = "0.103.8"
+hash = "sha256-jRvU9T6Nv2nCm0ttOSrMXAQegSF0opFxCDQXPraxBdA="
+
 [deps.semver]
 version = "1.0.27"
 hash = "sha256-pCtUP8s6sss+9vgOJWEtu4PxxokE6apJoeoRXo7TNCA="
@@ -167,9 +227,21 @@ hash = "sha256-GYsEoV8ezYpIQQt/LddKoj17AVZ/jawMRr9nxa8AGcg="
 version = "1.0.228"
 hash = "sha256-j9x5x1ikvIl2Nnbe7m4of4nL1Op/Y2Gol23+x8dafFc="
 
+[deps.serde_json]
+version = "1.0.149"
+hash = "sha256-0RpfHf1sQ/Gu9FFAeJGCWx54vQkq6OKYqLxEyVZRFoo="
+
 [deps.serde_spanned]
 version = "0.6.9"
 hash = "sha256-J53IKhALVIg/srWTbZpmSWJynmF1wD6maRCPcXqb87Y="
+
+[deps.shlex]
+version = "1.3.0"
+hash = "sha256-HoJHyJYByCZfnRnpmXtwWVqATF+nx9/lQpnF+pbAZdw="
+
+[deps.simd-adler32]
+version = "0.3.8"
+hash = "sha256-YTBWX3eVXQ31J2Gde/WmcOoC6W/TXgQqAZ7NBmt8FPQ="
 
 [deps.smallvec]
 version = "1.15.1"
@@ -182,6 +254,10 @@ hash = "sha256-Nha8xpy6Qa4bV/zC5ojob23IEgFOPjiOpdFtx2Q4Luo="
 [deps.strsim]
 version = "0.11.1"
 hash = "sha256-RqMWnA9H7bWXrkWFtsp+ImypxBEuJpIeWAcdy5u+W8A="
+
+[deps.subtle]
+version = "2.6.1"
+hash = "sha256-XYfBfa+RQxNkl+Clpr1j9/F9LwH0j594iphbdbZy6jk="
 
 [deps.syn]
 version = "2.0.114"
@@ -215,6 +291,14 @@ hash = "sha256-dlmBPtel5EIlOeOxRPt4pOodNkg52WniCRh83K8AXIE="
 version = "1.0.22"
 hash = "sha256-rc3TZsoOsLwiWa37mfR9Vdz19t0/ZLov6YMaItqsf4s="
 
+[deps.untrusted]
+version = "0.9.0"
+hash = "sha256-XCBMRovtaXtJ3W4+ML+DuEbirytQ0KDn8fAF/AIlmIU="
+
+[deps.ureq]
+version = "2.12.1"
+hash = "sha256-IdHDoOBB/PByyWGtivg+uVs2bLm6Ovm11TrcaH5l4sY="
+
 [deps.url]
 version = "2.5.8"
 hash = "sha256-I2riz4py0IEZ1UybrbjOqqOJS/qEcWc64ZY9LvZKrlc="
@@ -227,13 +311,65 @@ hash = "sha256-U2QlqLrH5vQtjwDoLX0CIGtnjgv2ueWi8JiIDhKul+g="
 version = "0.2.2"
 hash = "sha256-h+XZ48STfds73DVffc3YFS3S0fJrK9xWXoSdow7auk4="
 
+[deps.wasi]
+version = "0.11.1+wasi-snapshot-preview1"
+hash = "sha256-NCHoQpyN1fS9cLBdIzYRAyFF0nvJhqf5MTUDfGPGckA="
+
+[deps.webpki-roots]
+version = "0.26.11"
+hash = "sha256-fbMPU3TdqGdjvYFi6gx2P6fFLj11UJ5CYedg0YYA+9E="
+
+[deps.webpki-roots]
+version = "1.0.5"
+hash = "sha256-FK6mTRJxRmQwcNvIFV1X66DC9tfkDL5Q2j59nae96uI="
+
 [deps.windows-link]
 version = "0.2.1"
 hash = "sha256-wxBf6m5IAvhw845BDmeeQG+aeNbxrFFmv2AXNg5Gsq8="
 
 [deps.windows-sys]
+version = "0.52.0"
+hash = "sha256-UdAo4m9d+AacpFM0tPdpC3UrBAlxx9NkdM3qDOooKFQ="
+
+[deps.windows-sys]
 version = "0.61.2"
 hash = "sha256-u41eiRzZY1jzGpNAswmSx8iL3/V/ni3zAP3qm2fFLVU="
+
+[deps.windows-targets]
+version = "0.52.6"
+hash = "sha256-0cO1oBGL0x77NamwGT9u62L89mX//f+YQeDLtrRkqtE="
+
+[deps.windows_aarch64_gnullvm]
+version = "0.52.6"
+hash = "sha256-U5CL4gnIWGlRtggZhhXRzS40NzEUYRQugmiu32ro6rw="
+
+[deps.windows_aarch64_msvc]
+version = "0.52.6"
+hash = "sha256-C4c5tCJRpiFpipE138lqNt6B32smjvZH9WNwFpfVNZE="
+
+[deps.windows_i686_gnu]
+version = "0.52.6"
+hash = "sha256-TxPbns69dvHunK7Ak1Av+vQjRhWt4hV6SeSwCqU6oDk="
+
+[deps.windows_i686_gnullvm]
+version = "0.52.6"
+hash = "sha256-qeQSlrCLYIly3BDyvNv0jVKaTn1N2hWya5+2KCXY6Y4="
+
+[deps.windows_i686_msvc]
+version = "0.52.6"
+hash = "sha256-5g7V6KjQwGQ+HhK+jy2LJunIv1bhrdk35Yz3Dgdgbdc="
+
+[deps.windows_x86_64_gnu]
+version = "0.52.6"
+hash = "sha256-4hA/iWUkC8pUztPl6eFE6jMJQ1UbiBzlrh1oXEioUbk="
+
+[deps.windows_x86_64_gnullvm]
+version = "0.52.6"
+hash = "sha256-fao+6XyOd06n8+RMc5JY9w+Z/1YkABczMCn2r7E0toQ="
+
+[deps.windows_x86_64_msvc]
+version = "0.52.6"
+hash = "sha256-vPkomt4vlq4k4TvQVc07Y7xpoTZqJlGCS7JBNqivX4k="
 
 [deps.winnow]
 version = "0.7.14"
@@ -259,6 +395,10 @@ hash = "sha256-JObRP2Vi+CsUf2nXhTAZUnR4yoY2jCnc01WTK7eEXTQ="
 version = "0.1.6"
 hash = "sha256-Ahx4paD9Mp1XTxa2ZVRdNEiTrJH5Dnmfec6Bft+rK+Q="
 
+[deps.zeroize]
+version = "1.8.2"
+hash = "sha256-tW9W04EmGrq2tkCTAyzCJDJfOA5/8LvDt3n06Pa4V+I="
+
 [deps.zerotrie]
 version = "0.2.3"
 hash = "sha256-d4UVA7l6RgO58+DHvUHuyB+UmK0Okhcg/n5ByGBlcsc="
@@ -270,4 +410,8 @@ hash = "sha256-VmjZHDykEN0bSZmPWHF8012rptFZuy2NC28LLPbU6bM="
 [deps.zerovec-derive]
 version = "0.11.2"
 hash = "sha256-p5fY9PeXZvjJ7QFRZjmV7Tm2LhLBtdrU8RGPTnOZru4="
+
+[deps.zmij]
+version = "1.0.12"
+hash = "sha256-xqnb7iturrWgnzsFTEoAG2eaD1K/j2kt62Yg2cHrMZw="
 

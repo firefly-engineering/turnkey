@@ -4,6 +4,7 @@
 # devenv local state
 .devenv/
 .pre-commit-config.yaml
+.turnkey-deps-hashes
 
 # bv (beads viewer) local config and caches
 .bv/
