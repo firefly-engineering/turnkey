@@ -316,12 +316,20 @@ version = "0.11.1+wasi-snapshot-preview1"
 hash = "sha256-NCHoQpyN1fS9cLBdIzYRAyFF0nvJhqf5MTUDfGPGckA="
 
 [deps.webpki-roots]
+version = "0.26.11"
+hash = "sha256-fbMPU3TdqGdjvYFi6gx2P6fFLj11UJ5CYedg0YYA+9E="
+
+[deps.webpki-roots]
 version = "1.0.5"
 hash = "sha256-FK6mTRJxRmQwcNvIFV1X66DC9tfkDL5Q2j59nae96uI="
 
 [deps.windows-link]
 version = "0.2.1"
 hash = "sha256-wxBf6m5IAvhw845BDmeeQG+aeNbxrFFmv2AXNg5Gsq8="
+
+[deps.windows-sys]
+version = "0.52.0"
+hash = "sha256-UdAo4m9d+AacpFM0tPdpC3UrBAlxx9NkdM3qDOooKFQ="
 
 [deps.windows-sys]
 version = "0.61.2"
