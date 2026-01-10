@@ -9,6 +9,7 @@
 # bv (beads viewer) local config and caches
 .bv/
 .beads/.bv.lock
+.beads/bd.sock
 
 # Buck2 generated files
 buck-out/

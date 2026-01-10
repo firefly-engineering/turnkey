@@ -2,6 +2,9 @@
 
 let
   cfg = config.turnkey;
+
+  # Generate the direnv library script
+  direnvLib = import ./direnv-lib.nix { inherit lib pkgs config; };
 in
 {
   # Import the Buck2 generation sub-module
@@ -43,5 +46,8 @@ in
         resolvedPackages = map (name: cfg.registry.${name}) toolchainNames;
       in
       resolvedPackages;
+
+    # Export direnv library path
+    env.TURNKEY_DIRENV_LIB = "${direnvLib}";
   };
 }
