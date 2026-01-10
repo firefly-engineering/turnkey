@@ -3,7 +3,271 @@
 #
 # To regenerate: rustdeps-gen -o rust-deps.toml
 
+[deps.anstream]
+version = "0.6.21"
+hash = "sha256-e79f6xlTO5+8n3XHgQB4KYX+NCkRHKRsXqPmO+qEtl4="
+
+[deps.anstyle]
+version = "1.0.13"
+hash = "sha256-sPjaQ67iGZT4klI5TXMhcQBdt0ZaeB+k9b04seXI6w0="
+
+[deps.anstyle-parse]
+version = "0.2.7"
+hash = "sha256-b1NLdn5PK5k/Hs1BAyA/+LQw55MR3Usz3PpSJrH1mUI="
+
+[deps.anstyle-query]
+version = "1.1.5"
+hash = "sha256-U8blwejqmAhSpEu10jYg3lxWvG3fJ8XF43TGTnw8u/U="
+
+[deps.anstyle-wincon]
+version = "3.0.11"
+hash = "sha256-EQGoHaOvr4BTTxnzvlrywUSfeMJLWfM6Ly7CSKs2iFU="
+
+[deps.anyhow]
+version = "1.0.100"
+hash = "sha256-Kuzzp4+NZU7xGSKp2cT0LsiDNbTmkCH6MSfAUj0fQvo="
+
+[deps.base64]
+version = "0.22.1"
+hash = "sha256-Rbg3/6Ixc0vx6y62Qcd/OxGYQ8G2w0UKBurtTZ02Z5c="
+
+[deps.cargo-lock]
+version = "10.1.0"
+hash = "sha256-D5DpUgvKxJSVQwsLzpwX3AA/qIG5lcX7catc1O0oxX4="
+
+[deps.clap]
+version = "4.5.54"
+hash = "sha256-iPegyZYrVDHfe64Mo39ALJ1/SKD4xN6ZXoKWAZp0Kw4="
+
+[deps.clap_builder]
+version = "4.5.54"
+hash = "sha256-bA92NOvfr/2dEcdaiBd1wtB6S4HseGvpa+JWY2UQH3w="
+
+[deps.clap_derive]
+version = "4.5.49"
+hash = "sha256-C9KTihL/bf5PoENwJ2kXU1yhyf7hgrR5qHBOvzxpVAM="
+
+[deps.clap_lex]
+version = "0.7.6"
+hash = "sha256-sxF92/uaArtYzIi/5yCaGrzNTD64MtPa3oJP99QQ9lE="
+
+[deps.colorchoice]
+version = "1.0.4"
+hash = "sha256-pj4NbMr2xXv2IHlSEDvRmmmbGpM78YKjVrzbI3y5bmw="
+
+[deps.displaydoc]
+version = "0.2.5"
+hash = "sha256-8oyaH88aXETb78VOTS2AzrdHAcq5QTGaLwn41AUH1cM="
+
+[deps.equivalent]
+version = "1.0.2"
+hash = "sha256-uTefUNYrF+m59vVl+AHTdkPVQ6x/qC2rCfMwrE/71VU="
+
+[deps.form_urlencoded]
+version = "1.2.2"
+hash = "sha256-W+74FXbvzNFqCUqMn+MCjip7I6Z6BHZ8e/FotnXHsY4="
+
+[deps.hashbrown]
+version = "0.16.1"
+hash = "sha256-dhLYAziGLEmhzYA83KUAStUVt3iIDf6dFG1HcI+0QKg="
+
+[deps.heck]
+version = "0.5.0"
+hash = "sha256-vVMnzH1Jabhj7DZIjmlhH1Jdvp9NLxoSyb5eEhFQafU="
+
+[deps.icu_collections]
+version = "2.1.1"
+hash = "sha256-H1vJyLaIMND2UkAJeM3vxixF0z8hENrTYHfuqSQYs/k="
+
+[deps.icu_locale_core]
+version = "2.1.1"
+hash = "sha256-GixCaWIq5x7bdNjqo6Rtk1F3hsd7mZEf7GNbbYVMExs="
+
+[deps.icu_normalizer]
+version = "2.1.1"
+hash = "sha256-KfQkKUQp8S7cPBiVfC7jihf2m0EHaCI6NNRD8KBIy2k="
+
+[deps.icu_normalizer_data]
+version = "2.1.1"
+hash = "sha256-/Pbok3xwyx4ObhE8MpYI9BLjuvqBlMmtm2OAo6MHdNs="
+
+[deps.icu_properties]
+version = "2.1.2"
+hash = "sha256-z7EhbW9SHOyGUduZmG34seYbGWa7xARCE0LdPatYzgg="
+
+[deps.icu_properties_data]
+version = "2.1.2"
+hash = "sha256-wvsWvwaxYx27ialhf9qHhB/sa85S1oLrzuwYY3xDy4o="
+
+[deps.icu_provider]
+version = "2.1.1"
+hash = "sha256-D4a4hSazxUgsbGbifM9jgr2wiLM0oEdUsZDIHBVwl/U="
+
+[deps.idna]
+version = "1.1.0"
+hash = "sha256-kxW2AmqMib0VBJRvmPe9kCsDpEq7060p9H8bnQUaaD8="
+
+[deps.idna_adapter]
+version = "1.2.1"
+hash = "sha256-UjynLclicvyCiRZpgInXwRkBI5JQOTLHwSEgvOlHkpM="
+
+[deps.indexmap]
+version = "2.13.0"
+hash = "sha256-0EO8FeBPA87lIU5lbuyySmohuszHj5dAvlJQUkLC49g="
+
+[deps.is_terminal_polyfill]
+version = "1.70.2"
+hash = "sha256-Vu3w/R5fOvlv74BYClKfP+q03lxvPlIaufJC0+OnwhE="
+
 [deps.itoa]
 version = "1.0.17"
 hash = "sha256-QPSdCDvRBK4/QdeAA3hk3qwVILhy8d1ADckxTBcf0S4="
+
+[deps.litemap]
+version = "0.8.1"
+hash = "sha256-AyYQHlD9WGEPpHlKQ1z+OfngdnXyROn8jUV0Akasp5o="
+
+[deps.memchr]
+version = "2.7.6"
+hash = "sha256-l/ki8GnJL7IF0Wr2Q4J/NLNp/dm0iZXdrgj3mPbHeMc="
+
+[deps.once_cell_polyfill]
+version = "1.70.2"
+hash = "sha256-4NVX2+GUAjhv6T9D0UjP0k3h/toEty1GfJY/d8VU7i4="
+
+[deps.percent-encoding]
+version = "2.3.2"
+hash = "sha256-ZnFfa0N7wX+lUIIVdhW01XiDZRJuwapkhV0s0TRLyMo="
+
+[deps.potential_utf]
+version = "0.1.4"
+hash = "sha256-un3YCqmuyU79UA2sg3wwyrnnOeihDOkCuFubat6BcjU="
+
+[deps.proc-macro2]
+version = "1.0.105"
+hash = "sha256-8oAd3DXvyzoipak9N0gntxmsn2uocl906xkU7KTmjJk="
+
+[deps.quote]
+version = "1.0.43"
+hash = "sha256-fNJ4zKU6jvo15tih9QkrClVeHkOBqWzWAR/bfq1CIOU="
+
+[deps.semver]
+version = "1.0.27"
+hash = "sha256-pCtUP8s6sss+9vgOJWEtu4PxxokE6apJoeoRXo7TNCA="
+
+[deps.serde]
+version = "1.0.228"
+hash = "sha256-rqFSEc0HLayISYEkiXwofcH2KX2fiZ/wdV+sdtCJ4AE="
+
+[deps.serde_core]
+version = "1.0.228"
+hash = "sha256-GYsEoV8ezYpIQQt/LddKoj17AVZ/jawMRr9nxa8AGcg="
+
+[deps.serde_derive]
+version = "1.0.228"
+hash = "sha256-j9x5x1ikvIl2Nnbe7m4of4nL1Op/Y2Gol23+x8dafFc="
+
+[deps.serde_spanned]
+version = "0.6.9"
+hash = "sha256-J53IKhALVIg/srWTbZpmSWJynmF1wD6maRCPcXqb87Y="
+
+[deps.smallvec]
+version = "1.15.1"
+hash = "sha256-0kSPelZydAJqnfaFuhf+aa3UJ1tZWa9+PA57XrSO0Uw="
+
+[deps.stable_deref_trait]
+version = "1.2.1"
+hash = "sha256-Nha8xpy6Qa4bV/zC5ojob23IEgFOPjiOpdFtx2Q4Luo="
+
+[deps.strsim]
+version = "0.11.1"
+hash = "sha256-RqMWnA9H7bWXrkWFtsp+ImypxBEuJpIeWAcdy5u+W8A="
+
+[deps.syn]
+version = "2.0.114"
+hash = "sha256-gbWfQTLTS6LQvWBBc1lvsgoIb8voveppUu4ROu/0ujw="
+
+[deps.synstructure]
+version = "0.13.2"
+hash = "sha256-dSVw2Zg/5T9X6eA+YN0ErRCeDayDBz9OkZXl5C6QGjs="
+
+[deps.tinystr]
+version = "0.8.2"
+hash = "sha256-YIe1pHzVoPa9xrYSj8HdCmsT7N+FCjnwbnjlhLa8i2o="
+
+[deps.toml]
+version = "0.8.23"
+hash = "sha256-l6kBUubVO2zC287rpfo79FNV28rlEdRrgRpx+3KqpCk="
+
+[deps.toml_datetime]
+version = "0.6.11"
+hash = "sha256-rK7c9GQXKTCJ0hVjloFvcSkQWIpCKcNmiOA02BVd++w="
+
+[deps.toml_edit]
+version = "0.22.27"
+hash = "sha256-iK1BPbvNHq0hbYMDFNQUV+uZJD5XRkMC+onZDgxAHqA="
+
+[deps.toml_write]
+version = "0.1.2"
+hash = "sha256-dlmBPtel5EIlOeOxRPt4pOodNkg52WniCRh83K8AXIE="
+
+[deps.unicode-ident]
+version = "1.0.22"
+hash = "sha256-rc3TZsoOsLwiWa37mfR9Vdz19t0/ZLov6YMaItqsf4s="
+
+[deps.url]
+version = "2.5.8"
+hash = "sha256-I2riz4py0IEZ1UybrbjOqqOJS/qEcWc64ZY9LvZKrlc="
+
+[deps.utf8_iter]
+version = "1.0.4"
+hash = "sha256-U2QlqLrH5vQtjwDoLX0CIGtnjgv2ueWi8JiIDhKul+g="
+
+[deps.utf8parse]
+version = "0.2.2"
+hash = "sha256-h+XZ48STfds73DVffc3YFS3S0fJrK9xWXoSdow7auk4="
+
+[deps.windows-link]
+version = "0.2.1"
+hash = "sha256-wxBf6m5IAvhw845BDmeeQG+aeNbxrFFmv2AXNg5Gsq8="
+
+[deps.windows-sys]
+version = "0.61.2"
+hash = "sha256-u41eiRzZY1jzGpNAswmSx8iL3/V/ni3zAP3qm2fFLVU="
+
+[deps.winnow]
+version = "0.7.14"
+hash = "sha256-JN9ee/tr7phsmUtc4EpXOqzbeuornL/HMWLHyDNccPk="
+
+[deps.writeable]
+version = "0.6.2"
+hash = "sha256-Pke2LFKTUJ0mPTQRb5BBC4nGDk2UQbotdg6qhCeYHrY="
+
+[deps.yoke]
+version = "0.8.1"
+hash = "sha256-ejI/e6dH0BRFspgCuMKqfVb/oH5Sjag/IPmRuOQSQd4="
+
+[deps.yoke-derive]
+version = "0.8.1"
+hash = "sha256-KK8weDkilTf/9vpzHODTADlfb30wPdMpx26mnZPSfSU="
+
+[deps.zerofrom]
+version = "0.1.6"
+hash = "sha256-JObRP2Vi+CsUf2nXhTAZUnR4yoY2jCnc01WTK7eEXTQ="
+
+[deps.zerofrom-derive]
+version = "0.1.6"
+hash = "sha256-Ahx4paD9Mp1XTxa2ZVRdNEiTrJH5Dnmfec6Bft+rK+Q="
+
+[deps.zerotrie]
+version = "0.2.3"
+hash = "sha256-d4UVA7l6RgO58+DHvUHuyB+UmK0Okhcg/n5ByGBlcsc="
+
+[deps.zerovec]
+version = "0.11.5"
+hash = "sha256-VmjZHDykEN0bSZmPWHF8012rptFZuy2NC28LLPbU6bM="
+
+[deps.zerovec-derive]
+version = "0.11.2"
+hash = "sha256-p5fY9PeXZvjJ7QFRZjmV7Tm2LhLBtdrU8RGPTnOZru4="
 

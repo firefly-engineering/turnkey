@@ -18,7 +18,10 @@ result
 tools/godeps-gen/godeps-gen
 tools/gobuckify/gobuckify
 
-# Go build binaries
-godeps-gen
-rustdeps-gen
-tk
+# Go/Rust build binaries (at repo root)
+/godeps-gen
+/rustdeps-gen
+/tk
+
+# Rust build artifacts
+target/
