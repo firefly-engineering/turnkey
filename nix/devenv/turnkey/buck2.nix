@@ -522,6 +522,10 @@ in
       # Store tk's share path for shell completion setup
       // lib.optionalAttrs (turnkeyCfg.registry ? tk) {
         TURNKEY_TK_SHARE = "${turnkeyCfg.registry.tk}/share";
+      }
+      # Suppress devenv task trace output when quiet mode is enabled
+      // lib.optionalAttrs cfg.quiet {
+        DEVENV_TASKS_QUIET = "true";
       };
 
     # Create symlinks on shell entry
