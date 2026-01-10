@@ -21,6 +21,7 @@ type CratesIOPrefetcher struct {
 }
 
 // Prefetch downloads the crate from crates.io and returns its SRI hash.
+// Uses --unpack to match fetchzip's behavior (hash of unpacked contents).
 func (p *CratesIOPrefetcher) Prefetch(crateName, version string) (string, error) {
 	url := fmt.Sprintf("https://crates.io/api/v1/crates/%s/%s/download", crateName, version)
 
@@ -31,10 +32,13 @@ func (p *CratesIOPrefetcher) Prefetch(crateName, version string) (string, error)
 	return runNixPrefetchURL(url)
 }
 
-// runNixPrefetchURL runs nix-prefetch-url and returns the SRI hash.
+// runNixPrefetchURL runs nix-prefetch-url --unpack and returns the SRI hash.
+// The --unpack flag is critical: it unpacks the archive and hashes the contents,
+// which matches Nix's fetchzip behavior.
 func runNixPrefetchURL(url string) (string, error) {
-	// Use nix-prefetch-url with --type sha256 to get the hash
-	cmd := exec.Command("nix-prefetch-url", "--type", "sha256", url)
+	// Use nix-prefetch-url with --unpack to match fetchzip behavior
+	// fetchzip computes hash of unpacked contents, not the archive itself
+	cmd := exec.Command("nix-prefetch-url", "--type", "sha256", "--unpack", url)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("nix-prefetch-url failed: %w", err)

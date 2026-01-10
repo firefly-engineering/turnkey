@@ -46,7 +46,7 @@ func WriteTOML(w io.Writer, crates []Crate, opts OutputOptions) error {
 
 	if opts.IncludeHashWarning && hasMissingHashes {
 		fmt.Fprintln(w, "# WARNING: Some crates are missing hashes.")
-		fmt.Fprintln(w, "# Ensure Cargo.lock has checksums (run: cargo update)")
+		fmt.Fprintln(w, "# Re-run rustdeps-gen to prefetch hashes from crates.io")
 		fmt.Fprintln(w, "#")
 	}
 
