@@ -17,3 +17,8 @@ examples/hello-deps/hello-deps
 result
 tools/godeps-gen/godeps-gen
 tools/gobuckify/gobuckify
+
+# Go build binaries
+godeps-gen
+rustdeps-gen
+tk

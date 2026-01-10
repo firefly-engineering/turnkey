@@ -75,6 +75,7 @@
         {
           # Export tools as packages
           packages.godeps-gen = import ./nix/packages/godeps-gen.nix { inherit pkgs lib; };
+          packages.rustdeps-gen = import ./nix/packages/rustdeps-gen.nix { inherit pkgs lib; };
           packages.gobuckify = import ./nix/packages/gobuckify.nix { inherit pkgs lib; };
           packages.tk = import ./nix/packages/tk.nix { inherit pkgs lib; };
 
@@ -108,6 +109,7 @@
               typescript = pkgs.nodePackages.typescript;
               # Internal tools
               godeps-gen = config.packages.godeps-gen;
+              rustdeps-gen = config.packages.rustdeps-gen;
               gobuckify = config.packages.gobuckify;
               tk = config.packages.tk;
             };
