@@ -1,9 +1,10 @@
-# rustdeps-gen Nix package
+# pydeps-gen Nix package
 #
-# Builds the rustdeps-gen tool that generates rust-deps.toml from Cargo.lock.
-# This tool is used to create declarative Rust dependency files for Buck2 integration.
+# Builds the pydeps-gen tool that generates python-deps.toml from pyproject.toml
+# or requirements.txt. This tool is used to create declarative Python dependency
+# files for Buck2 integration.
 #
-# Written in Rust for proper Cargo.lock parsing using the cargo-lock crate.
+# Written in Rust for consistent tooling with rustdeps-gen.
 { pkgs, lib }:
 
 let
@@ -11,7 +12,7 @@ let
   root = ../..;
 in
 pkgs.rustPlatform.buildRustPackage {
-  pname = "rustdeps-gen";
+  pname = "pydeps-gen";
   version = "0.1.0";
 
   src = fs.toSource {
@@ -19,9 +20,9 @@ pkgs.rustPlatform.buildRustPackage {
     fileset = fs.unions [
       (root + "/Cargo.toml")
       (root + "/Cargo.lock")
-      (root + "/cmd/rustdeps-gen")
+      (root + "/cmd/pydeps-gen")
       # Include other workspace members for Cargo workspace resolution
-      (root + "/cmd/pydeps-gen/Cargo.toml")
+      (root + "/cmd/rustdeps-gen/Cargo.toml")
       (root + "/examples/rust-hello/Cargo.toml")
       (root + "/examples/rust-hello-deps/Cargo.toml")
     ];
@@ -31,22 +32,22 @@ pkgs.rustPlatform.buildRustPackage {
     lockFile = root + "/Cargo.lock";
   };
 
-  # Only build rustdeps-gen, not examples
-  cargoBuildFlags = [ "-p" "rustdeps-gen" ];
-  cargoTestFlags = [ "-p" "rustdeps-gen" ];
+  # Only build pydeps-gen, not examples
+  cargoBuildFlags = [ "-p" "pydeps-gen" ];
+  cargoTestFlags = [ "-p" "pydeps-gen" ];
 
   nativeBuildInputs = [ pkgs.makeWrapper ];
 
   # Wrap the binary to include nix in PATH for prefetching
   postInstall = ''
-    wrapProgram $out/bin/rustdeps-gen \
+    wrapProgram $out/bin/pydeps-gen \
       --prefix PATH : ${lib.makeBinPath [ pkgs.nix ]}
   '';
 
   meta = {
-    description = "Generate rust-deps.toml from Cargo.lock for Buck2 integration";
+    description = "Generate python-deps.toml from pyproject.toml or requirements.txt for Buck2 integration";
     homepage = "https://github.com/firefly-engineering/turnkey";
     license = lib.licenses.mit;
-    mainProgram = "rustdeps-gen";
+    mainProgram = "pydeps-gen";
   };
 }

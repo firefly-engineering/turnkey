@@ -7,6 +7,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "cmd/pydeps-gen",
     "cmd/rustdeps-gen",
     "examples/rust-hello",
     "examples/rust-hello-deps",
