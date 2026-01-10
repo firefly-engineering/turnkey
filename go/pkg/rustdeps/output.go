@@ -51,7 +51,7 @@ func WriteTOML(w io.Writer, crates []Crate, opts OutputOptions) error {
 	}
 
 	if opts.IncludeRegenerateHint {
-		fmt.Fprintln(w, "# To regenerate: rustdeps-gen --cargo-lock Cargo.lock > rust-deps.toml")
+		fmt.Fprintln(w, "# To regenerate: rustdeps-gen -o rust-deps.toml")
 		fmt.Fprintln(w)
 	}
 

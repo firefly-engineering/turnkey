@@ -52,7 +52,7 @@ func WriteTOML(w io.Writer, deps []Dependency, opts OutputOptions) error {
 	}
 
 	if opts.IncludeRegenerateHint {
-		fmt.Fprintln(w, "# To regenerate: godeps-gen --prefetch > go-deps.toml")
+		fmt.Fprintln(w, "# To regenerate: godeps-gen --prefetch -o go-deps.toml")
 		fmt.Fprintln(w)
 	}
 

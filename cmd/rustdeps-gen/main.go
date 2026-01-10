@@ -9,12 +9,14 @@
 //
 // Usage:
 //
-//	rustdeps-gen --cargo-lock Cargo.lock > rust-deps.toml
+//	rustdeps-gen -o rust-deps.toml
+//	rustdeps-gen --cargo-lock Cargo.lock -o rust-deps.toml
 package main
 
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/firefly-engineering/turnkey/go/pkg/rustdeps"
@@ -22,6 +24,7 @@ import (
 
 func main() {
 	cargoLockPath := flag.String("cargo-lock", "Cargo.lock", "path to Cargo.lock file")
+	outputPath := flag.String("o", "", "output file path (default: stdout)")
 	noPrefetch := flag.Bool("no-prefetch", false, "skip prefetching (output will have incorrect hashes)")
 	flag.Parse()
 
@@ -58,10 +61,26 @@ func main() {
 		})
 	}
 
+	// Determine output destination
+	var output io.Writer = os.Stdout
+	if *outputPath != "" {
+		f, err := os.Create(*outputPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error creating output file: %v\n", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+		output = f
+	}
+
 	// Output TOML
 	outputOpts := rustdeps.DefaultOutputOptions()
-	if err := rustdeps.WriteTOML(os.Stdout, crates, outputOpts); err != nil {
+	if err := rustdeps.WriteTOML(output, crates, outputOpts); err != nil {
 		fmt.Fprintf(os.Stderr, "error writing output: %v\n", err)
 		os.Exit(1)
+	}
+
+	if *outputPath != "" {
+		fmt.Fprintf(os.Stderr, "Wrote %s\n", *outputPath)
 	}
 }

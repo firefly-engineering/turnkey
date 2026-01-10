@@ -5,12 +5,14 @@
 //
 // Usage:
 //
-//	godeps-gen --go-mod go.mod --go-sum go.sum > go-deps.toml
+//	godeps-gen -o go-deps.toml
+//	godeps-gen --go-mod go.mod --go-sum go.sum -o go-deps.toml
 package main
 
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/firefly-engineering/turnkey/go/pkg/godeps"
@@ -19,6 +21,7 @@ import (
 func main() {
 	goModPath := flag.String("go-mod", "go.mod", "path to go.mod file")
 	goSumPath := flag.String("go-sum", "go.sum", "path to go.sum file")
+	outputPath := flag.String("o", "", "output file path (default: stdout)")
 	prefetch := flag.Bool("prefetch", false, "fetch Nix hashes using nix-prefetch-github (requires nix)")
 	includeIndirect := flag.Bool("indirect", true, "include indirect (transitive) dependencies")
 	flag.Parse()
@@ -56,16 +59,33 @@ func main() {
 
 	// Prefetch Nix hashes if requested
 	if *prefetch {
+		fmt.Fprintf(os.Stderr, "Prefetching %d dependencies...\n", len(deps))
 		prefetcher := godeps.DefaultPrefetcher(os.Stderr)
 		godeps.PrefetchAll(deps, prefetcher, func(dep godeps.Dependency, err error) {
 			fmt.Fprintf(os.Stderr, "warning: failed to prefetch %s: %v\n", dep.ImportPath, err)
 		})
 	}
 
+	// Determine output destination
+	var output io.Writer = os.Stdout
+	if *outputPath != "" {
+		f, err := os.Create(*outputPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error creating output file: %v\n", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+		output = f
+	}
+
 	// Output TOML
 	outputOpts := godeps.DefaultOutputOptions()
-	if err := godeps.WriteTOML(os.Stdout, deps, outputOpts); err != nil {
+	if err := godeps.WriteTOML(output, deps, outputOpts); err != nil {
 		fmt.Fprintf(os.Stderr, "error writing output: %v\n", err)
 		os.Exit(1)
+	}
+
+	if *outputPath != "" {
+		fmt.Fprintf(os.Stderr, "Wrote %s\n", *outputPath)
 	}
 }
