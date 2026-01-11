@@ -75,6 +75,7 @@
         {
           # Export tools as packages
           packages.godeps-gen = import ./nix/packages/godeps-gen.nix { inherit pkgs lib; };
+          packages.nix-prefetch-cached = import ./nix/packages/nix-prefetch-cached.nix { inherit pkgs lib; };
           packages.pydeps-gen = import ./nix/packages/pydeps-gen.nix { inherit pkgs lib; };
           packages.rustdeps-gen = import ./nix/packages/rustdeps-gen.nix { inherit pkgs lib; };
           packages.gobuckify = import ./nix/packages/gobuckify.nix { inherit pkgs lib; };

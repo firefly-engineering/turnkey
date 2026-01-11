@@ -11,6 +11,7 @@
 let
   fs = lib.fileset;
   root = ../..;
+  nix-prefetch-cached = import ./nix-prefetch-cached.nix { inherit pkgs lib; };
 in
 pkgs.buildGoModule {
   pname = "godeps-gen";
@@ -37,6 +38,7 @@ pkgs.buildGoModule {
       --prefix PATH : ${lib.makeBinPath [
         pkgs.nix-prefetch-github
         pkgs.nix
+        nix-prefetch-cached
       ]}
   '';
 

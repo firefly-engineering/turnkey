@@ -10,6 +10,7 @@
 let
   fs = lib.fileset;
   root = ../..;
+  nix-prefetch-cached = import ./nix-prefetch-cached.nix { inherit pkgs lib; };
 in
 pkgs.rustPlatform.buildRustPackage {
   pname = "pydeps-gen";
@@ -22,9 +23,11 @@ pkgs.rustPlatform.buildRustPackage {
       (root + "/Cargo.lock")
       (root + "/cmd/pydeps-gen")
       # Include other workspace members for Cargo workspace resolution
+      (root + "/cmd/nix-prefetch-cached")
       (root + "/cmd/rustdeps-gen/Cargo.toml")
       (root + "/examples/rust-hello/Cargo.toml")
       (root + "/examples/rust-hello-deps/Cargo.toml")
+      (root + "/rust/prefetch-cache")
     ];
   };
 
@@ -38,10 +41,10 @@ pkgs.rustPlatform.buildRustPackage {
 
   nativeBuildInputs = [ pkgs.makeWrapper ];
 
-  # Wrap the binary to include nix in PATH for prefetching
+  # Wrap the binary to include nix and nix-prefetch-cached in PATH for prefetching
   postInstall = ''
     wrapProgram $out/bin/pydeps-gen \
-      --prefix PATH : ${lib.makeBinPath [ pkgs.nix ]}
+      --prefix PATH : ${lib.makeBinPath [ pkgs.nix nix-prefetch-cached ]}
   '';
 
   meta = {

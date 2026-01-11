@@ -12,7 +12,7 @@ members = [
     "cmd/rustdeps-gen",
     "examples/rust-hello",
     "examples/rust-hello-deps",
-    "lib/prefetch-cache",
+    "rust/prefetch-cache",
 ]
 
 # Shared dependencies for all workspace members
