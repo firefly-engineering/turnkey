@@ -3,8 +3,9 @@
 # Reads a rust-deps.toml file and builds a Buck2 cell containing
 # all crate dependencies with BUCK files for rust_library targets.
 #
-# The TOML file format:
-#   [deps.crate-name]
+# The TOML file format (supports multiple versions of same crate):
+#   [deps."crate-name@1.0.0"]
+#   name = "crate-name"
 #   version = "1.0.0"
 #   hash = "sha256-..."
 #   features = ["feature1", "feature2"]  # optional
@@ -18,10 +19,13 @@ let
   depsToml = builtins.fromTOML (builtins.readFile depsFile);
 
   # Convert TOML deps to registry format
-  registry = lib.mapAttrs (crateName: dep: {
+  # Key is "name@version", value contains name, version, hash
+  registry = lib.mapAttrs (key: dep: {
+    # Use explicit name field, fallback to parsing key for backwards compat
+    crateName = dep.name or (lib.head (lib.splitString "@" key));
     inherit (dep) version;
     features = dep.features or [];
-    src = fetchCrate crateName dep;
+    src = fetchCrate (dep.name or (lib.head (lib.splitString "@" key))) dep;
   }) (depsToml.deps or {});
 
   # Fetch crate from crates.io
@@ -33,7 +37,8 @@ let
     };
 
   # Generate BUCK file content for a crate
-  generateBuckFile = crateName: dep:
+  # Uses versioned directory name to support multiple versions
+  generateBuckFile = key: dep:
     let
       # Find all .rs files (will be done at build time)
       visibility = ''["PUBLIC"]'';
@@ -43,7 +48,7 @@ let
       load("@prelude//:rules.bzl", "rust_library")
 
       rust_library(
-          name = "${crateName}",
+          name = "${dep.crateName}",
           srcs = glob(["src/**/*.rs"]),
           edition = "2021",
           visibility = ${visibility},
@@ -51,19 +56,21 @@ let
     '';
 
   # Generate shell commands to set up one crate
-  setupCrate = crateName: dep:
+  # key is "name@version", dep contains crateName, version, src
+  setupCrate = key: dep:
     let
-      vendorPath = "vendor/${crateName}";
+      # Use key (name@version) as directory to support multiple versions
+      vendorPath = "vendor/${key}";
     in
     ''
-      # Set up ${crateName}
+      # Set up ${key}
       mkdir -p $out/${vendorPath}
       cp -r ${dep.src}/* $out/${vendorPath}/
       chmod -R u+w $out/${vendorPath}
 
       # Generate BUCK file
       cat > $out/${vendorPath}/BUCK << 'BUCK'
-      ${generateBuckFile crateName dep}
+      ${generateBuckFile key dep}
       BUCK
     '';
 

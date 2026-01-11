@@ -199,10 +199,14 @@ fn write_toml(mut w: impl Write, crates: &[Crate]) -> Result<()> {
     writeln!(w, "# Source: Cargo.lock")?;
     writeln!(w, "#")?;
     writeln!(w, "# To regenerate: rustdeps-gen -o rust-deps.toml")?;
+    writeln!(w, "#")?;
+    writeln!(w, "# Key format: deps.\"crate-name@version\" to support multiple versions")?;
     writeln!(w)?;
 
     for c in crates {
-        writeln!(w, "[deps.{}]", c.name)?;
+        // Use "name@version" as key to handle multiple versions of same crate
+        writeln!(w, "[deps.\"{}@{}\"]", c.name, c.version)?;
+        writeln!(w, "name = \"{}\"", c.name)?;
         writeln!(w, "version = \"{}\"", c.version)?;
         match &c.nix_hash {
             Some(hash) => writeln!(w, "hash = \"{}\"", hash)?,
