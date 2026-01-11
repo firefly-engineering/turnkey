@@ -1,0 +1,14 @@
+[package]
+name = "nix-prefetch-cached"
+version = "0.1.0"
+edition = "2021"
+description = "Caching wrapper around nix-prefetch-url for faster dependency resolution"
+
+[[bin]]
+name = "nix-prefetch-cached"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+prefetch-cache = { path = "../../lib/prefetch-cache" }
