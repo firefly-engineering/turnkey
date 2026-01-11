@@ -83,11 +83,17 @@ fn main() -> Result<()> {
             crates_io_packages.len()
         );
 
-        for pkg in &crates_io_packages {
+        for (i, pkg) in crates_io_packages.iter().enumerate() {
             let name = pkg.name.as_str();
             let version = pkg.version.to_string();
 
-            eprintln!("  prefetching {}@{}...", name, version);
+            eprintln!(
+                "[{}/{}] prefetching {}@{}...",
+                i + 1,
+                crates_io_packages.len(),
+                name,
+                version
+            );
 
             let nix_hash = match prefetch_crate(name, &version) {
                 Ok(hash) => Some(hash),
@@ -151,46 +157,58 @@ fn convert_checksum_to_sri(hex: &str) -> Option<String> {
     })
 }
 
-/// Prefetch a crate from crates.io and return its Nix hash
+/// Prefetch a crate from crates.io and return its Nix hash (SRI format)
 fn prefetch_crate(name: &str, version: &str) -> Result<String> {
     let url = format!(
         "https://crates.io/api/v1/crates/{}/{}/download",
         name, version
     );
 
-    // Use nix-prefetch-url --unpack to match fetchzip behavior
-    let output = Command::new("nix-prefetch-url")
-        .args(["--type", "sha256", "--unpack", &url])
+    // Use nix-prefetch-cached for automatic caching
+    // Falls back to nix-prefetch-url if wrapper not available
+    let output = Command::new("nix-prefetch-cached")
+        .args(["--unpack", &url])
         .output()
-        .context("Failed to run nix-prefetch-url")?;
+        .or_else(|_| {
+            // Fallback to nix-prefetch-url if cached version not available
+            Command::new("nix-prefetch-url")
+                .args(["--type", "sha256", "--unpack", &url])
+                .output()
+        })
+        .context("Failed to run nix-prefetch-cached or nix-prefetch-url")?;
 
     if !output.status.success() {
         anyhow::bail!(
-            "nix-prefetch-url failed: {}",
+            "prefetch failed: {}",
             String::from_utf8_lossy(&output.stderr)
         );
     }
 
-    let base32_hash = String::from_utf8(output.stdout)
-        .context("Invalid UTF-8 from nix-prefetch-url")?
+    let hash = String::from_utf8(output.stdout)
+        .context("Invalid UTF-8 from prefetch")?
         .trim()
         .to_string();
 
-    // Convert to SRI format
-    let sri_output = Command::new("nix")
-        .args(["hash", "to-sri", "--type", "sha256", &base32_hash])
-        .output()
-        .context("Failed to run nix hash to-sri")?;
+    // nix-prefetch-cached already returns SRI format
+    // If using fallback nix-prefetch-url, we need to convert
+    if hash.starts_with("sha256-") {
+        Ok(hash)
+    } else {
+        // Convert base32 to SRI format
+        let sri_output = Command::new("nix")
+            .args(["hash", "to-sri", "--type", "sha256", &hash])
+            .output()
+            .context("Failed to run nix hash to-sri")?;
 
-    if !sri_output.status.success() {
-        // Fallback to base32 if conversion fails
-        return Ok(base32_hash);
+        if !sri_output.status.success() {
+            return Ok(hash);
+        }
+
+        Ok(String::from_utf8(sri_output.stdout)
+            .context("Invalid UTF-8 from nix hash")?
+            .trim()
+            .to_string())
     }
-
-    Ok(String::from_utf8(sri_output.stdout)
-        .context("Invalid UTF-8 from nix hash")?
-        .trim()
-        .to_string())
 }
 
 /// Write crates as TOML

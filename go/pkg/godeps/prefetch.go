@@ -255,23 +255,33 @@ func escapeModulePath(path string) string {
 	return result.String()
 }
 
-// runNixPrefetchURL runs nix-prefetch-url and returns the SRI hash.
+// runNixPrefetchURL runs nix-prefetch-url (or nix-prefetch-cached) and returns the SRI hash.
 func runNixPrefetchURL(url string) (string, error) {
-	// Use nix-prefetch-url with --type sha256 to get the hash
-	cmd := exec.Command("nix-prefetch-url", "--type", "sha256", url)
+	// Try nix-prefetch-cached first (with caching), fall back to nix-prefetch-url
+	cmd := exec.Command("nix-prefetch-cached", url)
 	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("nix-prefetch-url failed: %w", err)
+		// Fallback to nix-prefetch-url if cached version not available
+		cmd = exec.Command("nix-prefetch-url", "--type", "sha256", url)
+		output, err = cmd.Output()
+		if err != nil {
+			return "", fmt.Errorf("nix-prefetch-url failed: %w", err)
+		}
 	}
 
-	// nix-prefetch-url outputs the hash in base32 format
-	// Convert to SRI format using nix hash to-sri
-	base32Hash := strings.TrimSpace(string(output))
-	cmd = exec.Command("nix", "hash", "to-sri", "--type", "sha256", base32Hash)
+	hash := strings.TrimSpace(string(output))
+
+	// nix-prefetch-cached returns SRI format, nix-prefetch-url returns base32
+	if strings.HasPrefix(hash, "sha256-") {
+		return hash, nil
+	}
+
+	// Convert base32 to SRI format using nix hash to-sri
+	cmd = exec.Command("nix", "hash", "to-sri", "--type", "sha256", hash)
 	sriOutput, err := cmd.Output()
 	if err != nil {
 		// Fallback: return the base32 hash if conversion fails
-		return base32Hash, nil
+		return hash, nil
 	}
 
 	return strings.TrimSpace(string(sriOutput)), nil

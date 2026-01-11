@@ -542,32 +542,45 @@ fn resolve_single_dep(
 
 /// Prefetch a URL and return its Nix SRI hash
 fn prefetch_url(url: &str) -> Result<String> {
-    // Use nix hash convert to get SRI format directly
-    let output = Command::new("nix-prefetch-url")
-        .args(["--unpack", "--type", "sha256", url])
+    // Use nix-prefetch-cached for automatic caching
+    // Falls back to nix-prefetch-url if wrapper not available
+    let output = Command::new("nix-prefetch-cached")
+        .args(["--unpack", url])
         .output()
-        .context("Failed to run nix-prefetch-url")?;
+        .or_else(|_| {
+            // Fallback to nix-prefetch-url if cached version not available
+            Command::new("nix-prefetch-url")
+                .args(["--unpack", "--type", "sha256", url])
+                .output()
+        })
+        .context("Failed to run nix-prefetch-cached or nix-prefetch-url")?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("nix-prefetch-url failed: {}", stderr);
+        bail!("prefetch failed: {}", stderr);
     }
 
-    let base32_hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
-    // Convert base32 to SRI using nix hash convert
-    let convert_output = Command::new("nix")
-        .args(["hash", "convert", "--hash-algo", "sha256", "--to", "sri", &base32_hash])
-        .output()
-        .context("Failed to run nix hash convert")?;
+    // nix-prefetch-cached already returns SRI format
+    // If using fallback nix-prefetch-url, we need to convert
+    if hash.starts_with("sha256-") {
+        Ok(hash)
+    } else {
+        // Convert base32 to SRI using nix hash convert
+        let convert_output = Command::new("nix")
+            .args(["hash", "convert", "--hash-algo", "sha256", "--to", "sri", &hash])
+            .output()
+            .context("Failed to run nix hash convert")?;
 
-    if !convert_output.status.success() {
-        let stderr = String::from_utf8_lossy(&convert_output.stderr);
-        bail!("nix hash convert failed: {}", stderr);
+        if !convert_output.status.success() {
+            let stderr = String::from_utf8_lossy(&convert_output.stderr);
+            bail!("nix hash convert failed: {}", stderr);
+        }
+
+        let sri_hash = String::from_utf8_lossy(&convert_output.stdout).trim().to_string();
+        Ok(sri_hash)
     }
-
-    let sri_hash = String::from_utf8_lossy(&convert_output.stdout).trim().to_string();
-    Ok(sri_hash)
 }
 
 /// Generate python-deps.toml content
