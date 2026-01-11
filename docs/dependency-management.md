@@ -77,7 +77,7 @@ No network access during builds. All sources are pre-fetched into Nix store.
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         Hash Generation Tools                            │
 │                                                                          │
-│    godeps-gen --prefetch       (rust equivalent)        (python equiv)   │
+│    godeps-gen --prefetch        rustdeps-gen             pydeps-gen      │
 │                                                                          │
 │    Reads dependency declaration, fetches each module via nix-prefetch-*  │
 │    Outputs TOML with per-module SRI hashes                               │
@@ -98,7 +98,7 @@ No network access during builds. All sources are pre-fetched into Nix store.
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         Nix Cell Builders                                │
 │                                                                          │
-│    go-deps-cell.nix           rust-deps-cell.nix       python-deps-cell  │
+│    go-deps-cell.nix         rust-deps-cell.nix      python-deps-cell.nix │
 │                                                                          │
 │    - Reads TOML, fetches each module via fetchFromGitHub/fetchurl        │
 │    - Assembles into directory structure                                  │
@@ -148,17 +148,124 @@ The hash should come from the source (e.g., GitHub tarball), not from transforme
 
 ## Regenerating Dependencies
 
-When dependencies change:
+When dependencies change, use `tk sync` to regenerate all dependency files:
 
 ```bash
-# 1. Update the language-native declaration
+# Update language-native declaration, then sync
 go get github.com/new/dependency@v1.0.0
+tk sync
+```
 
-# 2. Regenerate the TOML with hashes
-godeps-gen --prefetch > go-deps.toml
+Or regenerate specific languages manually:
 
-# 3. Rebuild the cell (happens automatically via Nix)
-# The .turnkey/godeps symlink will point to new store path
+```bash
+# Go
+godeps-gen --prefetch -o go-deps.toml
+
+# Rust
+rustdeps-gen --cargo-lock Cargo.lock -o rust-deps.toml
+
+# Python (recommended: use lock file for reproducibility)
+uv lock && uv export --format pylock.toml -o pylock.toml
+pydeps-gen --lock pylock.toml -o python-deps.toml
+```
+
+## Dependency Generator Tools
+
+### godeps-gen (Go)
+
+Generates `go-deps.toml` from `go.mod` and `go.sum`.
+
+```bash
+godeps-gen [--prefetch] [-o go-deps.toml]
+```
+
+Options:
+- `--prefetch`: Fetch Nix hashes using nix-prefetch-github (required for valid hashes)
+- `--indirect`: Include indirect (transitive) dependencies (default: true)
+- `-o`: Output file (default: stdout)
+
+### rustdeps-gen (Rust)
+
+Generates `rust-deps.toml` from `Cargo.lock`.
+
+```bash
+rustdeps-gen --cargo-lock Cargo.lock [-o rust-deps.toml]
+```
+
+Options:
+- `--cargo-lock`: Path to Cargo.lock file (default: Cargo.lock)
+- `--no-prefetch`: Skip prefetching (produces incorrect hashes)
+- `-o`: Output file (default: stdout)
+
+### pydeps-gen (Python)
+
+Generates `python-deps.toml` from Python dependency files. Supports three input formats:
+
+**Input Formats:**
+
+| Format | Flag | Reproducibility | Notes |
+|--------|------|-----------------|-------|
+| pylock.toml (PEP 751) | `--lock` | ✅ Best | Exact versions and URLs |
+| pyproject.toml | `--pyproject` | ⚠️ Varies | Uses latest matching versions |
+| requirements.txt | `--requirements` | ⚠️ Varies | Pin versions with `==` for reproducibility |
+
+**Recommended Workflow (using uv):**
+
+```bash
+# 1. Generate lock file from pyproject.toml
+uv lock
+
+# 2. Export to PEP 751 format
+uv export --format pylock.toml -o pylock.toml
+
+# 3. Generate python-deps.toml with Nix hashes
+pydeps-gen --lock pylock.toml -o python-deps.toml
+```
+
+**CLI Options:**
+
+```
+--lock <PATH>          Path to pylock.toml (PEP 751 lock file) - RECOMMENDED
+--pyproject <PATH>     Path to pyproject.toml
+--requirements <PATH>  Path to requirements.txt
+-o, --output <PATH>    Output file (default: stdout)
+--no-prefetch          Skip prefetching (produces placeholder hashes)
+--include-dev          Include dev dependencies from optional-dependencies.dev
+```
+
+**Output Format:**
+
+```toml
+# python-deps.toml
+[deps.requests]
+version = "2.31.0"
+hash = "sha256-..."
+url = "https://files.pythonhosted.org/..."
+
+[deps.six]
+version = "1.16.0"
+hash = "sha256-..."
+url = "https://files.pythonhosted.org/..."
+```
+
+**Examples:**
+
+```bash
+# From PEP 751 lock file (best for reproducibility)
+pydeps-gen --lock pylock.toml -o python-deps.toml
+
+# From pyproject.toml (resolves to latest matching versions)
+pydeps-gen --pyproject pyproject.toml -o python-deps.toml
+
+# From requirements.txt
+pydeps-gen --requirements requirements.txt -o python-deps.toml
+
+# Include dev dependencies
+pydeps-gen --lock pylock.toml --include-dev -o python-deps.toml
+
+# Quick check without fetching (placeholder hashes)
+pydeps-gen --lock pylock.toml --no-prefetch
 ```
 
 ## Building Tools vs Dependency Cells
