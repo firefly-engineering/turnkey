@@ -415,11 +415,13 @@ def get_native_library_info(crate_name: str, version: str) -> dict | None:
     """Get info about native libraries for crates with pre-built native code.
 
     Some crates (like ring) have native C/assembly code that we pre-compile
-    in Nix. This returns info needed to create a prebuilt_cxx_library rule.
+    in Nix. This returns info needed to create a prebuilt_cxx_library rule
+    and configure the linker.
 
     Returns dict with:
         - lib_name: The library name (without lib prefix and .a suffix)
         - static_lib_path: Path to the static library file
+        - link_search_path: Path for -L flag (relative to crate dir)
     """
     if crate_name == "ring":
         # ring's native crypto library is pre-compiled and placed in out_dir/
@@ -429,6 +431,7 @@ def get_native_library_info(crate_name: str, version: str) -> dict | None:
         return {
             "lib_name": lib_name,
             "static_lib_path": f"out_dir/lib{lib_name}.a",
+            "link_search_path": "out_dir",
         }
     return None
 
@@ -464,6 +467,7 @@ def generate_buck_file(
     if native_lib_info:
         lib_name = native_lib_info["lib_name"]
         static_lib_path = native_lib_info["static_lib_path"]
+        link_search_path = native_lib_info.get("link_search_path", "out_dir")
         lines.extend([
             f"# Native crypto library pre-compiled in Nix",
             f"prebuilt_cxx_library(",
@@ -475,6 +479,8 @@ def generate_buck_file(
         ])
         # Add the native library as a dependency
         deps = deps + [f":{lib_name}"]
+        # Add -L flag so rustc can find the library during linking
+        rustc_flags = rustc_flags + [f"-Lnative={link_search_path}"]
 
     lines.extend([
         "rust_library(",
