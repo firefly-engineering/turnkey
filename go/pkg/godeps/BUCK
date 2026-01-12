@@ -26,4 +26,5 @@ go_test(
     deps = [
         "godeps//vendor/golang.org/x/mod/modfile:modfile",
     ],
+    target_under_test = ":godeps",
 )
