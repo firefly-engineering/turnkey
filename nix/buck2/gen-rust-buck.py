@@ -427,7 +427,7 @@ def get_native_library_info(crate_name: str, version: str) -> dict | None:
         # ring's native crypto library is pre-compiled and placed in out_dir/
         # The library name follows ring's versioning: libring_core_0_17_<patch>.a
         patch = version.split(".")[-1] if version else "0"
-        lib_name = f"ring_core_0_17_{patch}_"
+        lib_name = f"ring_core_0_17_{patch}__"
         return {
             "lib_name": lib_name,
             "static_lib_path": f"out_dir/lib{lib_name}.a",
@@ -484,6 +484,7 @@ def generate_buck_file(
             f'    name = "{lib_name}",',
             f'    static_lib = ":{lib_name}_file",',
             f'    link_whole = True,',
+            f'    preferred_linkage = "static",',
             f'    visibility = ["PUBLIC"],',
             f")",
             "",

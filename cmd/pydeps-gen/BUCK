@@ -12,6 +12,8 @@ rust_binary(
         "rustdeps//vendor/serde_json:serde_json",
         "rustdeps//vendor/toml:toml",
         "rustdeps//vendor/ureq:ureq",
+        # Native library for ring (TLS crypto) - Buck2 doesn't propagate native deps through Rust libs
+        "rustdeps//vendor/ring@0.17.14:ring_core_0_17_14__",
     ],
     visibility = ["PUBLIC"],
 )

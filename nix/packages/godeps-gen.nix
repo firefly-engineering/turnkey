@@ -28,7 +28,7 @@ pkgs.buildGoModule {
   };
   subPackages = [ "cmd/godeps-gen" ];
 
-  vendorHash = "sha256-qzjcuSUg5mPONQZnxz1kltrEhwtkwljCTEssULMAa78=";
+  vendorHash = "sha256-xe/0wnIMSzpEtCIHqJtVBRMnb3UUOHWxnhmg5naeVgc=";
 
   nativeBuildInputs = [ pkgs.makeWrapper ];
 
