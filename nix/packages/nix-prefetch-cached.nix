@@ -17,10 +17,7 @@ pkgs.rustPlatform.buildRustPackage {
 
   src = cargoLib.prunedCargoSource {
     inherit root;
-    members = [
-      "cmd/nix-prefetch-cached"
-      "rust/prefetch-cache"
-    ];
+    members = [ "cmd/nix-prefetch-cached" "rust/prefetch-cache" ];
   };
 
   cargoLock = {
