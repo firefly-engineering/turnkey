@@ -449,6 +449,9 @@ def generate_buck_file(
     native_lib_info: dict | None = None,
 ) -> str:
     """Generate BUCK file content."""
+    # Initialize linker_flags
+    linker_flags = []
+
     # Determine which rules we need to load
     rules_to_load = ["rust_library"]
     if native_lib_info:
@@ -482,6 +485,9 @@ def generate_buck_file(
         deps = deps + [f":{lib_name}"]
         # Add -L flag so rustc can find the library during linking
         rustc_flags = rustc_flags + [f"-Lnative={link_search_path}"]
+        # Also add exported_linker_flags to ensure the library is linked by dependents
+        # Using exported_linker_flags so they propagate to the final binary
+        linker_flags = [f"-L{link_search_path}", f"-l{lib_name}"]
 
     lines.extend([
         "rust_library(",
@@ -531,6 +537,13 @@ def generate_buck_file(
     if rustc_flags:
         lines.append("    rustc_flags = [")
         for flag in rustc_flags:
+            lines.append(f'        "{flag}",')
+        lines.append("    ],")
+
+    # Add exported_linker_flags for native libraries (propagates to dependents)
+    if linker_flags:
+        lines.append("    exported_linker_flags = [")
+        for flag in linker_flags:
             lines.append(f'        "{flag}",')
         lines.append("    ],")
 
