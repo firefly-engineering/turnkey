@@ -349,14 +349,40 @@ def generate_buck_file(
     return "\n".join(lines)
 
 
+def filter_features_for_availability(
+    features: list[str],
+    cargo: dict,
+    available_crates: set[str],
+) -> list[str]:
+    """Filter out features that enable unavailable optional dependencies."""
+    cargo_features = cargo.get("features", {})
+    optional_deps = get_optional_deps(cargo)
+
+    result = []
+    for f in features:
+        # Skip feature forwarding (shouldn't be here, but be safe)
+        if "/" in f:
+            continue
+        # Check if feature matches an optional dep that's not available
+        if f in optional_deps:
+            if not dep_is_available(f, available_crates):
+                continue
+        # Check if feature enables unavailable deps via dep: syntax
+        if feature_enables_unavailable_dep(f, cargo_features, available_crates):
+            continue
+        result.append(f)
+    return result
+
+
 def main():
     if len(sys.argv) < 3:
-        print("Usage: gen-rust-buck.py <crate_dir> <available_crates_json> [fixup_crates_json]", file=sys.stderr)
+        print("Usage: gen-rust-buck.py <crate_dir> <available_crates_json> [fixup_crates_json] [unified_features_json]", file=sys.stderr)
         sys.exit(1)
 
     crate_dir = Path(sys.argv[1])
     available_crates = set(json.loads(sys.argv[2]))
     fixup_crates = set(json.loads(sys.argv[3])) if len(sys.argv) > 3 else set()
+    unified_features = json.loads(sys.argv[4]) if len(sys.argv) > 4 else {}
 
     # Get crate name from directory (format: name@version or just name)
     dir_name = crate_dir.name
@@ -371,9 +397,17 @@ def main():
     crate_root = get_lib_path(cargo, crate_dir)
     deps = get_dependencies(cargo, available_crates)
     proc_macro = is_proc_macro(cargo)
-    features = get_default_features(cargo, available_crates)
     env = get_cargo_env(cargo, crate_name)
     rustc_flags = get_build_script_cfg_flags(crate_name)
+
+    # Use unified features if available, otherwise fall back to default features
+    if crate_name in unified_features:
+        features = unified_features[crate_name]
+        # Still need to filter for availability (unified features may include
+        # features that enable deps we don't have)
+        features = filter_features_for_availability(features, cargo, available_crates)
+    else:
+        features = get_default_features(cargo, available_crates)
 
     # Add OUT_DIR for crates that have build script fixups
     if crate_name in fixup_crates:

@@ -12,11 +12,17 @@
 #
 # This allows downstream repos to declare deps in pure data files.
 #
+# Feature unification:
+# Features are unified across the dependency graph, matching Cargo's behavior.
+# If any crate requires feature X on crate Y, crate Y is built with feature X.
+#
+# Manual overrides can be specified in an optional featuresFile (rust-features.toml).
+#
 # Build script fixups:
 # Some crates have build scripts that generate files needed at compile time.
 # We handle these by pre-generating the output in Nix.
 
-{ pkgs, lib, depsFile }:
+{ pkgs, lib, depsFile, featuresFile ? null }:
 
 let
   # Import semver utilities
@@ -43,8 +49,9 @@ let
       extension = "tar.gz";
     };
 
-  # Script to generate BUCK files by parsing Cargo.toml
+  # Scripts for BUCK file generation
   genBuckScript = ./gen-rust-buck.py;
+  computeFeaturesScript = ./compute-unified-features.py;
 
   # JSON list of all available crate names for dependency resolution
   availableCratesJson = builtins.toJSON (lib.attrNames cratesByName);
@@ -106,11 +113,13 @@ SERDE_PRIVATE
   # JSON map of crates that need OUT_DIR set (for gen-rust-buck.py)
   fixupCratesJson = builtins.toJSON (lib.filter needsFixup (lib.attrNames cratesByName));
 
-  # Generate shell commands to set up one crate
-  # key is "name@version", dep contains crateName, version, src
-  setupCrate = key: dep:
+  # ==========================================================================
+  # Crate setup (Phase 1: copy sources and apply fixups)
+  # ==========================================================================
+
+  # Generate shell commands to set up one crate's sources (no BUCK file yet)
+  setupCrateSources = key: dep:
     let
-      # Use key (name@version) as directory to support multiple versions
       vendorPath = "vendor/${key}";
       fixupCmds = getFixupCommands key dep;
     in
@@ -122,18 +131,35 @@ SERDE_PRIVATE
 
       # Apply fixups (if any)
       ${fixupCmds}
+    '';
 
-      # Generate BUCK file by parsing Cargo.toml
+  # All source setup commands
+  allSourceSetupCommands = lib.concatStringsSep "\n" (
+    lib.mapAttrsToList setupCrateSources registry
+  );
+
+  # ==========================================================================
+  # BUCK file generation (Phase 2: after feature unification)
+  # ==========================================================================
+
+  # Generate BUCK file for one crate using unified features
+  generateBuckFile = key: dep:
+    let
+      vendorPath = "vendor/${key}";
+    in
+    ''
+      # Generate BUCK file for ${key}
       ${pkgs.python3}/bin/python3 ${genBuckScript} \
         "$out/${vendorPath}" \
         '${availableCratesJson}' \
         '${fixupCratesJson}' \
+        "$UNIFIED_FEATURES" \
         > "$out/${vendorPath}/BUCK"
     '';
 
-  # All setup commands
-  allSetupCommands = lib.concatStringsSep "\n" (
-    lib.mapAttrsToList setupCrate registry
+  # All BUCK generation commands
+  allBuckGenCommands = lib.concatStringsSep "\n" (
+    lib.mapAttrsToList generateBuckFile registry
   );
 
   # ==========================================================================
@@ -167,14 +193,37 @@ SERDE_PRIVATE
     ) cratesByName
   );
 
+  # Optional features file handling
+  featuresFileArg = if featuresFile != null && builtins.pathExists featuresFile
+    then "${featuresFile}"
+    else "";
+
 in
 pkgs.runCommand "rust-deps-cell" {} ''
   mkdir -p $out/vendor
 
-  # Set up all crate sources and generate BUCK files
-  ${allSetupCommands}
+  # ==========================================================================
+  # Phase 1: Set up all crate sources and apply fixups
+  # ==========================================================================
+  ${allSourceSetupCommands}
 
-  # Create symlinks for unversioned crate references
+  # ==========================================================================
+  # Phase 2: Compute unified features across all crates
+  # ==========================================================================
+  echo "Computing unified features..."
+  UNIFIED_FEATURES=$(${pkgs.python3}/bin/python3 ${computeFeaturesScript} \
+    "$out/vendor" \
+    ${featuresFileArg})
+
+  # ==========================================================================
+  # Phase 3: Generate BUCK files with unified features
+  # ==========================================================================
+  echo "Generating BUCK files with unified features..."
+  ${allBuckGenCommands}
+
+  # ==========================================================================
+  # Phase 4: Create symlinks for unversioned crate references
+  # ==========================================================================
   # Users can reference "rustdeps//vendor/itoa:itoa" instead of "rustdeps//vendor/itoa@1.0.17:itoa"
   ${symlinkCommands}
 
@@ -188,5 +237,5 @@ pkgs.runCommand "rust-deps-cell" {} ''
       name = BUCK
   BUCKCONFIG
 
-  echo "Generated rustdeps cell v2 with ${toString (lib.length (lib.attrNames registry))} crates (with build script fixups)"
+  echo "Generated rustdeps cell with ${toString (lib.length (lib.attrNames registry))} crates (with feature unification)"
 ''

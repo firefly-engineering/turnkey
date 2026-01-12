@@ -186,6 +186,25 @@ in
             '';
           };
 
+          rustFeaturesFile = mkOption {
+            type = types.nullOr types.path;
+            default = null;
+            example = lib.literalExpression "./rust-features.toml";
+            description = ''
+              Path to rust-features.toml file for manual feature overrides.
+              This file is NOT generated - it's for resolving feature conflicts
+              or forcing specific feature sets on crates.
+
+              Format:
+                [overrides]
+                # Complete replacement
+                syn = ["derive", "parsing", "visit"]
+
+                # Additive/subtractive
+                serde = { add = ["alloc"] }
+                some-crate = { remove = ["incompatible-feature"] }
+            '';
+          };
 
           # Python dependencies
           pydeps = mkOption {
@@ -248,6 +267,10 @@ in
           import ../../buck2/rust-deps-cell.nix {
             inherit pkgs lib;
             depsFile = cfg.buck2.rustDepsFile;
+            featuresFile =
+              if cfg.buck2.rustFeaturesFile != null && builtins.pathExists cfg.buck2.rustFeaturesFile
+              then cfg.buck2.rustFeaturesFile
+              else null;
           }
         else
           cfg.buck2.rustdeps;
