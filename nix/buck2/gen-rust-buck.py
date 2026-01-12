@@ -455,7 +455,7 @@ def generate_buck_file(
     # Determine which rules we need to load
     rules_to_load = ["rust_library"]
     if native_lib_info:
-        rules_to_load.append("prebuilt_cxx_library")
+        rules_to_load.extend(["prebuilt_cxx_library", "export_file"])
 
     # Format rules for load statement: "rule1", "rule2"
     rules_str = ", ".join(f'"{r}"' for r in rules_to_load)
@@ -471,23 +471,27 @@ def generate_buck_file(
         lib_name = native_lib_info["lib_name"]
         static_lib_path = native_lib_info["static_lib_path"]
         link_search_path = native_lib_info.get("link_search_path", "out_dir")
+        # Use export_file to expose the library, then reference it in prebuilt_cxx_library
         lines.extend([
             f"# Native crypto library pre-compiled in Nix",
+            f"export_file(",
+            f'    name = "{lib_name}_file",',
+            f'    src = "{static_lib_path}",',
+            f'    visibility = ["PUBLIC"],',
+            f")",
+            "",
             f"prebuilt_cxx_library(",
             f'    name = "{lib_name}",',
-            f'    static_lib = "{static_lib_path}",',
-            f'    link_whole = True,  # Ensure all symbols are included in final link',
+            f'    static_lib = ":{lib_name}_file",',
+            f'    link_whole = True,',
             f'    visibility = ["PUBLIC"],',
             f")",
             "",
         ])
         # Add the native library as a dependency
         deps = deps + [f":{lib_name}"]
-        # Add -L flag so rustc can find the library during linking
+        # Add -L flag so rustc can find the library during compilation
         rustc_flags = rustc_flags + [f"-Lnative={link_search_path}"]
-        # Also add exported_linker_flags to ensure the library is linked by dependents
-        # Using exported_linker_flags so they propagate to the final binary
-        linker_flags = [f"-L{link_search_path}", f"-l{lib_name}"]
 
     lines.extend([
         "rust_library(",
