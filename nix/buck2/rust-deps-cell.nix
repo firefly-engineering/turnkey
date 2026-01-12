@@ -11,6 +11,10 @@
 #   features = ["feature1", "feature2"]  # optional
 #
 # This allows downstream repos to declare deps in pure data files.
+#
+# Build script fixups:
+# Some crates have build scripts that generate files needed at compile time.
+# We handle these by pre-generating the output in Nix.
 
 { pkgs, lib, depsFile }:
 
@@ -45,12 +49,54 @@ let
   # JSON list of all available crate names for dependency resolution
   availableCratesJson = builtins.toJSON (lib.attrNames cratesByName);
 
+  # ==========================================================================
+  # Build script fixups
+  # ==========================================================================
+  # Some crates have build scripts that generate files. We pre-generate these
+  # in Nix to avoid needing to run build scripts at Buck2 build time.
+
+  # Generate fixup commands for a specific crate
+  # Returns empty string if no fixup needed
+  getFixupCommands = key: dep:
+    let
+      crateName = dep.crateName;
+      version = dep.version;
+      patchVersion = lib.last (lib.splitString "." version);
+      vendorPath = "vendor/${key}";
+
+      # Common private.rs content for serde crates
+      serdePrivateRs = ''
+      #[doc(hidden)]
+      pub mod __private${patchVersion} {
+          #[doc(hidden)]
+          pub use crate::private::*;
+      }
+      '';
+    in
+    # serde_core and serde: both generate private.rs with version-specific module name
+    if crateName == "serde_core" || crateName == "serde" then ''
+      # Fixup: ${crateName} build script output
+      mkdir -p "$out/${vendorPath}/out_dir"
+      cat > "$out/${vendorPath}/out_dir/private.rs" << 'SERDE_PRIVATE'
+      ${serdePrivateRs}
+      SERDE_PRIVATE
+    ''
+    else "";
+
+  # Check if a crate needs build script fixups
+  needsFixup = crateName:
+    crateName == "serde_core" || crateName == "serde";
+
+  # JSON map of crates that need OUT_DIR set (for gen-rust-buck.py)
+  fixupCratesJson = builtins.toJSON (lib.filter needsFixup (lib.attrNames cratesByName));
+
   # Generate shell commands to set up one crate
   # key is "name@version", dep contains crateName, version, src
   setupCrate = key: dep:
     let
       # Use key (name@version) as directory to support multiple versions
       vendorPath = "vendor/${key}";
+      fixupCmds = getFixupCommands key dep;
     in
     ''
       # Set up ${key}
@@ -58,10 +104,14 @@ let
       cp -r ${dep.src}/* $out/${vendorPath}/
       chmod -R u+w $out/${vendorPath}
 
+      # Apply fixups (if any)
+      ${fixupCmds}
+
       # Generate BUCK file by parsing Cargo.toml
       ${pkgs.python3}/bin/python3 ${genBuckScript} \
         "$out/${vendorPath}" \
         '${availableCratesJson}' \
+        '${fixupCratesJson}' \
         > "$out/${vendorPath}/BUCK"
     '';
 
@@ -122,5 +172,5 @@ pkgs.runCommand "rust-deps-cell" {} ''
       name = BUCK
   BUCKCONFIG
 
-  echo "Generated rustdeps cell with ${toString (lib.length (lib.attrNames registry))} crates"
+  echo "Generated rustdeps cell v2 with ${toString (lib.length (lib.attrNames registry))} crates (with build script fixups)"
 ''

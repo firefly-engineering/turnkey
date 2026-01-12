@@ -65,6 +65,31 @@ def is_proc_macro(cargo: dict) -> bool:
     return cargo.get("lib", {}).get("proc-macro", False)
 
 
+def get_default_features(cargo: dict) -> list[str]:
+    """Get the default features from Cargo.toml.
+
+    Features are used for conditional compilation via --cfg feature="...".
+    Note: Feature forwarding syntax (e.g., "dep/feature") is filtered out
+    because it only makes sense in Cargo's dependency resolution context.
+    """
+    features = cargo.get("features", {})
+    default = features.get("default", [])
+    # Expand feature dependencies (features can enable other features)
+    enabled = set(default)
+    changed = True
+    while changed:
+        changed = False
+        for feature in list(enabled):
+            if feature in features:
+                for sub in features[feature]:
+                    if sub not in enabled and not sub.startswith("dep:"):
+                        enabled.add(sub)
+                        changed = True
+    # Filter out dependency feature forwarding (e.g., "serde_core/std")
+    # These are Cargo-specific and don't translate to --cfg flags
+    return [f for f in enabled if "/" not in f]
+
+
 def get_cargo_env(cargo: dict, crate_name: str) -> dict[str, str]:
     """Get Cargo environment variables that should be set during build.
 
@@ -192,6 +217,7 @@ def generate_buck_file(
     crate_root: str | None,
     deps: list[str],
     proc_macro: bool,
+    features: list[str],
     env: dict[str, str],
 ) -> str:
     """Generate BUCK file content."""
@@ -207,6 +233,13 @@ def generate_buck_file(
 
     if proc_macro:
         lines.append('    proc_macro = True,')
+
+    if features:
+        lines.append("    features = [")
+        for feature in sorted(features):
+            lines.append(f'        "{feature}",')
+        lines.append("    ],")
+
 
     if crate_root:
         lines.append(f'    crate_root = "{crate_root}",')
@@ -239,11 +272,12 @@ def generate_buck_file(
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: gen-rust-buck.py <crate_dir> <available_crates_json>", file=sys.stderr)
+        print("Usage: gen-rust-buck.py <crate_dir> <available_crates_json> [fixup_crates_json]", file=sys.stderr)
         sys.exit(1)
 
     crate_dir = Path(sys.argv[1])
     available_crates = set(json.loads(sys.argv[2]))
+    fixup_crates = set(json.loads(sys.argv[3])) if len(sys.argv) > 3 else set()
 
     # Get crate name from directory (format: name@version or just name)
     dir_name = crate_dir.name
@@ -258,9 +292,14 @@ def main():
     crate_root = get_lib_path(cargo, crate_dir)
     deps = get_dependencies(cargo, available_crates)
     proc_macro = is_proc_macro(cargo)
+    features = get_default_features(cargo)
     env = get_cargo_env(cargo, crate_name)
 
-    buck_content = generate_buck_file(crate_name, edition, crate_root, deps, proc_macro, env)
+    # Add OUT_DIR for crates that have build script fixups
+    if crate_name in fixup_crates:
+        env["OUT_DIR"] = "out_dir"
+
+    buck_content = generate_buck_file(crate_name, edition, crate_root, deps, proc_macro, features, env)
     print(buck_content)
 
 
