@@ -12,3 +12,12 @@ clap = { add = ["derive"] }
 
 # chrono needs serde feature for DateTime<Utc> serialization in local crates
 chrono = { add = ["serde"] }
+
+# rustls crypto backend - need ring feature on rustls-webpki
+rustls-webpki = { add = ["ring"] }
+
+# rustls-pki-types needs std for UnixTime::now()
+rustls-pki-types = { add = ["std"] }
+
+# ureq needs json feature for Response::into_json()
+ureq = { add = ["json"] }
