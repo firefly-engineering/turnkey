@@ -182,6 +182,41 @@ in
             description = ''
               Path to rust-deps.toml file declaring Rust crate dependencies.
               When set, turnkey will build the rustdeps cell automatically.
+
+              Alternative: Use cargoLockFile for full Cargo.lock compatibility via reindeer.
+            '';
+          };
+
+          cargoLockFile = mkOption {
+            type = types.nullOr types.path;
+            default = null;
+            example = lib.literalExpression "./Cargo.lock";
+            description = ''
+              Path to Cargo.lock file for full Cargo dependency resolution via reindeer.
+              When set, turnkey will use Facebook's reindeer tool to generate Buck2 rules
+              directly from Cargo.lock, providing full compatibility with:
+              - Feature resolution
+              - Build scripts (via fixups)
+              - proc-macro crates
+              - Platform-specific dependencies
+
+              This takes precedence over rustDepsFile when both are set.
+              Requires cargoVendorHash to be set for reproducible builds.
+            '';
+          };
+
+          cargoVendorHash = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            example = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+            description = ''
+              Hash of vendored Cargo dependencies for reproducible builds.
+              Required when using cargoLockFile.
+
+              To get this hash:
+              1. Set to lib.fakeHash initially
+              2. Build will fail with the correct hash
+              3. Update this value with the correct hash
             '';
           };
 
@@ -240,9 +275,17 @@ in
         else
           cfg.buck2.godeps;
 
-      # Build rustdeps cell from rustDepsFile if specified and exists
+      # Build rustdeps cell - prefer reindeer (cargoLockFile) over manual (rustDepsFile)
       rustdepsCell =
-        if cfg.buck2.rustDepsFile != null && builtins.pathExists cfg.buck2.rustDepsFile then
+        if cfg.buck2.cargoLockFile != null && builtins.pathExists cfg.buck2.cargoLockFile then
+          # Use reindeer for full Cargo.lock compatibility
+          import ../../buck2/rust-deps-cell-reindeer.nix {
+            inherit pkgs lib;
+            cargoLock = cfg.buck2.cargoLockFile;
+            cargoVendorHash = cfg.buck2.cargoVendorHash or lib.fakeHash;
+          }
+        else if cfg.buck2.rustDepsFile != null && builtins.pathExists cfg.buck2.rustDepsFile then
+          # Use manual rust-deps.toml approach
           import ../../buck2/rust-deps-cell.nix {
             inherit pkgs lib;
             depsFile = cfg.buck2.rustDepsFile;
