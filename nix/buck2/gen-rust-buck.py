@@ -187,20 +187,43 @@ def resolve_dep(pkg_name: str, available_crates: set[str]) -> str | None:
     return None
 
 
-def extract_deps_from_section(section_deps: dict, available_crates: set[str]) -> list[str]:
-    """Extract dependencies from a Cargo.toml dependency section."""
+def normalize_crate_name(name: str) -> str:
+    """Normalize crate name (Cargo treats hyphens and underscores as equivalent)."""
+    return name.replace("-", "_")
+
+
+def extract_deps_from_section(
+    section_deps: dict,
+    available_crates: set[str],
+) -> tuple[list[str], dict[str, str]]:
+    """Extract dependencies from a Cargo.toml dependency section.
+
+    Returns:
+        - List of regular dependency targets
+        - Dict of named deps (local_name -> target) for renamed dependencies
+    """
     deps = []
+    named_deps = {}
+
     for dep_name, dep_spec in section_deps.items():
         # Get the actual package name (may be different from dependency key)
         if isinstance(dep_spec, dict) and "package" in dep_spec:
             pkg_name = dep_spec["package"]
+            is_renamed = True
         else:
             pkg_name = dep_name
+            is_renamed = False
 
         target = resolve_dep(pkg_name, available_crates)
         if target:
-            deps.append(target)
-    return deps
+            if is_renamed:
+                # Use normalized local name (hyphens -> underscores) as the crate alias
+                local_name = normalize_crate_name(dep_name)
+                named_deps[local_name] = target
+            else:
+                deps.append(target)
+
+    return deps, named_deps
 
 
 def is_linux_compatible_target(target_spec: str) -> bool:
@@ -209,6 +232,10 @@ def is_linux_compatible_target(target_spec: str) -> bool:
     Handles common cfg() expressions from Cargo.toml.
     """
     target = target_spec.lower()
+
+    # cfg(any()) means "never match any target" - used for build-time-only deps
+    if "cfg(any())" in target:
+        return False
 
     # Skip Windows-only targets
     if "windows" in target:
@@ -243,26 +270,35 @@ def is_linux_compatible_target(target_spec: str) -> bool:
     return True
 
 
-def get_dependencies(cargo: dict, available_crates: set[str]) -> list[str]:
+def get_dependencies(cargo: dict, available_crates: set[str]) -> tuple[list[str], dict[str, str]]:
     """Extract dependencies that exist in our vendored crates.
 
     Note: We only include regular dependencies, not build-dependencies.
     Build scripts require separate rust_build_script rules in Buck2.
     Also, we only include dependencies compatible with Linux.
+
+    Returns:
+        - List of regular dependency targets
+        - Dict of named deps (local_name -> target) for renamed dependencies
     """
     deps = []
+    named_deps = {}
 
     # Standard dependencies (not build-dependencies)
     section_deps = cargo.get("dependencies", {})
-    deps.extend(extract_deps_from_section(section_deps, available_crates))
+    section_deps_list, section_named = extract_deps_from_section(section_deps, available_crates)
+    deps.extend(section_deps_list)
+    named_deps.update(section_named)
 
     # Target-specific dependencies - only for Linux-compatible targets
     for target_spec, target_config in cargo.get("target", {}).items():
         if is_linux_compatible_target(target_spec):
             section_deps = target_config.get("dependencies", {})
-            deps.extend(extract_deps_from_section(section_deps, available_crates))
+            section_deps_list, section_named = extract_deps_from_section(section_deps, available_crates)
+            deps.extend(section_deps_list)
+            named_deps.update(section_named)
 
-    return deps
+    return deps, named_deps
 
 
 def get_build_script_cfg_flags(crate_name: str) -> list[str]:
@@ -287,6 +323,7 @@ def generate_buck_file(
     edition: str,
     crate_root: str | None,
     deps: list[str],
+    named_deps: dict[str, str],
     proc_macro: bool,
     features: list[str],
     env: dict[str, str],
@@ -321,6 +358,13 @@ def generate_buck_file(
         for dep in sorted(set(deps)):
             lines.append(f'        "{dep}",')
         lines.append("    ],")
+
+    # Add named_deps for renamed dependencies (e.g., pki-types = { package = "rustls-pki-types" })
+    if named_deps:
+        lines.append("    named_deps = {")
+        for local_name, target in sorted(named_deps.items()):
+            lines.append(f'        "{local_name}": "{target}",')
+        lines.append("    },")
 
     # Add Cargo environment variables
     if env:
@@ -395,7 +439,7 @@ def main():
     crate_name = get_crate_name(cargo, fallback_name)
     edition = get_edition(cargo)
     crate_root = get_lib_path(cargo, crate_dir)
-    deps = get_dependencies(cargo, available_crates)
+    deps, named_deps = get_dependencies(cargo, available_crates)
     proc_macro = is_proc_macro(cargo)
     env = get_cargo_env(cargo, crate_name)
     rustc_flags = get_build_script_cfg_flags(crate_name)
@@ -413,7 +457,7 @@ def main():
     if crate_name in fixup_crates:
         env["OUT_DIR"] = "out_dir"
 
-    buck_content = generate_buck_file(crate_name, edition, crate_root, deps, proc_macro, features, env, rustc_flags)
+    buck_content = generate_buck_file(crate_name, edition, crate_root, deps, named_deps, proc_macro, features, env, rustc_flags)
     print(buck_content)
 
 
