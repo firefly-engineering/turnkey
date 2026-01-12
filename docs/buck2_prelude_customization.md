@@ -256,29 +256,99 @@ Build a custom Buck2 with a patched bundled prelude.
 
 ## Recommendation for Turnkey
 
-Based on the research, the **Extension Cell Pattern** is recommended:
+Based on the research, the **Nix-backed Prelude Cell** pattern is recommended - extending
+the same approach turnkey already uses for toolchains and dependency cells.
 
-1. **Keep using bundled prelude** for core language rules
-2. **Create a `turnkey-rules` cell** for custom functionality:
-   - Nix-specific rules (if needed)
-   - Custom dependency management rules
-   - Platform/toolchain extensions
+### The Pattern
 
-This mirrors how we already structure cells:
-- `toolchains` - generated toolchain definitions
-- `godeps`, `rustdeps`, `pydeps` - dependency cells
-- `turnkey-rules` (proposed) - custom build rules
+Turnkey already manages cells as Nix derivations symlinked from `.turnkey/`:
 
-Example future structure:
+```
+.turnkey/
+├── toolchains -> /nix/store/...-turnkey-toolchains-cell
+├── godeps     -> /nix/store/...-go-deps-cell
+├── rustdeps   -> /nix/store/...-rust-deps-cell
+├── pydeps     -> /nix/store/...-python-deps-cell
+└── prelude    -> /nix/store/...-turnkey-prelude  # Same pattern!
+```
+
+This approach:
+- **Keeps downstream repos lightweight** - just `flake.nix`, `.envrc`, `toolchain.toml`
+- **Centralizes maintenance** - turnkey maintains the prelude, not each downstream repo
+- **Uses existing infrastructure** - `prelude.strategy = "nix"` already supports this
+- **Flows through Nix** - updates come via flake inputs, not git submodules
+
+### Implementation
+
+The prelude Nix derivation would:
+
+1. **Fetch upstream prelude** from buck2-prelude repository
+2. **Apply turnkey patches** for customizations (like we do for gobuckify)
+3. **Add custom rules** for Nix-specific functionality
+
+```nix
+# nix/buck2/prelude.nix (proposed)
+{ pkgs, lib }:
+
+let
+  # Fetch upstream prelude at pinned commit
+  upstreamPrelude = pkgs.fetchFromGitHub {
+    owner = "facebook";
+    repo = "buck2-prelude";
+    rev = "...";  # Pinned commit
+    hash = "sha256-...";
+  };
+in
+pkgs.runCommand "turnkey-prelude" {} ''
+  cp -r ${upstreamPrelude} $out
+  chmod -R u+w $out
+
+  # Apply turnkey patches
+  patch -d $out -p1 < ${../patches/prelude/nix-integration.patch}
+
+  # Add custom rules
+  cp -r ${./prelude-extensions}/* $out/
+''
+```
+
+### Configuration
+
+Downstream repos would use:
+
+```nix
+devenv.shells.default = {
+  turnkey.buck2 = {
+    enable = true;
+    prelude.strategy = "nix";
+    # Prelude derivation provided by turnkey module
+  };
+};
+```
+
+The `.buckconfig` would be generated as:
 
 ```ini
 [cells]
-root = .
-prelude = prelude
-toolchains = .turnkey/toolchains
-turnkey = .turnkey/rules      # New: custom rules cell
-godeps = .turnkey/godeps
+prelude = .turnkey/prelude
+# ... other cells
 ```
+
+### Advantages Over Extension Cell Pattern
+
+| Aspect | Extension Cell | Nix-backed Prelude |
+|--------|---------------|-------------------|
+| Downstream repo size | Adds `prelude-custom/` dir | No additional files |
+| Maintenance location | Each downstream repo | Centralized in turnkey |
+| Update mechanism | Manual sync | Nix flake update |
+| Consistency | Can diverge | All repos use same prelude |
+| Buck2 compatibility | Two cells to understand | Single prelude cell |
+
+### Migration Path
+
+1. **Phase 1**: Continue using `bundled` (current state)
+2. **Phase 2**: Create `nix/buck2/prelude.nix` with upstream + patches
+3. **Phase 3**: Default new projects to `prelude.strategy = "nix"`
+4. **Phase 4**: Add turnkey-specific rules as needed
 
 ## When to Customize
 
