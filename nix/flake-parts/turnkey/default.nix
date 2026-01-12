@@ -206,6 +206,62 @@ in
             '';
           };
 
+          rustcFlagsRegistry = mkOption {
+            type = types.attrsOf (types.listOf types.str);
+            default = { };
+            example = lib.literalExpression ''
+              {
+                serde_json = ["--cfg" "fast_arithmetic=\"64\""];
+                rustix = ["--cfg" "libc" "--cfg" "linux_like" "--cfg" "linux_kernel"];
+                # Version-specific (takes precedence over crate name)
+                "rustix@0.39.0" = ["--cfg" "libc" "--cfg" "linux_like"];
+              }
+            '';
+            description = ''
+              Registry of rustc flags for crates whose build scripts generate cfg directives.
+              Keys can be crate names (catch-all) or "crate@version" for version-specific flags.
+              Version-specific entries take precedence over catch-all entries.
+
+              Default includes serde_json and rustix fixups.
+            '';
+          };
+
+          buildScriptFixups = mkOption {
+            type = types.attrsOf (types.either types.str (types.functionTo types.str));
+            default = { };
+            example = lib.literalExpression ''
+              {
+                # Simple shell string
+                my_crate = '''
+                  mkdir -p "$FIXUP_OUT_DIR"
+                  echo "// generated" > "$FIXUP_OUT_DIR/config.rs"
+                ''';
+
+                # Version-specific (takes precedence)
+                "my_crate@1.2.3" = '''
+                  mkdir -p "$FIXUP_OUT_DIR"
+                  echo "// special for 1.2.3" > "$FIXUP_OUT_DIR/config.rs"
+                ''';
+
+                # Function receiving context
+                another_crate = { crateName, version, patchVersion, key }: '''
+                  mkdir -p "$FIXUP_OUT_DIR"
+                  echo "pub const VERSION: &str = \"''${version}\";" > "$FIXUP_OUT_DIR/version.rs"
+                ''';
+              }
+            '';
+            description = ''
+              Registry of build script fixups for crates that need pre-generated files.
+              Keys can be crate names (catch-all) or "crate@version" for version-specific fixups.
+
+              Fixups can be:
+              - A shell string with variables: $FIXUP_OUT_DIR, $FIXUP_SRC_DIR, $CRATE_NAME, $CRATE_VERSION, $PATCH_VERSION, $CRATE_KEY
+              - A function taking { crateName, version, patchVersion, key } and returning shell commands
+
+              Default includes serde_core, serde, and ring fixups.
+            '';
+          };
+
           # Python dependencies
           pydeps = mkOption {
             type = types.nullOr types.package;
@@ -271,6 +327,8 @@ in
               if cfg.buck2.rustFeaturesFile != null && builtins.pathExists cfg.buck2.rustFeaturesFile
               then cfg.buck2.rustFeaturesFile
               else null;
+            rustcFlagsRegistry = cfg.buck2.rustcFlagsRegistry;
+            buildScriptFixups = cfg.buck2.buildScriptFixups;
           }
         else
           cfg.buck2.rustdeps;

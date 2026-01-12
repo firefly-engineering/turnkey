@@ -386,28 +386,30 @@ def get_dependencies(cargo: dict, available_crates: set[str]) -> tuple[list[str]
     return deps, named_deps
 
 
-def get_build_script_cfg_flags(crate_name: str) -> list[str]:
+def get_build_script_cfg_flags(crate_name: str, version: str, registry: dict) -> list[str]:
     """Get rustc cfg flags that would be set by a crate's build script.
 
-    Some crates have build scripts that probe the target and emit
-    cargo:rustc-cfg directives. We hardcode these for known crates
-    since we can't run build scripts in the Nix sandbox.
+    Looks up flags from the registry, which supports:
+    - Version-specific keys: "crate@version" (takes precedence)
+    - Catch-all keys: "crate" (fallback)
 
-    These are x86_64-linux specific for now.
+    Args:
+        crate_name: The crate name (e.g., "serde_json")
+        version: The crate version (e.g., "1.0.0")
+        registry: Dict mapping crate names/keys to lists of rustc flags
+
+    Returns:
+        List of rustc flags for the crate
     """
-    if crate_name == "serde_json":
-        # serde_json's build.rs sets fast_arithmetic based on target arch
-        # On x86_64, it uses 64-bit arithmetic
-        # Note: Quotes need escaping for BUCK file output
-        return ['--cfg', 'fast_arithmetic=\\"64\\"']
-    if crate_name == "rustix":
-        # rustix's build.rs selects backend and platform features based on target
-        # For x86_64-linux with libc backend, we need:
-        # - libc: selects the libc backend (vs linux_raw which requires more setup)
-        # - linux_like: enables Linux-like OS features
-        # - linux_kernel: enables Linux-specific syscalls like sendfile
-        # See: https://github.com/bytecodealliance/rustix/blob/main/build.rs
-        return ['--cfg', 'libc', '--cfg', 'linux_like', '--cfg', 'linux_kernel']
+    # Try versioned key first (e.g., "rustix@0.39.0")
+    versioned_key = f"{crate_name}@{version}"
+    if versioned_key in registry:
+        return registry[versioned_key]
+
+    # Fall back to crate name (catch-all)
+    if crate_name in registry:
+        return registry[crate_name]
+
     return []
 
 
@@ -588,13 +590,14 @@ def filter_features_for_availability(
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: gen-rust-buck.py <crate_dir> <available_crates_json> [fixup_crates_json] [unified_features_json]", file=sys.stderr)
+        print("Usage: gen-rust-buck.py <crate_dir> <available_crates_json> [fixup_crates_json] [unified_features_json] [rustc_flags_registry_json]", file=sys.stderr)
         sys.exit(1)
 
     crate_dir = Path(sys.argv[1])
     available_crates = set(json.loads(sys.argv[2]))
     fixup_crates = set(json.loads(sys.argv[3])) if len(sys.argv) > 3 else set()
     unified_features = json.loads(sys.argv[4]) if len(sys.argv) > 4 else {}
+    rustc_flags_registry = json.loads(sys.argv[5]) if len(sys.argv) > 5 else {}
 
     # Get crate name from directory (format: name@version or just name)
     dir_name = crate_dir.name
@@ -611,7 +614,7 @@ def main():
     deps, named_deps = get_dependencies(cargo, available_crates)
     proc_macro = is_proc_macro(cargo)
     env = get_cargo_env(cargo, crate_name)
-    rustc_flags = get_build_script_cfg_flags(crate_name)
+    rustc_flags = get_build_script_cfg_flags(crate_name, version, rustc_flags_registry)
 
     # Get native library info for crates with pre-built native code
     native_lib_info = get_native_library_info(crate_name, version)

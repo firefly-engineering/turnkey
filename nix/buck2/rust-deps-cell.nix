@@ -22,7 +22,7 @@
 # Some crates have build scripts that generate files needed at compile time.
 # We handle these by pre-generating the output in Nix.
 
-{ pkgs, lib, depsFile, featuresFile ? null }:
+{ pkgs, lib, depsFile, featuresFile ? null, rustcFlagsRegistry ? {}, buildScriptFixups ? {} }:
 
 # Build tools needed for native code compilation (ring, etc.)
 # Using stdenv.cc for the C compiler and binutils for ar
@@ -30,91 +30,51 @@ let buildTools = with pkgs; [ stdenv.cc perl ];
 in
 
 let
-  # Import semver utilities
-  semver = import ../lib/semver.nix { inherit lib; };
-
-  # Parse the TOML file
-  depsToml = builtins.fromTOML (builtins.readFile depsFile);
-
-  # Convert TOML deps to registry format
-  # Key is "name@version", value contains name, version, hash
-  registry = lib.mapAttrs (key: dep: {
-    # Use explicit name field, fallback to parsing key for backwards compat
-    crateName = dep.name or (lib.head (lib.splitString "@" key));
-    inherit (dep) version;
-    features = dep.features or [];
-    src = fetchCrate (dep.name or (lib.head (lib.splitString "@" key))) dep;
-  }) (depsToml.deps or {});
-
-  # Fetch crate from crates.io
-  fetchCrate = crateName: dep:
-    pkgs.fetchzip {
-      url = "https://crates.io/api/v1/crates/${crateName}/${dep.version}/download";
-      sha256 = dep.hash;
-      extension = "tar.gz";
-    };
-
-  # Scripts for BUCK file generation
-  genBuckScript = ./gen-rust-buck.py;
-  computeFeaturesScript = ./compute-unified-features.py;
-
-  # JSON list of all available crate names for dependency resolution
-  # Includes both versioned keys (e.g., "getrandom@0.2.17") and unversioned names
-  # This allows version-aware dependency resolution
-  availableCratesJson = builtins.toJSON (
-    (lib.attrNames cratesByName) ++  # unversioned names for symlinks
-    (lib.attrNames registry)         # versioned keys for precise matching
-  );
-
   # ==========================================================================
-  # Build script fixups
+  # Default registries
   # ==========================================================================
-  # Some crates have build scripts that generate files. We pre-generate these
-  # in Nix to avoid needing to run build scripts at Buck2 build time.
 
-  # Generate fixup commands for a specific crate
-  # Returns empty string if no fixup needed
-  getFixupCommands = key: dep:
-    let
-      crateName = dep.crateName;
-      version = dep.version;
-      patchVersion = lib.last (lib.splitString "." version);
-      vendorPath = "vendor/${key}";
+  # Default rustc flags for crates whose build scripts generate cfg directives
+  defaultRustcFlagsRegistry = {
+    serde_json = ["--cfg" ''fast_arithmetic=\"64\"''];
+    rustix = ["--cfg" "libc" "--cfg" "linux_like" "--cfg" "linux_kernel"];
+  };
 
-      # serde_core's private.rs - just the versioned module
-      serdeCorePrivateRs = ''
+  # Merge user-provided rustc flags with defaults (user takes precedence)
+  mergedRustcFlagsRegistry = defaultRustcFlagsRegistry // rustcFlagsRegistry;
+
+  # Default build script fixups
+  # Each fixup is a function that receives { crateName, version, patchVersion, key, vendorPath }
+  # and returns shell commands to execute
+  defaultBuildScriptFixups = {
+    serde_core = { patchVersion, vendorPath, ... }: ''
+      # Fixup: serde_core build script output
+      mkdir -p "$out/${vendorPath}/out_dir"
+      cat > "$out/${vendorPath}/out_dir/private.rs" << 'SERDE_CORE_PRIVATE'
 #[doc(hidden)]
 pub mod __private${patchVersion} {
     #[doc(hidden)]
     pub use crate::private::*;
 }
-      '';
+SERDE_CORE_PRIVATE
+    '';
 
-      # serde's private.rs - versioned module PLUS the serde_core_private alias
-      serdePrivateRs = ''
+    serde = { patchVersion, vendorPath, ... }: ''
+      # Fixup: serde build script output (includes serde_core_private alias)
+      mkdir -p "$out/${vendorPath}/out_dir"
+      cat > "$out/${vendorPath}/out_dir/private.rs" << 'SERDE_PRIVATE'
 #[doc(hidden)]
 pub mod __private${patchVersion} {
     #[doc(hidden)]
     pub use crate::private::*;
 }
 use serde_core::__private${patchVersion} as serde_core_private;
-      '';
-    in
-    if crateName == "serde_core" then ''
-      # Fixup: serde_core build script output
-      mkdir -p "$out/${vendorPath}/out_dir"
-      cat > "$out/${vendorPath}/out_dir/private.rs" << 'SERDE_CORE_PRIVATE'
-${serdeCorePrivateRs}
-SERDE_CORE_PRIVATE
-    ''
-    else if crateName == "serde" then ''
-      # Fixup: serde build script output (includes serde_core_private alias)
-      mkdir -p "$out/${vendorPath}/out_dir"
-      cat > "$out/${vendorPath}/out_dir/private.rs" << 'SERDE_PRIVATE'
-${serdePrivateRs}
 SERDE_PRIVATE
-    ''
-    else if crateName == "ring" then ''
+    '';
+
+    # Ring requires compiling native crypto library
+    # The fixup uses RING_PREFIX to namespace symbols by version
+    ring = { patchVersion, vendorPath, ... }: ''
       # Fixup: ring native crypto library compilation
       # Ring's build.rs compiles C and assembly files into libring_core_*.a
       # We replicate this in Nix for Buck2 to link against
@@ -125,7 +85,7 @@ SERDE_PRIVATE
 
       # Symbol prefix to avoid conflicts (matches ring's build.rs)
       # Note: The prefix ends with double underscore, matching what ring's Rust code expects
-      RING_PREFIX="ring_core_0_17_${patchVersion}__"
+      RING_PREFIX="ring_core_0_17_''${patchVersion}__"
 
       # Generate prefix header for symbol namespacing
       # Ring expects this at ring_core_generated/prefix_symbols.h
@@ -552,15 +512,91 @@ RING_ASM_PREFIX_HEADER
       # Create static library
       ar rcs "$RING_OUT/lib''${RING_PREFIX%.}.a" "''${RING_OBJS[@]}"
       echo "Built ring native library: $RING_OUT/lib''${RING_PREFIX%.}.a"
-    ''
+    '';
+  };
+
+  # Merge user-provided build script fixups with defaults (user takes precedence)
+  mergedBuildScriptFixups = defaultBuildScriptFixups // buildScriptFixups;
+
+  # Import semver utilities
+  semver = import ../lib/semver.nix { inherit lib; };
+
+  # Parse the TOML file
+  depsToml = builtins.fromTOML (builtins.readFile depsFile);
+
+  # Convert TOML deps to registry format
+  # Key is "name@version", value contains name, version, hash
+  registry = lib.mapAttrs (key: dep: {
+    # Use explicit name field, fallback to parsing key for backwards compat
+    crateName = dep.name or (lib.head (lib.splitString "@" key));
+    inherit (dep) version;
+    features = dep.features or [];
+    src = fetchCrate (dep.name or (lib.head (lib.splitString "@" key))) dep;
+  }) (depsToml.deps or {});
+
+  # Fetch crate from crates.io
+  fetchCrate = crateName: dep:
+    pkgs.fetchzip {
+      url = "https://crates.io/api/v1/crates/${crateName}/${dep.version}/download";
+      sha256 = dep.hash;
+      extension = "tar.gz";
+    };
+
+  # Scripts for BUCK file generation
+  genBuckScript = ./gen-rust-buck.py;
+  computeFeaturesScript = ./compute-unified-features.py;
+
+  # JSON list of all available crate names for dependency resolution
+  # Includes both versioned keys (e.g., "getrandom@0.2.17") and unversioned names
+  # This allows version-aware dependency resolution
+  availableCratesJson = builtins.toJSON (
+    (lib.attrNames cratesByName) ++  # unversioned names for symlinks
+    (lib.attrNames registry)         # versioned keys for precise matching
+  );
+
+  # JSON registry of rustc flags for crates with build script cfg directives
+  # Passed to gen-rust-buck.py for BUCK file generation
+  rustcFlagsRegistryJson = builtins.toJSON mergedRustcFlagsRegistry;
+
+  # ==========================================================================
+  # Build script fixups
+  # ==========================================================================
+  # Some crates have build scripts that generate files. We pre-generate these
+  # in Nix to avoid needing to run build scripts at Buck2 build time.
+
+  # Generate fixup commands for a specific crate
+  # Looks up in mergedBuildScriptFixups (version-specific key first, then crate name)
+  # Returns empty string if no fixup needed
+  getFixupCommands = key: dep:
+    let
+      crateName = dep.crateName;
+      version = dep.version;
+      patchVersion = lib.last (lib.splitString "." version);
+      vendorPath = "vendor/${key}";
+
+      # Context passed to fixup functions
+      fixupContext = { inherit crateName version patchVersion key vendorPath; };
+
+      # Look up fixup: try versioned key first, then crate name
+      fixup = mergedBuildScriptFixups.${key} or mergedBuildScriptFixups.${crateName} or null;
+
+      # If fixup is a function, call it with context; otherwise use as-is
+      resolvedFixup =
+        if fixup == null then null
+        else if builtins.isFunction fixup then fixup fixupContext
+        else fixup;
+    in
+    if resolvedFixup != null then resolvedFixup
     else "";
 
   # Check if a crate needs build script fixups
+  # Uses mergedBuildScriptFixups keys (supports version-specific and catch-all)
   needsFixup = crateName:
-    crateName == "serde_core" || crateName == "serde" || crateName == "ring";
+    lib.hasAttr crateName mergedBuildScriptFixups;
 
   # JSON map of crates that need OUT_DIR set (for gen-rust-buck.py)
-  fixupCratesJson = builtins.toJSON (lib.filter needsFixup (lib.attrNames cratesByName));
+  # Derived from the merged fixups registry keys
+  fixupCratesJson = builtins.toJSON (lib.attrNames mergedBuildScriptFixups);
 
   # ==========================================================================
   # Crate setup (Phase 1: copy sources and apply fixups)
@@ -603,6 +639,7 @@ RING_ASM_PREFIX_HEADER
         '${availableCratesJson}' \
         '${fixupCratesJson}' \
         "$UNIFIED_FEATURES" \
+        '${rustcFlagsRegistryJson}' \
         > "$out/${vendorPath}/BUCK"
     '';
 
