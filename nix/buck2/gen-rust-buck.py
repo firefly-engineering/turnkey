@@ -473,6 +473,7 @@ def generate_buck_file(
             f"prebuilt_cxx_library(",
             f'    name = "{lib_name}",',
             f'    static_lib = "{static_lib_path}",',
+            f'    link_whole = True,  # Ensure all symbols are included in final link',
             f'    visibility = ["PUBLIC"],',
             f")",
             "",
