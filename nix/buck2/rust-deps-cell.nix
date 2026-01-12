@@ -64,22 +64,38 @@ let
       patchVersion = lib.last (lib.splitString "." version);
       vendorPath = "vendor/${key}";
 
-      # Common private.rs content for serde crates
+      # serde_core's private.rs - just the versioned module
+      serdeCorePrivateRs = ''
+#[doc(hidden)]
+pub mod __private${patchVersion} {
+    #[doc(hidden)]
+    pub use crate::private::*;
+}
+      '';
+
+      # serde's private.rs - versioned module PLUS the serde_core_private alias
       serdePrivateRs = ''
-      #[doc(hidden)]
-      pub mod __private${patchVersion} {
-          #[doc(hidden)]
-          pub use crate::private::*;
-      }
+#[doc(hidden)]
+pub mod __private${patchVersion} {
+    #[doc(hidden)]
+    pub use crate::private::*;
+}
+use serde_core::__private${patchVersion} as serde_core_private;
       '';
     in
-    # serde_core and serde: both generate private.rs with version-specific module name
-    if crateName == "serde_core" || crateName == "serde" then ''
-      # Fixup: ${crateName} build script output
+    if crateName == "serde_core" then ''
+      # Fixup: serde_core build script output
+      mkdir -p "$out/${vendorPath}/out_dir"
+      cat > "$out/${vendorPath}/out_dir/private.rs" << 'SERDE_CORE_PRIVATE'
+${serdeCorePrivateRs}
+SERDE_CORE_PRIVATE
+    ''
+    else if crateName == "serde" then ''
+      # Fixup: serde build script output (includes serde_core_private alias)
       mkdir -p "$out/${vendorPath}/out_dir"
       cat > "$out/${vendorPath}/out_dir/private.rs" << 'SERDE_PRIVATE'
-      ${serdePrivateRs}
-      SERDE_PRIVATE
+${serdePrivateRs}
+SERDE_PRIVATE
     ''
     else "";
 

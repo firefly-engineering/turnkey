@@ -65,15 +65,55 @@ def is_proc_macro(cargo: dict) -> bool:
     return cargo.get("lib", {}).get("proc-macro", False)
 
 
-def get_default_features(cargo: dict) -> list[str]:
+def get_optional_deps(cargo: dict) -> set[str]:
+    """Get names of optional dependencies from Cargo.toml."""
+    optional = set()
+    for dep_name, dep_spec in cargo.get("dependencies", {}).items():
+        if isinstance(dep_spec, dict) and dep_spec.get("optional", False):
+            # Use the package name if renamed, otherwise use dep_name
+            pkg_name = dep_spec.get("package", dep_name)
+            optional.add(pkg_name)
+            optional.add(dep_name)  # Also add the alias
+    return optional
+
+
+def dep_is_available(dep_name: str, available_crates: set[str]) -> bool:
+    """Check if a dependency is available (checking hyphen/underscore variants)."""
+    return (dep_name in available_crates or
+            dep_name.replace("-", "_") in available_crates or
+            dep_name.replace("_", "-") in available_crates)
+
+
+def feature_enables_unavailable_dep(feature_name: str, features: dict, available_crates: set[str]) -> bool:
+    """Check if a feature enables an optional dependency that isn't available.
+
+    This handles cases like: default-hasher = ["dep:foldhash"]
+    where the feature name differs from the dependency it enables.
+    """
+    if feature_name not in features:
+        return False
+
+    for item in features[feature_name]:
+        if item.startswith("dep:"):
+            dep_name = item[4:]  # Remove "dep:" prefix
+            if not dep_is_available(dep_name, available_crates):
+                return True
+    return False
+
+
+def get_default_features(cargo: dict, available_crates: set[str]) -> list[str]:
     """Get the default features from Cargo.toml.
 
     Features are used for conditional compilation via --cfg feature="...".
-    Note: Feature forwarding syntax (e.g., "dep/feature") is filtered out
-    because it only makes sense in Cargo's dependency resolution context.
+    Note:
+    - Feature forwarding syntax (e.g., "dep/feature") is filtered out
+    - Features that enable optional deps not in available_crates are filtered out
+    - Features that enable unavailable deps via dep: syntax are filtered out
     """
     features = cargo.get("features", {})
     default = features.get("default", [])
+    optional_deps = get_optional_deps(cargo)
+
     # Expand feature dependencies (features can enable other features)
     enabled = set(default)
     changed = True
@@ -85,9 +125,23 @@ def get_default_features(cargo: dict) -> list[str]:
                     if sub not in enabled and not sub.startswith("dep:"):
                         enabled.add(sub)
                         changed = True
-    # Filter out dependency feature forwarding (e.g., "serde_core/std")
-    # These are Cargo-specific and don't translate to --cfg flags
-    return [f for f in enabled if "/" not in f]
+
+    # Filter out:
+    # 1. Dependency feature forwarding (e.g., "serde_core/std")
+    # 2. Features that match optional dep names when that dep isn't available
+    # 3. Features that enable unavailable deps via dep: syntax (e.g., default-hasher = ["dep:foldhash"])
+    result = []
+    for f in enabled:
+        if "/" in f:
+            continue  # Skip feature forwarding
+        if f in optional_deps:
+            # This feature name matches an optional dep - only enable if dep is available
+            if not dep_is_available(f, available_crates):
+                continue
+        if feature_enables_unavailable_dep(f, features, available_crates):
+            continue  # Skip features that enable unavailable deps
+        result.append(f)
+    return result
 
 
 def get_cargo_env(cargo: dict, crate_name: str) -> dict[str, str]:
@@ -211,6 +265,23 @@ def get_dependencies(cargo: dict, available_crates: set[str]) -> list[str]:
     return deps
 
 
+def get_build_script_cfg_flags(crate_name: str) -> list[str]:
+    """Get rustc cfg flags that would be set by a crate's build script.
+
+    Some crates have build scripts that probe the target and emit
+    cargo:rustc-cfg directives. We hardcode these for known crates
+    since we can't run build scripts in the Nix sandbox.
+
+    These are x86_64-linux specific for now.
+    """
+    if crate_name == "serde_json":
+        # serde_json's build.rs sets fast_arithmetic based on target arch
+        # On x86_64, it uses 64-bit arithmetic
+        # Note: Quotes need escaping for BUCK file output
+        return ['--cfg', 'fast_arithmetic=\\"64\\"']
+    return []
+
+
 def generate_buck_file(
     crate_name: str,
     edition: str,
@@ -219,6 +290,7 @@ def generate_buck_file(
     proc_macro: bool,
     features: list[str],
     env: dict[str, str],
+    rustc_flags: list[str],
 ) -> str:
     """Generate BUCK file content."""
     lines = [
@@ -261,6 +333,13 @@ def generate_buck_file(
             lines.append(f'        "{key}": "{escaped_value}",')
         lines.append("    },")
 
+    # Add rustc flags (for build script cfg emulation)
+    if rustc_flags:
+        lines.append("    rustc_flags = [")
+        for flag in rustc_flags:
+            lines.append(f'        "{flag}",')
+        lines.append("    ],")
+
     lines.extend([
         '    visibility = ["PUBLIC"],',
         ")",
@@ -292,14 +371,15 @@ def main():
     crate_root = get_lib_path(cargo, crate_dir)
     deps = get_dependencies(cargo, available_crates)
     proc_macro = is_proc_macro(cargo)
-    features = get_default_features(cargo)
+    features = get_default_features(cargo, available_crates)
     env = get_cargo_env(cargo, crate_name)
+    rustc_flags = get_build_script_cfg_flags(crate_name)
 
     # Add OUT_DIR for crates that have build script fixups
     if crate_name in fixup_crates:
         env["OUT_DIR"] = "out_dir"
 
-    buck_content = generate_buck_file(crate_name, edition, crate_root, deps, proc_macro, features, env)
+    buck_content = generate_buck_file(crate_name, edition, crate_root, deps, proc_macro, features, env, rustc_flags)
     print(buck_content)
 
 
