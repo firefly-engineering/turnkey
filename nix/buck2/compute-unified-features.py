@@ -135,14 +135,26 @@ def collect_feature_requirements(vendor_dir: Path) -> tuple[dict[str, set[str]],
 
 
 def is_linux_compatible_target(target_spec: str) -> bool:
-    """Check if a target specification is compatible with Linux x86_64."""
+    """Check if a target specification is compatible with Linux x86_64.
+
+    For cfg(any(...)) expressions, we include if ANY condition could match Linux.
+    """
     target = target_spec.lower()
 
-    # cfg(any()) means "never match any target"
+    # cfg(any()) with empty parens means "never match any target"
     if "cfg(any())" in target:
         return False
 
-    # Skip wasm32/wasm64-only targets
+    # Skip targets that explicitly exclude Unix
+    if "not(unix)" in target:
+        return False
+
+    # If target includes "unix" or "linux", it's compatible with Linux
+    # Check this BEFORE checking exclusions, since cfg(any(unix, wasi)) should match
+    if "unix" in target or "linux" in target:
+        return True
+
+    # Skip wasm32/wasm64-only targets (but not if they also include unix)
     if "wasm32" in target or "wasm64" in target:
         return False
 
@@ -150,16 +162,11 @@ def is_linux_compatible_target(target_spec: str) -> bool:
     if "windows" in target:
         return False
 
-    # Skip targets that explicitly exclude Unix
-    if "not(unix)" in target:
-        return False
-
     # Skip macOS-only targets (darwin, macos)
     if "target_os" in target and ("macos" in target or "darwin" in target):
-        if "unix" not in target:
-            return False
+        return False
 
-    # Skip other non-Linux OS targets
+    # Skip other non-Linux OS targets (only if unix not in target)
     if any(os in target for os in ["redox", "wasi", "ios", "android", "freebsd", "openbsd", "netbsd", "uefi"]):
         return False
 

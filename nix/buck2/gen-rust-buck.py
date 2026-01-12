@@ -315,14 +315,24 @@ def is_linux_compatible_target(target_spec: str) -> bool:
     """Check if a target specification is compatible with Linux x86_64.
 
     Handles common cfg() expressions from Cargo.toml.
+    For cfg(any(...)) expressions, we include if ANY condition could match Linux.
     """
     target = target_spec.lower()
 
-    # cfg(any()) means "never match any target" - used for build-time-only deps
+    # cfg(any()) with empty parens means "never match any target"
     if "cfg(any())" in target:
         return False
 
-    # Skip wasm32/wasm64-only targets
+    # Skip targets that explicitly exclude Unix
+    if "not(unix)" in target:
+        return False
+
+    # If target includes "unix" or "linux", it's compatible with Linux
+    # Check this BEFORE checking exclusions, since cfg(any(unix, wasi)) should match
+    if "unix" in target or "linux" in target:
+        return True
+
+    # Skip wasm32/wasm64-only targets (but not if they also include unix)
     if "wasm32" in target or "wasm64" in target:
         return False
 
@@ -330,27 +340,13 @@ def is_linux_compatible_target(target_spec: str) -> bool:
     if "windows" in target:
         return False
 
-    # Skip targets that explicitly exclude Unix
-    if "not(unix)" in target:
-        return False
-
     # Skip macOS-only targets (darwin, macos)
     if "target_os" in target and ("macos" in target or "darwin" in target):
-        # But not if it's a general Unix target that includes macos
-        if "unix" not in target:
-            return False
-
-    # Skip other non-Linux OS targets
-    if any(os in target for os in ["redox", "wasi", "ios", "android", "freebsd", "openbsd", "netbsd", "uefi"]):
         return False
 
-    # Include Unix targets (which includes Linux)
-    if "unix" in target:
-        return True
-
-    # Include Linux-specific targets
-    if "linux" in target:
-        return True
+    # Skip other non-Linux OS targets (only if unix not in target)
+    if any(os in target for os in ["redox", "wasi", "ios", "android", "freebsd", "openbsd", "netbsd", "uefi"]):
+        return False
 
     # Include targets that are platform-agnostic feature flags
     if "target_os" not in target and "target_family" not in target:
@@ -404,6 +400,14 @@ def get_build_script_cfg_flags(crate_name: str) -> list[str]:
         # On x86_64, it uses 64-bit arithmetic
         # Note: Quotes need escaping for BUCK file output
         return ['--cfg', 'fast_arithmetic=\\"64\\"']
+    if crate_name == "rustix":
+        # rustix's build.rs selects backend and platform features based on target
+        # For x86_64-linux with libc backend, we need:
+        # - libc: selects the libc backend (vs linux_raw which requires more setup)
+        # - linux_like: enables Linux-like OS features
+        # - linux_kernel: enables Linux-specific syscalls like sendfile
+        # See: https://github.com/bytecodealliance/rustix/blob/main/build.rs
+        return ['--cfg', 'libc', '--cfg', 'linux_like', '--cfg', 'linux_kernel']
     return []
 
 
