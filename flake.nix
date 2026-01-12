@@ -79,6 +79,7 @@
           packages.pydeps-gen = import ./nix/packages/pydeps-gen.nix { inherit pkgs lib; };
           packages.rustdeps-gen = import ./nix/packages/rustdeps-gen.nix { inherit pkgs lib; };
           packages.gobuckify = import ./nix/packages/gobuckify.nix { inherit pkgs lib; };
+          packages.cargo-prune-workspace = import ./nix/packages/cargo-prune-workspace.nix { inherit pkgs lib; };
           packages.tk = import ./nix/packages/tk.nix { inherit pkgs lib; };
 
           # Configure turnkey to use our local toolchain files

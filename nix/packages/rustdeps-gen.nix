@@ -7,27 +7,20 @@
 { pkgs, lib }:
 
 let
-  fs = lib.fileset;
   root = ../..;
+  cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
   nix-prefetch-cached = import ./nix-prefetch-cached.nix { inherit pkgs lib; };
 in
 pkgs.rustPlatform.buildRustPackage {
   pname = "rustdeps-gen";
   version = "0.1.0";
 
-  src = fs.toSource {
+  src = cargoLib.prunedCargoSource {
     inherit root;
-    fileset = fs.unions [
-      (root + "/Cargo.toml")
-      (root + "/Cargo.lock")
-      (root + "/cmd/rustdeps-gen")
-      # Include workspace members that have internal dependencies (need full source)
-      (root + "/cmd/nix-prefetch-cached")
-      (root + "/rust/prefetch-cache")
-      # Include other workspace members for Cargo workspace resolution (just Cargo.toml)
-      (root + "/cmd/pydeps-gen/Cargo.toml")
-      (root + "/examples/rust-hello/Cargo.toml")
-      (root + "/examples/rust-hello-deps/Cargo.toml")
+    members = [
+      "cmd/rustdeps-gen"
+      "cmd/nix-prefetch-cached"
+      "rust/prefetch-cache"
     ];
   };
 

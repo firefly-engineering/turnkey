@@ -165,10 +165,10 @@ name = "form_urlencoded"
 version = "1.2.2"
 hash = "sha256-W+74FXbvzNFqCUqMn+MCjip7I6Z6BHZ8e/FotnXHsY4="
 
-[deps."getrandom@0.2.16"]
+[deps."getrandom@0.2.17"]
 name = "getrandom"
-version = "0.2.16"
-hash = "sha256-xSCuE+b7CPPPCwvyF0yqq3pebvNW47XatGx+4ehKdbo="
+version = "0.2.17"
+hash = "sha256-p3too/Ip6ukNdfA3vM0rOCfb2bST2BbvIZTSR4kBzU8="
 
 [deps."getrandom@0.3.4"]
 name = "getrandom"
@@ -740,8 +740,8 @@ name = "zerovec-derive"
 version = "0.11.2"
 hash = "sha256-p5fY9PeXZvjJ7QFRZjmV7Tm2LhLBtdrU8RGPTnOZru4="
 
-[deps."zmij@1.0.12"]
+[deps."zmij@1.0.13"]
 name = "zmij"
-version = "1.0.12"
-hash = "sha256-xqnb7iturrWgnzsFTEoAG2eaD1K/j2kt62Yg2cHrMZw="
+version = "1.0.13"
+hash = "sha256-ykmV1brMFWMAwA+QKnyiMW72dUouB9sT45M6B0hEYng="
 
