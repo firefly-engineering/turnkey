@@ -9,3 +9,6 @@
 [overrides]
 # clap needs derive feature for our local Rust binaries that use #[derive(Parser)]
 clap = { add = ["derive"] }
+
+# chrono needs serde feature for DateTime<Utc> serialization in local crates
+chrono = { add = ["serde"] }
