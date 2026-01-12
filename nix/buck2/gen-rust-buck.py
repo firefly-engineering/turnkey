@@ -37,21 +37,21 @@ def get_edition(cargo: dict) -> str:
 
 
 def get_lib_path(cargo: dict, crate_dir: Path) -> str | None:
-    """Determine the library crate root path."""
+    """Determine the library crate root path.
+
+    Always returns an explicit path when possible to avoid Buck2's
+    crate_root inference issues with glob(["**/*"]) picking up
+    files in examples/, benches/, etc.
+    """
     # Check explicit [lib] path
     lib_section = cargo.get("lib", {})
     if "path" in lib_section:
         return lib_section["path"]
 
-    # Check for standard locations
+    # Check for standard locations - always return explicit path
     src_lib = crate_dir / "src" / "lib.rs"
     if src_lib.exists():
-        # Check for ambiguous case (multiple lib.rs files)
-        core_lib = crate_dir / "src" / "core" / "lib.rs"
-        if core_lib.exists():
-            # Prefer src/lib.rs
-            return "src/lib.rs"
-        return None  # Default, no need to specify
+        return "src/lib.rs"
 
     lib_rs = crate_dir / "lib.rs"
     if lib_rs.exists():
