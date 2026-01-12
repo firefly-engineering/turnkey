@@ -155,10 +155,10 @@ name = "find-msvc-tools"
 version = "0.1.7"
 hash = "sha256-BqlMwksL3gKqCdz947DsYy4egVMzdODjk1J6rcXxGcE="
 
-[deps."flate2@1.1.5"]
+[deps."flate2@1.1.8"]
 name = "flate2"
-version = "1.1.5"
-hash = "sha256-+5to47i8FuGYCbZ6vf57xqzqZ3hQGvaVwG9HoBNsrUY="
+version = "1.1.8"
+hash = "sha256-uKeWsdp+m9DjEL42zoAO8taa8oMJ6ZTWHPr9YGa8i7w="
 
 [deps."form_urlencoded@1.2.2"]
 name = "form_urlencoded"

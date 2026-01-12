@@ -411,6 +411,24 @@ def get_build_script_cfg_flags(crate_name: str) -> list[str]:
     return []
 
 
+def get_native_link_flags(crate_name: str, version: str) -> list[str]:
+    """Get linker flags for crates with pre-built native libraries.
+
+    Some crates (like ring) have native C/assembly code that we pre-compile
+    in Nix. This returns the flags needed to link against those libraries.
+    """
+    if crate_name == "ring":
+        # ring's native crypto library is pre-compiled and placed in out_dir/
+        # The library name follows ring's versioning: libring_core_0_17_<patch>.a
+        patch = version.split(".")[-1] if version else "0"
+        lib_name = f"ring_core_0_17_{patch}_"
+        return [
+            '-Lnative=out_dir',  # Add out_dir to library search path
+            f'-lstatic={lib_name}',  # Link the pre-built static library
+        ]
+    return []
+
+
 def generate_buck_file(
     crate_name: str,
     edition: str,
@@ -530,12 +548,17 @@ def main():
 
     cargo = parse_cargo_toml(crate_dir)
     crate_name = get_crate_name(cargo, fallback_name)
+    version = cargo.get("package", {}).get("version", "0.0.0")
     edition = get_edition(cargo)
     crate_root = get_lib_path(cargo, crate_dir)
     deps, named_deps = get_dependencies(cargo, available_crates)
     proc_macro = is_proc_macro(cargo)
     env = get_cargo_env(cargo, crate_name)
     rustc_flags = get_build_script_cfg_flags(crate_name)
+
+    # Add native library link flags for crates with pre-built native code
+    native_link_flags = get_native_link_flags(crate_name, version)
+    rustc_flags.extend(native_link_flags)
 
     # Use unified features if available, otherwise fall back to default features
     if crate_name in unified_features:
