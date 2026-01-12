@@ -118,15 +118,13 @@ def collect_feature_requirements(vendor_dir: Path) -> tuple[dict[str, set[str]],
             normalized = normalize_crate_name(pkg_name)
             required_features[normalized].update(features)
 
-        # Process dev-dependencies (they can affect feature requirements too)
-        for dep_name, dep_spec in cargo.get("dev-dependencies", {}).items():
-            pkg_name = get_dep_package_name(dep_name, dep_spec)
-            features = extract_dep_features(dep_spec)
-            normalized = normalize_crate_name(pkg_name)
-            required_features[normalized].update(features)
+        # Note: dev-dependencies are NOT processed since they don't affect
+        # library builds - only tests/examples which we don't build
 
-        # Process target-specific dependencies
+        # Process target-specific dependencies (filtered for Linux compatibility)
         for target_spec, target_config in cargo.get("target", {}).items():
+            if not is_linux_compatible_target(target_spec):
+                continue
             for dep_name, dep_spec in target_config.get("dependencies", {}).items():
                 pkg_name = get_dep_package_name(dep_name, dep_spec)
                 features = extract_dep_features(dep_spec)
@@ -134,6 +132,38 @@ def collect_feature_requirements(vendor_dir: Path) -> tuple[dict[str, set[str]],
                 required_features[normalized].update(features)
 
     return required_features, crate_cargo_data
+
+
+def is_linux_compatible_target(target_spec: str) -> bool:
+    """Check if a target specification is compatible with Linux x86_64."""
+    target = target_spec.lower()
+
+    # cfg(any()) means "never match any target"
+    if "cfg(any())" in target:
+        return False
+
+    # Skip wasm32/wasm64-only targets
+    if "wasm32" in target or "wasm64" in target:
+        return False
+
+    # Skip Windows-only targets
+    if "windows" in target:
+        return False
+
+    # Skip targets that explicitly exclude Unix
+    if "not(unix)" in target:
+        return False
+
+    # Skip macOS-only targets (darwin, macos)
+    if "target_os" in target and ("macos" in target or "darwin" in target):
+        if "unix" not in target:
+            return False
+
+    # Skip other non-Linux OS targets
+    if any(os in target for os in ["redox", "wasi", "ios", "android", "freebsd", "openbsd", "netbsd", "uefi"]):
+        return False
+
+    return True
 
 
 def collect_forwarded_features(

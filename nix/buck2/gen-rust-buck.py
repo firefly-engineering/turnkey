@@ -227,7 +227,7 @@ def extract_deps_from_section(
 
 
 def is_linux_compatible_target(target_spec: str) -> bool:
-    """Check if a target specification is compatible with Linux.
+    """Check if a target specification is compatible with Linux x86_64.
 
     Handles common cfg() expressions from Cargo.toml.
     """
@@ -235,6 +235,10 @@ def is_linux_compatible_target(target_spec: str) -> bool:
 
     # cfg(any()) means "never match any target" - used for build-time-only deps
     if "cfg(any())" in target:
+        return False
+
+    # Skip wasm32/wasm64-only targets
+    if "wasm32" in target or "wasm64" in target:
         return False
 
     # Skip Windows-only targets
@@ -252,7 +256,7 @@ def is_linux_compatible_target(target_spec: str) -> bool:
             return False
 
     # Skip other non-Linux OS targets
-    if any(os in target for os in ["redox", "wasi", "ios", "android", "freebsd", "openbsd", "netbsd"]):
+    if any(os in target for os in ["redox", "wasi", "ios", "android", "freebsd", "openbsd", "netbsd", "uefi"]):
         return False
 
     # Include Unix targets (which includes Linux)
