@@ -79,12 +79,41 @@ let
     lib.mapAttrsToList setupCrate registry
   );
 
+  # Group crates by unversioned name to create symlinks
+  # This allows users to reference crates without version suffix
+  cratesByName = lib.foldlAttrs (acc: key: dep:
+    let
+      name = dep.crateName;
+      existing = acc.${name} or [];
+    in
+    acc // { ${name} = existing ++ [{ inherit key; version = dep.version; }]; }
+  ) {} registry;
+
+  # Generate symlink commands for unversioned references
+  # When multiple versions exist, symlink points to the first (typically the latest due to sort order)
+  symlinkCommands = lib.concatStringsSep "\n" (
+    lib.mapAttrsToList (name: versions:
+      let
+        # Use the first version (keys are sorted, so this is predictable)
+        target = (lib.head versions).key;
+      in
+      ''
+        # Symlink ${name} -> ${target}
+        ln -s "${target}" "$out/vendor/${name}"
+      ''
+    ) cratesByName
+  );
+
 in
 pkgs.runCommand "rust-deps-cell" {} ''
   mkdir -p $out/vendor
 
   # Set up all crate sources and generate BUCK files
   ${allSetupCommands}
+
+  # Create symlinks for unversioned crate references
+  # Users can reference "rustdeps//vendor/itoa:itoa" instead of "rustdeps//vendor/itoa@1.0.17:itoa"
+  ${symlinkCommands}
 
   # Generate cell .buckconfig
   cat > $out/.buckconfig << 'BUCKCONFIG'
