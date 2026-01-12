@@ -54,7 +54,12 @@ let
   computeFeaturesScript = ./compute-unified-features.py;
 
   # JSON list of all available crate names for dependency resolution
-  availableCratesJson = builtins.toJSON (lib.attrNames cratesByName);
+  # Includes both versioned keys (e.g., "getrandom@0.2.17") and unversioned names
+  # This allows version-aware dependency resolution
+  availableCratesJson = builtins.toJSON (
+    (lib.attrNames cratesByName) ++  # unversioned names for symlinks
+    (lib.attrNames registry)         # versioned keys for precise matching
+  );
 
   # ==========================================================================
   # Build script fixups

@@ -151,12 +151,25 @@ def get_cargo_env(cargo: dict, crate_name: str) -> dict[str, str]:
     We replicate the most commonly used ones.
     """
     pkg = cargo.get("package", {})
+    version = pkg.get("version", "0.0.0")
+
+    # Parse version components (e.g., "1.2.3-beta.1" -> major=1, minor=2, patch=3, pre=beta.1)
+    version_parts = version.split("-", 1)
+    version_core = version_parts[0]
+    version_pre = version_parts[1] if len(version_parts) > 1 else ""
+
+    core_parts = version_core.split(".")
+    major = core_parts[0] if len(core_parts) > 0 else "0"
+    minor = core_parts[1] if len(core_parts) > 1 else "0"
+    patch = core_parts[2] if len(core_parts) > 2 else "0"
+
     env = {
         "CARGO_PKG_NAME": crate_name,
-        "CARGO_PKG_VERSION": pkg.get("version", "0.0.0"),
-        "CARGO_PKG_VERSION_MAJOR": pkg.get("version", "0.0.0").split(".")[0],
-        "CARGO_PKG_VERSION_MINOR": pkg.get("version", "0.0.0").split(".")[1] if "." in pkg.get("version", "0.0.0") else "0",
-        "CARGO_PKG_VERSION_PATCH": pkg.get("version", "0.0.0").split(".")[2].split("-")[0] if pkg.get("version", "0.0.0").count(".") >= 2 else "0",
+        "CARGO_PKG_VERSION": version,
+        "CARGO_PKG_VERSION_MAJOR": major,
+        "CARGO_PKG_VERSION_MINOR": minor,
+        "CARGO_PKG_VERSION_PATCH": patch,
+        "CARGO_PKG_VERSION_PRE": version_pre,
     }
     # Add optional fields if present
     if "description" in pkg:
@@ -173,9 +186,70 @@ def get_cargo_env(cargo: dict, crate_name: str) -> dict[str, str]:
     return env
 
 
-def resolve_dep(pkg_name: str, available_crates: set[str]) -> str | None:
-    """Resolve a package name to a Buck target if it exists in available crates."""
-    # Crate names in Cargo use hyphens or underscores, check both forms
+def find_matching_version(pkg_name: str, version_req: str | None, available_crates: set[str]) -> str | None:
+    """Find a versioned crate that matches the version requirement.
+
+    When multiple versions exist, we need to select the right one based on semver.
+    """
+    if not version_req:
+        return None
+
+    # Parse version requirement (simple parsing for common cases)
+    # Handle formats like "0.2.10", "^0.2", ">=1.0", "=1.2.3"
+    req = version_req.lstrip("^~>=<= ")
+    req_parts = req.split(".")
+    if not req_parts:
+        return None
+
+    major = req_parts[0]
+    minor = req_parts[1] if len(req_parts) > 1 else None
+
+    # Look for versioned crates matching this requirement
+    # Try exact match first, then compatible versions
+    candidates = []
+    for crate in available_crates:
+        if "@" not in crate:
+            continue
+        name, version = crate.rsplit("@", 1)
+        if name != pkg_name and name != pkg_name.replace("-", "_") and name != pkg_name.replace("_", "-"):
+            continue
+
+        v_parts = version.split(".")
+        v_major = v_parts[0] if len(v_parts) > 0 else "0"
+        v_minor = v_parts[1] if len(v_parts) > 1 else "0"
+
+        # For 0.x versions, minor version must match (0.2 != 0.3)
+        # For 1.x+, major version must match
+        if major == "0":
+            if v_major == major and (minor is None or v_minor == minor):
+                candidates.append((crate, version))
+        else:
+            if v_major == major:
+                candidates.append((crate, version))
+
+    if not candidates:
+        return None
+
+    # Return the highest matching version
+    # Sort by version parts (simple string sort works for most cases)
+    candidates.sort(key=lambda x: [int(p) for p in x[1].split(".")[:3] if p.isdigit()], reverse=True)
+    return candidates[0][0]
+
+
+def resolve_dep(pkg_name: str, available_crates: set[str], version_req: str | None = None) -> str | None:
+    """Resolve a package name to a Buck target if it exists in available crates.
+
+    When version_req is provided and multiple versions exist, selects the right version.
+    """
+    # First, try to find a versioned match if version requirement is specified
+    if version_req:
+        versioned = find_matching_version(pkg_name, version_req, available_crates)
+        if versioned:
+            # Use the versioned crate name but the unversioned target name
+            # e.g., getrandom@0.2.17 has target name "getrandom"
+            return f'rustdeps//vendor/{versioned}:' + versioned.split("@")[0]
+
+    # Fall back to unversioned symlink
     if pkg_name in available_crates:
         return f'rustdeps//vendor/{pkg_name}:{pkg_name}'
     elif pkg_name.replace("-", "_") in available_crates:
@@ -190,6 +264,15 @@ def resolve_dep(pkg_name: str, available_crates: set[str]) -> str | None:
 def normalize_crate_name(name: str) -> str:
     """Normalize crate name (Cargo treats hyphens and underscores as equivalent)."""
     return name.replace("-", "_")
+
+
+def get_version_req(dep_spec) -> str | None:
+    """Extract version requirement from a dependency specification."""
+    if isinstance(dep_spec, str):
+        return dep_spec
+    elif isinstance(dep_spec, dict):
+        return dep_spec.get("version")
+    return None
 
 
 def extract_deps_from_section(
@@ -214,7 +297,9 @@ def extract_deps_from_section(
             pkg_name = dep_name
             is_renamed = False
 
-        target = resolve_dep(pkg_name, available_crates)
+        # Get version requirement for proper version selection
+        version_req = get_version_req(dep_spec)
+        target = resolve_dep(pkg_name, available_crates, version_req)
         if target:
             if is_renamed:
                 # Use normalized local name (hyphens -> underscores) as the crate alias
