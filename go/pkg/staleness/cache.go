@@ -285,15 +285,20 @@ type GoPackageResult struct {
 }
 
 // DefaultCachePath returns the default path for the staleness cache file.
-// Uses TURNKEY_CACHE_DIR if set, otherwise ~/.cache/turnkey.
+// Uses TURNKEY_CACHE_DIR if set, otherwise $XDG_CACHE_HOME/turnkey (or ~/.cache/turnkey).
 func DefaultCachePath() string {
 	cacheDir := os.Getenv("TURNKEY_CACHE_DIR")
 	if cacheDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			home = "."
+		// Follow XDG Base Directory Specification
+		xdgCache := os.Getenv("XDG_CACHE_HOME")
+		if xdgCache == "" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				home = "."
+			}
+			xdgCache = filepath.Join(home, ".cache")
 		}
-		cacheDir = filepath.Join(home, ".cache", "turnkey")
+		cacheDir = filepath.Join(xdgCache, "turnkey")
 	}
 	return filepath.Join(cacheDir, "staleness-cache.json")
 }

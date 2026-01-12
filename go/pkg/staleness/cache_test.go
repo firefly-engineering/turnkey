@@ -3,6 +3,7 @@ package staleness
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -266,22 +267,40 @@ func TestFindBuckFiles(t *testing.T) {
 }
 
 func TestDefaultCachePath(t *testing.T) {
-	// Test with custom cache dir
-	os.Setenv("TURNKEY_CACHE_DIR", "/custom/cache")
-	defer os.Unsetenv("TURNKEY_CACHE_DIR")
+	// Save original env vars
+	origTurnkey := os.Getenv("TURNKEY_CACHE_DIR")
+	origXDG := os.Getenv("XDG_CACHE_HOME")
+	defer func() {
+		os.Setenv("TURNKEY_CACHE_DIR", origTurnkey)
+		os.Setenv("XDG_CACHE_HOME", origXDG)
+	}()
 
+	// Test with TURNKEY_CACHE_DIR (highest priority)
+	os.Setenv("TURNKEY_CACHE_DIR", "/custom/cache")
+	os.Setenv("XDG_CACHE_HOME", "/xdg/cache")
 	path := DefaultCachePath()
 	if path != "/custom/cache/staleness-cache.json" {
 		t.Errorf("expected /custom/cache/staleness-cache.json, got %s", path)
 	}
 
-	// Test with default
+	// Test with XDG_CACHE_HOME (when TURNKEY_CACHE_DIR not set)
 	os.Unsetenv("TURNKEY_CACHE_DIR")
+	path = DefaultCachePath()
+	if path != "/xdg/cache/turnkey/staleness-cache.json" {
+		t.Errorf("expected /xdg/cache/turnkey/staleness-cache.json, got %s", path)
+	}
+
+	// Test with default (~/.cache when XDG_CACHE_HOME not set)
+	os.Unsetenv("XDG_CACHE_HOME")
 	path = DefaultCachePath()
 	if !filepath.IsAbs(path) {
 		t.Errorf("expected absolute path, got %s", path)
 	}
 	if filepath.Base(path) != "staleness-cache.json" {
 		t.Errorf("expected staleness-cache.json, got %s", filepath.Base(path))
+	}
+	// Should contain .cache/turnkey
+	if !strings.Contains(path, ".cache/turnkey") && !strings.Contains(path, ".cache\\turnkey") {
+		t.Errorf("expected path to contain .cache/turnkey, got %s", path)
 	}
 }
