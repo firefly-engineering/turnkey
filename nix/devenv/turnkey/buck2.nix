@@ -192,19 +192,19 @@ ${generateTargets finalToolchains}
     godeps = {
       name = "godeps";
       path = ".turnkey/godeps";
-      derivation = cfg.godeps;
+      derivation = if cfg.go.enable then cfg.go.cell else null;
       description = "Go deps";
     };
     rustdeps = {
       name = "rustdeps";
       path = ".turnkey/rustdeps";
-      derivation = cfg.rustdeps;
+      derivation = if cfg.rust.enable then cfg.rust.cell else null;
       description = "Rust deps";
     };
     pydeps = {
       name = "pydeps";
       path = ".turnkey/pydeps";
-      derivation = cfg.pydeps;
+      derivation = if cfg.python.enable then cfg.python.cell else null;
       description = "Python deps";
     };
   } // lib.optionalAttrs (cfg.prelude.strategy == "nix") {
@@ -258,8 +258,8 @@ ${generateTargets finalToolchains}
       "${cell.path}:${cell.derivation}"
   ) nixCells;
 
-  # For backward compatibility
-  hasGodeps = cfg.godeps != null;
+  # Helper for Go deps enabled
+  hasGodeps = cfg.go.enable && cfg.go.cell != null;
 
   # Generate buckconfig content
   buckconfigContent = ''
@@ -304,31 +304,31 @@ ${generateTargets finalToolchains}
   # Build the list of sync rules based on what's enabled
   syncRules = lib.filter (r: r != null) [
     # Go deps rule
-    (if cfg.godeps != null || cfg.goDepsFile != null then {
+    (if cfg.go.enable && (cfg.go.cell != null || cfg.go.depsFile != null) then {
       name = "go";
-      sources = [ cfg.goModFile cfg.goSumFile ];
-      target = cfg.goDepsFile;
-      generator = [ "godeps-gen" "--go-mod" cfg.goModFile "--go-sum" cfg.goSumFile "--prefetch" ];
+      sources = [ cfg.go.modFile cfg.go.sumFile ];
+      target = cfg.go.depsFile;
+      generator = [ "godeps-gen" "--go-mod" cfg.go.modFile "--go-sum" cfg.go.sumFile "--prefetch" ];
     } else null)
 
     # Rust deps rule
-    (if cfg.rustdeps != null || cfg.rustDepsFile != null then {
+    (if cfg.rust.enable && (cfg.rust.cell != null || cfg.rust.depsFile != null) then {
       name = "rust";
-      sources = [ cfg.cargoTomlFile cfg.cargoLockFile ];
-      target = if cfg.rustDepsFile != null then cfg.rustDepsFile else "rust-deps.toml";
-      generator = [ "rustdeps-gen" "--cargo-lock" cfg.cargoLockFile ];
+      sources = [ cfg.rust.cargoTomlFile cfg.rust.cargoLockFile ];
+      target = if cfg.rust.depsFile != null then cfg.rust.depsFile else "rust-deps.toml";
+      generator = [ "rustdeps-gen" "--cargo-lock" cfg.rust.cargoLockFile ];
     } else null)
 
     # Python deps rule
-    (if cfg.pydeps != null || cfg.pythonDepsFile != null then {
+    (if cfg.python.enable && (cfg.python.cell != null || cfg.python.depsFile != null) then {
       name = "python";
-      sources = if cfg.pylockFile != null
-        then [ cfg.pylockFile ]
-        else [ cfg.pyprojectFile ];
-      target = if cfg.pythonDepsFile != null then cfg.pythonDepsFile else "python-deps.toml";
-      generator = if cfg.pylockFile != null
-        then [ "pydeps-gen" "--lock" cfg.pylockFile ]
-        else [ "pydeps-gen" "--pyproject" cfg.pyprojectFile ];
+      sources = if cfg.python.lockFile != null
+        then [ cfg.python.lockFile ]
+        else [ cfg.python.pyprojectFile ];
+      target = if cfg.python.depsFile != null then cfg.python.depsFile else "python-deps.toml";
+      generator = if cfg.python.lockFile != null
+        then [ "pydeps-gen" "--lock" cfg.python.lockFile ]
+        else [ "pydeps-gen" "--pyproject" cfg.python.pyprojectFile ];
     } else null)
   ];
 
@@ -418,142 +418,172 @@ in
       };
     };
 
-    godeps = lib.mkOption {
-      type = lib.types.nullOr lib.types.package;
-      default = null;
-      description = ''
-        Nix derivation containing the Go dependencies cell.
-        When set, a 'godeps' cell will be added to .buckconfig
-        and symlinked to .turnkey/godeps.
-      '';
+    # ==========================================================================
+    # Go language support
+    # ==========================================================================
+    go = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable Go dependency management for Buck2";
+      };
+
+      cell = lib.mkOption {
+        type = lib.types.nullOr lib.types.package;
+        default = null;
+        description = ''
+          Nix derivation containing the Go dependencies cell.
+          When set, a 'godeps' cell will be added to .buckconfig
+          and symlinked to .turnkey/godeps.
+        '';
+      };
+
+      depsFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = "go-deps.toml";
+        description = ''
+          Relative path to go-deps.toml file (for staleness checking).
+          Used to warn when go-deps.toml needs regeneration.
+        '';
+      };
+
+      modFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = "go.mod";
+        description = ''
+          Relative path to go.mod file (for staleness checking).
+          Used to warn when go-deps.toml needs regeneration.
+        '';
+      };
+
+      sumFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = "go.sum";
+        description = ''
+          Relative path to go.sum file (for staleness checking).
+          Used to warn when go-deps.toml needs regeneration.
+        '';
+      };
+
+      autoRegenerate = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Enable automatic go-deps.toml regeneration via pre-commit hook.
+          When enabled, go-deps.toml will be regenerated when go.mod or go.sum
+          are staged for commit.
+
+          Note: Requires godeps-gen in the shell's packages and nix-prefetch-github
+          available for hash fetching.
+        '';
+      };
+
+      generateOnShellEntry = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Automatically generate/regenerate go-deps.toml when entering the shell
+          if it's missing or stale (older than go.mod or go.sum).
+
+          This enables a workflow where go-deps.toml is generated on-demand:
+          1. First shell entry: go-deps.toml is generated (godeps cell skipped)
+          2. Subsequent entries: Nix uses the generated file
+
+          Requires godeps-gen to be available in PATH (add to registry or packages).
+        '';
+      };
     };
 
-    rustdeps = lib.mkOption {
-      type = lib.types.nullOr lib.types.package;
-      default = null;
-      description = ''
-        Nix derivation containing the Rust dependencies cell.
-        When set, a 'rustdeps' cell will be added to .buckconfig
-        and symlinked to .turnkey/rustdeps.
-      '';
+    # ==========================================================================
+    # Rust language support
+    # ==========================================================================
+    rust = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable Rust dependency management for Buck2";
+      };
+
+      cell = lib.mkOption {
+        type = lib.types.nullOr lib.types.package;
+        default = null;
+        description = ''
+          Nix derivation containing the Rust dependencies cell.
+          When set, a 'rustdeps' cell will be added to .buckconfig
+          and symlinked to .turnkey/rustdeps.
+        '';
+      };
+
+      depsFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = ''
+          Relative path to rust-deps.toml file (for staleness checking).
+          Used by tk sync for Rust dependency management.
+        '';
+      };
+
+      cargoTomlFile = lib.mkOption {
+        type = lib.types.str;
+        default = "Cargo.toml";
+        description = ''
+          Relative path to Cargo.toml file (for staleness checking).
+        '';
+      };
+
+      cargoLockFile = lib.mkOption {
+        type = lib.types.str;
+        default = "Cargo.lock";
+        description = ''
+          Relative path to Cargo.lock file (for staleness checking).
+        '';
+      };
     };
 
-    pydeps = lib.mkOption {
-      type = lib.types.nullOr lib.types.package;
-      default = null;
-      description = ''
-        Nix derivation containing the Python dependencies cell.
-        When set, a 'pydeps' cell will be added to .buckconfig
-        and symlinked to .turnkey/pydeps.
-      '';
-    };
+    # ==========================================================================
+    # Python language support
+    # ==========================================================================
+    python = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable Python dependency management for Buck2";
+      };
 
-    # Go dependency options
-    goDepsFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = "go-deps.toml";
-      description = ''
-        Relative path to go-deps.toml file (for staleness checking).
-        Used to warn when go-deps.toml needs regeneration.
-      '';
-    };
+      cell = lib.mkOption {
+        type = lib.types.nullOr lib.types.package;
+        default = null;
+        description = ''
+          Nix derivation containing the Python dependencies cell.
+          When set, a 'pydeps' cell will be added to .buckconfig
+          and symlinked to .turnkey/pydeps.
+        '';
+      };
 
-    goModFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = "go.mod";
-      description = ''
-        Relative path to go.mod file (for staleness checking).
-        Used to warn when go-deps.toml needs regeneration.
-      '';
-    };
+      depsFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = ''
+          Relative path to python-deps.toml file (for staleness checking).
+          Used by tk sync for Python dependency management.
+        '';
+      };
 
-    goSumFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = "go.sum";
-      description = ''
-        Relative path to go.sum file (for staleness checking).
-        Used to warn when go-deps.toml needs regeneration.
-      '';
-    };
+      pyprojectFile = lib.mkOption {
+        type = lib.types.str;
+        default = "pyproject.toml";
+        description = ''
+          Relative path to pyproject.toml file (for staleness checking).
+        '';
+      };
 
-    # Rust dependency options
-    rustDepsFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      description = ''
-        Relative path to rust-deps.toml file (for staleness checking).
-        Used by tk sync for Rust dependency management.
-      '';
-    };
-
-    cargoTomlFile = lib.mkOption {
-      type = lib.types.str;
-      default = "Cargo.toml";
-      description = ''
-        Relative path to Cargo.toml file (for staleness checking).
-      '';
-    };
-
-    cargoLockFile = lib.mkOption {
-      type = lib.types.str;
-      default = "Cargo.lock";
-      description = ''
-        Relative path to Cargo.lock file (for staleness checking).
-      '';
-    };
-
-    # Python dependency options
-    pythonDepsFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      description = ''
-        Relative path to python-deps.toml file (for staleness checking).
-        Used by tk sync for Python dependency management.
-      '';
-    };
-
-    pyprojectFile = lib.mkOption {
-      type = lib.types.str;
-      default = "pyproject.toml";
-      description = ''
-        Relative path to pyproject.toml file (for staleness checking).
-      '';
-    };
-
-    pylockFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      description = ''
-        Relative path to Python lock file (for staleness checking).
-      '';
-    };
-
-    autoRegenerate = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = ''
-        Enable automatic go-deps.toml regeneration via pre-commit hook.
-        When enabled, go-deps.toml will be regenerated when go.mod or go.sum
-        are staged for commit.
-
-        Note: Requires godeps-gen in the shell's packages and nix-prefetch-github
-        available for hash fetching.
-      '';
-    };
-
-    generateOnShellEntry = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = ''
-        Automatically generate/regenerate go-deps.toml when entering the shell
-        if it's missing or stale (older than go.mod or go.sum).
-
-        This enables a workflow where go-deps.toml is generated on-demand:
-        1. First shell entry: go-deps.toml is generated (godeps cell skipped)
-        2. Subsequent entries: Nix uses the generated file
-
-        Requires godeps-gen to be available in PATH (add to registry or packages).
-      '';
+      lockFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = ''
+          Relative path to Python lock file (for staleness checking).
+        '';
+      };
     };
 
     tk = {
@@ -710,11 +740,11 @@ in
       ${nixCellsSymlinkScript}
 
       # Auto-generate or check staleness of go-deps.toml
-      _go_deps_file="${cfg.goDepsFile}"
-      _go_mod_file="${cfg.goModFile}"
-      _go_sum_file="${cfg.goSumFile}"
+      _go_deps_file="${cfg.go.depsFile}"
+      _go_mod_file="${cfg.go.modFile}"
+      _go_sum_file="${cfg.go.sumFile}"
       _should_generate=0
-      _generate_enabled=${if cfg.generateOnShellEntry then "1" else "0"}
+      _generate_enabled=${if cfg.go.enable && cfg.go.generateOnShellEntry then "1" else "0"}
 
       if [ -f "$_go_mod_file" ]; then
         if [ ! -f "$_go_deps_file" ]; then
@@ -824,7 +854,7 @@ in
     # Pre-commit hooks
     git-hooks.hooks = {
       # Automatic go-deps.toml regeneration
-      godeps-gen = lib.mkIf (hasGodeps && cfg.autoRegenerate) {
+      godeps-gen = lib.mkIf (hasGodeps && cfg.go.autoRegenerate) {
         enable = true;
         name = "godeps-gen";
         description = "Regenerate go-deps.toml when go.mod or go.sum changes";
@@ -833,9 +863,9 @@ in
         entry = ''
           sh -c '
             if command -v godeps-gen >/dev/null 2>&1; then
-              echo "Regenerating ${cfg.goDepsFile}..."
-              godeps-gen --go-mod "${cfg.goModFile}" --go-sum "${cfg.goSumFile}" --prefetch > "${cfg.goDepsFile}"
-              git add "${cfg.goDepsFile}"
+              echo "Regenerating ${cfg.go.depsFile}..."
+              godeps-gen --go-mod "${cfg.go.modFile}" --go-sum "${cfg.go.sumFile}" --prefetch > "${cfg.go.depsFile}"
+              git add "${cfg.go.depsFile}"
             else
               echo "Warning: godeps-gen not found in PATH, skipping regeneration"
             fi

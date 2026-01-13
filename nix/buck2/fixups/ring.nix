@@ -23,9 +23,9 @@ let
   ) symbols.symbolRenames;
 
   # Generate #define lines for symbol prefixes
-  # Uses ''${RING_PREFIX} which becomes ${RING_PREFIX} in shell
+  # Uses \${RING_PREFIX} which becomes ${RING_PREFIX} in shell (escaped in double-quoted string)
   prefixDefines = lib.concatMapStringsSep "\n" (sym:
-    "#define ${sym} ''${RING_PREFIX}${sym}"
+    "#define ${sym} \${RING_PREFIX}${sym}"
   ) symbols.symbolsToPrefix;
 
   # Generate C source array for shell
