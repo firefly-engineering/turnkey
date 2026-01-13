@@ -81,6 +81,7 @@
           packages.gobuckify = import ./nix/packages/gobuckify.nix { inherit pkgs lib; };
           packages.cargo-prune-workspace = import ./nix/packages/cargo-prune-workspace.nix { inherit pkgs lib; };
           packages.tk = import ./nix/packages/tk.nix { inherit pkgs lib; };
+          packages.e2e-runner = import ./nix/packages/e2e-runner.nix { inherit pkgs lib; };
 
           # Configure turnkey to use our local toolchain files
           # Each file creates a corresponding shell

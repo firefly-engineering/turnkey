@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches: [main, agent-dev]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs on new pushes to same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast checks first (fail fast)
+  lint:
+    name: Lint & Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Check flake
+        run: nix flake check --no-build
+
+  # Unit tests for Go packages
+  unit-tests-go:
+    name: Go Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Run Go tests
+        run: |
+          nix develop --command go test -v -race ./go/pkg/...
+
+  # Unit tests for Rust packages
+  unit-tests-rust:
+    name: Rust Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Run Rust tests
+        run: |
+          nix develop --command cargo test --workspace
+
+  # Build all packages
+  build-packages:
+    name: Build Packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Build all packages
+        run: |
+          nix build .#godeps-gen
+          nix build .#pydeps-gen
+          nix build .#rustdeps-gen
+          nix build .#tk
+          nix build .#gobuckify
+
+  # E2E tests (release-gating)
+  e2e-tests:
+    name: E2E - ${{ matrix.test }}
+    runs-on: ubuntu-latest
+    needs: [lint, unit-tests-go, build-packages]
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false  # Run all tests even if one fails
+      matrix:
+        test:
+          - greenfield-template
+          # Add more tests as they are implemented:
+          # - ci-headless
+          # - native-tools-sync
+          # - multi-language
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Run E2E test (${{ matrix.test }})
+        run: |
+          chmod +x e2e/harness/runner.sh
+          TURNKEY_E2E_DIR="$PWD/e2e" \
+          TURNKEY_VERBOSE=1 \
+            ./e2e/harness/runner.sh ${{ matrix.test }}
+        env:
+          # Disable interactive features
+          TURNKEY_NON_INTERACTIVE: "1"
+
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ matrix.test }}-logs
+          path: /tmp/turnkey-e2e-*
+          retention-days: 7
+
+  # Summary job for branch protection
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [lint, unit-tests-go, unit-tests-rust, build-packages, e2e-tests]
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [[ "${{ needs.lint.result }}" != "success" ]] || \
+             [[ "${{ needs.unit-tests-go.result }}" != "success" ]] || \
+             [[ "${{ needs.unit-tests-rust.result }}" != "success" ]] || \
+             [[ "${{ needs.build-packages.result }}" != "success" ]] || \
+             [[ "${{ needs.e2e-tests.result }}" != "success" ]]; then
+            echo "One or more jobs failed"
+            exit 1
+          fi
+          echo "All jobs passed!"

@@ -36,6 +36,11 @@
             nix = pkgs.nix;
             go = pkgs.go;
 
+            # Required by Buck2 toolchains (go needs python + cxx)
+            python = pkgs.python3;
+            clang = pkgs.llvmPackages.clang;
+            lld = pkgs.llvmPackages.lld;
+
             # Turnkey tools
             godeps-gen = inputs.turnkey.packages.${pkgs.system}.godeps-gen;
             tk = inputs.turnkey.packages.${pkgs.system}.tk;
