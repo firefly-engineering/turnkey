@@ -72,9 +72,9 @@ let
       extension = "tar.gz";
     };
 
-  # Scripts for BUCK file generation
-  genBuckScript = ./gen-rust-buck.py;
-  computeFeaturesScript = ./compute-unified-features.py;
+  # Python tools for BUCK file generation (built from python/ and cmd/)
+  genRustBuck = import ../packages/gen-rust-buck.nix { inherit pkgs lib; };
+  computeUnifiedFeatures = import ../packages/compute-unified-features.nix { inherit pkgs lib; };
 
   # JSON list of all available crate names for dependency resolution
   # Includes both versioned keys (e.g., "getrandom@0.2.17") and unversioned names
@@ -164,7 +164,7 @@ let
     in
     ''
       # Generate BUCK file for ${key}
-      ${pkgs.python3}/bin/python3 ${genBuckScript} \
+      ${genRustBuck}/bin/gen-rust-buck \
         "$out/${vendorPath}" \
         '${availableCratesJson}' \
         '${fixupCratesJson}' \
@@ -229,7 +229,7 @@ pkgs.runCommand "rust-deps-cell" {
   # Phase 2: Compute unified features across all crates
   # ==========================================================================
   echo "Computing unified features..."
-  UNIFIED_FEATURES=$(${pkgs.python3}/bin/python3 ${computeFeaturesScript} \
+  UNIFIED_FEATURES=$(${computeUnifiedFeatures}/bin/compute-unified-features \
     "$out/vendor" \
     ${featuresFileArg})
 

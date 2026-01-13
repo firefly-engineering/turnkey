@@ -1,29 +1,15 @@
-#!/usr/bin/env python3
 """
 Tests for cfg() expression parsing and evaluation.
 
-Run with: python3 -m pytest nix/buck2/test_cfg_parser.py -v
+Run with: python3 -m pytest python/cfg/test_parser.py -v
 
 These test cases document the expected behavior of the cfg() parser
 for various platform-specific dependency expressions from Cargo.toml files.
 """
 
-import sys
-from pathlib import Path
-
-# Add the directory containing gen-rust-buck.py to the path
-sys.path.insert(0, str(Path(__file__).parent))
-
-from importlib import import_module
-
-# Import the module
-gen_rust_buck = import_module("gen-rust-buck")
-
-# Get the classes and functions we need to test
-CfgParser = gen_rust_buck.CfgParser
-TargetSpec = gen_rust_buck.TargetSpec
-evaluate_cfg = gen_rust_buck.evaluate_cfg
-is_linux_compatible_target = gen_rust_buck.is_linux_compatible_target
+from .parser import CfgParser, CfgKey, CfgKeyValue, CfgAll, CfgAny, CfgNot
+from .evaluator import TargetSpec, evaluate_cfg
+from .target import is_linux_compatible_target
 
 
 class TestCfgParser:
@@ -34,6 +20,7 @@ class TestCfgParser:
         parser = CfgParser('cfg(target_os = "linux")')
         result = parser.parse()
         assert result is not None
+        assert isinstance(result, CfgKeyValue)
         assert result.key == "target_os"
         assert result.value == "linux"
 
@@ -42,6 +29,7 @@ class TestCfgParser:
         parser = CfgParser('cfg(any(target_os = "linux", target_os = "android"))')
         result = parser.parse()
         assert result is not None
+        assert isinstance(result, CfgAny)
         assert len(result.children) == 2
 
     def test_all_combinator(self):
@@ -49,14 +37,16 @@ class TestCfgParser:
         parser = CfgParser('cfg(all(target_os = "linux", target_arch = "x86_64"))')
         result = parser.parse()
         assert result is not None
+        assert isinstance(result, CfgAll)
         assert len(result.children) == 2
 
     def test_not_combinator(self):
         """Test parsing not() combinator."""
-        parser = CfgParser('cfg(not(windows))')
+        parser = CfgParser("cfg(not(windows))")
         result = parser.parse()
         assert result is not None
-        assert hasattr(result, 'child')
+        assert isinstance(result, CfgNot)
+        assert hasattr(result, "child")
 
     def test_nested_expression(self):
         """Test parsing nested cfg expression."""
@@ -74,12 +64,12 @@ class TestCfgEvaluation:
 
     def test_unix_is_true(self):
         """Unix shorthand should be true on Linux."""
-        parser = CfgParser('cfg(unix)')
+        parser = CfgParser("cfg(unix)")
         assert evaluate_cfg(parser.parse(), self.target) is True
 
     def test_windows_is_false(self):
         """Windows shorthand should be false on Linux."""
-        parser = CfgParser('cfg(windows)')
+        parser = CfgParser("cfg(windows)")
         assert evaluate_cfg(parser.parse(), self.target) is False
 
     def test_target_os_linux(self):
@@ -114,7 +104,7 @@ class TestCfgEvaluation:
 
     def test_unknown_standalone_key_is_false(self):
         """Unknown standalone keys like 'miri' should be false."""
-        parser = CfgParser('cfg(miri)')
+        parser = CfgParser("cfg(miri)")
         assert evaluate_cfg(parser.parse(), self.target) is False
 
 
@@ -150,7 +140,7 @@ class TestGetrandomCfg:
         - all(True, True) = True
         """
         # The full expression from getrandom's Cargo.toml
-        expr = '''cfg(all(
+        expr = """cfg(all(
             any(target_os = "linux", target_os = "android"),
             not(any(
                 all(target_os = "linux", target_env = ""),
@@ -159,7 +149,7 @@ class TestGetrandomCfg:
                 getrandom_backend = "rdrand",
                 getrandom_backend = "rndr"
             ))
-        ))'''
+        ))"""
 
         parser = CfgParser(expr)
         result = parser.parse()
@@ -180,9 +170,7 @@ class TestGetrandomCfg:
         parser = CfgParser('cfg(target_env = "")')
         result = parser.parse()
         # Empty string causes fallback to CfgKey, not CfgKeyValue
-        from importlib import import_module
-        gen_rust_buck = import_module("gen-rust-buck")
-        assert isinstance(result, gen_rust_buck.CfgKey)
+        assert isinstance(result, CfgKey)
         assert result.key == "target_env"
 
 
@@ -196,19 +184,22 @@ class TestLinuxCompatibleTarget:
         assert is_linux_compatible_target('cfg(target_os = "windows")') is False
 
     def test_unix_cfg(self):
-        assert is_linux_compatible_target('cfg(unix)') is True
+        assert is_linux_compatible_target("cfg(unix)") is True
 
     def test_wasm_cfg(self):
         assert is_linux_compatible_target('cfg(target_arch = "wasm32")') is False
 
     def test_any_linux_android(self):
-        assert is_linux_compatible_target(
-            'cfg(any(target_os = "linux", target_os = "android"))'
-        ) is True
+        assert (
+            is_linux_compatible_target(
+                'cfg(any(target_os = "linux", target_os = "android"))'
+            )
+            is True
+        )
 
     def test_not_unix(self):
         """not(unix) should be false on Linux."""
-        assert is_linux_compatible_target('cfg(not(unix))') is False
+        assert is_linux_compatible_target("cfg(not(unix))") is False
 
 
 if __name__ == "__main__":
@@ -226,11 +217,11 @@ if __name__ == "__main__":
     failed = 0
 
     for test_class in tests:
-        if hasattr(test_class, 'setup_method'):
+        if hasattr(test_class, "setup_method"):
             test_class.setup_method()
 
         for name in dir(test_class):
-            if name.startswith('test_'):
+            if name.startswith("test_"):
                 try:
                     getattr(test_class, name)()
                     print(f"  PASS: {test_class.__class__.__name__}.{name}")
@@ -245,4 +236,4 @@ if __name__ == "__main__":
                     failed += 1
 
     print(f"\nResults: {passed} passed, {failed} failed")
-    sys.exit(0 if failed == 0 else 1)
+    exit(0 if failed == 0 else 1)

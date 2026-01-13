@@ -1,0 +1,14 @@
+load("@prelude//:rules.bzl", "python_library")
+
+python_library(
+    name = "cargo",
+    srcs = [
+        "__init__.py",
+        "features.py",
+        "toml.py",
+    ],
+    deps = [
+        "//python/cfg:cfg",
+    ],
+    visibility = ["PUBLIC"],
+)

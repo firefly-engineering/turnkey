@@ -1,61 +1,29 @@
-#!/usr/bin/env python3
-"""
-Compute unified features for all Rust crates in a vendor directory.
+"""Feature unification for Rust crates.
 
-This script implements Cargo-style feature unification:
+This module implements Cargo-style feature unification:
 1. Parse all Cargo.toml files to find dependency feature requirements
 2. Compute the union of all features requested by any dependent
-3. Output JSON mapping crate names to their unified feature sets
+3. Output mapping of crate names to their unified feature sets
 
 This matches Cargo's behavior where if any crate requires feature X on crate Y,
 crate Y is built with feature X enabled.
 """
 
-import json
-import sys
 import tomllib
 from collections import defaultdict
 from pathlib import Path
 
-
-def normalize_crate_name(name: str) -> str:
-    """Normalize crate name (Cargo treats hyphens and underscores as equivalent)."""
-    return name.replace("-", "_")
-
-
-def parse_cargo_toml(crate_dir: Path) -> dict:
-    """Parse Cargo.toml and extract relevant information."""
-    cargo_toml = crate_dir / "Cargo.toml"
-    if not cargo_toml.exists():
-        return {}
-
-    with open(cargo_toml, "rb") as f:
-        return tomllib.load(f)
-
-
-def get_crate_name(cargo: dict, fallback: str) -> str:
-    """Get the crate name from Cargo.toml."""
-    return cargo.get("package", {}).get("name", fallback)
-
-
-def extract_dep_features(dep_spec) -> list[str]:
-    """Extract features requested for a dependency."""
-    if isinstance(dep_spec, str):
-        return []  # Simple version string, no features
-    elif isinstance(dep_spec, dict):
-        features = list(dep_spec.get("features", []))
-        # If default-features is not explicitly false, include "default"
-        if dep_spec.get("default-features", True) and dep_spec.get("default_features", True):
-            features.append("default")
-        return features
-    return []
-
-
-def get_dep_package_name(dep_name: str, dep_spec) -> str:
-    """Get the actual package name for a dependency (handles renames)."""
-    if isinstance(dep_spec, dict) and "package" in dep_spec:
-        return dep_spec["package"]
-    return dep_name
+from .toml import (
+    parse_cargo_toml,
+    get_crate_name,
+    normalize_crate_name,
+    extract_dep_features,
+    get_dep_package_name,
+)
+try:
+    from cfg import is_linux_compatible_target
+except ImportError:
+    from python.cfg import is_linux_compatible_target
 
 
 def parse_feature_forwarding(feature_item: str) -> tuple[str, str] | None:
@@ -77,7 +45,9 @@ def parse_feature_forwarding(feature_item: str) -> tuple[str, str] | None:
     return (dep_name, feature)
 
 
-def collect_feature_requirements(vendor_dir: Path) -> tuple[dict[str, set[str]], dict[str, dict]]:
+def collect_feature_requirements(
+    vendor_dir: Path,
+) -> tuple[dict[str, set[str]], dict[str, dict]]:
     """
     Scan all crates and collect feature requirements from their dependents.
 
@@ -134,45 +104,6 @@ def collect_feature_requirements(vendor_dir: Path) -> tuple[dict[str, set[str]],
     return required_features, crate_cargo_data
 
 
-def is_linux_compatible_target(target_spec: str) -> bool:
-    """Check if a target specification is compatible with Linux x86_64.
-
-    For cfg(any(...)) expressions, we include if ANY condition could match Linux.
-    """
-    target = target_spec.lower()
-
-    # cfg(any()) with empty parens means "never match any target"
-    if "cfg(any())" in target:
-        return False
-
-    # Skip targets that explicitly exclude Unix
-    if "not(unix)" in target:
-        return False
-
-    # If target includes "unix" or "linux", it's compatible with Linux
-    # Check this BEFORE checking exclusions, since cfg(any(unix, wasi)) should match
-    if "unix" in target or "linux" in target:
-        return True
-
-    # Skip wasm32/wasm64-only targets (but not if they also include unix)
-    if "wasm32" in target or "wasm64" in target:
-        return False
-
-    # Skip Windows-only targets
-    if "windows" in target:
-        return False
-
-    # Skip macOS-only targets (darwin, macos)
-    if "target_os" in target and ("macos" in target or "darwin" in target):
-        return False
-
-    # Skip other non-Linux OS targets (only if unix not in target)
-    if any(os in target for os in ["redox", "wasi", "ios", "android", "freebsd", "openbsd", "netbsd", "uefi"]):
-        return False
-
-    return True
-
-
 def collect_forwarded_features(
     crate_cargo_data: dict[str, dict],
     required_features: dict[str, set[str]],
@@ -203,7 +134,9 @@ def collect_forwarded_features(
             # Get all features that will be enabled for this crate
             default_features = set(crate_features_def.get("default", []))
             requested = required_features.get(normalized_crate, set())
-            all_enabled = default_features | requested | forwarded.get(normalized_crate, set())
+            all_enabled = (
+                default_features | requested | forwarded.get(normalized_crate, set())
+            )
 
             # Expand features to find forwarding
             to_process = list(all_enabled)
@@ -293,7 +226,7 @@ def compute_unified_features(vendor_dir: Path, overrides: dict) -> dict[str, lis
     # Collect what features are requested by dependents
     required_features, crate_cargo_data = collect_feature_requirements(vendor_dir)
 
-    # Collect features forwarded through feature definitions (e.g., "alloc" = ["zerovec/alloc"])
+    # Collect features forwarded through feature definitions
     forwarded_features = collect_forwarded_features(crate_cargo_data, required_features)
 
     # Merge forwarded features into required features
@@ -383,22 +316,3 @@ def load_overrides(overrides_file: Path | None) -> dict:
         data = tomllib.load(f)
 
     return data.get("overrides", {})
-
-
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: compute-unified-features.py <vendor_dir> [overrides_file]", file=sys.stderr)
-        sys.exit(1)
-
-    vendor_dir = Path(sys.argv[1])
-    overrides_file = Path(sys.argv[2]) if len(sys.argv) > 2 else None
-
-    overrides = load_overrides(overrides_file)
-    unified = compute_unified_features(vendor_dir, overrides)
-
-    # Output as JSON
-    print(json.dumps(unified, indent=2, sort_keys=True))
-
-
-if __name__ == "__main__":
-    main()
