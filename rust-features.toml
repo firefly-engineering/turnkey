@@ -21,3 +21,6 @@ rustls-pki-types = { add = ["std"] }
 
 # ureq needs json feature for Response::into_json()
 ureq = { add = ["json"] }
+
+# syn needs printing feature for serde_derive (quote! macro to generate tokens)
+syn = { add = ["printing"] }

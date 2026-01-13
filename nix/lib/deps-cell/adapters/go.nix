@@ -124,14 +124,29 @@ rec {
       chmod -R u+w "$out/vendor/${importPath}"
     '') depPackages)}
 
-    # Generate modules.txt for Go toolchain compatibility
+    # Discover all Go packages by finding directories with .go files
+    # Exclude testdata directories and test-only packages
+    echo "Discovering Go packages..."
+    find $out/vendor -type f -name '*.go' ! -name '*_test.go' -printf '%h\n' | \
+      sort -u | \
+      grep -v '/testdata/' > /tmp/all_packages.txt || true
+
+    # Convert absolute paths to import paths
+    sed -i "s|$out/vendor/||g" /tmp/all_packages.txt
+
+    echo "Found $(wc -l < /tmp/all_packages.txt) packages"
+
+    # Generate vendor/modules.txt
+    # Format: module header, ## explicit, then all packages belonging to that module
     {
-      ${lib.concatStringsSep "\n" (lib.mapAttrsToList (importPath: depSpec: ''
-        echo "# ${importPath} ${depSpec.version}"
-        echo "## explicit"
-        echo "${importPath}"
+      ${lib.concatStringsSep "\n      " (lib.mapAttrsToList (importPath: depSpec: ''
+      echo "# ${importPath} ${depSpec.version}"
+      echo "## explicit"
+      grep -E "^${lib.escapeRegex importPath}(/|$)" /tmp/all_packages.txt || true
       '') deps)}
     } > $out/vendor/modules.txt
+
+    echo "Generated modules.txt"
 
     # Generate go.mod for gobuckify with actual versions
     cat > $out/go.mod << 'GOMOD'
@@ -146,18 +161,20 @@ rec {
     )
     GOMOD
 
-    # Generate main.go that imports all packages (for gobuckify discovery)
+    # Generate main.go that imports all discovered packages
     {
-      printf 'package main\n\n'
-      printf 'import (\n'
-      find $out/vendor -type f -name '*.go' ! -name '*_test.go' -printf '%h\n' | \
-        sort -u | grep -v '/testdata/' | \
-        sed "s|$out/vendor/||g" | \
-        while read pkg; do
-          printf '\t_ "%s"\n' "$pkg"
-        done
-      printf ')\n\nfunc main() {}\n'
+      echo "package main"
+      echo ""
+      echo "import ("
+      while read import_path; do
+        echo "	_ \"$import_path\""
+      done < /tmp/all_packages.txt
+      echo ")"
+      echo ""
+      echo "func main() {}"
     } > $out/main.go
+
+    echo "Generated main.go with $(wc -l < /tmp/all_packages.txt) imports"
 
     # Create gobuckify configuration
     cat > $out/gobuckify.json << 'GOBUCKIFY_CONFIG'

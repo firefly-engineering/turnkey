@@ -116,10 +116,11 @@ rec {
       }
     ) deps;
 
-    # Read features file if provided
-    featuresOverrides = if featuresFile != null
-      then builtins.fromTOML (builtins.readFile featuresFile)
-      else {};
+    # Features file argument for compute-unified-features
+    # The tool expects a file path, not JSON
+    featuresFileArg = if featuresFile != null
+      then "${featuresFile}"
+      else "";
   in
   pkgs.runCommand "rustdeps-cell" {
     nativeBuildInputs = cellBuildInputs ++
@@ -168,8 +169,10 @@ rec {
     # Compute unified features (if tool provided)
     ${if computeUnifiedFeatures != null then ''
       echo "Computing unified features..."
-      UNIFIED_FEATURES=$(compute-unified-features "$out/vendor" ${lib.optionalString (featuresFile != null) "'${builtins.toJSON featuresOverrides}'"})
+      echo "Features file arg: ${featuresFileArg}"
+      UNIFIED_FEATURES=$(compute-unified-features "$out/vendor" ${featuresFileArg})
       export UNIFIED_FEATURES
+      echo "syn features: $(echo "$UNIFIED_FEATURES" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("syn@2.0.114", d.get("syn", "not found")))' 2>/dev/null || echo "parse error")"
     '' else ''
       UNIFIED_FEATURES="{}"
       export UNIFIED_FEATURES
@@ -178,6 +181,9 @@ rec {
     # Generate BUCK files (if tool provided)
     ${if genRustBuck != null then ''
       echo "Generating BUCK files..."
+      # Debug: save UNIFIED_FEATURES to file
+      echo "$UNIFIED_FEATURES" > /tmp/unified_features_debug.json || true
+      echo "syn entry: $(echo "$UNIFIED_FEATURES" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(json.dumps(d.get("syn", "NOT FOUND")))' 2>/dev/null || echo "parse failed")"
       for dir in "$out/vendor"/*; do
         if [ -d "$dir" ] && [ -f "$dir/Cargo.toml" ]; then
           gen-rust-buck "$dir" \
