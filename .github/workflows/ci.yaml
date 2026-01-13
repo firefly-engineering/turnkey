@@ -118,10 +118,10 @@ jobs:
       matrix:
         test:
           - greenfield-template
+          - ci-headless
+          - multi-language
           # Add more tests as they are implemented:
-          # - ci-headless
           # - native-tools-sync
-          # - multi-language
     steps:
       - uses: actions/checkout@v4
 
