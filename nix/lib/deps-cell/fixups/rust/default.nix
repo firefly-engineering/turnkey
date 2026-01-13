@@ -3,24 +3,63 @@
 # Fixups for Rust crates that require special handling during build.
 # Each fixup file handles a family of related crates.
 #
-# Fixups are organized as:
-#   - serde.nix: serde, serde_core, serde_json, serde_derive
-#   - ring.nix: ring crypto library (native code)
-#   - rustix.nix: rustix platform flags
+# This module exports two types of fixups:
+#   - buildScriptFixups: Shell commands to generate build.rs outputs
+#   - rustcFlags: --cfg flags to pass to rustc
 #
-# Each fixup is a function: context -> string (shell commands)
+# Fixups are organized as:
+#   - serde.nix: serde, serde_core (build script), serde_json (rustc flags)
+#   - ring.nix: ring crypto library (native code compilation)
+#   - rustix.nix: rustix platform flags (rustc flags)
+#
+# Build script fixups are functions: context -> string (shell commands)
 # Context includes: { name, version, patchVersion, vendorPath, ... }
+#
+# Rustc flags are arrays: [ "--cfg" "flag" ... ]
 
 { pkgs, lib }:
 
 let
   # Import individual fixup files
-  # TODO: Migrate from nix/buck2/fixups/ once adapters are ready
-  # serdeFixups = import ./serde.nix { inherit pkgs lib; };
-  # ringFixups = import ./ring.nix { inherit pkgs lib; };
-  # rustixFixups = import ./rustix.nix { inherit pkgs lib; };
+  serdeFixups = import ./serde.nix { inherit lib; };
+  ringFixups = import ./ring.nix { inherit lib; };
+  rustixFixups = import ./rustix.nix { inherit lib; };
 in
-{
-  # Placeholder - will be populated when migrating from nix/buck2/fixups/
-  # See nix/buck2/fixups/default.nix for current implementation
+rec {
+  # ==========================================================================
+  # Build Script Fixups
+  # ==========================================================================
+  #
+  # These generate files that build.rs would normally create.
+  # Keyed by crate name or name@version.
+
+  buildScriptFixups =
+    (serdeFixups.buildScriptFixups or {})
+    // (ringFixups.buildScriptFixups or ringFixups)
+    // (rustixFixups.buildScriptFixups or {});
+
+  # ==========================================================================
+  # Rustc Flags
+  # ==========================================================================
+  #
+  # These are --cfg flags that build.rs would normally emit.
+  # Keyed by crate name or name@version.
+
+  rustcFlags =
+    (serdeFixups.rustcFlags or {})
+    // (ringFixups.rustcFlags or {})
+    // (rustixFixups.rustcFlags or {});
+
+  # ==========================================================================
+  # Combined (for backward compatibility)
+  # ==========================================================================
+  #
+  # The legacy API expected all fixups in a single attribute set.
+  # This merges build script fixups for compatibility with existing code.
+
+  # Legacy export: just the build script fixups (what old fixups/default.nix exported)
+  __legacyBuildScriptFixups = buildScriptFixups;
+
+  # Legacy export: just the rustc flags (what old rustc-flags/default.nix exported)
+  __legacyRustcFlags = rustcFlags;
 }

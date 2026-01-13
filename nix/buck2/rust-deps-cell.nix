@@ -31,9 +31,10 @@ let
   genRustBuck = import ../packages/gen-rust-buck.nix { inherit pkgs lib; };
   computeUnifiedFeatures = import ../packages/compute-unified-features.nix { inherit pkgs lib; };
 
-  # Import default registries from existing locations (until migration is complete)
-  defaultRustcFlagsRegistry = import ./rustc-flags { inherit lib; };
-  defaultBuildScriptFixups = import ./fixups { inherit lib; };
+  # Import default registries from deps-cell fixups
+  rustFixups = import ../lib/deps-cell/fixups/rust { inherit pkgs lib; };
+  defaultRustcFlagsRegistry = rustFixups.rustcFlags;
+  defaultBuildScriptFixups = rustFixups.buildScriptFixups;
 in
 depsCell.mkRustDepsCell {
   inherit depsFile featuresFile;
