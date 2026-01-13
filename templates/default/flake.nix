@@ -22,19 +22,45 @@
         "aarch64-darwin"
       ];
 
-      perSystem = { pkgs, ... }: {
+      perSystem = { pkgs, config, ... }: {
         # Enable turnkey toolchain management
-        turnkey = {
+        turnkey.toolchains = {
           enable = true;
-          declarationFile = ./toolchain.toml;
-        };
+          declarationFiles.default = ./toolchain.toml;
 
-        # Configure Buck2 integration
-        devenv.shells.default = {
-          turnkey.buck2 = {
+          # The default registry from turnkey provides buck2, nix, godeps-gen.
+          # Extend it with additional tools:
+          registry = {
+            # Base tools (from nixpkgs)
+            buck2 = pkgs.buck2;
+            nix = pkgs.nix;
+            go = pkgs.go;
+
+            # Turnkey tools
+            godeps-gen = inputs.turnkey.packages.${pkgs.system}.godeps-gen;
+            tk = inputs.turnkey.packages.${pkgs.system}.tk;
+          };
+
+          # Enable Buck2 integration
+          buck2 = {
             enable = true;
-            # Prelude strategy: bundled (default), git, nix, or path
-            # prelude.strategy = "bundled";
+            prelude.strategy = "bundled";
+
+            # Go dependencies (auto-generated from go.mod/go.sum)
+            go = {
+              enable = true;
+              depsFile = ./go-deps.toml;
+            };
+
+            # Uncomment to enable other languages:
+            # rust = {
+            #   enable = true;
+            #   depsFile = ./rust-deps.toml;
+            # };
+            # python = {
+            #   enable = true;
+            #   depsFile = ./python-deps.toml;
+            # };
           };
         };
       };
