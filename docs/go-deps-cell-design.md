@@ -80,6 +80,45 @@ Buck2's `importpath` attribute ensures the Go compiler sees the correct import p
 
 The `go_library` rule's `importpath = "github.com/spf13/cobra"` makes this work.
 
+### Target Path Format Reference
+
+When writing BUCK files that depend on packages from the godeps cell, use this format:
+
+```
+godeps//vendor/<import-path>:<target-name>
+```
+
+Where:
+- `godeps//` - the cell alias (configured in .buckconfig)
+- `vendor/` - **required prefix** - all packages live under vendor/
+- `<import-path>` - the full Go import path
+- `<target-name>` - the **directory name** (last path component), NOT the package name
+
+**Examples:**
+
+| Go Import | Correct Buck2 Target | Why |
+|-----------|---------------------|-----|
+| `github.com/spf13/cobra` | `godeps//vendor/github.com/spf13/cobra:cobra` | Target is `cobra` (dir name) |
+| `github.com/pelletier/go-toml/v2` | `godeps//vendor/github.com/pelletier/go-toml/v2:v2` | Target is `v2` (dir name), not `go-toml` |
+| `golang.org/x/sys/unix` | `godeps//vendor/golang.org/x/sys/unix:unix` | Target is `unix` (dir name) |
+
+**Common Mistakes:**
+
+```python
+# WRONG - missing vendor/ prefix
+deps = ["godeps//github.com/spf13/cobra:cobra"]
+
+# WRONG - using package name instead of directory name for versioned imports
+deps = ["godeps//vendor/github.com/pelletier/go-toml/v2:go-toml"]
+
+# CORRECT
+deps = ["godeps//vendor/github.com/pelletier/go-toml/v2:v2"]
+```
+
+**Why the target name is the directory name:**
+
+Buck2 targets are named after the directory containing the BUCK file. For versioned Go modules like `go-toml/v2`, the BUCK file lives in the `v2/` directory, so the target is named `v2`, not `go-toml`. The `importpath` attribute in the generated BUCK file tells the Go compiler to use the correct import path.
+
 ## Nix Integration
 
 ### Derivation Structure
