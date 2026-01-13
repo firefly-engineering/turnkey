@@ -237,8 +237,9 @@ def evaluate_cfg(predicate: CfgPredicate, target: TargetSpec) -> bool:
             return target.family == "unix"
         if key == "windows":
             return target.family == "windows"
-        # Unknown key - assume true (be permissive)
-        return True
+        # Unknown standalone keys (like miri, test, doc) are not set during
+        # normal compilation, so default to False
+        return False
 
     if isinstance(predicate, CfgKeyValue):
         key = predicate.key.lower()
@@ -265,8 +266,11 @@ def evaluate_cfg(predicate: CfgPredicate, target: TargetSpec) -> bool:
             # Features are handled separately
             return True
 
-        # Unknown key - assume true (be permissive)
-        return True
+        # Unknown key-value pairs (like getrandom_backend = "custom") should
+        # default to False since these cfg keys are not set unless explicitly
+        # configured. Previously we defaulted to True which caused issues with
+        # crates like getrandom that use custom cfg keys to exclude dependencies.
+        return False
 
     if isinstance(predicate, CfgAll):
         return all(evaluate_cfg(child, target) for child in predicate.children)
