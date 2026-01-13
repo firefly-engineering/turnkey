@@ -34,11 +34,9 @@ let
   # Default registries
   # ==========================================================================
 
-  # Default rustc flags for crates whose build scripts generate cfg directives
-  defaultRustcFlagsRegistry = {
-    serde_json = ["--cfg" ''fast_arithmetic=\"64\"''];
-    rustix = ["--cfg" "libc" "--cfg" "linux_like" "--cfg" "linux_kernel"];
-  };
+  # Default rustc flags imported from external modules
+  # These emulate cfg directives that would be set by build scripts
+  defaultRustcFlagsRegistry = import ./rustc-flags { inherit lib; };
 
   # Merge user-provided rustc flags with defaults (user takes precedence)
   mergedRustcFlagsRegistry = defaultRustcFlagsRegistry // rustcFlagsRegistry;
