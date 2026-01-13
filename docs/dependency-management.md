@@ -281,3 +281,91 @@ For dependency cells consumed by Buck2, we use per-module fetching because:
 - Buck2 needs to reference individual modules as targets
 - Each module's hash should be independently verifiable
 - The cell structure must match Buck2's expectations
+
+## Special Cases & Manual Intervention
+
+While most dependencies work automatically, some require special handling. This section documents common cases and how to address them.
+
+### When Manual Intervention Is Needed
+
+| Symptom | Likely Cause | Solution |
+|---------|--------------|----------|
+| Undefined `cfg` flags at compile time | Build script generates rustc flags | Add to `rustcFlagsRegistry` |
+| Missing generated files (e.g., `private.rs`) | Build script generates source files | Add to `buildScriptFixups` |
+| Linker errors for native symbols | Crate has C/assembly that needs compilation | Add native library fixup |
+| Feature-related compile errors | Wrong feature combination | Check `rust-features.toml` |
+
+### Automatic Handling vs Manual Configuration
+
+**Handled Automatically:**
+- Standard crate dependencies (deps in Cargo.toml)
+- Feature resolution and unification across dependency graph
+- Crate renaming (via `package` in dependencies)
+- Optional dependencies gated by features
+- Proc-macro crates
+
+**May Require Manual Configuration:**
+- Build scripts that generate rustc cfg flags
+- Build scripts that generate source files
+- Native code compilation (C/assembly)
+- Platform-specific feature detection
+- Crates with complex build.rs logic
+
+### Configuration Locations
+
+Configuration lives in your `flake.nix` under `turnkey.toolchains.buck2`:
+
+```nix
+{
+  turnkey.toolchains = {
+    buck2 = {
+      enable = true;
+      rustDepsFile = ./rust-deps.toml;
+
+      # Rustc flags for build scripts that emit cfg directives
+      rustcFlagsRegistry = {
+        my_crate = ["--cfg" "my_flag"];
+        "my_crate@1.2.3" = ["--cfg" "version_specific_flag"];
+      };
+
+      # Build script fixups for generated files
+      buildScriptFixups = {
+        my_crate = { patchVersion, vendorPath, ... }: ''
+          mkdir -p "$out/${vendorPath}/out_dir"
+          echo "// generated" > "$out/${vendorPath}/out_dir/generated.rs"
+        '';
+      };
+
+      # Feature overrides (in separate file)
+      rustFeaturesFile = ./rust-features.toml;
+    };
+  };
+}
+```
+
+### Default Registries
+
+Turnkey includes default fixups for known problematic crates:
+
+**Default `rustcFlagsRegistry`:**
+```nix
+{
+  serde_json = ["--cfg" ''fast_arithmetic=\"64\"''];
+  rustix = ["--cfg" "libc" "--cfg" "linux_like" "--cfg" "linux_kernel"];
+}
+```
+
+**Default `buildScriptFixups`:**
+- `serde_core` - Generates `out_dir/private.rs` with versioned module
+- `serde` - Generates `out_dir/private.rs` with serde_core alias
+- `ring` - Compiles native crypto library (~440 lines of build commands)
+
+User-provided values **override** defaults (same key) or **extend** them (new keys).
+
+## Language-Specific Guides
+
+For detailed handling of language-specific edge cases, see:
+
+- [Rust Dependency Handling](./rust-dependency-handling.md) - Build scripts, native code, features
+- Go dependencies are generally straightforward
+- Python dependencies use URL-based wheel fetching
