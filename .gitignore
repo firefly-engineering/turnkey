@@ -14,9 +14,8 @@
 # Buck2 generated files
 buck-out/
 .buckconfig
-# Ignore turnkey symlinks but track config files
+# Ignore turnkey symlinks (all generated from Nix)
 .turnkey/*
-!.turnkey/sync.toml
 examples/hello-deps/hello-deps
 result
 tools/godeps-gen/godeps-gen

@@ -186,6 +186,22 @@ in
             '';
           };
 
+          cargoTomlFile = mkOption {
+            type = types.str;
+            default = "Cargo.toml";
+            description = ''
+              Relative path to Cargo.toml file (for staleness checking and regeneration).
+            '';
+          };
+
+          cargoLockFile = mkOption {
+            type = types.str;
+            default = "Cargo.lock";
+            description = ''
+              Relative path to Cargo.lock file (for staleness checking and regeneration).
+            '';
+          };
+
           rustFeaturesFile = mkOption {
             type = types.nullOr types.path;
             default = null;
@@ -284,6 +300,25 @@ in
               When set, turnkey will build the pydeps cell automatically.
             '';
           };
+
+          pyprojectFile = mkOption {
+            type = types.str;
+            default = "pyproject.toml";
+            description = ''
+              Relative path to pyproject.toml file (for staleness checking and regeneration).
+            '';
+          };
+
+          pylockFile = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            example = "pylock.toml";
+            description = ''
+              Relative path to Python lock file (pylock.toml or requirements.txt).
+              If set, this is used as the source for staleness checking.
+              If null, pyproject.toml is used as the source.
+            '';
+          };
         };
       };
     }
@@ -363,6 +398,7 @@ in
             pydeps = pydepsCell;
             # Pass through paths for staleness checking and regeneration
             # Extract filename from path for runtime staleness checking
+            # Go dependency configuration
             goDepsFile =
               if cfg.buck2.goDepsFile != null
               then builtins.baseNameOf cfg.buck2.goDepsFile
@@ -371,6 +407,20 @@ in
             goSumFile = cfg.buck2.goSumFile;
             autoRegenerate = cfg.buck2.autoRegenerate;
             generateOnShellEntry = cfg.buck2.generateOnShellEntry;
+            # Rust dependency configuration
+            rustDepsFile =
+              if cfg.buck2.rustDepsFile != null
+              then builtins.baseNameOf cfg.buck2.rustDepsFile
+              else null;
+            cargoTomlFile = cfg.buck2.cargoTomlFile;
+            cargoLockFile = cfg.buck2.cargoLockFile;
+            # Python dependency configuration
+            pythonDepsFile =
+              if cfg.buck2.pythonDepsFile != null
+              then builtins.baseNameOf cfg.buck2.pythonDepsFile
+              else null;
+            pyprojectFile = cfg.buck2.pyprojectFile;
+            pylockFile = cfg.buck2.pylockFile;
             # Shell entry options
             welcomeMessage = cfg.buck2.welcomeMessage;
             quiet = cfg.buck2.quiet;
