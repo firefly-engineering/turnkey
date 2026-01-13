@@ -16,7 +16,6 @@ let
       ../../python/cfg
       ../../python/cargo
       ../../python/buck
-      ../../cmd/__init__.py
       ../../cmd/gen-rust-buck
     ];
   };
@@ -29,7 +28,7 @@ pkgs.writeShellApplication {
 
   text = ''
     export PYTHONPATH="${pythonSrc}"
-    exec python3 -m cmd.gen-rust-buck "$@"
+    exec python3 "${pythonSrc}/cmd/gen-rust-buck/__main__.py" "$@"
   '';
 
   meta = {

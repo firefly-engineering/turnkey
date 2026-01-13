@@ -15,7 +15,6 @@ let
       ../../python/__init__.py
       ../../python/cfg
       ../../python/cargo
-      ../../cmd/__init__.py
       ../../cmd/compute-unified-features
     ];
   };
@@ -28,7 +27,7 @@ pkgs.writeShellApplication {
 
   text = ''
     export PYTHONPATH="${pythonSrc}"
-    exec python3 -m cmd.compute-unified-features "$@"
+    exec python3 "${pythonSrc}/cmd/compute-unified-features/__main__.py" "$@"
   '';
 
   meta = {

@@ -118,6 +118,8 @@
               rustdeps-gen = config.packages.rustdeps-gen;
               gobuckify = config.packages.gobuckify;
               tk = config.packages.tk;
+              # Python testing
+              pytest = pkgs.python3Packages.pytest;
             };
             # Enable Buck2 toolchain generation
             buck2 = {

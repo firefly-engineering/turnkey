@@ -18,6 +18,7 @@ typescript = {}
 
 # Development utilities (not Buck2 toolchains)
 nix = {}
+pytest = {}  # Python test runner
 beads = {}
 beads_viewer = {}
 jj = {}

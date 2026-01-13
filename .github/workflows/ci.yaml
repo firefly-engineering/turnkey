@@ -19,11 +19,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v16
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
 
       - name: Check flake
         run: nix flake check --no-build --impure
@@ -35,11 +32,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v16
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
 
       - name: Run Go tests
         run: |
@@ -52,15 +46,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v16
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
 
       - name: Run Rust tests
         run: |
           nix develop --impure --command cargo test --workspace
+
+  # Unit tests for Python packages
+  unit-tests-python:
+    name: Python Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Run Python tests
+        run: |
+          nix develop --impure --command pytest python/ -v
 
   # Build all packages
   build-packages:
@@ -69,11 +74,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v16
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
 
       - name: Build all packages
         run: |
@@ -83,11 +85,29 @@ jobs:
           nix build .#tk
           nix build .#gobuckify
 
+  # Buck2 build and test
+  buck2-build-test:
+    name: Buck2 Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Build all targets
+        run: |
+          nix develop --impure --command tk build //...
+
+      - name: Run all tests
+        run: |
+          nix develop --impure --command tk test //...
+
   # E2E tests (release-gating)
   e2e-tests:
     name: E2E - ${{ matrix.test }}
     runs-on: ubuntu-latest
-    needs: [lint, unit-tests-go, build-packages]
+    needs: [lint, unit-tests-go, unit-tests-python, build-packages]
     timeout-minutes: 30
     strategy:
       fail-fast: false  # Run all tests even if one fails
@@ -101,11 +121,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v16
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
 
       - name: Run E2E test (${{ matrix.test }})
         run: |
@@ -129,7 +146,7 @@ jobs:
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [lint, unit-tests-go, unit-tests-rust, build-packages, e2e-tests]
+    needs: [lint, unit-tests-go, unit-tests-rust, unit-tests-python, build-packages, buck2-build-test, e2e-tests]
     if: always()
     steps:
       - name: Check all jobs passed
@@ -137,7 +154,9 @@ jobs:
           if [[ "${{ needs.lint.result }}" != "success" ]] || \
              [[ "${{ needs.unit-tests-go.result }}" != "success" ]] || \
              [[ "${{ needs.unit-tests-rust.result }}" != "success" ]] || \
+             [[ "${{ needs.unit-tests-python.result }}" != "success" ]] || \
              [[ "${{ needs.build-packages.result }}" != "success" ]] || \
+             [[ "${{ needs.buck2-build-test.result }}" != "success" ]] || \
              [[ "${{ needs.e2e-tests.result }}" != "success" ]]; then
             echo "One or more jobs failed"
             exit 1

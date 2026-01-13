@@ -1,0 +1,15 @@
+name: Setup Nix
+description: Install Nix and configure caching
+
+# =============================================================================
+# Update action versions here - single source of truth
+# =============================================================================
+
+runs:
+  using: composite
+  steps:
+    - name: Install Nix
+      uses: DeterminateSystems/nix-installer-action@v16
+
+    - name: Setup Nix cache
+      uses: DeterminateSystems/magic-nix-cache-action@v8
