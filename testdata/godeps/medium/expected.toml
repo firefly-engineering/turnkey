@@ -1,0 +1,16 @@
+[deps."github.com/google/uuid"]
+version = "v1.6.0"
+hash = ""
+
+[deps."github.com/pelletier/go-toml/v2"]
+version = "v2.2.4"
+hash = ""
+
+[deps."golang.org/x/mod"]
+version = "v0.31.0"
+hash = ""
+
+[deps."golang.org/x/sync"]
+version = "v0.18.0"
+hash = ""
+indirect = true

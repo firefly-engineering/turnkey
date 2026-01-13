@@ -19,6 +19,7 @@ go_library(
 go_test(
     name = "godeps_test",
     srcs = [
+        "integration_test.go",
         "output_test.go",
         "parser_test.go",
         "prefetch_test.go",
@@ -26,5 +27,6 @@ go_test(
     deps = [
         "godeps//vendor/golang.org/x/mod/modfile:modfile",
     ],
+    resources = ["//testdata:godeps_fixtures"],
     target_under_test = ":godeps",
 )

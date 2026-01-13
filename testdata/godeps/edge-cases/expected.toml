@@ -1,0 +1,11 @@
+[deps."github.com/google/uuid"]
+version = "v1.6.0"
+hash = ""
+
+[deps."golang.org/x/sys"]
+version = "v0.33.0"
+hash = ""
+
+[deps."gopkg.in/yaml.v3"]
+version = "v3.0.1"
+hash = ""
