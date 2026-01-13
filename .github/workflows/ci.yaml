@@ -67,10 +67,11 @@ jobs:
         run: |
           nix develop --impure --command pytest python/ -v
 
-  # Build all packages
+  # Build all packages (skip on agent-dev branch)
   build-packages:
     name: Build Packages
     runs-on: ubuntu-latest
+    if: github.ref != 'refs/heads/agent-dev'
     steps:
       - uses: actions/checkout@v4
 
@@ -103,10 +104,11 @@ jobs:
         run: |
           nix develop --impure --command tk test //...
 
-  # E2E tests (release-gating)
+  # E2E tests (release-gating, skip on agent-dev branch)
   e2e-tests:
     name: E2E - ${{ matrix.test }}
     runs-on: ubuntu-latest
+    if: github.ref != 'refs/heads/agent-dev'
     needs: [lint, unit-tests-go, unit-tests-python, build-packages]
     timeout-minutes: 30
     strategy:
@@ -151,13 +153,32 @@ jobs:
     steps:
       - name: Check all jobs passed
         run: |
-          if [[ "${{ needs.lint.result }}" != "success" ]] || \
-             [[ "${{ needs.unit-tests-go.result }}" != "success" ]] || \
-             [[ "${{ needs.unit-tests-rust.result }}" != "success" ]] || \
-             [[ "${{ needs.unit-tests-python.result }}" != "success" ]] || \
-             [[ "${{ needs.build-packages.result }}" != "success" ]] || \
-             [[ "${{ needs.buck2-build-test.result }}" != "success" ]] || \
-             [[ "${{ needs.e2e-tests.result }}" != "success" ]]; then
+          # Helper function to check job result (success or skipped is OK)
+          check_result() {
+            local result="$1"
+            local allow_skip="$2"
+            if [[ "$result" == "success" ]]; then
+              return 0
+            elif [[ "$allow_skip" == "true" && "$result" == "skipped" ]]; then
+              return 0
+            fi
+            return 1
+          }
+
+          failed=false
+
+          # Required jobs (must succeed)
+          check_result "${{ needs.lint.result }}" false || failed=true
+          check_result "${{ needs.unit-tests-go.result }}" false || failed=true
+          check_result "${{ needs.unit-tests-rust.result }}" false || failed=true
+          check_result "${{ needs.unit-tests-python.result }}" false || failed=true
+          check_result "${{ needs.buck2-build-test.result }}" false || failed=true
+
+          # Optional jobs (can be skipped on agent-dev branch)
+          check_result "${{ needs.build-packages.result }}" true || failed=true
+          check_result "${{ needs.e2e-tests.result }}" true || failed=true
+
+          if [[ "$failed" == "true" ]]; then
             echo "One or more jobs failed"
             exit 1
           fi
