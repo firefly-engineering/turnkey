@@ -3,6 +3,8 @@
 #
 # To regenerate: godeps-gen --prefetch -o go-deps.toml
 
+schema_version = 1
+
 [deps."github.com/google/uuid"]
 version = "v1.6.0"
 hash = "sha256-VWl9sqUzdOuhW0KzQlv0gwwUQClYkmZwSydHG2sALYw="
@@ -19,6 +21,10 @@ hash = "sha256-eOvJXcF3QYztJxlBzHXPweJYG08YsLzPXXM8Px3IXA4="
 version = "v0.18.0"
 hash = "sha256-S8o6y7GOaYWeq+TzT8BB6T+1mg82Mu08V0TL3ukJprg="
 indirect = true
+
+[deps."golang.org/x/sys"]
+version = "v0.40.0"
+hash = "sha256-beQ0c6q199u+e1ZuLm41LbGwourTRCtN/hImAaHsz+c="
 
 [deps."golang.org/x/tools"]
 version = "v0.39.0"
