@@ -1,0 +1,16 @@
+# Rust example with external crate dependencies
+#
+# Uses the `itoa` crate for efficient integer-to-string conversion.
+# Dependencies are managed via rust-deps.toml and the rustdeps cell.
+
+load("@prelude//:rules.bzl", "rust_binary")
+
+rust_binary(
+    name = "rust-hello-deps",
+    srcs = ["main.rs"],
+    edition = "2021",
+    deps = [
+        "rustdeps//vendor/itoa:itoa",
+    ],
+    visibility = ["PUBLIC"],
+)

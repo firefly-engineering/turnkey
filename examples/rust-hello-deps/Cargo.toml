@@ -1,0 +1,11 @@
+[package]
+name = "rust-hello-deps"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "rust-hello-deps"
+path = "main.rs"
+
+[dependencies]
+itoa.workspace = true

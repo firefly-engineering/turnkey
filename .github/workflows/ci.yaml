@@ -1,0 +1,187 @@
+name: CI
+
+on:
+  push:
+    branches: [main, agent-dev]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs on new pushes to same branch
+# Use head_ref (PR source branch) or ref_name (push branch) for consistent grouping
+# This prevents duplicate runs when pushing to a branch with an open PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast checks first (fail fast)
+  lint:
+    name: Lint & Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Check flake
+        run: nix flake check --no-build --impure
+
+  # Unit tests for Go packages
+  unit-tests-go:
+    name: Go Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Run Go tests
+        run: |
+          nix develop --impure --command go test -v -race ./go/pkg/...
+
+  # Unit tests for Rust packages
+  unit-tests-rust:
+    name: Rust Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Run Rust tests
+        run: |
+          nix develop --impure --command cargo test --workspace
+
+  # Unit tests for Python packages
+  unit-tests-python:
+    name: Python Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Run Python tests
+        run: |
+          nix develop --impure --command pytest python/ -v
+
+  # Build all packages (skip on agent-dev branch)
+  build-packages:
+    name: Build Packages
+    runs-on: ubuntu-latest
+    if: github.ref != 'refs/heads/agent-dev'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Build all packages
+        run: |
+          nix build .#godeps-gen
+          nix build .#pydeps-gen
+          nix build .#rustdeps-gen
+          nix build .#tk
+          nix build .#gobuckify
+
+  # Buck2 build and test
+  buck2-build-test:
+    name: Buck2 Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Build all targets
+        run: |
+          nix develop --impure --command tk build //...
+
+      - name: Run all tests
+        run: |
+          nix develop --impure --command tk test //...
+
+  # E2E tests (release-gating, skip on agent-dev branch)
+  e2e-tests:
+    name: E2E - ${{ matrix.test }}
+    runs-on: ubuntu-latest
+    if: github.ref != 'refs/heads/agent-dev'
+    needs: [lint, unit-tests-go, unit-tests-python, build-packages]
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false  # Run all tests even if one fails
+      matrix:
+        test:
+          - greenfield-template
+          # Add more tests as they are implemented:
+          # - ci-headless
+          # - native-tools-sync
+          # - multi-language
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Run E2E test (${{ matrix.test }})
+        run: |
+          chmod +x e2e/harness/runner.sh
+          TURNKEY_E2E_DIR="$PWD/e2e" \
+          TURNKEY_VERBOSE=1 \
+            ./e2e/harness/runner.sh ${{ matrix.test }}
+        env:
+          # Disable interactive features
+          TURNKEY_NON_INTERACTIVE: "1"
+
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ matrix.test }}-logs
+          path: /tmp/turnkey-e2e-*
+          retention-days: 7
+
+  # Summary job for branch protection
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [lint, unit-tests-go, unit-tests-rust, unit-tests-python, build-packages, buck2-build-test, e2e-tests]
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        run: |
+          # Helper function to check job result (success or skipped is OK)
+          check_result() {
+            local result="$1"
+            local allow_skip="$2"
+            if [[ "$result" == "success" ]]; then
+              return 0
+            elif [[ "$allow_skip" == "true" && "$result" == "skipped" ]]; then
+              return 0
+            fi
+            return 1
+          }
+
+          failed=false
+
+          # Required jobs (must succeed)
+          check_result "${{ needs.lint.result }}" false || failed=true
+          check_result "${{ needs.unit-tests-go.result }}" false || failed=true
+          check_result "${{ needs.unit-tests-rust.result }}" false || failed=true
+          check_result "${{ needs.unit-tests-python.result }}" false || failed=true
+          check_result "${{ needs.buck2-build-test.result }}" false || failed=true
+
+          # Optional jobs (can be skipped on agent-dev branch)
+          check_result "${{ needs.build-packages.result }}" true || failed=true
+          check_result "${{ needs.e2e-tests.result }}" true || failed=true
+
+          if [[ "$failed" == "true" ]]; then
+            echo "One or more jobs failed"
+            exit 1
+          fi
+          echo "All jobs passed!"

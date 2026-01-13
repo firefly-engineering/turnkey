@@ -1,0 +1,5 @@
+schema_version = 1
+
+[deps."github.com/google/uuid"]
+version = "v1.6.0"
+hash = ""

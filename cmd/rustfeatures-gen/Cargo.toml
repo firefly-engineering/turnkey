@@ -1,0 +1,14 @@
+[package]
+name = "rustfeatures-gen"
+version = "0.1.0"
+edition = "2021"
+description = "Generate rust-features.toml from workspace Cargo.toml files"
+
+[[bin]]
+name = "rustfeatures-gen"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+toml = "0.8"

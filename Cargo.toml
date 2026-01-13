@@ -1,0 +1,21 @@
+# Turnkey Rust workspace
+#
+# This is a monorepo workspace that declares all Rust dependencies.
+# Run `cargo update` to refresh Cargo.lock, then:
+#   rustdeps-gen --cargo-lock Cargo.lock > rust-deps.toml
+
+[workspace]
+resolver = "2"
+members = [
+    "cmd/nix-prefetch-cached",
+    "cmd/pydeps-gen",
+    "cmd/rustdeps-gen",
+    "cmd/rustfeatures-gen",
+    "examples/rust-hello",
+    "examples/rust-hello-deps",
+    "rust/prefetch-cache",
+]
+
+# Shared dependencies for all workspace members
+[workspace.dependencies]
+itoa = "1.0"

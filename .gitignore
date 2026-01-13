@@ -3,3 +3,28 @@
 
 # devenv local state
 .devenv/
+.pre-commit-config.yaml
+.turnkey-deps-hashes
+
+# bv (beads viewer) local config and caches
+.bv/
+.beads/.bv.lock
+.beads/bd.sock
+
+# Buck2 generated files
+buck-out/
+.buckconfig
+# Ignore turnkey symlinks (all generated from Nix)
+.turnkey/*
+examples/hello-deps/hello-deps
+result
+tools/godeps-gen/godeps-gen
+tools/gobuckify/gobuckify
+
+# Go/Rust build binaries (at repo root)
+/godeps-gen
+/rustdeps-gen
+/tk
+
+# Rust build artifacts
+target/

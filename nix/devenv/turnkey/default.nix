@@ -1,9 +1,14 @@
-{ lib, config, ... }:
+{ lib, config, pkgs, ... }:
 
 let
   cfg = config.turnkey;
+
+  # Generate the direnv library script
+  direnvLib = import ./direnv-lib.nix { inherit lib pkgs config; };
 in
 {
+  # Import the Buck2 generation sub-module
+  imports = [ ./buck2.nix ];
   options.turnkey = {
     enable = lib.mkOption {
       type = lib.types.bool;
@@ -41,5 +46,8 @@ in
         resolvedPackages = map (name: cfg.registry.${name}) toolchainNames;
       in
       resolvedPackages;
+
+    # Export direnv library path
+    env.TURNKEY_DIRENV_LIB = "${direnvLib}";
   };
 }
