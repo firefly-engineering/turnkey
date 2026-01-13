@@ -51,9 +51,22 @@ init_from_template() {
   local template="${1:-default}"
   local turnkey_root
   turnkey_root="$(get_turnkey_root)"
+  local template_dir="${turnkey_root}/templates/${template}"
 
-  # Use git+file: to respect .gitignore (avoids including socket files, etc.)
-  nix flake init -t "git+file://${turnkey_root}#${template}" --accept-flake-config
+  if [[ ! -d "$template_dir" ]]; then
+    echo "ERROR: Template not found: $template_dir" >&2
+    return 1
+  fi
+
+  # Copy template files directly (more reliable for testing)
+  cp -r "${template_dir}/." .
+
+  # Update flake.nix to use local turnkey path for testing
+  # Replace github:firefly-engineering/turnkey with a path reference
+  if [[ -f flake.nix ]]; then
+    sed -i "s|github:firefly-engineering/turnkey|git+file://${turnkey_root}|g" flake.nix
+  fi
+
   echo "Initialized from template: ${template}"
 }
 
@@ -76,15 +89,10 @@ commit_changes() {
 # Usage: run_in_devshell "command to run"
 run_in_devshell() {
   local cmd="$1"
-  local turnkey_root
-  turnkey_root="$(get_turnkey_root)"
 
   # Use --no-pure-eval to allow IFD (import from derivation)
-  # Use --override-input with git+file: to respect .gitignore
-  nix develop \
-    --no-pure-eval \
-    --override-input turnkey "git+file://${turnkey_root}" \
-    --command bash -c "$cmd"
+  # The flake.nix has already been patched to use local turnkey by init_from_template
+  nix develop --no-pure-eval --command bash -c "$cmd"
 }
 
 # Run a command in the devshell, capturing output
