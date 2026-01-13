@@ -26,7 +26,7 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@v8
 
       - name: Check flake
-        run: nix flake check --no-build
+        run: nix flake check --no-build --impure
 
   # Unit tests for Go packages
   unit-tests-go:
@@ -43,7 +43,7 @@ jobs:
 
       - name: Run Go tests
         run: |
-          nix develop --command go test -v -race ./go/pkg/...
+          nix develop --impure --command go test -v -race ./go/pkg/...
 
   # Unit tests for Rust packages
   unit-tests-rust:
@@ -60,7 +60,7 @@ jobs:
 
       - name: Run Rust tests
         run: |
-          nix develop --command cargo test --workspace
+          nix develop --impure --command cargo test --workspace
 
   # Build all packages
   build-packages:
