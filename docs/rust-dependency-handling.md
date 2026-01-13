@@ -214,6 +214,32 @@ Simple string fixups can use these shell variables:
 
 For complex fixups, prefer the function form for access to version info.
 
+### Nix Interpolation vs Shell Escaping (Important!)
+
+In Nix multiline strings (`'' ... ''`), there's a critical distinction:
+
+```nix
+buildScriptFixups = {
+  my_crate = { patchVersion, vendorPath, ... }: ''
+    # CORRECT: ${patchVersion} is Nix interpolation
+    # The Nix variable patchVersion (e.g., "14") is substituted at Nix eval time
+    MY_VAR="${patchVersion}"
+
+    # WRONG: ''${patchVersion} escapes the $ for shell
+    # This becomes literal ${patchVersion} in the shell script, which is undefined
+    MY_VAR="''${patchVersion}"  # Results in empty string!
+
+    # CORRECT: ''$out escapes for shell variable
+    # $out is a shell variable set by Nix's runCommand
+    echo "Output: $out"
+  '';
+};
+```
+
+**Rule of thumb:**
+- Use `${var}` for Nix variables (function arguments like `patchVersion`, `vendorPath`)
+- Use `$var` or `''$var` for shell variables (like `$out`, loop variables)
+
 ## Lessons Learned from Specific Crates
 
 ### serde / serde_core
