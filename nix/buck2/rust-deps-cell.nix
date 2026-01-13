@@ -85,7 +85,8 @@ SERDE_PRIVATE
 
       # Symbol prefix to avoid conflicts (matches ring's build.rs)
       # Note: The prefix ends with double underscore, matching what ring's Rust code expects
-      RING_PREFIX="ring_core_0_17_''${patchVersion}__"
+      # patchVersion is interpolated by Nix from the function argument
+      RING_PREFIX="ring_core_0_17_${patchVersion}__"
 
       # Generate prefix header for symbol namespacing
       # Ring expects this at ring_core_generated/prefix_symbols.h
