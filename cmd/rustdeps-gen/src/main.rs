@@ -221,6 +221,10 @@ fn write_toml(mut w: impl Write, crates: &[Crate]) -> Result<()> {
     writeln!(w, "# Key format: deps.\"crate-name@version\" to support multiple versions")?;
     writeln!(w)?;
 
+    // Schema version for forward compatibility
+    writeln!(w, "schema_version = 1")?;
+    writeln!(w)?;
+
     for c in crates {
         // Use "name@version" as key to handle multiple versions of same crate
         writeln!(w, "[deps.\"{}@{}\"]", c.name, c.version)?;

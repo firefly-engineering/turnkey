@@ -56,6 +56,10 @@ func WriteTOML(w io.Writer, deps []Dependency, opts OutputOptions) error {
 		fmt.Fprintln(w)
 	}
 
+	// Write schema version for forward compatibility
+	fmt.Fprintln(w, "schema_version = 1")
+	fmt.Fprintln(w)
+
 	// Write each dependency
 	for _, dep := range deps {
 		if err := writeDependency(w, dep); err != nil {

@@ -601,6 +601,10 @@ fn generate_toml(deps: &[PythonDep], source: &str) -> String {
     output.push_str(&format!("# To regenerate: {}\n", regen_cmd));
     output.push('\n');
 
+    // Schema version for forward compatibility
+    output.push_str("schema_version = 1\n");
+    output.push('\n');
+
     for dep in deps {
         output.push_str(&format!("[deps.{}]\n", dep.name.to_lowercase().replace('-', "_")));
         output.push_str(&format!("version = \"{}\"\n", dep.version));
