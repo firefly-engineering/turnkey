@@ -26,7 +26,7 @@ pkgs.buildGoModule {
   };
   subPackages = [ "cmd/cargo-prune-workspace" ];
 
-  vendorHash = "sha256-6JdnoCmu3KvG3pNbzMS2Xo0igMAcIZjpeA0S8a4MPWY=";
+  vendorHash = "sha256-FfIQwd6lWWP787ZaHHXffPTbdJpYEpwDJoD0tDVwLOM=";
 
   meta = {
     description = "Prune Cargo.toml workspace members to a whitelist";
