@@ -154,7 +154,7 @@ fn main() -> Result<()> {
     let lockfile_content = fs::read_to_string(&args.lock)
         .with_context(|| format!("Failed to read {}", args.lock.display()))?;
 
-    let lockfile: PnpmLockfile = serde_yaml::from_str(&lockfile_content)
+    let lockfile: PnpmLockfile = serde_saphyr::from_str(&lockfile_content)
         .with_context(|| format!("Failed to parse {}", args.lock.display()))?;
 
     eprintln!(

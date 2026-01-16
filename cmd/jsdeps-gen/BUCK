@@ -10,9 +10,12 @@ rust_binary(
         "rustdeps//vendor/base64:base64",
         "rustdeps//vendor/clap:clap",
         "rustdeps//vendor/serde:serde",
-        "rustdeps//vendor/serde_yaml:serde_yaml",
+        "rustdeps//vendor/serde-saphyr:serde-saphyr",
         "rustdeps//vendor/sha2:sha2",
         "rustdeps//vendor/toml:toml",
     ],
+    env = {
+        "CARGO_PKG_VERSION": "0.1.0",
+    },
     visibility = ["PUBLIC"],
 )
