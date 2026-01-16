@@ -31,8 +31,12 @@ This document provides comprehensive guidance for AI assistants working on the T
 ├── flake.nix                       # Main Nix flake configuration
 ├── flake.lock                      # Locked flake dependencies
 ├── toolchain.toml                  # Example toolchain declaration file
+├── cmd/
+│   ├── tk/                         # tk CLI - Buck2 wrapper with auto-sync
+│   └── tw/                         # tw CLI - Native tool wrapper for auto-sync
 ├── docs/
-│   └── buck2_cell_resolution.md    # Comprehensive Buck2 cell resolution documentation
+│   ├── buck2_cell_resolution.md    # Comprehensive Buck2 cell resolution documentation
+│   └── native-tool-wrappers.md     # How go/cargo/uv are wrapped with auto-sync
 └── nix/
     ├── devenv/
     │   └── turnkey/
@@ -93,6 +97,38 @@ Simple TOML format for declaring which toolchains are needed.
 - Includes source code references with exact file paths and line numbers
 - Provides working solutions to Buck2/Nix integration challenges
 - Excellent example of documentation quality expected in this project
+
+### CLI Tools
+
+#### `cmd/tk/` - Buck2 Wrapper
+The `tk` command wraps `buck2` with automatic dependency sync:
+- Runs `tk sync` before commands that read the build graph (`build`, `test`, `run`, etc.)
+- Pass-through for commands that don't need sync (`clean`, `kill`, etc.)
+- Configured via `.turnkey/sync.toml`
+
+```bash
+tk build //some:target    # Syncs deps first, then runs buck2 build
+tk --no-sync build ...    # Skip sync
+```
+
+#### `cmd/tw/` - Native Tool Wrapper
+The `tw` command wraps native language tools (`go`, `cargo`, `uv`) with auto-sync:
+- Detects when dependency files change after running commands
+- Triggers appropriate sync operation (e.g., `godeps-gen` after `go get`)
+- Used internally by transparent shell wrappers
+
+```bash
+tw go get github.com/foo/bar    # Runs go, syncs if go.mod changed
+tw -v cargo add serde           # Verbose mode
+```
+
+**Key packages:**
+- `go/pkg/syncconfig/` - Configuration parsing for `.turnkey/sync.toml`
+- `go/pkg/syncer/` - Sync execution logic
+- `go/pkg/snapshot/` - File hashing for change detection
+- `nix/packages/tw-wrappers.nix` - Shell wrappers that shadow real tools
+
+See `docs/native-tool-wrappers.md` for full documentation.
 
 ## Architecture Patterns
 
@@ -568,6 +604,7 @@ When adding functionality, ensure it works across all platforms.
 ## Related Resources
 
 - **Dependency Management**: See `docs/dependency-management.md` for core principles on how dependencies flow from language-native declarations through Nix to Buck2 cells. **Read this before working on any dependency-related code.**
+- **Native Tool Wrappers**: See `docs/native-tool-wrappers.md` for how `go`, `cargo`, `uv` are transparently wrapped with auto-sync.
 - **Buck2 Cell Resolution**: See `docs/buck2_cell_resolution.md` for deep dive
 - **flake-parts**: https://flake.parts/
 - **devenv**: https://devenv.sh/
