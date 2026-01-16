@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# E2E Test: Multi-language monorepo (Go + Rust)
+# E2E Test: Multi-language monorepo (Go + Rust + Python)
 #
-# Tests that both Go and Rust languages can coexist in the same project:
+# Tests that Go, Rust, and Python can coexist in the same project:
 # 1. Initialize from turnkey template
-# 2. Enable both Go and Rust support
+# 2. Enable Go, Rust, and Python support
 # 3. Add multi-language fixture code
-# 4. Generate deps files for both languages
-# 5. Build Go and Rust targets
-# 6. Run Rust tests
+# 4. Generate deps files for all languages
+# 5. Build Go, Rust, and Python targets
+# 6. Run tests
 #
 # Issue: turnkey-tps
 set -euo pipefail
@@ -16,7 +16,7 @@ set -euo pipefail
 source "${LIB_DIR}/assertions.sh"
 source "${LIB_DIR}/setup.sh"
 
-section "Test: Multi-language monorepo (Go + Rust)"
+section "Test: Multi-language monorepo (Go + Rust + Python)"
 
 # Step 1: Create test project
 step "Creating test project directory"
@@ -27,14 +27,14 @@ cd "$PROJECT_DIR"
 step "Initializing from turnkey template"
 init_from_template
 
-# Step 3: Enable Rust support in flake.nix
-step "Enabling Rust support in flake.nix"
+# Step 3: Enable multi-language support in flake.nix
+step "Enabling Go + Rust + Python support in flake.nix"
 # Get the turnkey path that init_from_template set
 turnkey_path=$(grep 'turnkey.url' flake.nix | sed 's/.*"\(.*\)".*/\1/')
 # Write a multi-language flake.nix
 cat > flake.nix << EOF
 {
-  description = "Multi-language Buck2 project (Go + Rust)";
+  description = "Multi-language Buck2 project (Go + Rust + Python)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -63,10 +63,12 @@ cat > flake.nix << EOF
             go = pkgs.go;
             rust = pkgs.rustc;
             python = pkgs.python3;
+            uv = pkgs.uv;
             clang = pkgs.llvmPackages.clang;
             lld = pkgs.llvmPackages.lld;
             godeps-gen = inputs.turnkey.packages.\${pkgs.system}.godeps-gen;
             rustdeps-gen = inputs.turnkey.packages.\${pkgs.system}.rustdeps-gen;
+            pydeps-gen = inputs.turnkey.packages.\${pkgs.system}.pydeps-gen;
             tk = inputs.turnkey.packages.\${pkgs.system}.tk;
           };
 
@@ -86,6 +88,12 @@ cat > flake.nix << EOF
               cargoTomlFile = "rust_lib/Cargo.toml";
               cargoLockFile = "rust_lib/Cargo.lock";
             };
+
+            python = {
+              enable = true;
+              depsFile = ./python-deps.toml;
+              pyprojectFile = "python_app/pyproject.toml";
+            };
           };
         };
       };
@@ -97,11 +105,14 @@ EOF
 step "Adding multi-language source code"
 copy_fixture "multi-language"
 
-# Step 5: Add rust toolchain to toolchain.toml
-step "Adding rust to toolchain.toml"
+# Step 5: Add rust and python toolchains to toolchain.toml
+step "Adding rust and python to toolchain.toml"
 cat >> toolchain.toml << 'EOF'
 rust = {}
 rustdeps-gen = {}
+python = {}
+uv = {}
+pydeps-gen = {}
 EOF
 
 # Step 5b: Create rust-features.toml to enable serde derive
@@ -117,12 +128,15 @@ step "Staging files for Nix flake"
 stage_for_flake
 
 # Step 7: Verify devshell has required tools
-step "Verifying devshell tools (Go + Rust)"
+step "Verifying devshell tools (Go + Rust + Python)"
 assert_command_in_devshell "buck2" || exit 1
 assert_command_in_devshell "go" || exit 1
 assert_command_in_devshell "godeps-gen" || exit 1
 assert_command_in_devshell "rustdeps-gen" || exit 1
 assert_command_in_devshell "cargo" || exit 1
+assert_command_in_devshell "python" || exit 1
+assert_command_in_devshell "uv" || exit 1
+assert_command_in_devshell "pydeps-gen" || exit 1
 
 # Step 8: Generate go-deps.toml
 step "Generating go-deps.toml"
@@ -136,10 +150,16 @@ run_in_devshell "rustdeps-gen --cargo-lock rust_lib/Cargo.lock -o rust-deps.toml
 assert_file_exists "rust-deps.toml" || exit 1
 assert_file_contains "rust-deps.toml" "serde" || exit 1
 
+# Step 9b: Generate python-deps.toml
+step "Generating python-deps.toml"
+run_in_devshell "pydeps-gen --lock python_app/pylock.toml -o python-deps.toml"
+assert_file_exists "python-deps.toml" || exit 1
+assert_file_contains "python-deps.toml" "six" || exit 1
+
 # Step 10: Commit deps files
 step "Committing deps files"
 stage_for_flake
-commit_changes "Add go-deps.toml and rust-deps.toml"
+commit_changes "Add go-deps.toml, rust-deps.toml, and python-deps.toml"
 
 # Step 11: Build Go binary
 step "Building Go binary"
@@ -158,4 +178,13 @@ step "Running Go binary"
 output=$(run_in_devshell_capture "buck2 run //:hello-go")
 assert_output_contains "echo '$output'" "Go: Hello" || exit 1
 
-section "PASS: Multi-language monorepo (Go + Rust)"
+# Step 15: Build Python binary
+step "Building Python binary"
+run_in_devshell "buck2 build //python_app:hello-python"
+
+# Step 16: Run Python binary
+step "Running Python binary"
+output=$(run_in_devshell_capture "buck2 run //python_app:hello-python")
+assert_output_contains "echo '$output'" "Python: Hello" || exit 1
+
+section "PASS: Multi-language monorepo (Go + Rust + Python)"
