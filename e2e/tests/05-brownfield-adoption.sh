@@ -12,6 +12,10 @@
 # Validates: brownfield adoption, no disruption to existing workflows
 #
 # Issue: turnkey-njc
+#
+# OPTIMIZED: Uses batched devshell calls to minimize nix develop overhead.
+# Original: 8 devshell calls (~112s overhead)
+# Optimized: 2 devshell calls (~28s overhead)
 set -euo pipefail
 
 # Source test libraries
@@ -195,9 +199,23 @@ EOF
 step "Staging new turnkey files"
 stage_for_flake
 
-# Step 5: Generate deps file from existing go.mod/go.sum
-step "Generating go-deps.toml from existing project deps"
-run_in_devshell "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml"
+# Step 5: Phase 1 - Generate deps and verify tools (single devshell)
+step "Generating deps and verifying tools (batched)"
+run_in_devshell_script << 'PHASE1'
+  echo "Checking required tools..."
+  for cmd in buck2 go godeps-gen; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      echo "ERROR: Command not found: $cmd" >&2
+      exit 1
+    fi
+    echo "  Found: $cmd"
+  done
+
+  echo ""
+  echo "Generating go-deps.toml from existing project deps..."
+  godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+  echo "Generated go-deps.toml"
+PHASE1
 assert_file_exists "go-deps.toml" || exit 1
 assert_file_contains "go-deps.toml" "github.com/google/uuid" || exit 1
 
@@ -208,24 +226,21 @@ commit_changes "Adopt turnkey for Buck2 builds"
 
 section "Verify Brownfield Project Works"
 
-# Step 7: Verify devshell has required tools
-step "Verifying devshell tools"
-assert_command_in_devshell "buck2" || exit 1
-assert_command_in_devshell "go" || exit 1
-assert_command_in_devshell "godeps-gen" || exit 1
+# Step 7: Phase 2 - Build and verify native tools (single devshell)
+step "Building with Buck2 and verifying native tools (batched)"
+run_in_devshell_script << 'PHASE2'
+  echo "Building with Buck2..."
+  buck2 build //:server
 
-# Step 8: Verify Buck2 build works
-step "Building with Buck2 (tk build)"
-run_in_devshell "buck2 build //:server"
+  echo ""
+  echo "Verifying native Go tools still work..."
+  go build -o /dev/null ./main.go
+  go vet ./main.go
+  go mod tidy
+  echo "Native Go tools work!"
+PHASE2
 
-# Step 9: Verify native Go tools still work
-# Note: Run specific commands to avoid Go scanning buck-out directory
-step "Verifying native Go tools still work"
-run_in_devshell "go build -o /dev/null ./main.go"
-run_in_devshell "go vet ./main.go"
-run_in_devshell "go mod tidy"
-
-# Step 10: Verify go.mod unchanged after turnkey adoption
+# Step 8: Verify go.mod unchanged after turnkey adoption
 step "Verifying go.mod unchanged"
 # go mod tidy should not have changed anything
 if git diff --exit-code go.mod go.sum; then

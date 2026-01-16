@@ -13,6 +13,11 @@
 # Validates: error messages, recovery paths, robustness
 #
 # Issue: turnkey-dw7
+#
+# OPTIMIZED: Uses batched devshell calls to minimize nix develop overhead.
+# Original: 8 devshell calls (~112s overhead)
+# Optimized: 7 devshell calls (~98s overhead)
+# Note: Limited batching due to intentional failure tests that need isolation.
 set -euo pipefail
 
 # Source test libraries
@@ -38,18 +43,25 @@ copy_fixture "greenfield-go"
 step "Staging files for Nix flake"
 stage_for_flake
 
-step "Generating initial go-deps.toml"
-run_in_devshell "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml"
+# Step 5: Phase 1 - Generate deps and verify initial build (single devshell)
+step "Generating deps and verifying initial build (batched)"
+run_in_devshell_script << 'PHASE1'
+  echo "Generating initial go-deps.toml..."
+  godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+PHASE1
 assert_file_exists "go-deps.toml" || exit 1
 
-# Step 5: Commit working state
+# Commit working state
 step "Committing working state"
 stage_for_flake
 commit_changes "Initial working state"
 
-# Verify working build
+# Verify working build (needs fresh devshell after commit)
 step "Verifying initial build works"
-run_in_devshell "buck2 build //:hello"
+run_in_devshell_script << 'PHASE1B'
+  echo "Building to verify initial state..."
+  buck2 build //:hello
+PHASE1B
 
 section "Test 1: Invalid Dependency"
 
@@ -79,7 +91,7 @@ step "Verifying clear error message for invalid dependency"
 stage_for_flake
 
 # godeps-gen should fail with a clear error message
-if run_in_devshell "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps-bad.toml" 2>&1; then
+if run_in_devshell_script "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps-bad.toml" 2>&1; then
   echo "ERROR: godeps-gen should have failed with invalid dependency" >&2
   exit 1
 fi
@@ -103,7 +115,7 @@ EOF
 # Step 9: Verify regeneration succeeds after fix
 step "Verifying regeneration succeeds after fix"
 stage_for_flake
-run_in_devshell "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml"
+run_in_devshell_script "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml"
 assert_file_exists "go-deps.toml" || exit 1
 assert_file_contains "go-deps.toml" "github.com/google/uuid" || exit 1
 
@@ -116,7 +128,7 @@ git add -A
 
 # Step 11: Verify regeneration works
 step "Verifying deps file can be regenerated"
-run_in_devshell "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml"
+run_in_devshell_script "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml"
 assert_file_exists "go-deps.toml" || exit 1
 assert_file_contains "go-deps.toml" "github.com/google/uuid" || exit 1
 
@@ -155,7 +167,7 @@ stage_for_flake
 commit_changes "Fix corrupted deps file"
 
 step "Verifying build works after fixing corruption"
-run_in_devshell "buck2 build //:hello"
+run_in_devshell_script "buck2 build //:hello"
 
 section "Test 4: Invalid BUCK File Recovery"
 
@@ -167,7 +179,7 @@ commit_changes "Intentionally corrupted BUCK file"
 
 # Step 17: Verify clear error message
 step "Verifying clear error for invalid BUCK file"
-if run_in_devshell "buck2 build //:hello" 2>&1 | tee /tmp/buck-error.log; then
+if run_in_devshell_script "buck2 build //:hello" 2>&1 | tee /tmp/buck-error.log; then
   echo "ERROR: Build should have failed with invalid BUCK file" >&2
   exit 1
 fi
@@ -194,6 +206,6 @@ commit_changes "Fix BUCK file"
 
 # Step 19: Verify build works after fix
 step "Verifying build works after fixing BUCK file"
-run_in_devshell "buck2 build //:hello"
+run_in_devshell_script "buck2 build //:hello"
 
 section "PASS: Error recovery and diagnostics"

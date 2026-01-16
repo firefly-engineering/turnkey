@@ -155,3 +155,52 @@ log_verbose() {
     echo "[verbose] $*"
   fi
 }
+
+# =============================================================================
+# Optimized Devshell Helpers
+# =============================================================================
+# These helpers minimize nix develop invocations by batching commands.
+# Each nix develop call has ~13-15s overhead, so batching saves significant time.
+
+# Run a script inside the devshell (multiple commands in single session)
+# Usage: run_in_devshell_script <<'EOF'
+#   command1
+#   command2
+#   command3
+# EOF
+# Or: run_in_devshell_script "command1 && command2 && command3"
+run_in_devshell_script() {
+  local script
+  if [[ $# -gt 0 ]]; then
+    script="$1"
+  else
+    script=$(cat)
+  fi
+
+  # Create a temporary script file to handle complex commands
+  local tmpscript
+  tmpscript=$(mktemp)
+  cat > "$tmpscript" << SCRIPT
+#!/usr/bin/env bash
+set -euo pipefail
+$script
+SCRIPT
+  chmod +x "$tmpscript"
+
+  # Run in devshell
+  local result=0
+  nix develop --no-pure-eval --command bash "$tmpscript" || result=$?
+
+  rm -f "$tmpscript"
+  return $result
+}
+
+# Run a script and capture output
+# Usage: output=$(run_in_devshell_script_capture <<'EOF'
+#   command1
+#   command2
+# EOF
+# )
+run_in_devshell_script_capture() {
+  run_in_devshell_script "$@" 2>&1
+}

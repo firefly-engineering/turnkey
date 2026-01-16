@@ -8,6 +8,10 @@
 # 4. Verify build still works with new dep
 #
 # Issue: turnkey-66b
+#
+# OPTIMIZED: Uses batched devshell calls to minimize nix develop overhead.
+# Original: 9 devshell calls (~126s overhead)
+# Optimized: 4 devshell calls (~56s overhead)
 set -euo pipefail
 
 # Source test libraries
@@ -33,9 +37,15 @@ copy_fixture "multi-language"
 step "Staging files for Nix flake"
 stage_for_flake
 
-# Step 5: Generate initial deps files
-step "Generating initial deps files"
-run_in_devshell "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml"
+# Step 5: Phase 1 - Generate initial deps and verify build (single devshell)
+step "Generating initial deps and verifying build (batched)"
+run_in_devshell_script << 'PHASE1'
+  echo "Generating go-deps.toml..."
+  godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+
+  echo "Recording initial state..."
+  sha256sum go-deps.toml > /tmp/initial-deps-hash.txt
+PHASE1
 assert_file_exists "go-deps.toml" || exit 1
 
 # Step 6: Commit to make deps available
@@ -43,51 +53,48 @@ step "Committing initial state"
 stage_for_flake
 commit_changes "Initial setup with deps"
 
-# Step 7: Verify initial build works
-step "Verifying initial build"
-run_in_devshell "tk build //:hello-go"
+# Step 7: Phase 2 - Verify initial build and add new dep (single devshell)
+step "Verifying build and adding new dependency (batched)"
+run_in_devshell_script << 'PHASE2'
+  echo "Verifying initial build..."
+  tk build //:hello-go
 
-# Step 8: Record initial go-deps.toml content
-step "Recording initial deps state"
-initial_deps_hash=$(run_in_devshell_capture "sha256sum go-deps.toml | cut -d' ' -f1")
-echo "Initial go-deps.toml hash: $initial_deps_hash"
+  echo ""
+  echo "Recording initial go-deps.toml hash..."
+  initial_hash=$(sha256sum go-deps.toml | cut -d' ' -f1)
+  echo "Initial hash: $initial_hash"
+  echo "$initial_hash" > /tmp/initial-hash.txt
 
-# Step 9: Add a new Go dependency using 'go get'
-# The wrapped 'go' command should auto-sync go-deps.toml
-step "Adding new Go dependency with 'go get'"
+  echo ""
+  echo "Updating module path..."
+  go mod edit -module example.com/native-sync-test
 
-# First, update go.mod to use a module path that allows adding deps
-run_in_devshell "go mod edit -module example.com/native-sync-test"
+  echo ""
+  echo "Adding new Go dependency with 'go get'..."
+  go get github.com/fatih/color@v1.16.0
 
-# Add a new dependency - tw should detect the change and sync
-run_in_devshell "go get github.com/fatih/color@v1.16.0"
+  echo ""
+  echo "Checking if go-deps.toml was updated..."
+  new_hash=$(sha256sum go-deps.toml | cut -d' ' -f1)
+  echo "New hash: $new_hash"
 
-# Step 10: Verify go-deps.toml was auto-updated
-step "Verifying go-deps.toml was auto-updated"
-new_deps_hash=$(run_in_devshell_capture "sha256sum go-deps.toml | cut -d' ' -f1")
-echo "New go-deps.toml hash: $new_deps_hash"
+  if [ "$initial_hash" = "$new_hash" ]; then
+    echo "ERROR: go-deps.toml was not updated after 'go get'"
+    exit 1
+  fi
+  echo "SUCCESS: go-deps.toml was updated (hashes differ)"
+PHASE2
 
-if [[ "$initial_deps_hash" == "$new_deps_hash" ]]; then
-  echo "ERROR: go-deps.toml was not updated after 'go get'" >&2
-  echo "This suggests the tw wrapper did not trigger sync" >&2
-  exit 1
-fi
-echo "go-deps.toml was updated (hashes differ)"
-
-# Step 11: Verify the new dependency is in go-deps.toml
+# Step 8: Verify the new dependency is in go-deps.toml
 step "Verifying new dependency in go-deps.toml"
 assert_file_contains "go-deps.toml" "github.com/fatih/color" || exit 1
 
-# Step 12: Stage updated files
+# Step 9: Stage updated files
 step "Staging updated deps"
 stage_for_flake
 commit_changes "Add fatih/color dependency"
 
-# Step 13: Verify build still works after adding dep
-step "Verifying build works with new dependency"
-run_in_devshell "tk build //:hello-go"
-
-# Step 14: Update BUCK to use the new dep and create source that uses it
+# Step 10: Update source to use new dependency
 step "Updating source to use new dependency"
 cat > main.go << 'EOF'
 package main
@@ -122,12 +129,18 @@ EOF
 stage_for_flake
 commit_changes "Use fatih/color in hello"
 
-# Step 15: Build and run with the new dependency
-step "Building with new dependency usage"
-run_in_devshell "tk build //:hello-go"
+# Step 11: Phase 3 - Build and run with new dependency (single devshell)
+step "Building and running with new dependency (batched)"
+output=$(run_in_devshell_script_capture << 'PHASE3'
+  echo "Building with new dependency..."
+  tk build //:hello-go
 
-step "Running binary with new dependency"
-output=$(run_in_devshell_capture "tk run //:hello-go")
+  echo ""
+  echo "Running binary..."
+  tk run //:hello-go
+PHASE3
+)
+echo "$output" | tail -5
 assert_output_contains "echo '$output'" "Hello from turnkey" || exit 1
 
 section "PASS: Language-native tools stay in sync"

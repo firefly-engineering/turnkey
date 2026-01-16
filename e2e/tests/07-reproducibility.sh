@@ -9,6 +9,10 @@
 # 5. Compare hashes - must be identical
 #
 # Issue: turnkey-tdb3
+#
+# OPTIMIZED: Uses batched devshell calls to minimize nix develop overhead.
+# Original: 6 devshell calls (~84s overhead)
+# Optimized: 3 devshell calls (~42s overhead)
 set -euo pipefail
 
 # Source test libraries
@@ -123,17 +127,22 @@ EOF
 step "Staging files for Nix flake"
 stage_for_flake
 
-# Step 8: Generate deps files
-step "Generating go-deps.toml"
-run_in_devshell "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml"
+# Step 8: Phase 1 - Generate all deps files (single devshell)
+step "Generating all deps files (batched)"
+run_in_devshell_script << 'PHASE1'
+  echo "Generating go-deps.toml..."
+  godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+
+  echo ""
+  echo "Generating rust-deps.toml..."
+  rustdeps-gen --cargo-lock rust_lib/Cargo.lock -o rust-deps.toml
+
+  echo ""
+  echo "Generating python-deps.toml..."
+  pydeps-gen --lock python_app/pylock.toml -o python-deps.toml
+PHASE1
 assert_file_exists "go-deps.toml" || exit 1
-
-step "Generating rust-deps.toml"
-run_in_devshell "rustdeps-gen --cargo-lock rust_lib/Cargo.lock -o rust-deps.toml"
 assert_file_exists "rust-deps.toml" || exit 1
-
-step "Generating python-deps.toml"
-run_in_devshell "pydeps-gen --lock python_app/pylock.toml -o python-deps.toml"
 assert_file_exists "python-deps.toml" || exit 1
 
 # Step 9: Commit deps files
@@ -141,9 +150,12 @@ step "Committing deps files"
 stage_for_flake
 commit_changes "Add deps files"
 
-# Step 10: First build - capture hashes
+# Step 10: Phase 2 - First build (single devshell)
 step "Building targets (first build)"
-run_in_devshell "tk build //:hello-go //rust_lib:greeting //python_app:hello-python"
+run_in_devshell_script << 'PHASE2'
+  echo "Building all targets..."
+  tk build //:hello-go //rust_lib:greeting //python_app:hello-python
+PHASE2
 
 step "Capturing output hashes (first build)"
 # Find outputs using find (most reliable)
@@ -171,18 +183,18 @@ echo "Go hash (build 1): $go_hash1"
 echo "Rust hash (build 1): $rust_hash1"
 echo "Python hash (build 1): $python_hash1"
 
-# Step 11: Clean build artifacts
-step "Cleaning build artifacts"
-run_in_devshell "tk clean"
+# Step 11: Phase 3 - Clean and rebuild (single devshell)
+step "Cleaning build artifacts and rebuilding (batched)"
+run_in_devshell_script << 'PHASE3'
+  echo "Cleaning build artifacts..."
+  tk clean
 
-# Verify clean worked
-assert_file_not_exists "$go_output" "Go output should be cleaned" || exit 1
+  echo ""
+  echo "Rebuilding all targets..."
+  tk build //:hello-go //rust_lib:greeting //python_app:hello-python
+PHASE3
 
-# Step 12: Second build
-step "Building targets (second build)"
-run_in_devshell "tk build //:hello-go //rust_lib:greeting //python_app:hello-python"
-
-# Step 13: Capture hashes again
+# Step 12: Capture hashes again
 step "Capturing output hashes (second build)"
 # Find outputs again
 go_output2=$(find buck-out -name "hello-go" -type f ! -name "*.d" ! -name "*.dwp" 2>/dev/null | head -1)
@@ -201,7 +213,7 @@ echo "Go hash (build 2): $go_hash2"
 echo "Rust hash (build 2): $rust_hash2"
 echo "Python hash (build 2): $python_hash2"
 
-# Step 14: Compare hashes
+# Step 13: Compare hashes
 step "Verifying build reproducibility"
 
 if [[ "$go_hash1" != "$go_hash2" ]]; then

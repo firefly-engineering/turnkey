@@ -12,6 +12,10 @@
 # - Non-interactive workflow
 #
 # Issue: turnkey-2t5
+#
+# OPTIMIZED: Uses batched devshell calls to minimize nix develop overhead.
+# Original: 7 devshell calls (~98s overhead)
+# Optimized: 3 devshell calls (~42s overhead)
 set -euo pipefail
 
 # Source test libraries
@@ -38,10 +42,13 @@ copy_fixture "greenfield-go"
 step "Staging files for Nix flake"
 stage_for_flake
 
-# Step 5: Generate go-deps.toml BEFORE committing
-# In a real CI scenario, this would already be committed
+# Step 5: Phase 1 - Generate deps (single devshell)
 step "Generating go-deps.toml"
-run_in_devshell "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml"
+run_in_devshell_script << 'PHASE1'
+  echo "Generating go-deps.toml..."
+  godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+  echo "Generated go-deps.toml"
+PHASE1
 assert_file_exists "go-deps.toml" || exit 1
 
 # Step 6: Commit everything - this is the "clone-ready" state
@@ -53,26 +60,29 @@ commit_changes "Initial project setup with deps"
 
 section "CI/CD Build Simulation"
 
-# Step 7: Test CI-style build command
-# This uses `nix develop --command` directly, without direnv
-step "Running CI-style build (nix develop --command buck2 build //...)"
-run_in_devshell "buck2 build //..."
+# Step 7: Phase 2 - CI-style build, test, and run (single devshell)
+step "Running CI-style build/test/run (batched)"
+output=$(run_in_devshell_script_capture << 'PHASE2'
+  echo "=== CI Build ==="
+  buck2 build //...
 
-# Step 8: Test CI-style test command
-# The greenfield fixture doesn't have tests, but we can run the test command
-# to verify it doesn't fail (empty test run is OK)
-step "Running CI-style test (nix develop --command buck2 test //...)"
-# Use || true because no test targets exist in greenfield fixture
-run_in_devshell "buck2 test //... || echo 'No test targets (expected for greenfield)'"
+  echo ""
+  echo "=== CI Test ==="
+  buck2 test //... || echo "No test targets (expected for greenfield)"
 
-# Step 9: Run the binary to verify functional output
-step "Verifying built binary works"
-output=$(run_in_devshell_capture "buck2 run //:hello")
+  echo ""
+  echo "=== Run binary ==="
+  buck2 run //:hello
+PHASE2
+)
+echo "$output" | tail -10
+
+# Verify output
 assert_output_contains "echo '$output'" "Hello from turnkey" || exit 1
 
 section "Verify Hermetic Build Properties"
 
-# Step 10: Verify .envrc was NOT executed
+# Step 8: Verify .envrc was NOT executed
 # The run_in_devshell function uses nix develop --command which doesn't use direnv
 step "Verifying direnv was not involved"
 # Create a marker file that .envrc would create if executed
@@ -80,13 +90,16 @@ echo 'touch /tmp/envrc-was-executed-$$' >> .envrc
 stage_for_flake
 commit_changes "Add .envrc marker"
 
-# Run another build - should succeed without .envrc being sourced
-run_in_devshell "buck2 build //:hello"
-# Note: We can't easily verify the marker wasn't created since /tmp is shared,
-# but the key point is that the build succeeded using nix develop --command
+# Step 9: Phase 3 - Run another build and verify deps cell (single devshell)
+step "Final verification (batched)"
+run_in_devshell_script << 'PHASE3'
+  echo "Building again (should succeed without .envrc)..."
+  buck2 build //:hello
 
-# Step 11: Verify the deps cell exists and is usable
-step "Verifying deps cell is accessible"
-run_in_devshell "buck2 targets godeps//..."
+  echo ""
+  echo "Verifying deps cell is accessible..."
+  buck2 targets godeps//...
+  echo "Deps cell is accessible"
+PHASE3
 
 section "PASS: CI/CD without interactive shell"

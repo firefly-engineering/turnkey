@@ -10,6 +10,10 @@
 # 6. Run tests
 #
 # Issue: turnkey-tps
+#
+# OPTIMIZED: Uses batched devshell calls to minimize nix develop overhead.
+# Original: 21 devshell calls (~294s overhead)
+# Optimized: 3 devshell calls (~42s overhead)
 set -euo pipefail
 
 # Source test libraries
@@ -132,75 +136,90 @@ EOF
 step "Staging files for Nix flake"
 stage_for_flake
 
-# Step 7: Verify devshell has required tools
-step "Verifying devshell tools (Go + Rust + Python + TypeScript)"
-assert_command_in_devshell "buck2" || exit 1
-assert_command_in_devshell "go" || exit 1
-assert_command_in_devshell "godeps-gen" || exit 1
-assert_command_in_devshell "rustdeps-gen" || exit 1
-assert_command_in_devshell "cargo" || exit 1
-assert_command_in_devshell "python" || exit 1
-assert_command_in_devshell "uv" || exit 1
-assert_command_in_devshell "pydeps-gen" || exit 1
-assert_command_in_devshell "node" || exit 1
-assert_command_in_devshell "tsc" || exit 1
+# Step 7: Phase 1 - Verify tools and generate all deps (single devshell)
+step "Verifying devshell tools and generating deps (batched)"
+run_in_devshell_script << 'PHASE1'
+  echo "Checking required tools..."
+  for cmd in buck2 go godeps-gen rustdeps-gen cargo python uv pydeps-gen node tsc; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      echo "ERROR: Command not found: $cmd" >&2
+      exit 1
+    fi
+    echo "  Found: $cmd"
+  done
 
-# Step 8: Generate go-deps.toml
-step "Generating go-deps.toml"
-run_in_devshell "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml"
+  echo ""
+  echo "Generating go-deps.toml..."
+  godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+  echo "Generated go-deps.toml"
+
+  echo ""
+  echo "Generating rust-deps.toml..."
+  rustdeps-gen --cargo-lock rust_lib/Cargo.lock -o rust-deps.toml
+  echo "Generated rust-deps.toml"
+
+  echo ""
+  echo "Generating python-deps.toml..."
+  pydeps-gen --lock python_app/pylock.toml -o python-deps.toml
+  echo "Generated python-deps.toml"
+PHASE1
+
+# Verify deps files were created
 assert_file_exists "go-deps.toml" || exit 1
 assert_file_contains "go-deps.toml" "github.com/google/uuid" || exit 1
-
-# Step 9: Generate rust-deps.toml
-step "Generating rust-deps.toml"
-run_in_devshell "rustdeps-gen --cargo-lock rust_lib/Cargo.lock -o rust-deps.toml"
 assert_file_exists "rust-deps.toml" || exit 1
 assert_file_contains "rust-deps.toml" "serde" || exit 1
-
-# Step 9b: Generate python-deps.toml
-step "Generating python-deps.toml"
-run_in_devshell "pydeps-gen --lock python_app/pylock.toml -o python-deps.toml"
 assert_file_exists "python-deps.toml" || exit 1
 assert_file_contains "python-deps.toml" "six" || exit 1
 
-# Step 10: Commit deps files
+# Step 8: Commit deps files
 step "Committing deps files"
 stage_for_flake
 commit_changes "Add go-deps.toml, rust-deps.toml, and python-deps.toml"
 
-# Step 11: Build Go binary
-step "Building Go binary"
-run_in_devshell "buck2 build //:hello-go"
+# Step 9: Phase 2 - Build all targets (single devshell)
+step "Building all targets (batched)"
+run_in_devshell_script << 'PHASE2'
+  echo "Building Go binary..."
+  buck2 build //:hello-go
 
-# Step 12: Build Rust library
-step "Building Rust library"
-run_in_devshell "buck2 build //rust_lib:greeting"
+  echo ""
+  echo "Building Rust library..."
+  buck2 build //rust_lib:greeting
 
-# Step 13: Run Rust tests
-step "Running Rust tests"
-run_in_devshell "buck2 test //rust_lib:greeting-test"
+  echo ""
+  echo "Running Rust tests..."
+  buck2 test //rust_lib:greeting-test
 
-# Step 14: Run Go binary
-step "Running Go binary"
-output=$(run_in_devshell_capture "buck2 run //:hello-go")
+  echo ""
+  echo "Building Python binary..."
+  buck2 build //python_app:hello-python
+
+  echo ""
+  echo "Building TypeScript binary..."
+  buck2 build //typescript_app:hello-typescript
+PHASE2
+
+# Step 10: Phase 3 - Run binaries and verify output (single devshell)
+step "Running binaries and verifying output (batched)"
+output=$(run_in_devshell_script_capture << 'PHASE3'
+  echo "=== Go output ==="
+  buck2 run //:hello-go
+
+  echo ""
+  echo "=== Python output ==="
+  buck2 run //python_app:hello-python
+
+  echo ""
+  echo "=== TypeScript output ==="
+  buck2 run //typescript_app:hello-typescript
+PHASE3
+)
+echo "$output" | tail -15
+
+# Verify outputs
 assert_output_contains "echo '$output'" "Go: Hello" || exit 1
-
-# Step 15: Build Python binary
-step "Building Python binary"
-run_in_devshell "buck2 build //python_app:hello-python"
-
-# Step 16: Run Python binary
-step "Running Python binary"
-output=$(run_in_devshell_capture "buck2 run //python_app:hello-python")
 assert_output_contains "echo '$output'" "Python: Hello" || exit 1
-
-# Step 17: Build TypeScript binary
-step "Building TypeScript binary"
-run_in_devshell "buck2 build //typescript_app:hello-typescript"
-
-# Step 18: Run TypeScript binary
-step "Running TypeScript binary"
-output=$(run_in_devshell_capture "buck2 run //typescript_app:hello-typescript")
 assert_output_contains "echo '$output'" "TypeScript: Hello" || exit 1
 
 section "PASS: Multi-language monorepo (Go + Rust + Python + TypeScript)"

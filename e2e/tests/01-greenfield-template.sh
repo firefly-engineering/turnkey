@@ -8,6 +8,10 @@
 # 4. Build with Buck2
 #
 # Issue: turnkey-1us
+#
+# OPTIMIZED: Uses batched devshell calls to minimize nix develop overhead.
+# Original: 6 devshell calls (~84s overhead)
+# Optimized: 2 devshell calls (~28s overhead)
 set -euo pipefail
 
 # Source test libraries
@@ -39,32 +43,46 @@ copy_fixture "greenfield-go"
 step "Staging files for Nix flake"
 stage_for_flake
 
-# Step 6: Verify devshell has required tools
-step "Verifying devshell tools"
-assert_command_in_devshell "buck2" || exit 1
-assert_command_in_devshell "go" || exit 1
-assert_command_in_devshell "godeps-gen" || exit 1
+# Step 6: Phase 1 - Verify tools and generate deps (single devshell)
+step "Verifying devshell tools and generating deps (batched)"
+run_in_devshell_script << 'PHASE1'
+  echo "Checking required tools..."
+  for cmd in buck2 go godeps-gen; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      echo "ERROR: Command not found: $cmd" >&2
+      exit 1
+    fi
+    echo "  Found: $cmd"
+  done
 
-# Step 7: Generate go-deps.toml
-step "Generating go-deps.toml"
-run_in_devshell "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml"
+  echo "Generating go-deps.toml..."
+  godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+  echo "Generated go-deps.toml"
+PHASE1
+
+# Verify deps file was created
 assert_file_exists "go-deps.toml" || exit 1
 assert_file_contains "go-deps.toml" "github.com/google/uuid" || exit 1
 assert_file_contains "go-deps.toml" "schema_version" || exit 1
 
-# Step 8: Commit to make deps available
+# Step 7: Commit to make deps available
 step "Committing deps file"
 stage_for_flake
 commit_changes "Add go-deps.toml"
 
-# Step 9: Build with Buck2
-step "Building with Buck2"
-# Note: We need to re-enter devshell after committing for deps cell to be available
-run_in_devshell "buck2 build //:hello"
+# Step 8: Phase 2 - Build and run (single devshell)
+step "Building and running with Buck2 (batched)"
+output=$(run_in_devshell_script_capture << 'PHASE2'
+  echo "Building //:hello..."
+  buck2 build //:hello
 
-# Step 10: Run the binary
-step "Running the binary"
-output=$(run_in_devshell_capture "buck2 run //:hello")
+  echo "Running //:hello..."
+  buck2 run //:hello
+PHASE2
+)
+echo "$output" | tail -5
+
+# Step 9: Verify output
 assert_output_contains "echo '$output'" "Hello from turnkey" || exit 1
 
 section "PASS: Greenfield project from template"

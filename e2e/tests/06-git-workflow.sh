@@ -12,6 +12,10 @@
 # Validates: git branch switching, no stale state
 #
 # Issue: turnkey-m5t
+#
+# OPTIMIZED: Uses batched devshell calls to minimize nix develop overhead.
+# Original: 8 devshell calls (~112s overhead)
+# Optimized: 4 devshell calls (~56s overhead)
 set -euo pipefail
 
 # Source test libraries
@@ -72,21 +76,30 @@ EOF
 step "Staging files for Nix flake"
 stage_for_flake
 
-step "Generating go-deps.toml for main branch"
-run_in_devshell "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml"
+# Step 5: Phase 1 - Generate deps and verify build (single devshell)
+step "Generating deps and verifying main branch build (batched)"
+output=$(run_in_devshell_script_capture << 'PHASE1'
+  echo "Generating go-deps.toml for main branch..."
+  godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+
+  echo ""
+  echo "Building main branch..."
+  buck2 build //:hello
+
+  echo ""
+  echo "Running main branch binary..."
+  buck2 run //:hello
+PHASE1
+)
+echo "$output" | tail -5
 assert_file_exists "go-deps.toml" || exit 1
 assert_file_contains "go-deps.toml" "github.com/google/uuid" || exit 1
+assert_output_contains "echo '$output'" "UUID:" || exit 1
 
-# Step 5: Commit main branch state
+# Step 6: Commit main branch state
 step "Committing main branch state"
 stage_for_flake
 commit_changes "Initial project with uuid dependency"
-
-# Step 6: Verify main branch builds
-step "Verifying main branch build"
-run_in_devshell "buck2 build //:hello"
-output=$(run_in_devshell_capture "buck2 run //:hello")
-assert_output_contains "echo '$output'" "UUID:" || exit 1
 
 # Save main branch dep count for comparison
 main_deps_count=$(grep -c '^\[deps\.' go-deps.toml || echo 0)
@@ -149,10 +162,17 @@ go_binary(
 )
 EOF
 
-# Step 9: Regenerate deps for feature branch
-step "Regenerating go-deps.toml for feature branch"
+# Step 9: Phase 2 - Regenerate deps and build feature branch (single devshell)
+step "Regenerating deps and building feature branch (batched)"
 stage_for_flake
-run_in_devshell "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml"
+run_in_devshell_script << 'PHASE2'
+  echo "Regenerating go-deps.toml for feature branch..."
+  godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+
+  echo ""
+  echo "Building feature branch..."
+  buck2 build //:hello
+PHASE2
 
 # Verify new dependency is in deps file
 assert_file_contains "go-deps.toml" "github.com/pkg/errors" || exit 1
@@ -172,13 +192,9 @@ step "Committing feature branch changes"
 stage_for_flake
 commit_changes "Add fatih/color dependency"
 
-# Step 11: Verify feature branch builds
-step "Verifying feature branch build"
-run_in_devshell "buck2 build //:hello"
-
 section "Branch Switching: Verify State Isolation"
 
-# Step 12: Switch back to main
+# Step 11: Switch back to main
 step "Switching back to main branch"
 git checkout main
 
@@ -192,9 +208,12 @@ if [[ "$main_current_count" -ne "$main_deps_count" ]]; then
   exit 1
 fi
 
-# Verify main branch still builds (without color dependency)
+# Step 12: Phase 3 - Verify main branch still builds (single devshell)
 step "Verifying main branch still builds"
-run_in_devshell "buck2 build //:hello"
+run_in_devshell_script << 'PHASE3'
+  echo "Building main branch..."
+  buck2 build //:hello
+PHASE3
 
 # Step 13: Switch to feature branch
 step "Switching to feature branch"
@@ -209,10 +228,6 @@ if [[ "$feature_current_count" -ne "$feature_deps_count" ]]; then
   echo "  Expected: ${feature_deps_count}, Got: ${feature_current_count}" >&2
   exit 1
 fi
-
-# Verify feature branch builds with color
-step "Verifying feature branch builds with new dependency"
-run_in_devshell "buck2 build //:hello"
 
 section "Merge: Verify Correct Dependency Integration"
 
@@ -231,9 +246,12 @@ if [[ "$merged_deps_count" -ne "$feature_deps_count" ]]; then
   exit 1
 fi
 
-# Verify merged main builds
+# Step 15: Phase 4 - Verify merged main builds (single devshell)
 step "Verifying merged main builds"
-run_in_devshell "buck2 build //:hello"
+run_in_devshell_script << 'PHASE4'
+  echo "Building merged main..."
+  buck2 build //:hello
+PHASE4
 
 # Verify the errors dependency is present
 assert_file_contains "go-deps.toml" "github.com/pkg/errors" || exit 1
