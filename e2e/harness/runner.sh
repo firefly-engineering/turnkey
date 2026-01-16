@@ -171,13 +171,13 @@ main() {
       local skipped=0
 
       for test_name in $(echo "${!TESTS[@]}" | tr ' ' '\n' | sort); do
-        ((total++))
+        ((++total))
         local result=0
         run_test "${test_name}" || result=$?
         case $result in
-          0) ((passed++)) ;;
-          2) ((skipped++)) ;;
-          *) ((failed++)) ;;
+          0) ((++passed)) ;;
+          2) ((++skipped)) ;;
+          *) ((++failed)) ;;
         esac
         echo ""
       done
