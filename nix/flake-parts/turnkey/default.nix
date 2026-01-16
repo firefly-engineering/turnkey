@@ -47,6 +47,18 @@ in
           description = "Default registry mapping toolchain names to packages (inherited by all shells)";
         };
 
+        wrapNativeTools = mkOption {
+          type = types.bool;
+          default = true;
+          description = ''
+            Automatically wrap native language tools (go, cargo, uv) with tw for auto-sync.
+            When enabled, requesting 'go' in toolchain.toml gives you a wrapped version
+            that automatically syncs dependency files when they change.
+
+            Set to false to use unwrapped tools.
+          '';
+        };
+
         buck2 = {
           enable = mkOption {
             type = types.bool;
@@ -367,7 +379,35 @@ in
 
       # Load default registry if user didn't provide one
       defaultRegistry = import ../../registry { inherit pkgs lib; };
-      registry = if cfg.registry == { } then defaultRegistry else cfg.registry;
+      baseRegistry = if cfg.registry == { } then defaultRegistry else cfg.registry;
+
+      # Build tw for wrapping native tools
+      tw = import ../../packages/tw.nix { inherit pkgs lib; };
+
+      # Build wrapper packages for native tools
+      # Each wrapper provides a binary with the same name as the tool (e.g., 'go')
+      # but transparently invokes tw for auto-sync
+      twWrappers = import ../../packages/tw-wrappers.nix { inherit pkgs lib tw; };
+
+      # Tools that can be wrapped (must have entries in tw-wrappers.nix)
+      wrappableTools = [ "go" "cargo" "uv" ];
+
+      # Augment registry with wrappers when wrapNativeTools is enabled
+      # This replaces 'go' with 'tw-go' (which provides the 'go' binary)
+      registry =
+        if cfg.wrapNativeTools then
+          baseRegistry // (lib.listToAttrs (
+            lib.filter (x: x != null) (
+              map (tool:
+                if baseRegistry ? ${tool} then
+                  { name = tool; value = twWrappers."tw-${tool}"; }
+                else
+                  null
+              ) wrappableTools
+            )
+          ))
+        else
+          baseRegistry;
 
       # Build gobuckify for generating BUCK files
       gobuckify = import ../../packages/gobuckify.nix { inherit pkgs lib; };
