@@ -224,3 +224,32 @@ assert_not_empty() {
     return 1
   fi
 }
+
+# =============================================================================
+# Optimized Devshell Assertions
+# =============================================================================
+# These assertions minimize nix develop invocations by batching checks.
+# Each nix develop call has ~13-15s overhead, so batching saves significant time.
+
+# Assert multiple commands exist in devshell (single devshell invocation)
+# Usage: assert_commands_in_devshell buck2 go godeps-gen rustdeps-gen
+assert_commands_in_devshell() {
+  local cmds=("$@")
+  local msg="Commands should exist in devshell: ${cmds[*]}"
+
+  # Build a script that checks all commands
+  local check_script="missing=();"
+  for cmd in "${cmds[@]}"; do
+    check_script+="command -v $cmd >/dev/null 2>&1 || missing+=('$cmd');"
+  done
+  check_script+='if [ ${#missing[@]} -gt 0 ]; then echo "Missing: ${missing[*]}" >&2; exit 1; fi'
+
+  if nix develop --no-pure-eval --command bash -c "$check_script" 2>&1; then
+    _assert_pass "$msg"
+    echo "Commands available in devshell: ${cmds[*]}"
+    return 0
+  else
+    _assert_fail "$msg"
+    return 1
+  fi
+}

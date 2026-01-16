@@ -74,12 +74,33 @@ def normalize_crate_name(name: str) -> str:
 
 
 def dep_is_available(dep_name: str, available_crates: set[str]) -> bool:
-    """Check if a dependency is available (checking hyphen/underscore variants)."""
-    return (
-        dep_name in available_crates
-        or dep_name.replace("-", "_") in available_crates
-        or dep_name.replace("_", "-") in available_crates
-    )
+    """Check if a dependency is available (checking hyphen/underscore variants).
+
+    Handles both exact matches (e.g., "quote") and versioned names (e.g., "quote@1.0.43").
+    """
+    # Check for exact match first
+    if dep_name in available_crates:
+        return True
+
+    # Check hyphen/underscore variants
+    underscore_variant = dep_name.replace("-", "_")
+    hyphen_variant = dep_name.replace("_", "-")
+
+    if underscore_variant in available_crates or hyphen_variant in available_crates:
+        return True
+
+    # Check for versioned names (e.g., "quote@1.0.43")
+    for crate in available_crates:
+        if "@" in crate:
+            crate_name = crate.split("@")[0]
+            if (
+                crate_name == dep_name
+                or crate_name == underscore_variant
+                or crate_name == hyphen_variant
+            ):
+                return True
+
+    return False
 
 
 def feature_enables_unavailable_dep(

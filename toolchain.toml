@@ -6,8 +6,10 @@
 buck2 = {}
 
 # Language toolchains (used by Buck2)
+# These are automatically wrapped with tw for auto-sync when dependency files change
 go = {}
 rust = {}
+cargo = {}
 python = {}
 uv = {}        # Python package manager for lock file generation
 reindeer = {}  # Tool for generating Buck2 targets from Cargo.toml

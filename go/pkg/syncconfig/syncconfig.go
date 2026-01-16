@@ -40,6 +40,11 @@ type Config struct {
 	// Buck defines BUCK file staleness rules (future).
 	// These track when source files change and need to regenerate BUCK files.
 	Buck []BuckRule `toml:"buck"`
+
+	// Wrappers defines tool wrapper rules for auto-sync.
+	// These configure which native tools (go, cargo, uv) should trigger
+	// sync operations when they modify dependency files.
+	Wrappers []WrapperRule `toml:"wrappers"`
 }
 
 // DepsRule defines a staleness rule for dependency generation.
@@ -78,6 +83,32 @@ type BuckRule struct {
 	Enabled *bool `toml:"enabled,omitempty"`
 }
 
+// WrapperRule defines a tool wrapper configuration for auto-sync.
+// When a wrapped tool modifies dependency files, the associated
+// deps rule is triggered to regenerate the dependency declaration.
+type WrapperRule struct {
+	// Name is a human-readable identifier for this wrapper (e.g., "go", "cargo").
+	Name string `toml:"name"`
+
+	// Command is the underlying tool to wrap (e.g., "go", "cargo", "uv").
+	Command string `toml:"command"`
+
+	// MutatingSubcommands lists subcommands that may modify dependency files.
+	// Examples: ["get", "mod"] for go, ["add", "remove", "update"] for cargo.
+	MutatingSubcommands []string `toml:"mutating_subcommands"`
+
+	// WatchFiles are the files to monitor for changes (relative to project root).
+	// Examples: ["go.mod", "go.sum"], ["Cargo.toml", "Cargo.lock"].
+	WatchFiles []string `toml:"watch_files"`
+
+	// DepsRule is the name of the deps rule to trigger when files change.
+	// This must match the Name field of a [[deps]] rule.
+	DepsRule string `toml:"deps_rule"`
+
+	// Enabled controls whether this wrapper is active (default: true).
+	Enabled *bool `toml:"enabled,omitempty"`
+}
+
 // IsEnabled returns whether the rule is enabled.
 func (r *DepsRule) IsEnabled() bool {
 	if r.Enabled == nil {
@@ -92,6 +123,24 @@ func (r *BuckRule) IsEnabled() bool {
 		return true
 	}
 	return *r.Enabled
+}
+
+// IsEnabled returns whether the wrapper is enabled.
+func (r *WrapperRule) IsEnabled() bool {
+	if r.Enabled == nil {
+		return true
+	}
+	return *r.Enabled
+}
+
+// IsMutatingSubcommand returns true if the given subcommand may modify dependency files.
+func (r *WrapperRule) IsMutatingSubcommand(subcommand string) bool {
+	for _, mut := range r.MutatingSubcommands {
+		if subcommand == mut {
+			return true
+		}
+	}
+	return false
 }
 
 // Load reads the config file from the given path.
@@ -154,6 +203,39 @@ func (c *Config) EnabledBuckRules() []BuckRule {
 	return rules
 }
 
+// EnabledWrapperRules returns only the enabled wrapper rules.
+func (c *Config) EnabledWrapperRules() []WrapperRule {
+	var rules []WrapperRule
+	for _, r := range c.Wrappers {
+		if r.IsEnabled() {
+			rules = append(rules, r)
+		}
+	}
+	return rules
+}
+
+// FindWrapper finds a wrapper rule by command name.
+// Returns nil if no matching wrapper is found.
+func (c *Config) FindWrapper(command string) *WrapperRule {
+	for i := range c.Wrappers {
+		if c.Wrappers[i].Command == command && c.Wrappers[i].IsEnabled() {
+			return &c.Wrappers[i]
+		}
+	}
+	return nil
+}
+
+// FindDepsRule finds a deps rule by name.
+// Returns nil if no matching rule is found.
+func (c *Config) FindDepsRule(name string) *DepsRule {
+	for i := range c.Deps {
+		if c.Deps[i].Name == name && c.Deps[i].IsEnabled() {
+			return &c.Deps[i]
+		}
+	}
+	return nil
+}
+
 // Validate checks the config for common errors.
 func (c *Config) Validate() error {
 	for i, r := range c.Deps {
@@ -180,6 +262,28 @@ func (c *Config) Validate() error {
 		}
 		if len(r.Generator) == 0 {
 			return fmt.Errorf("buck rule %q: generator command is required", r.Name)
+		}
+	}
+
+	for i, r := range c.Wrappers {
+		if r.Name == "" {
+			return fmt.Errorf("wrapper rule %d: name is required", i)
+		}
+		if r.Command == "" {
+			return fmt.Errorf("wrapper rule %q: command is required", r.Name)
+		}
+		if len(r.MutatingSubcommands) == 0 {
+			return fmt.Errorf("wrapper rule %q: at least one mutating_subcommands is required", r.Name)
+		}
+		if len(r.WatchFiles) == 0 {
+			return fmt.Errorf("wrapper rule %q: at least one watch_files is required", r.Name)
+		}
+		if r.DepsRule == "" {
+			return fmt.Errorf("wrapper rule %q: deps_rule is required", r.Name)
+		}
+		// Verify the referenced deps rule exists
+		if c.FindDepsRule(r.DepsRule) == nil {
+			return fmt.Errorf("wrapper rule %q: deps_rule %q not found", r.Name, r.DepsRule)
 		}
 	}
 

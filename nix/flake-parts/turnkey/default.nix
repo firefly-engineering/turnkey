@@ -47,6 +47,18 @@ in
           description = "Default registry mapping toolchain names to packages (inherited by all shells)";
         };
 
+        wrapNativeTools = mkOption {
+          type = types.bool;
+          default = true;
+          description = ''
+            Automatically wrap native language tools (go, cargo, uv) with tw for auto-sync.
+            When enabled, requesting 'go' in toolchain.toml gives you a wrapped version
+            that automatically syncs dependency files when they change.
+
+            Set to false to use unwrapped tools.
+          '';
+        };
+
         buck2 = {
           enable = mkOption {
             type = types.bool;
@@ -57,20 +69,26 @@ in
           prelude = {
             strategy = mkOption {
               type = types.enum [ "bundled" "git" "nix" "path" ];
-              default = "bundled";
+              default = "nix";
               description = ''
                 How to provide the Buck2 prelude cell:
+                - nix: Use turnkey's Nix-backed prelude (default, recommended)
                 - bundled: Use Buck2's built-in bundled prelude
                 - git: Use a git external cell
-                - nix: Use a Nix derivation
                 - path: Use an explicit filesystem path
               '';
             };
 
             path = mkOption {
-              type = types.either types.path types.str;
-              default = "bundled://";
-              description = "Path to the prelude cell (use 'bundled://' for Buck2's built-in prelude)";
+              type = types.nullOr (types.either types.path (types.either types.str types.package));
+              default = null;
+              description = ''
+                Path to the prelude cell.
+                - For nix: defaults to turnkey-prelude derivation (can override with custom derivation)
+                - For bundled: use "bundled://" to use Buck2's built-in prelude
+                - For git: the local checkout path
+                - For path: an absolute or relative filesystem path
+              '';
             };
           };
 
@@ -367,7 +385,38 @@ in
 
       # Load default registry if user didn't provide one
       defaultRegistry = import ../../registry { inherit pkgs lib; };
-      registry = if cfg.registry == { } then defaultRegistry else cfg.registry;
+      baseRegistry = if cfg.registry == { } then defaultRegistry else cfg.registry;
+
+      # Build the turnkey-prelude derivation (Nix-backed prelude cell)
+      turnkeyPrelude = import ../../buck2/prelude.nix { inherit pkgs lib; };
+
+      # Build tw for wrapping native tools
+      tw = import ../../packages/tw.nix { inherit pkgs lib; };
+
+      # Build wrapper packages for native tools
+      # Each wrapper provides a binary with the same name as the tool (e.g., 'go')
+      # but transparently invokes tw for auto-sync
+      twWrappers = import ../../packages/tw-wrappers.nix { inherit pkgs lib tw; };
+
+      # Tools that can be wrapped (must have entries in tw-wrappers.nix)
+      wrappableTools = [ "go" "cargo" "uv" ];
+
+      # Augment registry with wrappers when wrapNativeTools is enabled
+      # This replaces 'go' with 'tw-go' (which provides the 'go' binary)
+      registry =
+        if cfg.wrapNativeTools then
+          baseRegistry // (lib.listToAttrs (
+            lib.filter (x: x != null) (
+              map (tool:
+                if baseRegistry ? ${tool} then
+                  { name = tool; value = twWrappers."tw-${tool}"; }
+                else
+                  null
+              ) wrappableTools
+            )
+          ))
+        else
+          baseRegistry;
 
       # Build gobuckify for generating BUCK files
       gobuckify = import ../../packages/gobuckify.nix { inherit pkgs lib; };
@@ -421,6 +470,18 @@ in
         else
           null;
 
+      # Resolve the prelude path based on strategy
+      # - nix: use turnkeyPrelude (or user-specified derivation)
+      # - bundled: use "bundled://"
+      # - path/git: use user-specified path
+      resolvedPreludePath =
+        if cfg.buck2.prelude.strategy == "nix" then
+          if cfg.buck2.prelude.path != null then cfg.buck2.prelude.path else turnkeyPrelude
+        else if cfg.buck2.prelude.strategy == "bundled" then
+          "bundled://"
+        else
+          cfg.buck2.prelude.path;
+
       # Create a shell configuration for each declaration file
       mkShellConfig = shellName: declarationFile: {
         imports = [ ../../devenv/turnkey ];
@@ -434,7 +495,7 @@ in
             enable = cfg.buck2.enable;
             prelude = {
               strategy = cfg.buck2.prelude.strategy;
-              path = cfg.buck2.prelude.path;
+              path = resolvedPreludePath;
             };
             # Shell entry options
             welcomeMessage = cfg.buck2.welcomeMessage;

@@ -96,6 +96,33 @@ func (s *Syncer) SyncDeps() (*Result, error) {
 	return result, nil
 }
 
+// SyncRule regenerates a single dependency rule unconditionally.
+// Unlike SyncDeps, it does not check staleness - it always regenerates.
+// This is used by tw when it detects that dependency files have changed.
+func (s *Syncer) SyncRule(rule syncconfig.DepsRule) error {
+	if !rule.IsEnabled() {
+		return nil
+	}
+
+	if !s.Quiet {
+		s.printf("Syncing %s...\n", rule.Target)
+	}
+
+	if s.DryRun {
+		s.printf("  Would regenerate %s (dry run)\n", rule.Target)
+		return nil
+	}
+
+	if err := s.regenerate(rule); err != nil {
+		return fmt.Errorf("%s: regeneration failed: %w", rule.Name, err)
+	}
+
+	if !s.Quiet {
+		s.printf("  Regenerated %s\n", rule.Target)
+	}
+	return nil
+}
+
 // Check performs a staleness check without regenerating.
 // Returns true if any targets are stale.
 func (s *Syncer) Check() (*Result, bool, error) {

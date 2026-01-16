@@ -81,7 +81,9 @@
           packages.gobuckify = import ./nix/packages/gobuckify.nix { inherit pkgs lib; };
           packages.cargo-prune-workspace = import ./nix/packages/cargo-prune-workspace.nix { inherit pkgs lib; };
           packages.tk = import ./nix/packages/tk.nix { inherit pkgs lib; };
+          packages.tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
           packages.e2e-runner = import ./nix/packages/e2e-runner.nix { inherit pkgs lib; };
+          packages.turnkey-prelude = import ./nix/buck2/prelude.nix { inherit pkgs lib; };
 
           # Configure turnkey to use our local toolchain files
           # Each file creates a corresponding shell
@@ -118,13 +120,16 @@
               rustdeps-gen = config.packages.rustdeps-gen;
               gobuckify = config.packages.gobuckify;
               tk = config.packages.tk;
+              tw = config.packages.tw;
+              # Note: go, cargo, uv are automatically wrapped by flake-parts module
+              # when wrapNativeTools = true (the default)
               # Python testing
               pytest = pkgs.python3Packages.pytest;
             };
             # Enable Buck2 toolchain generation
             buck2 = {
               enable = true;
-              prelude.strategy = "bundled";
+              # prelude.strategy defaults to "nix" - uses turnkey-prelude derivation
               welcomeMessage = "Welcome to turnkey dev shell";
 
               # Go dependencies

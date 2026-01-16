@@ -183,14 +183,28 @@
     reason = "Rust dependency generator, creates Buck2 targets from Cargo.toml but not a toolchain rule";
   };
 
-  # JavaScript/TypeScript - no Buck2 toolchain rule, used via genrule
+  # JavaScript/TypeScript
   nodejs = {
     skip = true;
-    reason = "Node.js runtime, used for JS/TS builds via genrule but not a Buck2 toolchain rule";
+    reason = "Node.js runtime, used as dependency of typescript toolchain";
   };
 
   typescript = {
-    skip = true;
-    reason = "TypeScript compiler, used for TS builds via genrule but not a Buck2 toolchain rule";
+    skip = false;
+    targets = [
+      {
+        name = "typescript";
+        rule = "system_typescript_toolchain";
+        load = "@prelude//typescript:toolchain.bzl";
+        visibility = [ "PUBLIC" ];
+        # Dynamic attrs resolved at build time from registry
+        dynamicAttrs = registry: {
+          node_path = "${registry.nodejs}/bin/node";
+          tsc_path = "${registry.typescript}/lib/node_modules/typescript/bin/tsc";
+        };
+      }
+    ];
+    # TypeScript needs nodejs for running
+    implicitDependencies = [ ];
   };
 }

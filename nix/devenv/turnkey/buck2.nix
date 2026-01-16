@@ -207,6 +207,12 @@ ${generateTargets finalToolchains}
       derivation = if cfg.python.enable then cfg.python.cell else null;
       description = "Python deps";
     };
+    jsdeps = {
+      name = "jsdeps";
+      path = ".turnkey/jsdeps";
+      derivation = if cfg.javascript.enable then cfg.javascript.cell else null;
+      description = "JavaScript deps";
+    };
   } // lib.optionalAttrs (cfg.prelude.strategy == "nix") {
     # Prelude cell (only when using nix strategy)
     prelude = {
@@ -330,6 +336,15 @@ ${generateTargets finalToolchains}
         then [ "pydeps-gen" "--lock" cfg.python.lockFile ]
         else [ "pydeps-gen" "--pyproject" cfg.python.pyprojectFile ];
     } else null)
+
+    # JavaScript deps rule
+    (if cfg.javascript.enable && (cfg.javascript.cell != null || cfg.javascript.depsFile != null) then {
+      name = "javascript";
+      sources = [ cfg.javascript.lockFile ];
+      target = if cfg.javascript.depsFile != null then cfg.javascript.depsFile else "js-deps.toml";
+      generator = [ "jsdeps-gen" "--lock" cfg.javascript.lockFile ]
+        ++ lib.optionals cfg.javascript.includeDevDependencies [ "--include-dev" ];
+    } else null)
   ];
 
   # Format a single rule as TOML
@@ -394,7 +409,7 @@ in
       };
 
       path = lib.mkOption {
-        type = lib.types.either lib.types.path lib.types.str;
+        type = lib.types.either lib.types.path (lib.types.either lib.types.str lib.types.package);
         default = "bundled://";
         description = ''
           Path to the prelude cell.
@@ -582,6 +597,53 @@ in
         default = null;
         description = ''
           Relative path to Python lock file (for staleness checking).
+        '';
+      };
+    };
+
+    # ==========================================================================
+    # JavaScript language support
+    # ==========================================================================
+    javascript = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable JavaScript/TypeScript dependency management for Buck2";
+      };
+
+      cell = lib.mkOption {
+        type = lib.types.nullOr lib.types.package;
+        default = null;
+        description = ''
+          Nix derivation containing the JavaScript dependencies cell.
+          When set, a 'jsdeps' cell will be added to .buckconfig
+          and symlinked to .turnkey/jsdeps.
+        '';
+      };
+
+      depsFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = ''
+          Relative path to js-deps.toml file (for staleness checking).
+          Used by tk sync for JavaScript dependency management.
+        '';
+      };
+
+      lockFile = lib.mkOption {
+        type = lib.types.str;
+        default = "pnpm-lock.yaml";
+        description = ''
+          Relative path to pnpm-lock.yaml file (for staleness checking).
+        '';
+      };
+
+      includeDevDependencies = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Include dev dependencies when generating js-deps.toml.
+          Passed as --include-dev to jsdeps-gen.
         '';
       };
     };

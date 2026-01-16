@@ -1,0 +1,9 @@
+# This directory contains patches to apply to the upstream Buck2 prelude.
+#
+# Patches are applied in alphabetical order.
+# Use numbered prefixes for ordering: 01-fix-something.patch, 02-add-feature.patch
+#
+# To create a patch:
+#   1. Clone facebook/buck2-prelude
+#   2. Make your changes
+#   3. git diff > /path/to/turnkey/nix/patches/prelude/01-description.patch

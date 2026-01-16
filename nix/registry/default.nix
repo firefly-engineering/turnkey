@@ -12,6 +12,15 @@
   # Go dependency management (godeps-gen with prefetcher tools)
   godeps-gen = import ../packages/godeps-gen.nix { inherit pkgs lib; };
 
+  # Rust dependency management
+  rustdeps-gen = import ../packages/rustdeps-gen.nix { inherit pkgs lib; };
+
+  # Python dependency management
+  pydeps-gen = import ../packages/pydeps-gen.nix { inherit pkgs lib; };
+
+  # JavaScript dependency management
+  jsdeps-gen = import ../packages/jsdeps-gen.nix { inherit pkgs lib; };
+
   # Python testing
   pytest = pkgs.python3Packages.pytest;
 }

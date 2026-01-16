@@ -1,4 +1,4 @@
-load("@prelude//:rules.bzl", "python_library")
+load("@prelude//:rules.bzl", "python_library", "python_test")
 
 python_library(
     name = "cargo",
@@ -11,4 +11,16 @@ python_library(
         "//python/cfg:cfg",
     ],
     visibility = ["PUBLIC"],
+)
+
+python_test(
+    name = "test_toml",
+    srcs = ["test_toml.py"],
+    deps = [":cargo"],
+)
+
+python_test(
+    name = "test_features",
+    srcs = ["test_features.py"],
+    deps = [":cargo"],
 )

@@ -1,0 +1,19 @@
+lockfileVersion: '9.0'
+
+packages:
+  lodash@4.17.21:
+    resolution:
+      integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==
+    dev: false
+
+  '@types/node@22.10.10':
+    resolution:
+      integrity: sha512-X47y/mPNzxviAGY5TcYPtYL8JsY3kAq2n8fMmKoRCxq/c4v4pyGNCzM2R6+M5/umG4ZfHuTBxpplYdKOlq9OY2Qw==
+    dev: true
+    dependencies:
+      undici-types: 6.20.0
+
+  undici-types@6.20.0:
+    resolution:
+      integrity: sha512-Ny6QZ2Ber4F2VIFQK3kV6A5fVVuLb8JNmBXOlMJu5CfLiHrPFkCqopKzwzJSTc1FDZ+DKZqfLqHfHBN9t9FhPOg==
+    dev: true
