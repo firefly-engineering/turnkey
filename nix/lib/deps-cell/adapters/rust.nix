@@ -177,12 +177,21 @@ rec {
     ''}
 
     # Generate BUCK files (if tool provided)
-    ${if genRustBuck != null then ''
+    ${if genRustBuck != null then
+      let
+        # Include both versioned (e.g., base64@0.22.1) and unversioned (e.g., base64) names
+        # so that gen-rust-buck can resolve deps either way
+        versionedNames = lib.attrNames deps;
+        unversionedNames = lib.unique (map (key:
+          lib.head (lib.splitString "@" key)
+        ) versionedNames);
+        allCrateNames = versionedNames ++ unversionedNames;
+      in ''
       echo "Generating BUCK files..."
       for dir in "$out/vendor"/*; do
         if [ -d "$dir" ] && [ -f "$dir/Cargo.toml" ]; then
           gen-rust-buck "$dir" \
-            '${builtins.toJSON (lib.attrNames deps)}' \
+            '${builtins.toJSON allCrateNames}' \
             '${builtins.toJSON (lib.attrNames allBuildScriptFixups)}' \
             "$UNIFIED_FEATURES" \
             '${builtins.toJSON rustcFlagsRegistry}' \

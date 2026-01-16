@@ -20,3 +20,4 @@ members = [
 # Shared dependencies for all workspace members
 [workspace.dependencies]
 itoa = "1.0"
+serde-saphyr = "0.0.15"

@@ -9,6 +9,7 @@
 #
 # Fixups are organized as:
 #   - serde.nix: serde, serde_core (build script), serde_json (rustc flags)
+#   - thiserror.nix: thiserror (build script)
 #   - ring.nix: ring crypto library (native code compilation)
 #   - rustix.nix: rustix platform flags (rustc flags)
 #
@@ -22,6 +23,7 @@
 let
   # Import individual fixup files
   serdeFixups = import ./serde.nix { inherit lib; };
+  thiserrorFixups = import ./thiserror.nix { inherit lib; };
   ringFixups = import ./ring.nix { inherit lib; };
   rustixFixups = import ./rustix.nix { inherit lib; };
 in
@@ -35,6 +37,7 @@ rec {
 
   buildScriptFixups =
     (serdeFixups.buildScriptFixups or {})
+    // (thiserrorFixups.buildScriptFixups or {})
     // (ringFixups.buildScriptFixups or ringFixups)
     // (rustixFixups.buildScriptFixups or {});
 
@@ -47,6 +50,7 @@ rec {
 
   rustcFlags =
     (serdeFixups.rustcFlags or {})
+    // (thiserrorFixups.rustcFlags or {})
     // (ringFixups.rustcFlags or {})
     // (rustixFixups.rustcFlags or {});
 

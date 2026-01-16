@@ -8,7 +8,7 @@ description = "Generate js-deps.toml from pnpm-lock.yaml for Buck2/Nix integrati
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
+serde-saphyr.workspace = true
 toml = "0.8"
 sha2 = "0.10"
 base64 = "0.22"
