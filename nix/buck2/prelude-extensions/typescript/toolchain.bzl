@@ -49,5 +49,6 @@ system_typescript_toolchain = rule(
             doc = "Default flags to pass to tsc",
         ),
     },
+    is_toolchain_rule = True,
     doc = "Defines a TypeScript toolchain using system-provided binaries.",
 )
