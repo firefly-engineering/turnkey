@@ -26,3 +26,4 @@ godeps-gen = {}    # Tool for generating go-deps.toml from go.mod/go.sum
 pydeps-gen = {}    # Tool for generating python-deps.toml from pyproject.toml/requirements.txt
 rustdeps-gen = {}  # Tool for generating rust-deps.toml from Cargo.lock
 tk = {}            # Turnkey CLI wrapper for buck2 with auto-sync
+tw = {}            # Turnkey wrapper for native tools (go, cargo, uv) with auto-sync

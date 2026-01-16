@@ -81,6 +81,7 @@
           packages.gobuckify = import ./nix/packages/gobuckify.nix { inherit pkgs lib; };
           packages.cargo-prune-workspace = import ./nix/packages/cargo-prune-workspace.nix { inherit pkgs lib; };
           packages.tk = import ./nix/packages/tk.nix { inherit pkgs lib; };
+          packages.tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
           packages.e2e-runner = import ./nix/packages/e2e-runner.nix { inherit pkgs lib; };
 
           # Configure turnkey to use our local toolchain files
@@ -118,6 +119,7 @@
               rustdeps-gen = config.packages.rustdeps-gen;
               gobuckify = config.packages.gobuckify;
               tk = config.packages.tk;
+              tw = config.packages.tw;
               # Python testing
               pytest = pkgs.python3Packages.pytest;
             };
