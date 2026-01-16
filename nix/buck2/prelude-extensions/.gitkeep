@@ -1,0 +1,14 @@
+# This directory contains custom Starlark rules and extensions
+# that are merged into the upstream Buck2 prelude.
+#
+# Files here can:
+# - Add new .bzl files with custom rules
+# - Override existing prelude files (use with caution)
+#
+# Example structure:
+#   prelude-extensions/
+#   ├── typescript/
+#   │   ├── rules.bzl
+#   │   └── toolchain.bzl
+#   └── nix/
+#       └── rules.bzl
