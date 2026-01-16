@@ -15,7 +15,9 @@
 #
 # OPTIMIZED: Uses batched devshell calls to minimize nix develop overhead.
 # Original: 8 devshell calls (~112s overhead)
-# Optimized: 4 devshell calls (~56s overhead)
+# Optimized: 6 devshell calls (~84s overhead)
+# Note: Deps generation and build must be in separate devshells because
+#       the godeps cell is evaluated at devshell entry time.
 set -euo pipefail
 
 # Source test libraries
@@ -76,30 +78,33 @@ EOF
 step "Staging files for Nix flake"
 stage_for_flake
 
-# Step 5: Phase 1 - Generate deps and verify build (single devshell)
-step "Generating deps and verifying main branch build (batched)"
-output=$(run_in_devshell_script_capture << 'PHASE1'
+# Step 5: Phase 1 - Generate deps (must be committed before build)
+step "Generating go-deps.toml for main branch"
+run_in_devshell_script << 'PHASE1'
   echo "Generating go-deps.toml for main branch..."
   godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+PHASE1
+assert_file_exists "go-deps.toml" || exit 1
+assert_file_contains "go-deps.toml" "github.com/google/uuid" || exit 1
 
-  echo ""
+# Step 6: Commit main branch state (deps must be committed before Buck2 can see godeps cell)
+step "Committing main branch state"
+stage_for_flake
+commit_changes "Initial project with uuid dependency"
+
+# Step 7: Phase 2 - Build and run (single devshell, after deps committed)
+step "Verifying main branch build (batched)"
+output=$(run_in_devshell_script_capture << 'PHASE2'
   echo "Building main branch..."
   buck2 build //:hello
 
   echo ""
   echo "Running main branch binary..."
   buck2 run //:hello
-PHASE1
+PHASE2
 )
 echo "$output" | tail -5
-assert_file_exists "go-deps.toml" || exit 1
-assert_file_contains "go-deps.toml" "github.com/google/uuid" || exit 1
 assert_output_contains "echo '$output'" "UUID:" || exit 1
-
-# Step 6: Commit main branch state
-step "Committing main branch state"
-stage_for_flake
-commit_changes "Initial project with uuid dependency"
 
 # Save main branch dep count for comparison
 main_deps_count=$(grep -c '^\[deps\.' go-deps.toml || echo 0)
@@ -107,11 +112,11 @@ step "Main branch has ${main_deps_count} dependencies"
 
 section "Feature Branch: Adding New Dependency"
 
-# Step 7: Create feature branch
+# Step 8: Create feature branch
 step "Creating feature branch"
 git checkout -b feature/add-color
 
-# Step 8: Update code to use new dependency (pkg/errors - pure Go, no assembly)
+# Step 9: Update code to use new dependency (pkg/errors - pure Go, no assembly)
 step "Updating code with new dependency"
 cat > cmd/hello/main.go << 'EOF'
 package main
@@ -162,20 +167,26 @@ go_binary(
 )
 EOF
 
-# Step 9: Phase 2 - Regenerate deps and build feature branch (single devshell)
-step "Regenerating deps and building feature branch (batched)"
+# Step 10: Regenerate deps for feature branch
+step "Regenerating deps for feature branch"
 stage_for_flake
-run_in_devshell_script << 'PHASE2'
+run_in_devshell_script << 'PHASE3'
   echo "Regenerating go-deps.toml for feature branch..."
   godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
-
-  echo ""
-  echo "Building feature branch..."
-  buck2 build //:hello
-PHASE2
+PHASE3
 
 # Verify new dependency is in deps file
 assert_file_contains "go-deps.toml" "github.com/pkg/errors" || exit 1
+
+# Stage updated deps so next devshell sees them
+stage_for_flake
+
+# Step 11: Build feature branch (separate devshell so it sees new deps)
+step "Building feature branch"
+run_in_devshell_script << 'PHASE4'
+  echo "Building feature branch..."
+  buck2 build //:hello
+PHASE4
 
 # Count deps on feature branch
 feature_deps_count=$(grep -c '^\[deps\.' go-deps.toml || echo 0)
@@ -187,14 +198,14 @@ if [[ "$feature_deps_count" -le "$main_deps_count" ]]; then
   exit 1
 fi
 
-# Step 10: Commit feature branch changes
+# Step 12: Commit feature branch changes
 step "Committing feature branch changes"
 stage_for_flake
 commit_changes "Add fatih/color dependency"
 
 section "Branch Switching: Verify State Isolation"
 
-# Step 11: Switch back to main
+# Step 13: Switch back to main
 step "Switching back to main branch"
 git checkout main
 
@@ -208,14 +219,14 @@ if [[ "$main_current_count" -ne "$main_deps_count" ]]; then
   exit 1
 fi
 
-# Step 12: Phase 3 - Verify main branch still builds (single devshell)
+# Step 14: Phase 3 - Verify main branch still builds (single devshell)
 step "Verifying main branch still builds"
 run_in_devshell_script << 'PHASE3'
   echo "Building main branch..."
   buck2 build //:hello
 PHASE3
 
-# Step 13: Switch to feature branch
+# Step 15: Switch to feature branch
 step "Switching to feature branch"
 git checkout feature/add-color
 
@@ -231,7 +242,7 @@ fi
 
 section "Merge: Verify Correct Dependency Integration"
 
-# Step 14: Merge feature to main
+# Step 16: Merge feature to main
 step "Merging feature branch to main"
 git checkout main
 git merge feature/add-color --no-edit
@@ -246,7 +257,7 @@ if [[ "$merged_deps_count" -ne "$feature_deps_count" ]]; then
   exit 1
 fi
 
-# Step 15: Phase 4 - Verify merged main builds (single devshell)
+# Step 17: Phase 4 - Verify merged main builds (single devshell)
 step "Verifying merged main builds"
 run_in_devshell_script << 'PHASE4'
   echo "Building merged main..."
