@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# E2E Test: Multi-language monorepo (Go + Rust + Python)
+# E2E Test: Multi-language monorepo (Go + Rust + Python + TypeScript)
 #
-# Tests that Go, Rust, and Python can coexist in the same project:
+# Tests that Go, Rust, Python, and TypeScript can coexist in the same project:
 # 1. Initialize from turnkey template
-# 2. Enable Go, Rust, and Python support
+# 2. Enable Go, Rust, Python, and TypeScript support
 # 3. Add multi-language fixture code
 # 4. Generate deps files for all languages
-# 5. Build Go, Rust, and Python targets
+# 5. Build Go, Rust, Python, and TypeScript targets
 # 6. Run tests
 #
 # Issue: turnkey-tps
@@ -16,7 +16,7 @@ set -euo pipefail
 source "${LIB_DIR}/assertions.sh"
 source "${LIB_DIR}/setup.sh"
 
-section "Test: Multi-language monorepo (Go + Rust + Python)"
+section "Test: Multi-language monorepo (Go + Rust + Python + TypeScript)"
 
 # Step 1: Create test project
 step "Creating test project directory"
@@ -28,13 +28,13 @@ step "Initializing from turnkey template"
 init_from_template
 
 # Step 3: Enable multi-language support in flake.nix
-step "Enabling Go + Rust + Python support in flake.nix"
+step "Enabling Go + Rust + Python + TypeScript support in flake.nix"
 # Get the turnkey path that init_from_template set
 turnkey_path=$(grep 'turnkey.url' flake.nix | sed 's/.*"\(.*\)".*/\1/')
 # Write a multi-language flake.nix
 cat > flake.nix << EOF
 {
-  description = "Multi-language Buck2 project (Go + Rust + Python)";
+  description = "Multi-language Buck2 project (Go + Rust + Python + TypeScript)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -66,6 +66,8 @@ cat > flake.nix << EOF
             uv = pkgs.uv;
             clang = pkgs.llvmPackages.clang;
             lld = pkgs.llvmPackages.lld;
+            nodejs = pkgs.nodejs;
+            typescript = pkgs.typescript;
             godeps-gen = inputs.turnkey.packages.\${pkgs.system}.godeps-gen;
             rustdeps-gen = inputs.turnkey.packages.\${pkgs.system}.rustdeps-gen;
             pydeps-gen = inputs.turnkey.packages.\${pkgs.system}.pydeps-gen;
@@ -74,7 +76,8 @@ cat > flake.nix << EOF
 
           buck2 = {
             enable = true;
-            prelude.strategy = "bundled";
+            # Use nix prelude strategy for TypeScript support
+            prelude.strategy = "nix";
 
             go = {
               enable = true;
@@ -105,14 +108,16 @@ EOF
 step "Adding multi-language source code"
 copy_fixture "multi-language"
 
-# Step 5: Add rust and python toolchains to toolchain.toml
-step "Adding rust and python to toolchain.toml"
+# Step 5: Add rust, python, and typescript toolchains to toolchain.toml
+step "Adding rust, python, and typescript to toolchain.toml"
 cat >> toolchain.toml << 'EOF'
 rust = {}
 rustdeps-gen = {}
 python = {}
 uv = {}
 pydeps-gen = {}
+nodejs = {}
+typescript = {}
 EOF
 
 # Step 5b: Create rust-features.toml to enable serde derive
@@ -128,7 +133,7 @@ step "Staging files for Nix flake"
 stage_for_flake
 
 # Step 7: Verify devshell has required tools
-step "Verifying devshell tools (Go + Rust + Python)"
+step "Verifying devshell tools (Go + Rust + Python + TypeScript)"
 assert_command_in_devshell "buck2" || exit 1
 assert_command_in_devshell "go" || exit 1
 assert_command_in_devshell "godeps-gen" || exit 1
@@ -137,6 +142,8 @@ assert_command_in_devshell "cargo" || exit 1
 assert_command_in_devshell "python" || exit 1
 assert_command_in_devshell "uv" || exit 1
 assert_command_in_devshell "pydeps-gen" || exit 1
+assert_command_in_devshell "node" || exit 1
+assert_command_in_devshell "tsc" || exit 1
 
 # Step 8: Generate go-deps.toml
 step "Generating go-deps.toml"
@@ -187,4 +194,13 @@ step "Running Python binary"
 output=$(run_in_devshell_capture "buck2 run //python_app:hello-python")
 assert_output_contains "echo '$output'" "Python: Hello" || exit 1
 
-section "PASS: Multi-language monorepo (Go + Rust + Python)"
+# Step 17: Build TypeScript binary
+step "Building TypeScript binary"
+run_in_devshell "buck2 build //typescript_app:hello-typescript"
+
+# Step 18: Run TypeScript binary
+step "Running TypeScript binary"
+output=$(run_in_devshell_capture "buck2 run //typescript_app:hello-typescript")
+assert_output_contains "echo '$output'" "TypeScript: Hello" || exit 1
+
+section "PASS: Multi-language monorepo (Go + Rust + Python + TypeScript)"
