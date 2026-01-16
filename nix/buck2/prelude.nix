@@ -6,6 +6,9 @@
 # 3. Copying extensions from nix/buck2/prelude-extensions/
 #
 # The result is symlinked to .turnkey/prelude in downstream projects.
+#
+# IMPORTANT: The prelude version must match the buck2 binary version.
+# See docs/buck2-prelude-compatibility.md for update instructions.
 { pkgs, lib }:
 
 let
