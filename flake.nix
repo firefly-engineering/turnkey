@@ -82,6 +82,10 @@
           packages.cargo-prune-workspace = import ./nix/packages/cargo-prune-workspace.nix { inherit pkgs lib; };
           packages.tk = import ./nix/packages/tk.nix { inherit pkgs lib; };
           packages.tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
+          packages.tw-wrappers = import ./nix/packages/tw-wrappers.nix {
+            inherit pkgs lib;
+            tw = config.packages.tw;
+          };
           packages.e2e-runner = import ./nix/packages/e2e-runner.nix { inherit pkgs lib; };
 
           # Configure turnkey to use our local toolchain files
@@ -120,6 +124,11 @@
               gobuckify = config.packages.gobuckify;
               tk = config.packages.tk;
               tw = config.packages.tw;
+              # Transparent wrappers that shadow native tools with auto-sync
+              # Use these instead of go/cargo/uv to get automatic dependency sync
+              tw-go = config.packages.tw-wrappers.tw-go;
+              tw-cargo = config.packages.tw-wrappers.tw-cargo;
+              tw-uv = config.packages.tw-wrappers.tw-uv;
               # Python testing
               pytest = pkgs.python3Packages.pytest;
             };

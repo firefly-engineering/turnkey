@@ -6,10 +6,12 @@
 buck2 = {}
 
 # Language toolchains (used by Buck2)
-go = {}
+# Using tw-* wrappers for auto-sync when dependency files change
+tw-go = {}     # Wraps 'go' with auto-sync (go get → syncs go-deps.toml)
 rust = {}
+tw-cargo = {}  # Wraps 'cargo' with auto-sync (cargo add → syncs rust-deps.toml)
 python = {}
-uv = {}        # Python package manager for lock file generation
+tw-uv = {}     # Wraps 'uv' with auto-sync (uv add → syncs python-deps.toml)
 reindeer = {}  # Tool for generating Buck2 targets from Cargo.toml
 
 # JavaScript/TypeScript (no Buck2 toolchain, but available for genrule builds)

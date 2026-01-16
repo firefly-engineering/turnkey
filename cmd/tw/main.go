@@ -155,9 +155,9 @@ func parseFlags(args []string) []string {
 // runTool executes the tool with the given arguments and returns the exit code.
 // It forwards signals to the child process.
 func runTool(name string, args []string) int {
-	toolPath, err := exec.LookPath(name)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "tw: %s not found in PATH: %v\n", name, err)
+	toolPath := findRealTool(name)
+	if toolPath == "" {
+		fmt.Fprintf(os.Stderr, "tw: %s not found in PATH\n", name)
 		return 1
 	}
 
@@ -177,7 +177,7 @@ func runTool(name string, args []string) int {
 		}
 	}()
 
-	err = cmd.Run()
+	err := cmd.Run()
 	signal.Stop(sigChan)
 	close(sigChan)
 
@@ -215,6 +215,26 @@ func runSyncForRule(cfg *syncconfig.Config, wrapper *syncconfig.WrapperRule, roo
 	}
 
 	return 0
+}
+
+// findRealTool finds the real tool binary, avoiding wrapper recursion.
+// It first checks TURNKEY_REAL_<TOOL> env var (set by shell wrappers),
+// then falls back to PATH lookup.
+func findRealTool(name string) string {
+	// Check for explicit path from shell wrapper (avoids recursion)
+	envVar := "TURNKEY_REAL_" + strings.ToUpper(name)
+	if path := os.Getenv(envVar); path != "" {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+
+	// Fall back to PATH lookup
+	path, err := exec.LookPath(name)
+	if err != nil {
+		return ""
+	}
+	return path
 }
 
 // findProjectRoot walks up from cwd to find the project root.
