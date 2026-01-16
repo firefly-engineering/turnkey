@@ -9,8 +9,9 @@ typescript_library(
 )
 
 typescript_binary(
-    name = "hello",
+    name = "typescript-hello",
     main = "main.ts",
     srcs = ["main.ts"],
     deps = [":greeter"],
+    visibility = ["PUBLIC"],
 )
