@@ -394,7 +394,7 @@ in
       };
 
       path = lib.mkOption {
-        type = lib.types.either lib.types.path lib.types.str;
+        type = lib.types.either lib.types.path (lib.types.either lib.types.str lib.types.package);
         default = "bundled://";
         description = ''
           Path to the prelude cell.
