@@ -37,6 +37,32 @@ var (
 	noSync  bool
 )
 
+// defaultWrapperRules provides sensible defaults for common tools.
+// These are used when no [[wrappers]] section exists in sync.toml.
+var defaultWrapperRules = map[string]*syncconfig.WrapperRule{
+	"go": {
+		Name:                "go",
+		Command:             "go",
+		MutatingSubcommands: []string{"get", "mod"},
+		WatchFiles:          []string{"go.mod", "go.sum"},
+		DepsRule:            "go",
+	},
+	"cargo": {
+		Name:                "cargo",
+		Command:             "cargo",
+		MutatingSubcommands: []string{"add", "remove", "update"},
+		WatchFiles:          []string{"Cargo.toml", "Cargo.lock"},
+		DepsRule:            "rust",
+	},
+	"uv": {
+		Name:                "uv",
+		Command:             "uv",
+		MutatingSubcommands: []string{"add", "remove", "lock", "sync"},
+		WatchFiles:          []string{"pyproject.toml", "uv.lock"},
+		DepsRule:            "python",
+	},
+}
+
 func main() {
 	args := os.Args[1:]
 
@@ -69,14 +95,21 @@ func main() {
 		runToolAndExit(toolName, toolArgs)
 	}
 
-	// Find wrapper rule for this tool
+	// Find wrapper rule for this tool (config takes precedence over defaults)
 	rule := cfg.FindWrapper(toolName)
+	if rule == nil {
+		// Try default rules
+		rule = defaultWrapperRules[toolName]
+	}
 	if rule == nil {
 		// No wrapper configured for this tool - just pass through
 		if verbose {
 			fmt.Fprintf(os.Stderr, "tw: no wrapper rule for %q, passing through\n", toolName)
 		}
 		runToolAndExit(toolName, toolArgs)
+	}
+	if verbose && cfg.FindWrapper(toolName) == nil {
+		fmt.Fprintf(os.Stderr, "tw: using default wrapper rule for %q\n", toolName)
 	}
 
 	// Determine if this is a mutating subcommand
