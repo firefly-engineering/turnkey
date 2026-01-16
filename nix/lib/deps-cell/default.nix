@@ -196,4 +196,5 @@ rec {
   inherit (adapters.go) mkGoDepPackage mkGoDepsCell;
   inherit (adapters.rust) mkRustDepPackage mkRustDepsCell;
   inherit (adapters.python) mkPythonDepPackage mkPythonDepsCell;
+  inherit (adapters.javascript) mkJsDepPackage mkJsDepsCell;
 }

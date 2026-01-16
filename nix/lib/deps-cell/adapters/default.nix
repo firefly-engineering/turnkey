@@ -15,4 +15,5 @@
   go = import ./go.nix { inherit pkgs lib; };
   rust = import ./rust.nix { inherit pkgs lib; };
   python = import ./python.nix { inherit pkgs lib; };
+  javascript = import ./javascript.nix { inherit pkgs lib; };
 }
