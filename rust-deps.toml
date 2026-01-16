@@ -5,6 +5,8 @@
 #
 # Key format: deps."crate-name@version" to support multiple versions
 
+schema_version = 1
+
 [deps."adler2@2.0.1"]
 name = "adler2"
 version = "2.0.1"
@@ -59,6 +61,11 @@ hash = "sha256-Rbg3/6Ixc0vx6y62Qcd/OxGYQ8G2w0UKBurtTZ02Z5c="
 name = "bitflags"
 version = "2.10.0"
 hash = "sha256-nNfYkzqnyqeQKO7BVPy8Gk8Zr7mY00+OLyT1zHLexZs="
+
+[deps."block-buffer@0.10.4"]
+name = "block-buffer"
+version = "0.10.4"
+hash = "sha256-bwr2UJKHUL3gzEEU1xE1uhfZ0qK8nTXk/TTyKHLwSj4="
 
 [deps."bumpalo@3.19.1"]
 name = "bumpalo"
@@ -115,10 +122,25 @@ name = "core-foundation-sys"
 version = "0.8.7"
 hash = "sha256-J98GeYhncf4Vsuzy7qsbeFz1RTgBLzwez0/CNpR3ncA="
 
+[deps."cpufeatures@0.2.17"]
+name = "cpufeatures"
+version = "0.2.17"
+hash = "sha256-2Eo+k6U0qJKIjibDcOjbd85grIOF4tgGZzZ4PB6XuDs="
+
 [deps."crc32fast@1.5.0"]
 name = "crc32fast"
 version = "1.5.0"
 hash = "sha256-1fpDY2g/wunCXWmIpsRqNiHbWoiBZpdvAwAWlwxbhaE="
+
+[deps."crypto-common@0.1.7"]
+name = "crypto-common"
+version = "0.1.7"
+hash = "sha256-0EfhaDP7K1h1awhkqr2iOfLzXsAjWlA9tWPAOjpmtis="
+
+[deps."digest@0.10.7"]
+name = "digest"
+version = "0.10.7"
+hash = "sha256-axiynLIMJ6MCldbqrBdwguXyqGMPM7JvRKi5//8hPCY="
 
 [deps."dirs@5.0.1"]
 name = "dirs"
@@ -164,6 +186,11 @@ hash = "sha256-uKeWsdp+m9DjEL42zoAO8taa8oMJ6ZTWHPr9YGa8i7w="
 name = "form_urlencoded"
 version = "1.2.2"
 hash = "sha256-W+74FXbvzNFqCUqMn+MCjip7I6Z6BHZ8e/FotnXHsY4="
+
+[deps."generic-array@0.14.7"]
+name = "generic-array"
+version = "0.14.7"
+hash = "sha256-o4a0w6FBwSqOX3bNOznxiVBQbmH6s0NAl0S4IIvWsR8="
 
 [deps."getrandom@0.2.17"]
 name = "getrandom"
@@ -375,6 +402,11 @@ name = "rustversion"
 version = "1.0.22"
 hash = "sha256-1Ejjt+8zEI5SXTBTVh0pK3LGNeq94QdAncmBu9CBeRw="
 
+[deps."ryu@1.0.22"]
+name = "ryu"
+version = "1.0.22"
+hash = "sha256-PS/ukmcuT2ownOBv6tomgMSdL/X3w/B47la8rzRXCM8="
+
 [deps."semver@1.0.27"]
 name = "semver"
 version = "1.0.27"
@@ -404,6 +436,16 @@ hash = "sha256-0RpfHf1sQ/Gu9FFAeJGCWx54vQkq6OKYqLxEyVZRFoo="
 name = "serde_spanned"
 version = "0.6.9"
 hash = "sha256-J53IKhALVIg/srWTbZpmSWJynmF1wD6maRCPcXqb87Y="
+
+[deps."serde_yaml@0.9.34+deprecated"]
+name = "serde_yaml"
+version = "0.9.34+deprecated"
+hash = "sha256-XVcL+UNNYcXDufbxbdOj6wG+BmFsxpWE685KxgBvClM="
+
+[deps."sha2@0.10.9"]
+name = "sha2"
+version = "0.10.9"
+hash = "sha256-ZIRwEig6Ue74a2Ybhl1M0nH7y3Tj8yeON3JSr3D3XTY="
 
 [deps."shlex@1.3.0"]
 name = "shlex"
@@ -485,10 +527,20 @@ name = "toml_write"
 version = "0.1.2"
 hash = "sha256-dlmBPtel5EIlOeOxRPt4pOodNkg52WniCRh83K8AXIE="
 
+[deps."typenum@1.19.0"]
+name = "typenum"
+version = "1.19.0"
+hash = "sha256-5vBPNc316ZUAoQrSrL4wVapBpqOrjjvN5OWHmBL+mVY="
+
 [deps."unicode-ident@1.0.22"]
 name = "unicode-ident"
 version = "1.0.22"
 hash = "sha256-rc3TZsoOsLwiWa37mfR9Vdz19t0/ZLov6YMaItqsf4s="
+
+[deps."unsafe-libyaml@0.2.11"]
+name = "unsafe-libyaml"
+version = "0.2.11"
+hash = "sha256-1BS4IxKlMeXZbJRTi6KfUvdo/f4TDgd1niCRsp9qyR8="
 
 [deps."untrusted@0.9.0"]
 name = "untrusted"
@@ -514,6 +566,11 @@ hash = "sha256-U2QlqLrH5vQtjwDoLX0CIGtnjgv2ueWi8JiIDhKul+g="
 name = "utf8parse"
 version = "0.2.2"
 hash = "sha256-h+XZ48STfds73DVffc3YFS3S0fJrK9xWXoSdow7auk4="
+
+[deps."version_check@0.9.5"]
+name = "version_check"
+version = "0.9.5"
+hash = "sha256-tQZZutDs8hU+nNvD5jUzLJMyp3OcblIinn2y52wIA6c="
 
 [deps."wasi@0.11.1+wasi-snapshot-preview1"]
 name = "wasi"
