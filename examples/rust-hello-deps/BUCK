@@ -8,7 +8,7 @@ load("@prelude//:rules.bzl", "rust_binary")
 rust_binary(
     name = "rust-hello-deps",
     srcs = ["main.rs"],
-    edition = "2021",
+    edition = "2024",
     deps = [
         "rustdeps//vendor/itoa:itoa",
     ],

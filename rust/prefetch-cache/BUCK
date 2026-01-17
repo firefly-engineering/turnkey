@@ -4,7 +4,7 @@ load("@prelude//:rules.bzl", "rust_library", "rust_test")
 rust_library(
     name = "prefetch-cache",
     srcs = glob(["src/**/*.rs"]),
-    edition = "2021",
+    edition = "2024",
     deps = [
         "rustdeps//vendor/anyhow:anyhow",
         "rustdeps//vendor/chrono:chrono",
@@ -18,7 +18,7 @@ rust_library(
 rust_test(
     name = "prefetch-cache-test",
     srcs = glob(["src/**/*.rs"]),
-    edition = "2021",
+    edition = "2024",
     deps = [
         "rustdeps//vendor/anyhow:anyhow",
         "rustdeps//vendor/chrono:chrono",
