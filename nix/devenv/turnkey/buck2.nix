@@ -701,6 +701,22 @@ in
           Requires Python 3.11+ with tomllib support.
         '';
       };
+
+      monorepoDepCheck = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Add a pre-commit hook that verifies monorepo dependency rules.
+          Checks that all languages follow the pattern of declaring deps
+          at the root level:
+          - Go: single go.mod at root
+          - Rust: workspace.dependencies with workspace = true refs
+          - Python: deps in root pyproject.toml
+          - JavaScript: workspace: protocol for nested packages
+
+          Requires Python 3.11+ with tomllib support.
+        '';
+      };
     };
 
     quiet = lib.mkOption {
@@ -980,6 +996,18 @@ in
         pass_filenames = false;
         entry = ''
           ${pkgs.python3}/bin/python cmd/check-rust-edition/__main__.py
+        '';
+      };
+
+      # Monorepo dependency rules check
+      monorepo-dep-check = lib.mkIf cfg.tk.monorepoDepCheck {
+        enable = true;
+        name = "monorepo-dep-check";
+        description = "Check monorepo dependency rules (all languages)";
+        files = "(go\\.mod|Cargo\\.toml|pyproject\\.toml|package\\.json)$";
+        pass_filenames = false;
+        entry = ''
+          ${pkgs.python3}/bin/python cmd/check-monorepo-deps/__main__.py
         '';
       };
     };
