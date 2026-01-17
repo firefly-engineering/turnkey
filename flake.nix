@@ -6,6 +6,13 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     devenv.url = "github:cachix/devenv";
 
+    # Required by devenv for container support (even if unused)
+    nix2container = {
+      url = "github:nlewo/nix2container";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    mk-shell-bin.url = "github:rrbutani/nix-mk-shell-bin";
+
     # Beads - distributed git-backed graph issue tracker for AI agents
     beads = {
       url = "github:steveyegge/beads/v0.46.0";
@@ -91,7 +98,6 @@
             enable = true;
             declarationFiles = {
               default = ./toolchain.toml; # Creates devShells.default with buck2 + nix + beads + go
-              ci = ./toolchain.ci.toml; # Creates devShells.ci with just nix
             };
             # Extend the default registry with packages from flake inputs
             registry = {

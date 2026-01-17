@@ -1,5 +1,0 @@
-# Turnkey toolchain declaration for CI environment
-# This demonstrates a minimal CI toolchain with just nix
-
-[toolchains]
-nix = {}
