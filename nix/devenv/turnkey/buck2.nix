@@ -1010,6 +1010,18 @@ in
           ${pkgs.python3}/bin/python cmd/check-monorepo-deps/__main__.py
         '';
       };
+
+      # Nix flake check
+      nix-flake-check = {
+        enable = true;
+        name = "nix-flake-check";
+        description = "Check Nix flake validity";
+        files = "\\.nix$";
+        pass_filenames = false;
+        entry = ''
+          nix flake check --no-build --impure
+        '';
+      };
     };
   };
 }
