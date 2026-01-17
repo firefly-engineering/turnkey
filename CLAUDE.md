@@ -226,62 +226,87 @@ resolvedPackages = map (name: cfg.registry.${name}) toolchainNames;
 ```
 Declarative configuration → runtime resolution.
 
-## Go Module Layout (Monorepo)
+## Monorepo Dependency Management
 
-This repository uses a **single go.mod at the root** for all Go code. This is a monorepo pattern where all Go tools and examples share the same module.
+**CRITICAL RULE**: All dependencies in this monorepo MUST be declared at the **root level** using each language's workspace/module mechanism. Sub-projects reference these root-level dependencies rather than declaring their own versions.
 
-### Key Principles
+This ensures:
+- **Version consistency** across all code
+- **Single update point** for each dependency
+- **No version conflicts** in lockfiles
+- **Buck2 alignment** with how dependency cells work
 
-1. **Single go.mod at repo root** - All Go code shares one module: `github.com/firefly-engineering/turnkey`
-2. **No nested go.mod files** - Tools like `tools/godeps-gen` do NOT have their own go.mod
-3. **Shared dependencies** - All Go dependencies are declared in the root go.mod/go.sum
-4. **Subpackage imports** - Internal packages use full import paths like `github.com/firefly-engineering/turnkey/tools/godeps-gen`
+### Go
 
-### Directory Structure
+**Root file**: `go.mod` at repo root
+
 ```
 /turnkey/
-├── go.mod                    # Single module declaration
+├── go.mod                    # Single module: github.com/firefly-engineering/turnkey
 ├── go.sum                    # All dependency hashes
-├── go-deps.toml              # Generated Nix dependency declarations
-├── tools/
-│   └── godeps-gen/
-│       └── main.go           # Tool code (no go.mod here!)
-└── examples/
-    └── hello-deps/
-        └── main.go           # Example code (no go.mod here!)
+├── go-deps.toml              # Generated for Nix/Buck2
+└── cmd/godeps-gen/main.go    # NO go.mod here - uses root module
 ```
 
-### Building Go Tools
+- All Go code shares one module
+- No nested go.mod files
+- Add deps with `go get` from repo root
 
-```bash
-# From repo root - builds tools/godeps-gen/main.go
-go build -o godeps-gen ./tools/godeps-gen
+### Rust
 
-# Run directly
-go run ./tools/godeps-gen --help
+**Root file**: `Cargo.toml` with `[workspace]` and `[workspace.dependencies]`
+
+```
+/turnkey/
+├── Cargo.toml                # [workspace.dependencies] declares ALL shared deps
+├── Cargo.lock                # Single lockfile
+├── rust-deps.toml            # Generated for Nix/Buck2
+└── cmd/jsdeps-gen/
+    └── Cargo.toml            # Uses: serde.workspace = true
 ```
 
-### Nix Packaging Considerations
+Adding a dependency:
+```toml
+# 1. Root Cargo.toml
+[workspace.dependencies]
+my-dep = "1.2.3"
 
-For Go tools, use standard `buildGoModule` with `vendorHash`:
-
-```nix
-pkgs.buildGoModule {
-  pname = "godeps-gen";
-  src = ./.;  # Repo root
-  subPackages = [ "cmd/godeps-gen" ];
-  vendorHash = "sha256-...";  # Let build fail once to get this
-}
+# 2. Member Cargo.toml - MUST use workspace reference
+[dependencies]
+my-dep.workspace = true       # ✅ Correct
+# my-dep = "1.2.3"            # ❌ WRONG - never specify version directly
 ```
 
-For **dependency cells** (consumed by Buck2), use per-module fetching - see `docs/dependency-management.md`.
+### Python
 
-### Why Monorepo?
+**Root file**: `pyproject.toml` at repo root
 
-1. **Consistency** - All code uses same dependency versions
-2. **Simplicity** - One place to manage deps, one go.sum to update
-3. **Buck2 alignment** - Matches Buck2's cell-based monorepo model
-4. **Dogfooding** - Tools can depend on library code in the same repo
+```
+/turnkey/
+├── pyproject.toml            # [project.dependencies] declares all deps
+├── uv.lock                   # Lockfile (managed by uv)
+├── python-deps.toml          # Generated for Nix/Buck2
+└── python/mypackage/         # NO pyproject.toml here
+```
+
+- All Python code uses the root pyproject.toml
+- Use `uv add` from repo root to add dependencies
+- Sub-packages are part of the root project
+
+### TypeScript/JavaScript
+
+**Root file**: `package.json` at repo root (when applicable)
+
+```
+/turnkey/
+├── package.json              # All dependencies declared here
+├── pnpm-lock.yaml            # Lockfile (managed by pnpm)
+├── js-deps.toml              # Generated for Nix/Buck2
+└── ts/mypackage/             # NO package.json here (or uses workspace protocol)
+```
+
+- Use pnpm workspaces for multi-package setups
+- Add deps with `pnpm add` from repo root
 
 ## Importing External Software
 
