@@ -17,6 +17,10 @@ members = [
     "rust/prefetch-cache",
 ]
 
+# Shared package metadata for all workspace members
+[workspace.package]
+edition = "2021"
+
 # Shared dependencies for all workspace members
 # ALL dependencies must be declared here and referenced with workspace = true
 [workspace.dependencies]
