@@ -19,7 +19,7 @@ members = [
 
 # Shared package metadata for all workspace members
 [workspace.package]
-edition = "2021"
+edition = "2024"
 
 # Shared dependencies for all workspace members
 # ALL dependencies must be declared here and referenced with workspace = true
