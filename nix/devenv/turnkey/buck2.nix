@@ -688,6 +688,19 @@ in
           Requires tk to be available in PATH (add 'tk' to your toolchain.toml).
         '';
       };
+
+      rustEditionCheck = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Add a pre-commit hook that verifies Rust edition alignment.
+          Checks that:
+          1. All workspace members use edition.workspace = true
+          2. BUCK files have edition matching workspace.package.edition
+
+          Requires Python 3.11+ with tomllib support.
+        '';
+      };
     };
 
     quiet = lib.mkOption {
@@ -955,6 +968,18 @@ in
               echo "Warning: tk not found in PATH, skipping sync check"
             fi
           '
+        '';
+      };
+
+      # Rust edition alignment check
+      rust-edition-check = lib.mkIf (cfg.rust.enable && cfg.tk.rustEditionCheck) {
+        enable = true;
+        name = "rust-edition-check";
+        description = "Check Rust edition alignment between Cargo.toml and BUCK";
+        files = "(Cargo\\.toml|BUCK)$";
+        pass_filenames = false;
+        entry = ''
+          ${pkgs.python3}/bin/python cmd/check-rust-edition/__main__.py
         '';
       };
     };

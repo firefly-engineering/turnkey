@@ -1,0 +1,8 @@
+load("@prelude//python:python.bzl", "python_binary")
+
+python_binary(
+    name = "check-rust-edition",
+    main = "__main__.py",
+    srcs = glob(["*.py"]),
+    visibility = ["PUBLIC"],
+)
