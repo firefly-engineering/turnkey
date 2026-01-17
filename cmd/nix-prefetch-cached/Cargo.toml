@@ -9,6 +9,6 @@ name = "nix-prefetch-cached"
 path = "src/main.rs"
 
 [dependencies]
-anyhow = "1"
-clap = { version = "4", features = ["derive"] }
-prefetch-cache = { path = "../../rust/prefetch-cache" }
+anyhow.workspace = true
+clap.workspace = true
+prefetch-cache.workspace = true

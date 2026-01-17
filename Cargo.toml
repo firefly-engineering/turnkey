@@ -18,6 +18,22 @@ members = [
 ]
 
 # Shared dependencies for all workspace members
+# ALL dependencies must be declared here and referenced with workspace = true
 [workspace.dependencies]
+anyhow = "1.0"
+base64 = "0.22"
+cargo-lock = "10"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4.5", features = ["derive"] }
+dirs = "5.0"
 itoa = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 serde-saphyr = "0.0.15"
+sha2 = "0.10"
+tempfile = "3.10"
+toml = "0.8"
+ureq = { version = "2", features = ["json"] }
+
+# Workspace member references (for path dependencies between crates)
+prefetch-cache = { path = "rust/prefetch-cache" }
