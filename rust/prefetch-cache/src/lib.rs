@@ -196,10 +196,10 @@ impl PrefetchCache {
 impl Drop for PrefetchCache {
     fn drop(&mut self) {
         // Auto-save on drop
-        if self.dirty {
-            if let Err(e) = self.save() {
-                eprintln!("prefetch-cache: warning: failed to save cache: {}", e);
-            }
+        if self.dirty
+            && let Err(e) = self.save()
+        {
+            eprintln!("prefetch-cache: warning: failed to save cache: {}", e);
         }
     }
 }

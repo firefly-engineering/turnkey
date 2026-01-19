@@ -86,14 +86,14 @@ fn main() -> Result<()> {
     let hash = prefetch_url(&args.url, args.unpack)?;
 
     // Store in cache
-    if !args.no_cache {
-        if let Ok(mut cache) = PrefetchCache::new() {
-            cache.set(cache_key, hash.clone());
-            if let Err(e) = cache.save() {
-                if args.verbose {
-                    eprintln!("warning: failed to save cache: {}", e);
-                }
-            }
+    if !args.no_cache
+        && let Ok(mut cache) = PrefetchCache::new()
+    {
+        cache.set(cache_key, hash.clone());
+        if let Err(e) = cache.save()
+            && args.verbose
+        {
+            eprintln!("warning: failed to save cache: {}", e);
         }
     }
 

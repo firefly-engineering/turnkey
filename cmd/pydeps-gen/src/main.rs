@@ -278,9 +278,7 @@ fn parse_dep_specifier(spec: &str) -> (String, Option<String>) {
 
 /// Normalize package name (PEP 503)
 fn normalize_name(name: &str) -> String {
-    name.to_lowercase()
-        .replace('_', "-")
-        .replace('.', "-")
+    name.to_lowercase().replace(['_', '.'], "-")
 }
 
 /// Parse pyproject.toml and extract dependencies
@@ -305,57 +303,56 @@ fn parse_pyproject(path: &PathBuf, include_dev: bool) -> Result<Vec<(String, Opt
         }
 
         // Optional dependencies (e.g., dev)
-        if include_dev {
-            if let Some(optional) = &project.optional_dependencies {
-                if let Some(dev_deps) = optional.get("dev") {
-                    for dep in dev_deps {
-                        let (name, version) = parse_dep_specifier(dep);
-                        if !name.is_empty() {
-                            deps.push((name, version));
-                        }
-                    }
+        if include_dev
+            && let Some(optional) = &project.optional_dependencies
+            && let Some(dev_deps) = optional.get("dev")
+        {
+            for dep in dev_deps {
+                let (name, version) = parse_dep_specifier(dep);
+                if !name.is_empty() {
+                    deps.push((name, version));
                 }
             }
         }
     }
 
     // Poetry style: [tool.poetry.dependencies]
-    if let Some(tool) = &pyproject.tool {
-        if let Some(poetry) = &tool.poetry {
-            if let Some(poetry_deps) = &poetry.dependencies {
-                for (name, value) in poetry_deps {
-                    // Skip python itself
-                    if name == "python" {
-                        continue;
-                    }
-                    let version = match value {
-                        toml::Value::String(v) => Some(format!("=={}", v.trim_start_matches('^'))),
-                        toml::Value::Table(t) => {
-                            t.get("version").and_then(|v| v.as_str()).map(|v| {
-                                format!("=={}", v.trim_start_matches('^'))
-                            })
-                        }
-                        _ => None,
-                    };
-                    deps.push((normalize_name(name), version));
+    if let Some(tool) = &pyproject.tool
+        && let Some(poetry) = &tool.poetry
+    {
+        if let Some(poetry_deps) = &poetry.dependencies {
+            for (name, value) in poetry_deps {
+                // Skip python itself
+                if name == "python" {
+                    continue;
                 }
+                let version = match value {
+                    toml::Value::String(v) => Some(format!("=={}", v.trim_start_matches('^'))),
+                    toml::Value::Table(t) => {
+                        t.get("version").and_then(|v| v.as_str()).map(|v| {
+                            format!("=={}", v.trim_start_matches('^'))
+                        })
+                    }
+                    _ => None,
+                };
+                deps.push((normalize_name(name), version));
             }
+        }
 
-            if include_dev {
-                if let Some(dev_deps) = &poetry.dev_dependencies {
-                    for (name, value) in dev_deps {
-                        let version = match value {
-                            toml::Value::String(v) => Some(format!("=={}", v.trim_start_matches('^'))),
-                            toml::Value::Table(t) => {
-                                t.get("version").and_then(|v| v.as_str()).map(|v| {
-                                    format!("=={}", v.trim_start_matches('^'))
-                                })
-                            }
-                            _ => None,
-                        };
-                        deps.push((normalize_name(name), version));
+        if include_dev
+            && let Some(dev_deps) = &poetry.dev_dependencies
+        {
+            for (name, value) in dev_deps {
+                let version = match value {
+                    toml::Value::String(v) => Some(format!("=={}", v.trim_start_matches('^'))),
+                    toml::Value::Table(t) => {
+                        t.get("version").and_then(|v| v.as_str()).map(|v| {
+                            format!("=={}", v.trim_start_matches('^'))
+                        })
                     }
-                }
+                    _ => None,
+                };
+                deps.push((normalize_name(name), version));
             }
         }
     }
@@ -501,8 +498,8 @@ fn resolve_single_dep(
     // Determine version to use
     let version = if let Some(constraint) = version_constraint {
         // Extract pinned version from constraint like "==1.2.3"
-        if constraint.starts_with("==") {
-            constraint[2..].to_string()
+        if let Some(pinned) = constraint.strip_prefix("==") {
+            pinned.to_string()
         } else {
             // For non-pinned constraints, use latest version
             response.info.version.clone()

@@ -113,10 +113,10 @@ fn main() -> Result<()> {
     }
 
     // Also check workspace.dependencies in root Cargo.toml
-    if let Some(workspace) = root_toml.get("workspace") {
-        if let Some(deps) = workspace.get("dependencies") {
-            collect_dependency_features(deps, "workspace", &skip_crates, &mut crate_features);
-        }
+    if let Some(workspace) = root_toml.get("workspace")
+        && let Some(deps) = workspace.get("dependencies")
+    {
+        collect_dependency_features(deps, "workspace", &skip_crates, &mut crate_features);
     }
 
     // Filter to only crates that have explicit features
@@ -143,28 +143,27 @@ fn main() -> Result<()> {
 fn get_workspace_members(root_toml: &toml::Value, root_dir: &Path) -> Result<Vec<PathBuf>> {
     let mut members = Vec::new();
 
-    if let Some(workspace) = root_toml.get("workspace") {
-        if let Some(member_list) = workspace.get("members") {
-            if let Some(arr) = member_list.as_array() {
-                for member in arr {
-                    if let Some(member_str) = member.as_str() {
-                        // Handle glob patterns
-                        if member_str.contains('*') {
-                            let pattern = root_dir.join(member_str);
-                            // Simple glob expansion (just handle basic patterns)
-                            if let Some(parent) = pattern.parent() {
-                                if let Ok(entries) = fs::read_dir(parent) {
-                                    for entry in entries.flatten() {
-                                        if entry.path().is_dir() {
-                                            members.push(entry.path());
-                                        }
-                                    }
-                                }
+    if let Some(workspace) = root_toml.get("workspace")
+        && let Some(member_list) = workspace.get("members")
+        && let Some(arr) = member_list.as_array()
+    {
+        for member in arr {
+            if let Some(member_str) = member.as_str() {
+                // Handle glob patterns
+                if member_str.contains('*') {
+                    let pattern = root_dir.join(member_str);
+                    // Simple glob expansion (just handle basic patterns)
+                    if let Some(parent) = pattern.parent()
+                        && let Ok(entries) = fs::read_dir(parent)
+                    {
+                        for entry in entries.flatten() {
+                            if entry.path().is_dir() {
+                                members.push(entry.path());
                             }
-                        } else {
-                            members.push(root_dir.join(member_str));
                         }
                     }
+                } else {
+                    members.push(root_dir.join(member_str));
                 }
             }
         }
@@ -196,7 +195,7 @@ fn collect_dependency_features(
             if !features.is_empty() {
                 let entry = crate_features
                     .entry(crate_name.clone())
-                    .or_insert_with(CrateFeatures::default);
+                    .or_default();
                 entry.features.extend(features);
                 entry.sources.push(source_name.to_string());
             }
@@ -209,13 +208,13 @@ fn extract_features(dep_value: &toml::Value) -> Vec<String> {
     match dep_value {
         // Inline table: { version = "1", features = ["derive"] }
         toml::Value::Table(t) => {
-            if let Some(features) = t.get("features") {
-                if let Some(arr) = features.as_array() {
-                    return arr
-                        .iter()
-                        .filter_map(|v| v.as_str().map(String::from))
-                        .collect();
-                }
+            if let Some(features) = t.get("features")
+                && let Some(arr) = features.as_array()
+            {
+                return arr
+                    .iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect();
             }
             Vec::new()
         }

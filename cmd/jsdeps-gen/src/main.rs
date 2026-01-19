@@ -141,7 +141,7 @@ fn npm_tarball_url(name: &str, version: &str) -> String {
         format!(
             "https://registry.npmjs.org/{}/-/{}-{}.tgz",
             encoded_name,
-            name.split('/').last().unwrap_or(name),
+            name.split('/').next_back().unwrap_or(name),
             version
         )
     } else {
