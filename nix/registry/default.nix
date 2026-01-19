@@ -56,6 +56,7 @@
   # ==========================================================================
   nodejs = pkgs.nodejs;
   typescript = pkgs.nodePackages.typescript;
+  biome = pkgs.biome;  # Fast linter and formatter for JS/TS/JSON
   jsdeps-gen = import ../packages/jsdeps-gen.nix { inherit pkgs lib; };
 
   # ==========================================================================

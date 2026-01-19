@@ -23,6 +23,7 @@ reindeer = {}  # Tool for generating Buck2 targets from Cargo.toml
 # JavaScript/TypeScript (no Buck2 toolchain, but available for genrule builds)
 nodejs = {}
 typescript = {}
+biome = {}  # Fast linter and formatter for JS/TS/JSON
 
 # Documentation tools
 mdbook = {}
