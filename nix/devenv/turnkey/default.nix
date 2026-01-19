@@ -49,5 +49,11 @@ in
 
     # Export direnv library path
     env.TURNKEY_DIRENV_LIB = "${direnvLib}";
+
+    # Redirect Python bytecode cache to .turnkey to keep source tree clean
+    # Must be set in enterShell with $PWD since env vars are set at build time
+    enterShell = ''
+      export PYTHONPYCACHEPREFIX="$PWD/.turnkey/pycache"
+    '';
   };
 }
