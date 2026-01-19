@@ -8,7 +8,7 @@ import (
 
 func TestParseBuckDeps(t *testing.T) {
 	dir := t.TempDir()
-	buckFile := filepath.Join(dir, "BUCK")
+	buckFile := filepath.Join(dir, "rules.star")
 
 	content := `load("@prelude//:rules.bzl", "go_library")
 
@@ -49,7 +49,7 @@ go_library(
 
 func TestParseBuckPackageName(t *testing.T) {
 	dir := t.TempDir()
-	buckFile := filepath.Join(dir, "BUCK")
+	buckFile := filepath.Join(dir, "rules.star")
 
 	content := `go_library(
     name = "mylib",
@@ -183,8 +183,8 @@ func TestExtractDepPath(t *testing.T) {
 func TestCheckGoImports_InSync(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `go_library(
     name = "lib",
     package_name = "github.com/example/mylib",
@@ -229,8 +229,8 @@ func Do() {
 func TestCheckGoImports_MissingDep(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file without deps
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file without deps
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `go_library(
     name = "lib",
     package_name = "github.com/example/mylib",
@@ -274,8 +274,8 @@ func Do() string {
 func TestCheckGoImports_ExtraDep(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file with deps
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file with deps
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `go_library(
     name = "lib",
     package_name = "github.com/example/mylib",

@@ -195,7 +195,7 @@ rec {
             '${builtins.toJSON (lib.attrNames allBuildScriptFixups)}' \
             "$UNIFIED_FEATURES" \
             '${builtins.toJSON rustcFlagsRegistry}' \
-            > "$dir/BUCK" || echo "# BUCK generation failed" > "$dir/BUCK"
+            > "$dir/rules.star" || echo "# rules.star generation failed" > "$dir/rules.star"
         fi
       done
     '' else ''
@@ -203,14 +203,14 @@ rec {
     ''}
 
     # Generate cell .buckconfig
-    cat > $out/.buckconfig << 'BUCKCONFIG'
+    cat > $out/.buckconfig << 'CELLCONFIG'
     [cells]
         rustdeps = .
         prelude = prelude
 
     [buildfile]
-        name = BUCK
-    BUCKCONFIG
+        name = rules.star
+    CELLCONFIG
   '';
 
   # ==========================================================================

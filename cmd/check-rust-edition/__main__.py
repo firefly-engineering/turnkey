@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Check that Rust editions are consistent between Cargo.toml and BUCK files.
+"""Check that Rust editions are consistent between Cargo.toml and rules.star files.
 
 This script verifies:
 1. All workspace members use edition.workspace = true
-2. BUCK files have edition matching workspace.package.edition
+2. rules.star files have edition matching workspace.package.edition
 """
 
 import sys
@@ -23,7 +23,7 @@ def parse_toml(path: Path) -> dict:
 
 
 def extract_buck_editions(buck_path: Path) -> list[tuple[str, str]]:
-    """Extract edition values from a BUCK file.
+    """Extract edition values from a rules.star file.
 
     Returns list of (target_name, edition) tuples.
     """
@@ -58,9 +58,9 @@ def check_workspace_member(
     workspace_edition: str,
     errors: list[str],
 ) -> None:
-    """Check a workspace member's Cargo.toml and BUCK file."""
+    """Check a workspace member's Cargo.toml and rules.star file."""
     cargo_toml = member_path / "Cargo.toml"
-    buck_file = member_path / "BUCK"
+    buck_file = member_path / "rules.star"
 
     if not cargo_toml.exists():
         return
@@ -86,7 +86,7 @@ def check_workspace_member(
             f"{cargo_toml}: no edition specified, should use 'edition.workspace = true'"
         )
 
-    # Check BUCK file if it exists
+    # Check rules.star file if it exists
     if buck_file.exists():
         buck_editions = extract_buck_editions(buck_file)
         for target_name, buck_edition in buck_editions:
@@ -161,7 +161,7 @@ def main() -> int:
             print(f"  - {error}")
         print("\nTo fix:")
         print("  1. Update Cargo.toml files to use 'edition.workspace = true'")
-        print(f"  2. Update BUCK files to use 'edition = \"{workspace_edition}\"'")
+        print(f"  2. Update rules.star files to use 'edition = \"{workspace_edition}\"'")
         return 1
 
     print("All editions are aligned")

@@ -24,6 +24,8 @@ let
       # Constraint prefixes for platform-specific select() statements
       os_constraint_prefix = "config//os:";
       arch_constraint_prefix = "config//cpu:";
+      # Output filename for build files
+      buildfile_name = "rules.star";
     };
     platforms = [
       { go_os = "linux"; go_arch = "amd64"; buck_os = "linux"; buck_arch = "x86_64"; }
@@ -242,14 +244,14 @@ rec {
     ${gobuckify}/bin/gobuckify .
 
     # Generate cell .buckconfig
-    cat > $out/.buckconfig << 'BUCKCONFIG'
+    cat > $out/.buckconfig << 'CELLCONFIG'
     [cells]
         godeps = .
         prelude = prelude
 
     [buildfile]
-        name = BUCK
-    BUCKCONFIG
+        name = rules.star
+    CELLCONFIG
   '';
 
   # ==========================================================================

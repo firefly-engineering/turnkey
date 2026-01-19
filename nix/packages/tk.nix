@@ -1,7 +1,7 @@
 # tk Nix package
 #
 # Builds the tk CLI - a transparent wrapper around buck2 that auto-syncs.
-# This tool ensures generated files (BUCK files, dependency cells) are
+# This tool ensures generated files (rules.star files, dependency cells) are
 # up-to-date before running buck2 commands that read the build graph.
 #
 # Usage:

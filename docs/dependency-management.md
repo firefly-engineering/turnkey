@@ -48,7 +48,7 @@ go-deps.toml  →  go-deps-cell.nix  →  .turnkey/godeps/  (symlink to Nix stor
 
 The cell contains:
 - Fetched source files for each dependency
-- Generated BUCK files for Buck2 to consume
+- Generated rules.star files for Buck2 to consume
 - Any scaffolding needed by build tools (e.g., `modules.txt` for Go)
 
 ### 5. Build Tools Read from Cells, Not Network
@@ -102,7 +102,7 @@ No network access during builds. All sources are pre-fetched into Nix store.
 │                                                                          │
 │    - Reads TOML, fetches each module via fetchFromGitHub/fetchurl        │
 │    - Assembles into directory structure                                  │
-│    - Generates BUCK files (via gobuckify or equivalent)                  │
+│    - Generates rules.star files (via gobuckify or equivalent)                  │
 └─────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
@@ -112,7 +112,7 @@ No network access during builds. All sources are pre-fetched into Nix store.
 │    .turnkey/godeps/           .turnkey/rustdeps/       .turnkey/pydeps/  │
 │    (symlinks to Nix store)                                               │
 │                                                                          │
-│    Contains: source files, BUCK files, cell config                       │
+│    Contains: source files, rules.star files, cell config                       │
 └─────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼

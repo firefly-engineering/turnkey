@@ -1,1 +1,1 @@
-"""Check Rust edition alignment between Cargo.toml and BUCK files."""
+"""Check Rust edition alignment between Cargo.toml and rules.star files."""

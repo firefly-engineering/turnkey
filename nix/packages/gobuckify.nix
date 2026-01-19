@@ -1,4 +1,4 @@
-# gobuckify - generates BUCK files for Go dependencies
+# gobuckify - generates rules.star files for Go dependencies
 #
 # This fetches gobuckify from the upstream facebook/buck2 repository and
 # applies a patch to use the `go` command directly instead of
@@ -54,7 +54,7 @@ pkgs.buildGoModule {
   vendorHash = null;
 
   meta = with lib; {
-    description = "Generate BUCK files for Go third-party dependencies";
+    description = "Generate rules.star files for Go third-party dependencies";
     homepage = "https://github.com/facebook/buck2";
     license = with licenses; [ mit asl20 ];
     maintainers = [ ];

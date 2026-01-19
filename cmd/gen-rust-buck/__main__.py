@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate BUCK file for a Rust crate."""
+"""Generate rules.star file for a Rust crate."""
 
 import json
 import sys

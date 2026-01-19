@@ -28,7 +28,7 @@ import (
 
 // syncFirstCommands are buck2 subcommands that read the build graph.
 // These commands will have sync run before them to ensure generated
-// files (BUCK files, dependency cells) are up-to-date.
+// files (rules.star files, dependency cells) are up-to-date.
 var syncFirstCommands = []string{
 	"build",
 	"run",

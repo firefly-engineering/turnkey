@@ -184,7 +184,7 @@ rec {
         prelude = prelude
 
     [buildfile]
-        name = BUCK
+        name = rules.star
     BUCKCONFIG
   '';
 

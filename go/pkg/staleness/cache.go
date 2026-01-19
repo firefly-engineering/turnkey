@@ -13,7 +13,7 @@ import (
 
 // CacheEntry represents a cached staleness check result for a package.
 type CacheEntry struct {
-	// BuckFile is the path to the BUCK file.
+	// BuckFile is the path to the rules.star file.
 	BuckFile string `json:"buck_file"`
 
 	// SrcListHash is the hash of the sorted source file list.
@@ -22,7 +22,7 @@ type CacheEntry struct {
 	// ImportHash is the hash of the sorted import list.
 	ImportHash string `json:"import_hash"`
 
-	// BuckFileHash is the hash of the BUCK file contents.
+	// BuckFileHash is the hash of the rules.star file contents.
 	BuckFileHash string `json:"buck_file_hash"`
 
 	// LastCheck indicates whether the last check found staleness.
@@ -31,7 +31,7 @@ type CacheEntry struct {
 
 // Cache stores staleness check results to avoid redundant parsing.
 type Cache struct {
-	// entries maps BUCK file paths to their cache entries.
+	// entries maps rules.star file paths to their cache entries.
 	entries map[string]*CacheEntry
 
 	// dirty tracks whether the cache has been modified.
@@ -93,7 +93,7 @@ func (c *Cache) Save(path string) error {
 	return nil
 }
 
-// NeedsCheck returns true if the given BUCK file needs a staleness check.
+// NeedsCheck returns true if the given rules.star file needs a staleness check.
 // This compares the current source files and imports against cached hashes.
 func (c *Cache) NeedsCheck(buckFile string, srcFiles, imports []string) bool {
 	entry, ok := c.entries[buckFile]
@@ -113,7 +113,7 @@ func (c *Cache) NeedsCheck(buckFile string, srcFiles, imports []string) bool {
 		return true
 	}
 
-	// Check if BUCK file has changed
+	// Check if rules.star file has changed
 	buckHash, err := hashFile(buckFile)
 	if err != nil {
 		return true
@@ -125,7 +125,7 @@ func (c *Cache) NeedsCheck(buckFile string, srcFiles, imports []string) bool {
 	return false
 }
 
-// Update stores a new cache entry for the given BUCK file.
+// Update stores a new cache entry for the given rules.star file.
 func (c *Cache) Update(buckFile string, srcFiles, imports []string, wasStale bool) error {
 	buckHash, err := hashFile(buckFile)
 	if err != nil {
@@ -144,12 +144,12 @@ func (c *Cache) Update(buckFile string, srcFiles, imports []string, wasStale boo
 	return nil
 }
 
-// Get returns the cached entry for a BUCK file, or nil if not cached.
+// Get returns the cached entry for a rules.star file, or nil if not cached.
 func (c *Cache) Get(buckFile string) *CacheEntry {
 	return c.entries[buckFile]
 }
 
-// Remove deletes the cache entry for a BUCK file.
+// Remove deletes the cache entry for a rules.star file.
 func (c *Cache) Remove(buckFile string) {
 	if _, ok := c.entries[buckFile]; ok {
 		delete(c.entries, buckFile)
@@ -199,7 +199,7 @@ type CachedCheck struct {
 }
 
 // CheckGoPackage performs a cached staleness check on a Go package.
-// Returns whether the BUCK file is stale (needs regeneration).
+// Returns whether the rules.star file is stale (needs regeneration).
 func (cc *CachedCheck) CheckGoPackage() (*GoPackageResult, error) {
 	dir := filepath.Dir(cc.BuckFile)
 
@@ -262,10 +262,10 @@ func (cc *CachedCheck) CheckGoPackage() (*GoPackageResult, error) {
 
 // GoPackageResult contains the result of a Go package staleness check.
 type GoPackageResult struct {
-	// BuckFile is the path to the BUCK file.
+	// BuckFile is the path to the rules.star file.
 	BuckFile string
 
-	// Stale is true if the BUCK file needs regeneration.
+	// Stale is true if the rules.star file needs regeneration.
 	Stale bool
 
 	// FromCache is true if the result came from cache.
@@ -303,7 +303,7 @@ func DefaultCachePath() string {
 	return filepath.Join(cacheDir, "staleness-cache.json")
 }
 
-// FindBuckFiles finds all BUCK files in a directory tree.
+// FindBuckFiles finds all rules.star files in a directory tree.
 func FindBuckFiles(root string) ([]string, error) {
 	var buckFiles []string
 
@@ -321,7 +321,7 @@ func FindBuckFiles(root string) ([]string, error) {
 			return nil
 		}
 
-		if info.Name() == "BUCK" {
+		if info.Name() == "rules.star" {
 			buckFiles = append(buckFiles, path)
 		}
 

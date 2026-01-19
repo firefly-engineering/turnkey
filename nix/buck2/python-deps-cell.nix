@@ -1,7 +1,7 @@
 # Python dependencies cell builder
 #
 # Reads a python-deps.toml file and builds a Buck2 cell containing
-# all Python package dependencies with BUCK files for python_library targets.
+# all Python package dependencies with rules.star files for python_library targets.
 #
 # The TOML file format:
 #   [deps.package-name]

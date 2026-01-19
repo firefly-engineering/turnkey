@@ -18,12 +18,12 @@ This document describes the architecture for managing Go external dependencies t
 ```
 /nix/store/<hash>-go-deps-cell/
 ├── .buckconfig           # Cell identity
-├── BUCK                  # Root BUCK file with package list
+├── rules.star                  # Root rules.star file with package list
 └── vendor/
     └── github.com/
         └── spf13/
             └── cobra/
-                ├── BUCK           # go_library target
+                ├── rules.star           # go_library target
                 └── *.go           # Source files from Nix
 ```
 
@@ -38,15 +38,15 @@ The directory structure mirrors Go import paths, matching Buck2's conventions fo
     prelude = bundled://
 
 [buildfile]
-    name = BUCK
+    name = rules.star
 ```
 
-### Generated BUCK Files
+### Generated rules.star Files
 
 Each package gets a `go_library` target:
 
 ```python
-# vendor/github.com/spf13/cobra/BUCK
+# vendor/github.com/spf13/cobra/rules.star
 go_library(
     name = "cobra",
     srcs = glob(["*.go"], exclude = ["*_test.go"]),
@@ -59,10 +59,10 @@ go_library(
 )
 ```
 
-### User's BUCK File
+### User's rules.star File
 
 ```python
-# examples/hello-deps/BUCK
+# examples/hello-deps/rules.star
 go_binary(
     name = "hello",
     srcs = ["main.go"],
@@ -82,7 +82,7 @@ The `go_library` rule's `importpath = "github.com/spf13/cobra"` makes this work.
 
 ### Target Path Format Reference
 
-When writing BUCK files that depend on packages from the godeps cell, use this format:
+When writing rules.star files that depend on packages from the godeps cell, use this format:
 
 ```
 godeps//vendor/<import-path>:<target-name>
@@ -117,7 +117,7 @@ deps = ["godeps//vendor/github.com/pelletier/go-toml/v2:v2"]
 
 **Why the target name is the directory name:**
 
-Buck2 targets are named after the directory containing the BUCK file. For versioned Go modules like `go-toml/v2`, the BUCK file lives in the `v2/` directory, so the target is named `v2`, not `go-toml`. The `importpath` attribute in the generated BUCK file tells the Go compiler to use the correct import path.
+Buck2 targets are named after the directory containing the rules.star file. For versioned Go modules like `go-toml/v2`, the rules.star file lives in the `v2/` directory, so the target is named `v2`, not `go-toml`. The `importpath` attribute in the generated rules.star file tells the Go compiler to use the correct import path.
 
 ## Nix Integration
 
@@ -137,7 +137,7 @@ let
     # or use gomod2nix for proper vendoring
   ) deps;
 
-  # Generate BUCK file content for each dep
+  # Generate rules.star file content for each dep
   generateBuck = name: src: ''
     go_library(
       name = "${baseName name}",
@@ -151,13 +151,13 @@ in
 pkgs.runCommand "go-deps-cell" {} ''
   mkdir -p $out/vendor
 
-  # Copy sources and generate BUCK files
+  # Copy sources and generate rules.star files
   ${lib.concatStrings (lib.mapAttrsToList (name: src: ''
     mkdir -p $out/vendor/${name}
     cp -r ${src}/* $out/vendor/${name}/
-    cat > $out/vendor/${name}/BUCK <<'BUCK'
+    cat > $out/vendor/${name}/rules.star <<'rules.star'
     ${generateBuck name src}
-    BUCK
+    rules.star
   '') depSources)}
 
   # Generate cell .buckconfig
@@ -224,7 +224,7 @@ else null;
 
 ### 1. gomod2nix Integration
 
-Use `gomod2nix` to generate a Nix expression from go.mod, then convert to BUCK files.
+Use `gomod2nix` to generate a Nix expression from go.mod, then convert to rules.star files.
 
 **Pros**: Mature tooling, handles vendoring correctly
 **Cons**: Extra layer of abstraction

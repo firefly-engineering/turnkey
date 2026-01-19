@@ -13,13 +13,13 @@ import (
 
 // ImportResult contains the result of an import comparison.
 type ImportResult struct {
-	// Stale is true if the BUCK file's deps don't match actual imports.
+	// Stale is true if the rules.star file's deps don't match actual imports.
 	Stale bool
 
-	// BuckFile is the path to the BUCK file.
+	// BuckFile is the path to the rules.star file.
 	BuckFile string
 
-	// DeclaredDeps are the dependency targets declared in the BUCK file.
+	// DeclaredDeps are the dependency targets declared in the rules.star file.
 	DeclaredDeps []string
 
 	// ActualImports are the import paths found in Go source files.
@@ -33,20 +33,20 @@ type ImportResult struct {
 }
 
 // CheckGoImports compares the Go imports in source files against
-// the deps declared in the BUCK file for the go_library rule.
+// the deps declared in the rules.star file for the go_library rule.
 //
 // This parses Go source files using go/parser to extract import paths,
-// then compares against deps in the BUCK file.
+// then compares against deps in the rules.star file.
 func CheckGoImports(buckFile string) (*ImportResult, error) {
 	dir := filepath.Dir(buckFile)
 
-	// Parse declared deps from BUCK file
+	// Parse declared deps from rules.star file
 	declaredDeps, err := parseBuckDeps(buckFile, "go_library")
 	if err != nil {
 		return nil, err
 	}
 
-	// Get package name from BUCK file (for self-reference filtering)
+	// Get package name from rules.star file (for self-reference filtering)
 	pkgName, err := parseBuckPackageName(buckFile, "go_library")
 	if err != nil {
 		return nil, err
@@ -64,7 +64,7 @@ func CheckGoImports(buckFile string) (*ImportResult, error) {
 	return compareImportsAndDeps(buckFile, externalImports, declaredDeps), nil
 }
 
-// parseBuckDeps extracts the deps list from a specific rule type in a BUCK file.
+// parseBuckDeps extracts the deps list from a specific rule type in a rules.star file.
 func parseBuckDeps(buckFile, ruleType string) ([]string, error) {
 	content, err := os.ReadFile(buckFile)
 	if err != nil {
@@ -114,7 +114,7 @@ func parseBuckDeps(buckFile, ruleType string) ([]string, error) {
 	return deps, nil
 }
 
-// parseBuckPackageName extracts the package_name from a BUCK file.
+// parseBuckPackageName extracts the package_name from a rules.star file.
 func parseBuckPackageName(buckFile, ruleType string) (string, error) {
 	content, err := os.ReadFile(buckFile)
 	if err != nil {
