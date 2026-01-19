@@ -60,6 +60,12 @@
   jsdeps-gen = import ../packages/jsdeps-gen.nix { inherit pkgs lib; };
 
   # ==========================================================================
+  # Solidity toolchain
+  # ==========================================================================
+  solc = pkgs.solc;  # Solidity compiler
+  foundry = pkgs.foundry;  # Ethereum dev toolkit (forge, cast, anvil)
+
+  # ==========================================================================
   # Documentation tooling
   # ==========================================================================
   mdbook = pkgs.mdbook;

@@ -25,6 +25,10 @@ nodejs = {}
 typescript = {}
 biome = {}  # Fast linter and formatter for JS/TS/JSON
 
+# Solidity toolchain
+solc = {}      # Solidity compiler
+foundry = {}   # Ethereum dev toolkit (forge, cast, anvil)
+
 # Documentation tools
 mdbook = {}
 

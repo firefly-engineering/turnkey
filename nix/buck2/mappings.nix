@@ -208,6 +208,39 @@
     implicitDependencies = [ ];
   };
 
+  # Solidity smart contract toolchain
+  solidity = {
+    skip = false;
+    targets = [
+      {
+        name = "solidity";
+        rule = "system_solidity_toolchain";
+        load = "@prelude//solidity:toolchain.bzl";
+        visibility = [ "PUBLIC" ];
+        # Dynamic attrs resolved at build time from registry
+        dynamicAttrs = registry: {
+          solc_path = "${registry.solc}/bin/solc";
+          forge_path = "${registry.foundry}/bin/forge";
+          cast_path = "${registry.foundry}/bin/cast";
+          anvil_path = "${registry.foundry}/bin/anvil";
+        };
+      }
+    ];
+    implicitDependencies = [ ];
+  };
+
+  # solc is not a toolchain rule, used by solidity toolchain
+  solc = {
+    skip = true;
+    reason = "Solidity compiler, used as dependency of solidity toolchain";
+  };
+
+  # Foundry toolkit (forge, cast, anvil)
+  foundry = {
+    skip = true;
+    reason = "Ethereum dev toolkit, used as dependency of solidity toolchain";
+  };
+
   # ==========================================================================
   # Documentation Toolchains
   # ==========================================================================
