@@ -271,27 +271,27 @@ func TestDefaultCachePath(t *testing.T) {
 	origTurnkey := os.Getenv("TURNKEY_CACHE_DIR")
 	origXDG := os.Getenv("XDG_CACHE_HOME")
 	defer func() {
-		os.Setenv("TURNKEY_CACHE_DIR", origTurnkey)
-		os.Setenv("XDG_CACHE_HOME", origXDG)
+		_ = os.Setenv("TURNKEY_CACHE_DIR", origTurnkey)
+		_ = os.Setenv("XDG_CACHE_HOME", origXDG)
 	}()
 
 	// Test with TURNKEY_CACHE_DIR (highest priority)
-	os.Setenv("TURNKEY_CACHE_DIR", "/custom/cache")
-	os.Setenv("XDG_CACHE_HOME", "/xdg/cache")
+	_ = os.Setenv("TURNKEY_CACHE_DIR", "/custom/cache")
+	_ = os.Setenv("XDG_CACHE_HOME", "/xdg/cache")
 	path := DefaultCachePath()
 	if path != "/custom/cache/staleness-cache.json" {
 		t.Errorf("expected /custom/cache/staleness-cache.json, got %s", path)
 	}
 
 	// Test with XDG_CACHE_HOME (when TURNKEY_CACHE_DIR not set)
-	os.Unsetenv("TURNKEY_CACHE_DIR")
+	_ = os.Unsetenv("TURNKEY_CACHE_DIR")
 	path = DefaultCachePath()
 	if path != "/xdg/cache/turnkey/staleness-cache.json" {
 		t.Errorf("expected /xdg/cache/turnkey/staleness-cache.json, got %s", path)
 	}
 
 	// Test with default (~/.cache when XDG_CACHE_HOME not set)
-	os.Unsetenv("XDG_CACHE_HOME")
+	_ = os.Unsetenv("XDG_CACHE_HOME")
 	path = DefaultCachePath()
 	if !filepath.IsAbs(path) {
 		t.Errorf("expected absolute path, got %s", path)

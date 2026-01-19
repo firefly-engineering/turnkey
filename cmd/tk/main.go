@@ -10,8 +10,8 @@
 //	tk clean                   # passes through directly (no sync)
 //	tk --no-sync build ...     # skip sync, run buck2 directly
 //
-// The command lists (syncFirstCommands and passThroughCommands) are
-// configurable at the top of this file.
+// The passThroughCommands list is configurable at the top of this file.
+// All other commands (build, run, test, query, etc.) will sync first.
 package main
 
 import (
@@ -26,23 +26,9 @@ import (
 	"github.com/firefly-engineering/turnkey/go/pkg/syncer"
 )
 
-// syncFirstCommands are buck2 subcommands that read the build graph.
-// These commands will have sync run before them to ensure generated
-// files (rules.star files, dependency cells) are up-to-date.
-var syncFirstCommands = []string{
-	"build",
-	"run",
-	"test",
-	"query",
-	"cquery",
-	"uquery",
-	"targets",
-	"audit",
-	"bxl",
-}
-
 // passThroughCommands are buck2 subcommands that don't read the build
 // graph and can be passed through directly without syncing.
+// All other commands will have sync run before them.
 var passThroughCommands = []string{
 	"clean",
 	"kill",

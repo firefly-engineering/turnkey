@@ -244,10 +244,8 @@ func (cc *CachedCheck) CheckGoPackage() (*GoPackageResult, error) {
 
 	stale := srcResult.Stale || importResult.Stale
 
-	// Update cache
-	if err := cc.Cache.Update(cc.BuckFile, srcFiles, externalImports, stale); err != nil {
-		// Log error but don't fail the check
-	}
+	// Update cache (ignore errors - don't fail the check for cache issues)
+	_ = cc.Cache.Update(cc.BuckFile, srcFiles, externalImports, stale)
 
 	return &GoPackageResult{
 		BuckFile:     cc.BuckFile,

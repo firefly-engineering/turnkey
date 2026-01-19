@@ -82,7 +82,7 @@ func (p *GitHubPrefetcher) Prefetch(importPath, version string) (string, error) 
 	}
 
 	if p.Logger != nil {
-		fmt.Fprintf(p.Logger, "prefetching %s/%s@%s...\n", owner, repo, version)
+		_, _ = fmt.Fprintf(p.Logger, "prefetching %s/%s@%s...\n", owner, repo, version)
 	}
 
 	return runNixPrefetchGitHub(owner, repo, version)
@@ -109,7 +109,7 @@ func (p *GolangOrgPrefetcher) Prefetch(importPath, version string) (string, erro
 	repo := parts[2]
 
 	if p.Logger != nil {
-		fmt.Fprintf(p.Logger, "prefetching golang/%s@%s (from %s)...\n", repo, version, importPath)
+		_, _ = fmt.Fprintf(p.Logger, "prefetching golang/%s@%s (from %s)...\n", repo, version, importPath)
 	}
 
 	return runNixPrefetchGitHub("golang", repo, version)
@@ -135,7 +135,7 @@ func (p *GopkgInPrefetcher) Prefetch(importPath, version string) (string, error)
 	}
 
 	if p.Logger != nil {
-		fmt.Fprintf(p.Logger, "prefetching %s/%s@%s (from %s)...\n", owner, repo, version, importPath)
+		_, _ = fmt.Fprintf(p.Logger, "prefetching %s/%s@%s (from %s)...\n", owner, repo, version, importPath)
 	}
 
 	return runNixPrefetchGitHub(owner, repo, version)
@@ -207,7 +207,7 @@ func (p *UberGoPrefetcher) Prefetch(importPath, version string) (string, error) 
 	repo := parts[1]
 
 	if p.Logger != nil {
-		fmt.Fprintf(p.Logger, "prefetching uber-go/%s@%s (from %s)...\n", repo, version, importPath)
+		_, _ = fmt.Fprintf(p.Logger, "prefetching uber-go/%s@%s (from %s)...\n", repo, version, importPath)
 	}
 
 	return runNixPrefetchGitHub("uber-go", repo, version)
@@ -226,15 +226,14 @@ func (p *GoProxyPrefetcher) Supports(importPath string) bool {
 
 // Prefetch downloads the module zip from proxy.golang.org and computes the hash.
 func (p *GoProxyPrefetcher) Prefetch(importPath, version string) (string, error) {
-	// URL encode the module path (replace / with !)
-	escapedPath := strings.ReplaceAll(importPath, "/", "!")
-	// Handle uppercase letters in module paths (rare but possible)
-	escapedPath = escapeModulePath(importPath)
+	// URL encode the module path for proxy.golang.org
+	// Handles / -> ! conversion and uppercase -> !lowercase per module proxy protocol
+	escapedPath := escapeModulePath(importPath)
 
 	url := fmt.Sprintf("https://proxy.golang.org/%s/@v/%s.zip", escapedPath, version)
 
 	if p.Logger != nil {
-		fmt.Fprintf(p.Logger, "prefetching %s@%s from proxy.golang.org...\n", importPath, version)
+		_, _ = fmt.Fprintf(p.Logger, "prefetching %s@%s from proxy.golang.org...\n", importPath, version)
 	}
 
 	return runNixPrefetchURL(url)

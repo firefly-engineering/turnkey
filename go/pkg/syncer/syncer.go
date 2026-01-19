@@ -212,6 +212,6 @@ func (s *Syncer) regenerate(rule syncconfig.DepsRule) error {
 
 func (s *Syncer) printf(format string, args ...interface{}) {
 	if s.Output != nil {
-		fmt.Fprintf(s.Output, format, args...)
+		_, _ = fmt.Fprintf(s.Output, format, args...)
 	}
 }

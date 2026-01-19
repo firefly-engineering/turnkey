@@ -363,10 +363,8 @@ func (cc *CachedCheck) CheckRustPackage() (*RustPackageResult, error) {
 
 	stale := srcResult.Stale || useResult.Stale
 
-	// Update cache
-	if err := cc.Cache.Update(cc.BuckFile, srcFiles, externalUses, stale); err != nil {
-		// Log error but don't fail the check
-	}
+	// Update cache (ignore errors - don't fail the check for cache issues)
+	_ = cc.Cache.Update(cc.BuckFile, srcFiles, externalUses, stale)
 
 	return &RustPackageResult{
 		BuckFile:  cc.BuckFile,
