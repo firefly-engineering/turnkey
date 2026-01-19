@@ -207,4 +207,25 @@
     # TypeScript needs nodejs for running
     implicitDependencies = [ ];
   };
+
+  # ==========================================================================
+  # Documentation Toolchains
+  # ==========================================================================
+
+  mdbook = {
+    skip = false;
+    targets = [
+      {
+        name = "mdbook";
+        rule = "system_mdbook_toolchain";
+        load = "@prelude//mdbook:toolchain.bzl";
+        visibility = [ "PUBLIC" ];
+        # Dynamic attrs resolved at build time from registry
+        dynamicAttrs = registry: {
+          mdbook_path = "${registry.mdbook}/bin/mdbook";
+        };
+      }
+    ];
+    implicitDependencies = [ ];
+  };
 }

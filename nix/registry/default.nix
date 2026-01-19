@@ -23,4 +23,7 @@
 
   # Python testing
   pytest = pkgs.python3Packages.pytest;
+
+  # Documentation tooling
+  mdbook = pkgs.mdbook;
 }

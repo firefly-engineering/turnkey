@@ -18,6 +18,9 @@ reindeer = {}  # Tool for generating Buck2 targets from Cargo.toml
 nodejs = {}
 typescript = {}
 
+# Documentation tools
+mdbook = {}
+
 # Development utilities (not Buck2 toolchains)
 nix = {}
 pytest = {}  # Python test runner

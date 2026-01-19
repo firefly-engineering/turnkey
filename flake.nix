@@ -131,6 +131,8 @@
               # when wrapNativeTools = true (the default)
               # Python testing
               pytest = pkgs.python3Packages.pytest;
+              # Documentation tools
+              mdbook = pkgs.mdbook;
             };
             # Enable Buck2 toolchain generation
             buck2 = {
