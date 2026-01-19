@@ -4,9 +4,9 @@ python_binary(
     name = "gen-rust-buck",
     main = "__main__.py",
     deps = [
-        "//python/buck:buck",
-        "//python/cargo:cargo",
-        "//python/cfg:cfg",
+        "//src/python/buck:buck",
+        "//src/python/cargo:cargo",
+        "//src/python/cfg:cfg",
     ],
     visibility = ["PUBLIC"],
 )

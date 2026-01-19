@@ -22,8 +22,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/firefly-engineering/turnkey/go/pkg/syncconfig"
-	"github.com/firefly-engineering/turnkey/go/pkg/syncer"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/syncer"
 )
 
 // passThroughCommands are buck2 subcommands that don't read the build

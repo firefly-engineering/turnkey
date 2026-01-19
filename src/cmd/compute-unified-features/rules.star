@@ -4,8 +4,8 @@ python_binary(
     name = "compute-unified-features",
     main = "__main__.py",
     deps = [
-        "//python/cargo:cargo",
-        "//python/cfg:cfg",
+        "//src/python/cargo:cargo",
+        "//src/python/cfg:cfg",
     ],
     visibility = ["PUBLIC"],
 )

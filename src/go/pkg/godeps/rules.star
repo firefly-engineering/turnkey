@@ -3,7 +3,7 @@ load("@prelude//:rules.bzl", "go_library", "go_test")
 
 go_library(
     name = "godeps",
-    package_name = "github.com/firefly-engineering/turnkey/go/pkg/godeps",
+    package_name = "github.com/firefly-engineering/turnkey/src/go/pkg/godeps",
     srcs = [
         "output.go",
         "parser.go",
@@ -27,6 +27,6 @@ go_test(
     deps = [
         "godeps//vendor/golang.org/x/mod/modfile:modfile",
     ],
-    resources = ["//testdata:godeps_fixtures"],
+    resources = ["//src/testdata:godeps_fixtures"],
     target_under_test = ":godeps",
 )

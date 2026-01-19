@@ -17,7 +17,7 @@ pkgs.rustPlatform.buildRustPackage {
 
   src = cargoLib.prunedCargoSource {
     inherit root;
-    members = [ "cmd/soldeps-gen" ];
+    members = [ "src/cmd/soldeps-gen" ];
   };
 
   cargoLock = {

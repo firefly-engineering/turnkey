@@ -4,7 +4,7 @@ load("@prelude//:rules.bzl", "go_library", "go_test")
 
 go_library(
     name = "staleness",
-    package_name = "github.com/firefly-engineering/turnkey/go/pkg/staleness",
+    package_name = "github.com/firefly-engineering/turnkey/src/go/pkg/staleness",
     srcs = [
         "cache.go",
         "imports.go",

@@ -1054,7 +1054,7 @@ in
         files = "(Cargo\\.toml|rules\\.star)$";
         pass_filenames = false;
         entry = ''
-          ${pkgs.python3}/bin/python cmd/check-rust-edition/__main__.py
+          ${pkgs.python3}/bin/python src/cmd/check-rust-edition/__main__.py
         '';
       };
 
@@ -1066,7 +1066,7 @@ in
         files = "(go\\.mod|Cargo\\.toml|pyproject\\.toml|package\\.json)$";
         pass_filenames = false;
         entry = ''
-          ${pkgs.python3}/bin/python cmd/check-monorepo-deps/__main__.py
+          ${pkgs.python3}/bin/python src/cmd/check-monorepo-deps/__main__.py
         '';
       };
 

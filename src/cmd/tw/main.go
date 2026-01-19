@@ -27,9 +27,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/firefly-engineering/turnkey/go/pkg/snapshot"
-	"github.com/firefly-engineering/turnkey/go/pkg/syncconfig"
-	"github.com/firefly-engineering/turnkey/go/pkg/syncer"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/snapshot"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/syncer"
 )
 
 var (

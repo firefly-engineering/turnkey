@@ -15,7 +15,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/firefly-engineering/turnkey/go/pkg/godeps"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/godeps"
 )
 
 func main() {

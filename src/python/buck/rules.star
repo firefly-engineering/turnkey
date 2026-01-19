@@ -7,8 +7,8 @@ python_library(
         "generator.py",
     ],
     deps = [
-        "//python/cfg:cfg",
-        "//python/cargo:cargo",
+        "//src/python/cfg:cfg",
+        "//src/python/cargo:cargo",
     ],
     visibility = ["PUBLIC"],
 )

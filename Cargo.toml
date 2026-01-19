@@ -7,15 +7,15 @@
 [workspace]
 resolver = "2"
 members = [
-    "cmd/jsdeps-gen",
-    "cmd/nix-prefetch-cached",
-    "cmd/pydeps-gen",
-    "cmd/rustdeps-gen",
-    "cmd/rustfeatures-gen",
-    "cmd/soldeps-gen",
-    "examples/rust-hello",
-    "examples/rust-hello-deps",
-    "rust/prefetch-cache",
+    "src/cmd/jsdeps-gen",
+    "src/cmd/nix-prefetch-cached",
+    "src/cmd/pydeps-gen",
+    "src/cmd/rustdeps-gen",
+    "src/cmd/rustfeatures-gen",
+    "src/cmd/soldeps-gen",
+    "src/examples/rust-hello",
+    "src/examples/rust-hello-deps",
+    "src/rust/prefetch-cache",
 ]
 
 # Shared package metadata for all workspace members
@@ -41,4 +41,4 @@ toml = "0.8"
 ureq = { version = "2", features = ["json"] }
 
 # Workspace member references (for path dependencies between crates)
-prefetch-cache = { path = "rust/prefetch-cache" }
+prefetch-cache = { path = "src/rust/prefetch-cache" }

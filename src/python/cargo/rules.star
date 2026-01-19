@@ -8,7 +8,7 @@ python_library(
         "toml.py",
     ],
     deps = [
-        "//python/cfg:cfg",
+        "//src/python/cfg:cfg",
     ],
     visibility = ["PUBLIC"],
 )

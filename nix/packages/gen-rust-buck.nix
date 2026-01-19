@@ -12,11 +12,11 @@ let
   pythonSrc = lib.fileset.toSource {
     inherit root;
     fileset = lib.fileset.unions [
-      ../../python/__init__.py
-      ../../python/cfg
-      ../../python/cargo
-      ../../python/buck
-      ../../cmd/gen-rust-buck
+      ../../src/python/__init__.py
+      ../../src/python/cfg
+      ../../src/python/cargo
+      ../../src/python/buck
+      ../../src/cmd/gen-rust-buck
     ];
   };
 
@@ -27,8 +27,8 @@ pkgs.writeShellApplication {
   runtimeInputs = [ pkgs.python3 ];
 
   text = ''
-    export PYTHONPATH="${pythonSrc}"
-    exec python3 "${pythonSrc}/cmd/gen-rust-buck/__main__.py" "$@"
+    export PYTHONPATH="${pythonSrc}/src"
+    exec python3 "${pythonSrc}/src/cmd/gen-rust-buck/__main__.py" "$@"
   '';
 
   meta = {

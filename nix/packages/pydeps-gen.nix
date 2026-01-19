@@ -18,7 +18,7 @@ pkgs.rustPlatform.buildRustPackage {
 
   src = cargoLib.prunedCargoSource {
     inherit root;
-    members = [ "cmd/pydeps-gen" ];
+    members = [ "src/cmd/pydeps-gen" ];
   };
 
   cargoLock = {

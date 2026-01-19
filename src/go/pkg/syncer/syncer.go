@@ -14,8 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/firefly-engineering/turnkey/go/pkg/staleness"
-	"github.com/firefly-engineering/turnkey/go/pkg/syncconfig"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/staleness"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 )
 
 // Result represents the result of a sync operation.

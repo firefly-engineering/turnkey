@@ -8,7 +8,7 @@ rust_binary(
     deps = [
         "rustdeps//vendor/anyhow:anyhow",
         "rustdeps//vendor/clap:clap",
-        "//rust/prefetch-cache:prefetch-cache",
+        "//src/rust/prefetch-cache:prefetch-cache",
     ],
     visibility = ["PUBLIC"],
 )

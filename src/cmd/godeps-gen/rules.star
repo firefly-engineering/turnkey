@@ -5,7 +5,7 @@ go_binary(
     name = "godeps-gen",
     srcs = ["main.go"],
     deps = [
-        "//go/pkg/godeps:godeps",
+        "//src/go/pkg/godeps:godeps",
     ],
     visibility = ["PUBLIC"],
 )

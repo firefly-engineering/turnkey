@@ -17,7 +17,7 @@ tk build //path/to:target
 
 ```bash
 # Build a specific target
-tk build //examples/go-hello:go-hello
+tk build //src/examples/go-hello:go-hello
 
 # Build all targets
 tk build //...

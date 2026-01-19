@@ -12,10 +12,10 @@ let
   pythonSrc = lib.fileset.toSource {
     inherit root;
     fileset = lib.fileset.unions [
-      ../../python/__init__.py
-      ../../python/cfg
-      ../../python/cargo
-      ../../cmd/compute-unified-features
+      ../../src/python/__init__.py
+      ../../src/python/cfg
+      ../../src/python/cargo
+      ../../src/cmd/compute-unified-features
     ];
   };
 
@@ -26,8 +26,8 @@ pkgs.writeShellApplication {
   runtimeInputs = [ pkgs.python3 ];
 
   text = ''
-    export PYTHONPATH="${pythonSrc}"
-    exec python3 "${pythonSrc}/cmd/compute-unified-features/__main__.py" "$@"
+    export PYTHONPATH="${pythonSrc}/src"
+    exec python3 "${pythonSrc}/src/cmd/compute-unified-features/__main__.py" "$@"
   '';
 
   meta = {
