@@ -12,6 +12,7 @@
 
 - [toolchain.toml](./configuration/toolchain-toml.md)
 - [Buck2 Integration](./configuration/buck2-integration.md)
+- [The .turnkey Directory](./configuration/turnkey-directory.md)
 - [Shell Environment](./configuration/shell-environment.md)
 
 # Workflows

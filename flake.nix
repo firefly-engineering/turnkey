@@ -100,39 +100,11 @@
               default = ./toolchain.toml; # Creates devShells.default with buck2 + nix + beads + go
             };
             # Extend the default registry with packages from flake inputs
-            registry = {
-              buck2 = pkgs.buck2;
-              nix = pkgs.nix;
+            # (standard toolchains like buck2, nix, go, tk, etc. come from default registry)
+            registryExtensions = {
               beads = inputs.beads.packages.${system}.default;
               beads_viewer = inputs.beads_viewer.packages.${system}.default;
               jj = inputs.jj.packages.${system}.default;
-              # Language toolchains for Buck2 integration
-              go = pkgs.go;
-              rust = pkgs.rustc;
-              cargo = pkgs.cargo;
-              reindeer = pkgs.reindeer;
-              python = pkgs.python3;
-              uv = pkgs.uv;  # Python package manager for lock file generation
-              cxx = pkgs.stdenv.cc;
-              # Use clangUseLLVM which has lld integration for -fuse-ld=lld to work
-              clang = pkgs.llvmPackages.clangUseLLVM;
-              lld = pkgs.lld;
-              # JavaScript/TypeScript (no Buck2 toolchain, but available in shell for genrule)
-              nodejs = pkgs.nodejs;
-              typescript = pkgs.nodePackages.typescript;
-              # Internal tools
-              godeps-gen = config.packages.godeps-gen;
-              pydeps-gen = config.packages.pydeps-gen;
-              rustdeps-gen = config.packages.rustdeps-gen;
-              gobuckify = config.packages.gobuckify;
-              tk = config.packages.tk;
-              tw = config.packages.tw;
-              # Note: go, cargo, uv are automatically wrapped by flake-parts module
-              # when wrapNativeTools = true (the default)
-              # Python testing
-              pytest = pkgs.python3Packages.pytest;
-              # Documentation tools
-              mdbook = pkgs.mdbook;
             };
             # Enable Buck2 toolchain generation
             buck2 = {

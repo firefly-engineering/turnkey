@@ -44,7 +44,26 @@ in
           type = types.lazyAttrsOf types.package;
           default = { };
           defaultText = "Default registry from nix/registry";
-          description = "Default registry mapping toolchain names to packages (inherited by all shells)";
+          description = ''
+            Complete registry override. When set, replaces the default registry entirely.
+            Prefer using registryExtensions to add packages without duplicating defaults.
+          '';
+        };
+
+        registryExtensions = mkOption {
+          type = types.lazyAttrsOf types.package;
+          default = { };
+          example = lib.literalExpression ''
+            {
+              beads = inputs.beads.packages.''${system}.default;
+              myTool = pkgs.myTool;
+            }
+          '';
+          description = ''
+            Extend the default registry with additional packages.
+            These are merged on top of the default registry, so you only need
+            to specify additions rather than duplicating all defaults.
+          '';
         };
 
         wrapNativeTools = mkOption {
@@ -383,9 +402,20 @@ in
     let
       cfg = config.turnkey.toolchains;
 
-      # Load default registry if user didn't provide one
+      # Load default registry and merge with extensions
       defaultRegistry = import ../../registry { inherit pkgs lib; };
-      baseRegistry = if cfg.registry == { } then defaultRegistry else cfg.registry;
+
+      # Registry merging:
+      # 1. Start with default registry
+      # 2. Merge registryExtensions on top (allows adding packages without duplication)
+      # 3. If registry is explicitly set (non-empty), use that as complete override
+      baseRegistry =
+        if cfg.registry != { } then
+          # Complete override - user specified full registry
+          cfg.registry
+        else
+          # Default + extensions
+          defaultRegistry // cfg.registryExtensions;
 
       # Build the turnkey-prelude derivation (Nix-backed prelude cell)
       turnkeyPrelude = import ../../buck2/prelude.nix { inherit pkgs lib; };
