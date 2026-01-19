@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from .toml import (
+from python.cargo.toml import (
     parse_cargo_toml,
     get_crate_name,
     find_workspace_root,

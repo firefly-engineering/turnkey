@@ -6,6 +6,7 @@ python_library(
         "__init__.py",
         "generator.py",
     ],
+    base_module = "python.buck",
     deps = [
         "//src/python/cfg:cfg",
         "//src/python/cargo:cargo",

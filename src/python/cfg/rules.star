@@ -8,11 +8,13 @@ python_library(
         "parser.py",
         "target.py",
     ],
+    base_module = "python.cfg",
     visibility = ["PUBLIC"],
 )
 
 python_test(
     name = "test",
     srcs = ["test_parser.py"],
+    base_module = "python.cfg",
     deps = [":cfg"],
 )

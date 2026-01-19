@@ -7,6 +7,7 @@ python_library(
         "features.py",
         "toml.py",
     ],
+    base_module = "python.cargo",
     deps = [
         "//src/python/cfg:cfg",
     ],
