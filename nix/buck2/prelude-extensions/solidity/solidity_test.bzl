@@ -216,7 +216,7 @@ solidity_test = rule(
             doc = "Verbosity level (0-5, maps to forge -v flags)",
         ),
         "_solidity_toolchain": attrs.toolchain_dep(
-            default = "toolchains//:solidity",
+            default = "toolchains//:solc",
             providers = [SolidityToolchainInfo],
         ),
     },

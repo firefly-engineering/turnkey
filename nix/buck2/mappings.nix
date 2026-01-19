@@ -209,11 +209,12 @@
   };
 
   # Solidity smart contract toolchain
-  solidity = {
+  # Uses 'solc' as the toolchain name (matches registry entry)
+  solc = {
     skip = false;
     targets = [
       {
-        name = "solidity";
+        name = "solc";
         rule = "system_solidity_toolchain";
         load = "@prelude//solidity:toolchain.bzl";
         visibility = [ "PUBLIC" ];
@@ -227,12 +228,6 @@
       }
     ];
     implicitDependencies = [ ];
-  };
-
-  # solc is not a toolchain rule, used by solidity toolchain
-  solc = {
-    skip = true;
-    reason = "Solidity compiler, used as dependency of solidity toolchain";
   };
 
   # Foundry toolkit (forge, cast, anvil)

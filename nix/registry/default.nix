@@ -62,6 +62,9 @@
   # ==========================================================================
   # Solidity toolchain
   # ==========================================================================
+  # The 'solidity' entry is for the Buck2 toolchain - it provides solc in PATH
+  # Use 'solc' and 'foundry' directly if you need specific tools
+  solidity = pkgs.solc;  # Buck2 toolchain entry (provides solc)
   solc = pkgs.solc;  # Solidity compiler
   foundry = pkgs.foundry;  # Ethereum dev toolkit (forge, cast, anvil)
   soldeps-gen = import ../packages/soldeps-gen.nix { inherit pkgs lib; };

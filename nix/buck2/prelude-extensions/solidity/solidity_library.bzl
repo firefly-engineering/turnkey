@@ -166,7 +166,7 @@ solidity_library = rule(
             doc = "Number of optimizer runs (higher = optimized for more frequent calls)",
         ),
         "_solidity_toolchain": attrs.toolchain_dep(
-            default = "toolchains//:solidity",
+            default = "toolchains//:solc",
             providers = [SolidityToolchainInfo],
         ),
     },
