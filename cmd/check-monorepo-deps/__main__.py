@@ -262,9 +262,17 @@ def check_javascript(root: Path, errors: list[str]) -> None:
             dev_deps = config.get("devDependencies", {})
 
             direct_deps = []
-            for name, version in {**deps, **dev_deps}.items():
+            # Check both dictionaries independently to avoid merge masking violations
+            # (e.g., package in dependencies with direct version, devDependencies with workspace:*)
+            for name, version in deps.items():
                 if isinstance(version, str) and not version.startswith("workspace:"):
                     direct_deps.append(f"{name}@{version}")
+            for name, version in dev_deps.items():
+                if isinstance(version, str) and not version.startswith("workspace:"):
+                    # Only add if not already reported from dependencies
+                    key = f"{name}@{version}"
+                    if key not in direct_deps:
+                        direct_deps.append(key)
 
             if direct_deps:
                 errors.append(
