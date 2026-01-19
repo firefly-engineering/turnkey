@@ -6,7 +6,6 @@ Dependencies are managed via python-deps.toml and the pydeps cell.
 """
 
 import six
-import sys
 
 
 def main() -> None:

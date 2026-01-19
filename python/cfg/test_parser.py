@@ -226,7 +226,7 @@ if __name__ == "__main__":
                     getattr(test_class, name)()
                     print(f"  PASS: {test_class.__class__.__name__}.{name}")
                     passed += 1
-                except AssertionError as e:
+                except AssertionError:
                     print(f"  FAIL: {test_class.__class__.__name__}.{name}")
                     traceback.print_exc()
                     failed += 1
