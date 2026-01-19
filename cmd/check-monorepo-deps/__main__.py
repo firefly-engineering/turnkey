@@ -183,15 +183,14 @@ def check_rust_deps_section(
             elif isinstance(dep_spec, dict):
                 if not dep_spec.get("workspace"):
                     # Has attributes but not workspace = true
+                    # Since ws_dep is not None, this dep exists in workspace.dependencies
+                    # (possibly via normalized name), so it must use workspace = true
                     if "version" in dep_spec:
                         errors.append(
                             f"rust: {cargo_path} [{section}] {dep_name} has version = \"{dep_spec['version']}\" - "
                             f"should use '{dep_name}.workspace = true' (defined in workspace.dependencies)"
                         )
-                    elif "path" in dep_spec and dep_name not in workspace_deps:
-                        # Path deps that aren't in workspace are OK
-                        pass
-                    elif not dep_spec.get("workspace"):
+                    else:
                         errors.append(
                             f"rust: {cargo_path} [{section}] {dep_name} - "
                             f"should use '{dep_name}.workspace = true' (defined in workspace.dependencies)"
