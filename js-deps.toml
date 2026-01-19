@@ -1,0 +1,15 @@
+[meta]
+generator = "jsdeps-gen 0.1.0"
+lockfile_version = "9.0"
+
+[[package]]
+name = "@types/lodash"
+version = "4.17.23"
+url = "https://registry.npmjs.org/@types%2flodash/-/lodash-4.17.23.tgz"
+integrity = "sha512-RDvF6wTulMPjrNdCoYRC8gNR880JNGT8uB+REUpC2Ns4pRqQJhGz90wh7rgdXDPpCczF3VGktDuFGVnz8zP7HA=="
+
+[[package]]
+name = "lodash"
+version = "4.17.21"
+url = "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz"
+integrity = "sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg=="

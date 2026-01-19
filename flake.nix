@@ -90,6 +90,7 @@
           packages.tk = import ./nix/packages/tk.nix { inherit pkgs lib; };
           packages.tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
           packages.e2e-runner = import ./nix/packages/e2e-runner.nix { inherit pkgs lib; };
+          packages.jsdeps-gen = import ./nix/packages/jsdeps-gen.nix { inherit pkgs lib; };
           packages.turnkey-prelude = import ./nix/buck2/prelude.nix { inherit pkgs lib; };
 
           # Configure turnkey to use our local toolchain files
@@ -130,6 +131,12 @@
               python = {
                 enable = true;
                 depsFile = ./python-deps.toml; # Python package dependencies
+              };
+
+              # JavaScript/TypeScript dependencies
+              javascript = {
+                enable = true;
+                depsFile = ./js-deps.toml; # npm package dependencies
               };
             };
           };
