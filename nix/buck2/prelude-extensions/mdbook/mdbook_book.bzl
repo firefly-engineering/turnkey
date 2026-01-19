@@ -17,155 +17,124 @@ def _mdbook_book_impl(ctx: AnalysisContext) -> list[Provider]:
     # Declare output directory for the built book
     out_dir = ctx.actions.declare_output("book", dir = True)
 
-    # Create a build directory that mirrors the expected mdbook structure
-    build_dir = ctx.actions.declare_output("_build", dir = True)
-
-    # Collect all source files
-    all_srcs = list(ctx.attrs.srcs)
-    if ctx.attrs.book_toml:
-        all_srcs.append(ctx.attrs.book_toml)
-
-    # Create a script that:
-    # 1. Sets up the build directory with proper structure
-    # 2. Runs mdbook build
-    # 3. Copies output to the declared output directory
+    # Create a build script that sets up the directory structure and runs mdbook
     build_script = ctx.actions.declare_output("build.sh")
 
-    # Build the copy commands for source files
-    # We need to recreate the directory structure under _build/src/
-    copy_commands = []
-    for src in ctx.attrs.srcs:
-        # Get the path relative to the source root
-        src_path = src.short_path
-        copy_commands.append('mkdir -p "_build/$(dirname "{}")"'.format(src_path))
-        copy_commands.append('cp "${{SRCS[{}]}}" "_build/{}"'.format(len(copy_commands) // 2, src_path))
-
-    script_content = """\
-#!/bin/bash
-set -euo pipefail
-
-# Create build directory structure
-mkdir -p _build
-
-# Copy book.toml
-cp "$BOOK_TOML" _build/book.toml
-
-# Copy source files preserving directory structure
-{copy_commands}
-
-# Run mdbook build
-cd _build
-"$MDBOOK" build --dest-dir "$OUT_DIR"
-""".format(copy_commands = "\n".join(copy_commands) if copy_commands else "# No source files")
-
-    ctx.actions.write(
-        build_script,
-        script_content,
-        is_executable = True,
-    )
-
-    # Build the mdbook command
-    build_cmd = cmd_args(
-        "/bin/bash",
-        build_script,
-    )
-
-    # Set environment variables for the script
-    build_cmd.add(cmd_args(hidden = [
-        cmd_args(toolchain.mdbook.args, format = "MDBOOK={}"),
-        cmd_args(ctx.attrs.book_toml, format = "BOOK_TOML={}") if ctx.attrs.book_toml else cmd_args(),
-        cmd_args(out_dir.as_output(), format = "OUT_DIR={}"),
-    ]))
-
-    # Add source files as hidden dependencies
-    build_cmd.add(cmd_args(hidden = all_srcs))
-
-    # Actually, let's use a simpler approach - create a proper action
-    # that copies files and runs mdbook
-
-    # Simpler approach: use ctx.actions.run with proper args
-    run_cmd = cmd_args()
-    run_cmd.add("/bin/bash")
-    run_cmd.add("-c")
-
-    # Build inline script
-    inline_script = cmd_args(
-        "set -euo pipefail;",
-        "BUILD_DIR=$(mktemp -d);",
-        "trap 'rm -rf \"$BUILD_DIR\"' EXIT;",
-        cmd_args(ctx.attrs.book_toml, format = "cp {} \"$BUILD_DIR/book.toml\";"),
-        "mkdir -p \"$BUILD_DIR/src\";",
-        delimiter = " ",
-    )
-
-    # Copy each source file
-    for src in ctx.attrs.srcs:
-        inline_script.add(cmd_args(
-            src,
-            format = "mkdir -p \"$BUILD_DIR/$(dirname {})\" && cp {} \"$BUILD_DIR/{}\";".format(
-                src.short_path, "{}", src.short_path
-            ),
-        ))
-
-    # Run mdbook build
-    inline_script.add(cmd_args(
-        toolchain.mdbook.args,
-        out_dir.as_output(),
-        format = "cd \"$BUILD_DIR\" && {} build --dest-dir {};",
-    ))
-
-    run_cmd.add(inline_script)
-
-    ctx.actions.run(
-        run_cmd,
-        category = "mdbook_build",
-        identifier = ctx.label.name,
-        local_only = True,  # mdbook may have issues with sandboxing
-    )
-
-    # Create RunInfo for `buck2 run` that serves the book
-    # mdbook serve needs the source directory, not the built output
-    # So we'll create a script that builds and serves
-    serve_script = ctx.actions.declare_output("serve.sh")
-    serve_script_content = cmd_args(
-        "#!/bin/bash",
+    # Build script content
+    script_lines = [
+        "#!/usr/bin/env bash",
         "set -euo pipefail",
         "",
-        "# Create temporary directory with book structure",
+        "# Arguments: mdbook_path out_dir book_toml src_files...",
+        "MDBOOK=$1",
+        "OUT_DIR=$2",
+        "BOOK_TOML=$3",
+        "shift 3",
+        "",
+        "# Make output path absolute",
+        'OUT_DIR_ABS="$(pwd)/$OUT_DIR"',
+        "",
+        "# Create temp build directory",
         "BUILD_DIR=$(mktemp -d)",
         'trap \'rm -rf "$BUILD_DIR"\' EXIT',
         "",
-        cmd_args(ctx.attrs.book_toml, format = "cp {} \"$BUILD_DIR/book.toml\""),
-        "mkdir -p \"$BUILD_DIR/src\"",
-        delimiter = "\n",
-    )
-
-    # Add copy commands for source files
-    for src in ctx.attrs.srcs:
-        serve_script_content.add(cmd_args(
-            src,
-            format = "mkdir -p \"$BUILD_DIR/$(dirname {})\" && cp {} \"$BUILD_DIR/{}\"".format(
-                src.short_path, "{}", src.short_path
-            ),
-        ))
-
-    serve_script_content.add(cmd_args(
+        "# Copy book.toml",
+        'cp "$BOOK_TOML" "$BUILD_DIR/book.toml"',
         "",
-        "cd \"$BUILD_DIR\"",
-        cmd_args(toolchain.mdbook.args, format = "{} serve \"$@\""),
-        delimiter = "\n",
-    ))
+        "# Copy source files preserving directory structure",
+        'for src in "$@"; do',
+        '    # Get relative path (remove leading directory components to get src/...)',
+        '    rel_path="${src#*/src/}"',
+        '    if [[ "$src" == *"/src/"* ]]; then',
+        '        rel_path="src/$rel_path"',
+        '    fi',
+        '    mkdir -p "$BUILD_DIR/$(dirname "$rel_path")"',
+        '    cp "$src" "$BUILD_DIR/$rel_path"',
+        "done",
+        "",
+        "# Run mdbook build",
+        'cd "$BUILD_DIR"',
+        '"$MDBOOK" build --dest-dir "$OUT_DIR_ABS"',
+    ]
 
     ctx.actions.write(
-        serve_script,
-        serve_script_content,
+        build_script,
+        "\n".join(script_lines),
         is_executable = True,
     )
 
-    # RunInfo that serves the book directory
-    run_info = RunInfo(
-        args = cmd_args(serve_script),
+    # Build command
+    build_cmd = cmd_args(build_script)
+    build_cmd.add(toolchain.mdbook.args)
+    build_cmd.add(out_dir.as_output())
+    build_cmd.add(ctx.attrs.book_toml)
+    for src in ctx.attrs.srcs:
+        build_cmd.add(src)
+
+    ctx.actions.run(
+        build_cmd,
+        category = "mdbook_build",
+        identifier = ctx.label.name,
+        local_only = True,
     )
+
+    # Create serve script for `buck2 run`
+    serve_script = ctx.actions.declare_output("serve.sh")
+
+    serve_lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        "# Arguments: mdbook_path book_toml src_files... -- [serve args]",
+        "MDBOOK=$1",
+        "BOOK_TOML=$2",
+        "shift 2",
+        "",
+        "# Collect source files until --",
+        "SRCS=()",
+        'while [[ $# -gt 0 && "$1" != "--" ]]; do',
+        '    SRCS+=("$1")',
+        "    shift",
+        "done",
+        '[ "$1" = "--" ] && shift  # Skip the --',
+        "",
+        "# Create temp build directory",
+        "BUILD_DIR=$(mktemp -d)",
+        'trap \'rm -rf "$BUILD_DIR"\' EXIT',
+        "",
+        "# Copy book.toml",
+        'cp "$BOOK_TOML" "$BUILD_DIR/book.toml"',
+        "",
+        "# Copy source files",
+        'for src in "${SRCS[@]}"; do',
+        '    rel_path="${src#*/src/}"',
+        '    if [[ "$src" == *"/src/"* ]]; then',
+        '        rel_path="src/$rel_path"',
+        '    fi',
+        '    mkdir -p "$BUILD_DIR/$(dirname "$rel_path")"',
+        '    cp "$src" "$BUILD_DIR/$rel_path"',
+        "done",
+        "",
+        "# Run mdbook serve",
+        'cd "$BUILD_DIR"',
+        '"$MDBOOK" serve "$@"',
+    ]
+
+    ctx.actions.write(
+        serve_script,
+        "\n".join(serve_lines),
+        is_executable = True,
+    )
+
+    # RunInfo for serve
+    serve_cmd = cmd_args(serve_script)
+    serve_cmd.add(toolchain.mdbook.args)
+    serve_cmd.add(ctx.attrs.book_toml)
+    for src in ctx.attrs.srcs:
+        serve_cmd.add(src)
+    serve_cmd.add("--")
+
+    run_info = RunInfo(args = serve_cmd)
 
     book_info = MdbookBookInfo(
         output_dir = out_dir,
@@ -180,7 +149,7 @@ cd _build
                 "serve": [DefaultInfo(default_output = serve_script), run_info],
             },
         ),
-        run_info,  # Default run action is serve
+        run_info,
         book_info,
     ]
 

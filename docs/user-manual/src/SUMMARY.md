@@ -1,0 +1,33 @@
+# Summary
+
+[Introduction](./introduction.md)
+
+# Getting Started
+
+- [Installation](./getting-started/installation.md)
+- [Quick Start](./getting-started/quick-start.md)
+- [Project Setup](./getting-started/project-setup.md)
+
+# Configuration
+
+- [toolchain.toml](./configuration/toolchain-toml.md)
+- [Buck2 Integration](./configuration/buck2-integration.md)
+- [Shell Environment](./configuration/shell-environment.md)
+
+# Workflows
+
+- [Building Projects](./workflows/building.md)
+- [Running Tests](./workflows/testing.md)
+- [Managing Dependencies](./workflows/dependencies.md)
+
+# Language Support
+
+- [Go](./languages/go.md)
+- [Rust](./languages/rust.md)
+- [Python](./languages/python.md)
+- [TypeScript](./languages/typescript.md)
+
+# Reference
+
+- [CLI Commands](./reference/cli.md)
+- [Troubleshooting](./reference/troubleshooting.md)

@@ -1,0 +1,12 @@
+[book]
+title = "Turnkey User Manual"
+authors = ["Firefly Engineering"]
+description = "User guide for Turnkey toolchain management"
+language = "en"
+
+[build]
+build-dir = "book"
+
+[output.html]
+git-repository-url = "https://github.com/firefly-engineering/turnkey"
+edit-url-template = "https://github.com/firefly-engineering/turnkey/edit/main/docs/user-manual/{path}"
