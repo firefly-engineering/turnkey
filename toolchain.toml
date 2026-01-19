@@ -33,6 +33,9 @@ soldeps-gen = {}  # Tool for generating solidity-deps.toml from foundry.toml
 # Documentation tools
 mdbook = {}
 
+# Data templating
+jsonnet = {}  # Jsonnet to JSON compiler
+
 # Development utilities (not Buck2 toolchains)
 nix = {}
 pytest = {}  # Python test runner

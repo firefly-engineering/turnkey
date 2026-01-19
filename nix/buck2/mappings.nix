@@ -265,4 +265,24 @@
     ];
     implicitDependencies = [ ];
   };
+
+  # ==========================================================================
+  # Data Templating Toolchains
+  # ==========================================================================
+
+  jsonnet = {
+    skip = false;
+    targets = [
+      {
+        name = "jsonnet";
+        rule = "system_jsonnet_toolchain";
+        load = "@prelude//jsonnet:toolchain.bzl";
+        visibility = [ "PUBLIC" ];
+        dynamicAttrs = registry: {
+          jsonnet_path = "${registry.jsonnet}/bin/jsonnet";
+        };
+      }
+    ];
+    implicitDependencies = [ ];
+  };
 }
