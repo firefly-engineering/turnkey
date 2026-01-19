@@ -1,18 +1,7 @@
 # Solidity example - ERC20 Token with OpenZeppelin dependencies
 #
 # This example demonstrates Solidity dependency management with external packages.
-# To build this example, you need to:
-#
-# 1. Enable Solidity deps in your flake.nix:
-#    turnkey.buck2.solidity = {
-#      enable = true;
-#      depsFile = ./solidity-deps.toml;
-#    };
-#
-# 2. Ensure solidity-deps.toml has been generated from foundry.toml:
-#    soldeps-gen --foundry-toml foundry.toml --output solidity-deps.toml
-#
-# 3. Re-enter your devenv shell to regenerate the soldeps cell
+# Dependencies are declared in the root solidity-deps.toml (monorepo pattern).
 
 load("@prelude//solidity:solidity.bzl", "solidity_contract", "solidity_library", "solidity_test")
 
@@ -21,11 +10,10 @@ solidity_library(
     name = "token_lib",
     srcs = ["src/MyToken.sol"],
     deps = [
-        "//soldeps:openzeppelin_contracts",
+        "soldeps//:openzeppelin_contracts",
     ],
-    remappings = {
-        "@openzeppelin/contracts/": "//soldeps:openzeppelin_contracts/contracts/",
-    },
+    # Auto-generate remappings from the soldeps cell
+    soldeps_cell = ".turnkey/soldeps",
     optimizer = True,
     optimizer_runs = 200,
     visibility = ["PUBLIC"],
@@ -45,12 +33,10 @@ solidity_test(
     srcs = ["test/MyToken.t.sol"],
     deps = [
         ":token_lib",
-        "//soldeps:forge_std",
+        "soldeps//:forge_std",
     ],
-    remappings = {
-        "@openzeppelin/contracts/": "//soldeps:openzeppelin_contracts/contracts/",
-        "forge-std/": "//soldeps:forge_std/src/",
-    },
+    # Auto-generate remappings from the soldeps cell
+    soldeps_cell = ".turnkey/soldeps",
     fuzz_runs = 256,
     visibility = ["PUBLIC"],
 )

@@ -11,6 +11,7 @@ def _solidity_test_impl(ctx: AnalysisContext) -> list[Provider]:
     """Implementation of solidity_test rule.
 
     Runs Solidity tests using Foundry's forge test command.
+    Remappings are auto-generated from soldeps_cell if provided.
     """
     toolchain = ctx.attrs._solidity_toolchain[SolidityToolchainInfo]
 
@@ -34,16 +35,17 @@ def _solidity_test_impl(ctx: AnalysisContext) -> list[Provider]:
                 for output in default_info.default_outputs:
                     dep_artifacts.append(output)
 
-    # Merge remappings
+    # Merge remappings from deps and explicit remappings
     all_remappings = merge_remappings(ctx.attrs.remappings, dep_infos)
 
     # Create test script that sets up forge project structure
     test_script = ctx.actions.declare_output("run_tests.sh")
 
-    # Build remappings for remappings.txt
+    # Build explicit remappings for embedding (non-Buck-target style only)
     remappings_lines = []
     for prefix, target in all_remappings.items():
-        remappings_lines.append("{}={}".format(prefix, target))
+        if not target.startswith("//") and not target.startswith("@") and ":" not in target:
+            remappings_lines.append("{}={}".format(prefix, target))
     remappings_content = "\\n".join(remappings_lines)
 
     # Build forge test arguments
@@ -81,24 +83,30 @@ mkdir -p "$WORK_DIR/src"
 mkdir -p "$WORK_DIR/test"
 mkdir -p "$WORK_DIR/lib"
 
-# Copy test sources
+# Parse arguments
 TEST_SRCS=()
-FOUND_TESTS=0
 DEP_SRCS=()
+SOLDEPS_CELL=""
+MODE="none"
+
 for arg in "$@"; do
     if [[ "$arg" == "--test-srcs" ]]; then
-        FOUND_TESTS=1
+        MODE="test"
         continue
     fi
     if [[ "$arg" == "--dep-srcs" ]]; then
-        FOUND_TESTS=2
+        MODE="dep"
         continue
     fi
-    if [[ "$FOUND_TESTS" == "1" ]]; then
-        TEST_SRCS+=("$arg")
-    elif [[ "$FOUND_TESTS" == "2" ]]; then
-        DEP_SRCS+=("$arg")
+    if [[ "$arg" == "--soldeps-cell" ]]; then
+        MODE="soldeps"
+        continue
     fi
+    case "$MODE" in
+        test) TEST_SRCS+=("$arg") ;;
+        dep) DEP_SRCS+=("$arg") ;;
+        soldeps) SOLDEPS_CELL="$arg"; MODE="none" ;;
+    esac
 done
 
 # Copy test files
@@ -117,10 +125,31 @@ for src in "${DEP_SRCS[@]}"; do
     fi
 done
 
-# Create remappings.txt
-cat > "$WORK_DIR/remappings.txt" << 'REMAPPINGS'
-""" + remappings_content + """
-REMAPPINGS
+# Build remappings.txt - auto-generate from soldeps cell if available
+REMAPPINGS_CONTENT=""
+
+# Auto-generate remappings from soldeps cell's remappings.txt
+if [[ -n "$SOLDEPS_CELL" && -f "$SOLDEPS_CELL/remappings.txt" ]]; then
+    while IFS= read -r line; do
+        if [[ -n "$line" && ! "$line" =~ ^# ]]; then
+            # Convert relative path in remapping to absolute path
+            # Format: prefix=vendor/package/ -> prefix=/abs/path/to/cell/vendor/package/
+            PREFIX="${line%%=*}"
+            RELPATH="${line#*=}"
+            ABSPATH="$(realpath "$SOLDEPS_CELL")/$RELPATH"
+            REMAPPINGS_CONTENT+="${PREFIX}=${ABSPATH}"$'\\n'
+        fi
+    done < "$SOLDEPS_CELL/remappings.txt"
+fi
+
+# Add any additional explicit remappings
+EXPLICIT_REMAPPINGS='""" + remappings_content + """'
+if [[ -n "$EXPLICIT_REMAPPINGS" ]]; then
+    REMAPPINGS_CONTENT+="$EXPLICIT_REMAPPINGS"
+fi
+
+# Write remappings.txt
+echo -e "$REMAPPINGS_CONTENT" > "$WORK_DIR/remappings.txt"
 
 # Create minimal foundry.toml
 cat > "$WORK_DIR/foundry.toml" << 'FOUNDRY'
@@ -156,6 +185,11 @@ cd "$WORK_DIR"
     for artifact in dep_artifacts:
         test_cmd.add(artifact)
 
+    # Add soldeps cell path if provided
+    if ctx.attrs.soldeps_cell:
+        test_cmd.add("--soldeps-cell")
+        test_cmd.add(ctx.attrs.soldeps_cell)
+
     # Create run info for test execution
     run_info = RunInfo(args = test_cmd)
 
@@ -181,11 +215,16 @@ solidity_test = rule(
             default = [],
             doc = "Dependencies (solidity_library targets or filegroups from soldeps)",
         ),
+        "soldeps_cell": attrs.option(
+            attrs.string(),
+            default = None,
+            doc = "Path to the soldeps cell directory. When set, remappings are auto-generated from the cell's remappings.txt.",
+        ),
         "remappings": attrs.dict(
             key = attrs.string(),
             value = attrs.string(),
             default = {},
-            doc = "Import remappings for test files",
+            doc = "Additional import remappings. Usually not needed when using soldeps_cell.",
         ),
         "fuzz_runs": attrs.option(
             attrs.int(),

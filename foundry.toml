@@ -1,0 +1,18 @@
+# Root-level Foundry configuration for turnkey monorepo
+# This declares Solidity dependencies used by all examples.
+#
+# Individual examples may have their own foundry.toml for local development,
+# but the soldeps cell is built from the root solidity-deps.toml.
+
+[profile.default]
+src = "examples"
+test = "examples"
+libs = ["lib"]
+out = "out"
+
+# Shared dependencies used across examples
+[dependencies]
+forge-std = "https://github.com/foundry-rs/forge-std@v1.8.0"
+
+# Note: npm dependencies like @openzeppelin/contracts are added via
+# the package.json/pnpm-lock.yaml. soldeps-gen can read both sources.

@@ -10,7 +10,8 @@ load(":providers.bzl", "SolidityLibraryInfo", "SolidityToolchainInfo", "get_tran
 def _solidity_library_impl(ctx: AnalysisContext) -> list[Provider]:
     """Implementation of solidity_library rule.
 
-    Compiles Solidity sources using solc with Standard JSON I/O.
+    Compiles Solidity sources using solc with automatic remapping generation.
+    Remappings are auto-generated from soldeps dependencies - no manual config needed.
     """
     toolchain = ctx.attrs._solidity_toolchain[SolidityToolchainInfo]
 
@@ -24,9 +25,11 @@ def _solidity_library_impl(ctx: AnalysisContext) -> list[Provider]:
     # Declare output directory for compiled artifacts
     out_dir = ctx.actions.declare_output("artifacts", dir = True)
 
-    # Collect dependency info
+    # Collect dependency info and artifacts
     dep_infos = []
     dep_artifacts = []
+    soldeps_dirs = []  # Track soldeps cell directories for auto-remapping
+
     for dep in ctx.attrs.deps:
         if SolidityLibraryInfo in dep:
             dep_info = dep[SolidityLibraryInfo]
@@ -39,6 +42,9 @@ def _solidity_library_impl(ctx: AnalysisContext) -> list[Provider]:
             if default_info.default_outputs:
                 for output in default_info.default_outputs:
                     dep_artifacts.append(output)
+                    # Track if this looks like a soldeps dependency
+                    # The output will be the filegroup's files, but we need the cell root
+                    soldeps_dirs.append(output)
 
     # Merge remappings from deps and explicit remappings
     all_remappings = merge_remappings(ctx.attrs.remappings, dep_infos)
@@ -46,17 +52,12 @@ def _solidity_library_impl(ctx: AnalysisContext) -> list[Provider]:
     # Create build script for compilation
     build_script = ctx.actions.declare_output("compile.sh")
 
-    # Build remappings arguments
-    remappings_args = []
-    for prefix, target in all_remappings.items():
-        remappings_args.append('"{}"'.format("{}={}".format(prefix, target)))
-    remappings_str = " ".join(remappings_args)
-
     # Build optimizer settings
     optimizer_args = ""
     if ctx.attrs.optimizer:
         optimizer_args = '"--optimize" "--optimize-runs" "{}"'.format(ctx.attrs.optimizer_runs)
 
+    # The script auto-generates remappings from the soldeps remappings.txt
     script_content = """#!/usr/bin/env bash
 set -euo pipefail
 
@@ -64,30 +65,70 @@ SOLC="$1"
 OUT_DIR="$2"
 shift 2
 
-# Collect source files
+# Parse args - sources come first, then --soldeps-cell <path>, then --remappings <extra>
 SRCS=()
+SOLDEPS_CELL=""
+EXTRA_REMAPPINGS=()
+MODE="srcs"
+
 for arg in "$@"; do
-    SRCS+=("$arg")
+    if [[ "$arg" == "--soldeps-cell" ]]; then
+        MODE="soldeps"
+        continue
+    fi
+    if [[ "$arg" == "--remappings" ]]; then
+        MODE="remappings"
+        continue
+    fi
+    if [[ "$MODE" == "srcs" ]]; then
+        SRCS+=("$arg")
+    elif [[ "$MODE" == "soldeps" ]]; then
+        SOLDEPS_CELL="$arg"
+        MODE="srcs"  # Reset after reading the cell path
+    elif [[ "$MODE" == "remappings" ]]; then
+        EXTRA_REMAPPINGS+=("$arg")
+    fi
 done
 
 # Create output directory
 mkdir -p "$OUT_DIR"
 
-# Run solc for each source file
-# Using combined-json output for simplicity
+# Build remapping flags
+REMAPPING_FLAGS=()
+
+# Auto-generate remappings from soldeps cell's remappings.txt
+if [[ -n "$SOLDEPS_CELL" && -f "$SOLDEPS_CELL/remappings.txt" ]]; then
+    while IFS= read -r line; do
+        if [[ -n "$line" && ! "$line" =~ ^# ]]; then
+            # Convert relative path in remapping to absolute path
+            # Format: prefix=vendor/package/ -> prefix=/abs/path/to/cell/vendor/package/
+            PREFIX="${line%%=*}"
+            RELPATH="${line#*=}"
+            ABSPATH="$(realpath "$SOLDEPS_CELL")/$RELPATH"
+            REMAPPING_FLAGS+=("${PREFIX}=${ABSPATH}")
+        fi
+    done < "$SOLDEPS_CELL/remappings.txt"
+fi
+
+# Add any extra explicit remappings
+for remap in "${EXTRA_REMAPPINGS[@]}"; do
+    REMAPPING_FLAGS+=("$remap")
+done
+
+# Run solc with combined-json output
 "$SOLC" \\
     --combined-json abi,bin,bin-runtime,srcmap,srcmap-runtime,metadata \\
     """ + optimizer_args + """ \\
-    """ + remappings_str + """ \\
+    "${REMAPPING_FLAGS[@]}" \\
     --output-dir "$OUT_DIR" \\
     --overwrite \\
     "${SRCS[@]}"
 
-# Also generate individual contract files for convenience
+# Also generate individual contract files
 "$SOLC" \\
     --abi --bin --bin-runtime --metadata \\
     """ + optimizer_args + """ \\
-    """ + remappings_str + """ \\
+    "${REMAPPING_FLAGS[@]}" \\
     --output-dir "$OUT_DIR" \\
     --overwrite \\
     "${SRCS[@]}"
@@ -104,8 +145,22 @@ mkdir -p "$OUT_DIR"
     compile_cmd.add(solc.args)
     compile_cmd.add(out_dir.as_output())
 
+    # Add source files
     for src in ctx.attrs.srcs:
         compile_cmd.add(src)
+
+    # Add soldeps cell path if we have a soldeps_cell attribute
+    if ctx.attrs.soldeps_cell:
+        compile_cmd.add("--soldeps-cell")
+        compile_cmd.add(ctx.attrs.soldeps_cell)
+
+    # Add explicit remappings (these should be path-based, not Buck targets)
+    if all_remappings:
+        compile_cmd.add("--remappings")
+        for prefix, target in all_remappings.items():
+            # Skip Buck target-style remappings (they should use deps instead)
+            if not target.startswith("//") and not target.startswith("@") and ":" not in target:
+                compile_cmd.add("{}={}".format(prefix, target))
 
     ctx.actions.run(
         cmd_args(compile_cmd, hidden = ctx.attrs.srcs + dep_artifacts),
@@ -146,11 +201,16 @@ solidity_library = rule(
             default = [],
             doc = "Dependencies (other solidity_library targets or filegroups from soldeps)",
         ),
+        "soldeps_cell": attrs.option(
+            attrs.string(),
+            default = None,
+            doc = "Path to the soldeps cell directory. When set, remappings are auto-generated from the cell's remappings.txt.",
+        ),
         "remappings": attrs.dict(
             key = attrs.string(),
             value = attrs.string(),
             default = {},
-            doc = "Import remappings (e.g., {'@openzeppelin/': '//soldeps:openzeppelin_contracts/'})",
+            doc = "Additional import remappings. Usually not needed when using soldeps_cell.",
         ),
         "solc_version": attrs.option(
             attrs.string(),
@@ -170,5 +230,5 @@ solidity_library = rule(
             providers = [SolidityToolchainInfo],
         ),
     },
-    doc = "Compiles Solidity sources to bytecode and ABI.",
+    doc = "Compiles Solidity sources to bytecode and ABI. Use soldeps_cell for automatic remapping generation.",
 )
