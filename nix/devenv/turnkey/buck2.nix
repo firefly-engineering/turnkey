@@ -216,6 +216,12 @@ ${generateTargets finalToolchains}
       derivation = if cfg.javascript.enable then cfg.javascript.cell else null;
       description = "JavaScript deps";
     };
+    soldeps = {
+      name = "soldeps";
+      path = ".turnkey/soldeps";
+      derivation = if cfg.solidity.enable then cfg.solidity.cell else null;
+      description = "Solidity deps";
+    };
   } // lib.optionalAttrs (cfg.prelude.strategy == "nix") {
     # Prelude cell (only when using nix strategy)
     prelude = {
@@ -351,6 +357,14 @@ ${generateTargets finalToolchains}
       target = if cfg.javascript.depsFile != null then cfg.javascript.depsFile else "js-deps.toml";
       generator = [ "jsdeps-gen" "--lock" cfg.javascript.lockFile ]
         ++ lib.optionals cfg.javascript.includeDevDependencies [ "--include-dev" ];
+    } else null)
+
+    # Solidity deps rule
+    (if cfg.solidity.enable && (cfg.solidity.cell != null || cfg.solidity.depsFile != null) then {
+      name = "solidity";
+      sources = [ cfg.solidity.foundryTomlFile ];
+      target = if cfg.solidity.depsFile != null then cfg.solidity.depsFile else "solidity-deps.toml";
+      generator = [ "soldeps-gen" "--foundry" cfg.solidity.foundryTomlFile ];
     } else null)
   ];
 
@@ -651,6 +665,44 @@ in
         description = ''
           Include dev dependencies when generating js-deps.toml.
           Passed as --include-dev to jsdeps-gen.
+        '';
+      };
+    };
+
+    # ==========================================================================
+    # Solidity language support
+    # ==========================================================================
+    solidity = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable Solidity dependency management for Buck2";
+      };
+
+      cell = lib.mkOption {
+        type = lib.types.nullOr lib.types.package;
+        default = null;
+        description = ''
+          Nix derivation containing the Solidity dependencies cell.
+          When set, a 'soldeps' cell will be added to .buckconfig
+          and symlinked to .turnkey/soldeps.
+        '';
+      };
+
+      depsFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = ''
+          Relative path to solidity-deps.toml file (for staleness checking).
+          Used by tk sync for Solidity dependency management.
+        '';
+      };
+
+      foundryTomlFile = lib.mkOption {
+        type = lib.types.str;
+        default = "foundry.toml";
+        description = ''
+          Relative path to foundry.toml file (for staleness checking).
         '';
       };
     };

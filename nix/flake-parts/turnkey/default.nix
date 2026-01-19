@@ -437,6 +437,47 @@ in
               '';
             };
           };
+
+          # ==========================================================================
+          # Solidity language support
+          # ==========================================================================
+          solidity = {
+            enable = mkOption {
+              type = types.bool;
+              default = true;
+              description = "Enable Solidity dependency management for Buck2";
+            };
+
+            cell = mkOption {
+              type = types.nullOr types.package;
+              default = null;
+              description = ''
+                Nix derivation containing the Solidity dependencies cell.
+                When set, a 'soldeps' cell will be added to .buckconfig
+                and symlinked to .turnkey/soldeps.
+
+                Prefer using depsFile instead for declarative configuration.
+              '';
+            };
+
+            depsFile = mkOption {
+              type = types.nullOr types.path;
+              default = null;
+              example = lib.literalExpression "./solidity-deps.toml";
+              description = ''
+                Path to solidity-deps.toml file declaring Solidity dependencies.
+                When set, turnkey will build the soldeps cell automatically.
+              '';
+            };
+
+            foundryTomlFile = mkOption {
+              type = types.str;
+              default = "foundry.toml";
+              description = ''
+                Relative path to foundry.toml file (for staleness checking and regeneration).
+              '';
+            };
+          };
         };
       };
     }
@@ -564,6 +605,20 @@ in
         else
           null;
 
+      # Build soldeps cell from solidity.depsFile if specified and exists
+      # Only built if solidity.enable is true
+      soldepsCell =
+        if cfg.buck2.solidity.enable then
+          if cfg.buck2.solidity.depsFile != null && builtins.pathExists cfg.buck2.solidity.depsFile then
+            import ../../buck2/solidity-deps-cell.nix {
+              inherit pkgs lib;
+              depsFile = cfg.buck2.solidity.depsFile;
+            }
+          else
+            cfg.buck2.solidity.cell
+        else
+          null;
+
       # Resolve the prelude path based on strategy
       # - nix: use turnkeyPrelude (or user-specified derivation)
       # - bundled: use "bundled://"
@@ -643,6 +698,17 @@ in
                 else null;
               lockFile = cfg.buck2.javascript.lockFile;
               includeDevDependencies = cfg.buck2.javascript.includeDevDependencies;
+            };
+
+            # Solidity language configuration
+            solidity = {
+              enable = cfg.buck2.solidity.enable;
+              cell = soldepsCell;
+              depsFile =
+                if cfg.buck2.solidity.depsFile != null
+                then builtins.baseNameOf cfg.buck2.solidity.depsFile
+                else null;
+              foundryTomlFile = cfg.buck2.solidity.foundryTomlFile;
             };
           };
         };
