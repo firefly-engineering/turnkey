@@ -79,44 +79,25 @@ def _mdbook_book_impl(ctx: AnalysisContext) -> list[Provider]:
     )
 
     # Create serve script for `buck2 run`
+    # This serves from the source directory directly (for development)
     serve_script = ctx.actions.declare_output("serve.sh")
 
+    # Get the book directory from book_toml path
+    # book_toml is like "docs/user-manual/book.toml", we need "docs/user-manual"
     serve_lines = [
         "#!/usr/bin/env bash",
         "set -euo pipefail",
         "",
-        "# Arguments: mdbook_path book_toml src_files... -- [serve args]",
+        "# Arguments: mdbook_path book_toml [serve args]",
         "MDBOOK=$1",
         "BOOK_TOML=$2",
         "shift 2",
         "",
-        "# Collect source files until --",
-        "SRCS=()",
-        'while [[ $# -gt 0 && "$1" != "--" ]]; do',
-        '    SRCS+=("$1")',
-        "    shift",
-        "done",
-        '[ "$1" = "--" ] && shift  # Skip the --',
+        "# Get the directory containing book.toml",
+        'BOOK_DIR=$(dirname "$BOOK_TOML")',
         "",
-        "# Create temp build directory",
-        "BUILD_DIR=$(mktemp -d)",
-        'trap \'rm -rf "$BUILD_DIR"\' EXIT',
-        "",
-        "# Copy book.toml",
-        'cp "$BOOK_TOML" "$BUILD_DIR/book.toml"',
-        "",
-        "# Copy source files",
-        'for src in "${SRCS[@]}"; do',
-        '    rel_path="${src#*/src/}"',
-        '    if [[ "$src" == *"/src/"* ]]; then',
-        '        rel_path="src/$rel_path"',
-        '    fi',
-        '    mkdir -p "$BUILD_DIR/$(dirname "$rel_path")"',
-        '    cp "$src" "$BUILD_DIR/$rel_path"',
-        "done",
-        "",
-        "# Run mdbook serve",
-        'cd "$BUILD_DIR"',
+        "# Run mdbook serve from the book directory",
+        'cd "$BOOK_DIR"',
         '"$MDBOOK" serve "$@"',
     ]
 
@@ -126,13 +107,10 @@ def _mdbook_book_impl(ctx: AnalysisContext) -> list[Provider]:
         is_executable = True,
     )
 
-    # RunInfo for serve
+    # RunInfo for serve - just needs mdbook path and book.toml location
     serve_cmd = cmd_args(serve_script)
     serve_cmd.add(toolchain.mdbook.args)
     serve_cmd.add(ctx.attrs.book_toml)
-    for src in ctx.attrs.srcs:
-        serve_cmd.add(src)
-    serve_cmd.add("--")
 
     run_info = RunInfo(args = serve_cmd)
 
