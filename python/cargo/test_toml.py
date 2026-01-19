@@ -11,6 +11,7 @@ from pathlib import Path
 from .toml import (
     parse_cargo_toml,
     get_crate_name,
+    find_workspace_root,
     get_edition,
     get_lib_path,
     is_proc_macro,
@@ -45,6 +46,45 @@ class TestGetCrateName(unittest.TestCase):
         self.assertEqual(get_crate_name(cargo, "fallback"), "fallback")
 
 
+class TestFindWorkspaceRoot(unittest.TestCase):
+    """Test cases for find_workspace_root."""
+
+    def test_finds_workspace_in_parent(self):
+        """Finds workspace root in parent directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            # Create workspace root Cargo.toml
+            (tmpdir / "Cargo.toml").write_text(
+                """
+[workspace]
+members = ["crates/*"]
+
+[workspace.package]
+edition = "2024"
+"""
+            )
+            # Create a member crate directory
+            member = tmpdir / "crates" / "my-crate"
+            member.mkdir(parents=True)
+
+            result = find_workspace_root(member)
+            self.assertEqual(result, tmpdir)
+
+    def test_returns_none_when_no_workspace(self):
+        """Returns None when no workspace found."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            # Create a non-workspace Cargo.toml
+            (tmpdir / "Cargo.toml").write_text(
+                """
+[package]
+name = "standalone"
+"""
+            )
+            result = find_workspace_root(tmpdir)
+            self.assertIsNone(result)
+
+
 class TestGetEdition(unittest.TestCase):
     """Test cases for get_edition."""
 
@@ -62,6 +102,46 @@ class TestGetEdition(unittest.TestCase):
         """Defaults when package section exists but edition missing."""
         cargo = {"package": {"name": "foo"}}
         self.assertEqual(get_edition(cargo), "2015")
+
+    def test_workspace_inheritance_with_workspace_cargo(self):
+        """Resolves edition from workspace_cargo when using inheritance."""
+        cargo = {"package": {"name": "member", "edition": {"workspace": True}}}
+        workspace_cargo = {"workspace": {"package": {"edition": "2024"}}}
+        self.assertEqual(get_edition(cargo, workspace_cargo=workspace_cargo), "2024")
+
+    def test_workspace_inheritance_auto_find(self):
+        """Auto-finds workspace root when crate_dir is provided."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            # Create workspace root
+            (tmpdir / "Cargo.toml").write_text(
+                """
+[workspace]
+members = ["crates/*"]
+
+[workspace.package]
+edition = "2024"
+"""
+            )
+            # Create member crate
+            member = tmpdir / "crates" / "my-crate"
+            member.mkdir(parents=True)
+            (member / "Cargo.toml").write_text(
+                """
+[package]
+name = "my-crate"
+edition.workspace = true
+"""
+            )
+
+            cargo = {"package": {"name": "my-crate", "edition": {"workspace": True}}}
+            self.assertEqual(get_edition(cargo, crate_dir=member), "2024")
+
+    def test_workspace_inheritance_fallback(self):
+        """Falls back to 2021 when workspace inheritance can't be resolved."""
+        cargo = {"package": {"name": "orphan", "edition": {"workspace": True}}}
+        # No workspace_cargo and no crate_dir - can't resolve
+        self.assertEqual(get_edition(cargo), "2021")
 
 
 class TestGetLibPath(unittest.TestCase):

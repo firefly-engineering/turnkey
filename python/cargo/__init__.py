@@ -3,6 +3,7 @@
 from .toml import (
     parse_cargo_toml,
     get_crate_name,
+    find_workspace_root,
     get_edition,
     get_lib_path,
     is_proc_macro,
@@ -29,6 +30,7 @@ __all__ = [
     # toml.py
     "parse_cargo_toml",
     "get_crate_name",
+    "find_workspace_root",
     "get_edition",
     "get_lib_path",
     "is_proc_macro",

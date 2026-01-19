@@ -19,12 +19,66 @@ def get_crate_name(cargo: dict, fallback: str) -> str:
     return cargo.get("package", {}).get("name", fallback)
 
 
-def get_edition(cargo: dict) -> str:
+def find_workspace_root(start_dir: Path) -> Path | None:
+    """Find the workspace root by walking up the directory tree.
+
+    Returns the directory containing Cargo.toml with [workspace], or None.
+    """
+    current = start_dir.resolve()
+    while current != current.parent:
+        cargo_toml = current / "Cargo.toml"
+        if cargo_toml.exists():
+            with open(cargo_toml, "rb") as f:
+                cargo = tomllib.load(f)
+            if "workspace" in cargo:
+                return current
+        current = current.parent
+    return None
+
+
+def get_edition(
+    cargo: dict,
+    crate_dir: Path | None = None,
+    workspace_cargo: dict | None = None,
+) -> str:
     """Get the Rust edition from Cargo.toml.
 
-    Rust defaults to 2015 when no edition is specified.
+    Handles workspace inheritance (edition.workspace = true) by resolving
+    from the workspace root's [workspace.package] section.
+
+    Args:
+        cargo: Parsed Cargo.toml dict
+        crate_dir: Optional path to crate directory (for auto-finding workspace)
+        workspace_cargo: Optional pre-parsed workspace Cargo.toml dict
+
+    Returns:
+        Edition string (e.g., "2021"). Defaults to "2015" when not specified.
     """
-    return cargo.get("package", {}).get("edition", "2015")
+    edition = cargo.get("package", {}).get("edition", "2015")
+
+    # Handle workspace inheritance
+    if isinstance(edition, dict) and edition.get("workspace"):
+        # Try to resolve from provided workspace cargo
+        if workspace_cargo:
+            ws_edition = workspace_cargo.get("workspace", {}).get("package", {}).get("edition")
+            if ws_edition:
+                return ws_edition
+
+        # Try to auto-find workspace root
+        if crate_dir:
+            ws_root = find_workspace_root(crate_dir)
+            if ws_root:
+                ws_cargo_toml = ws_root / "Cargo.toml"
+                with open(ws_cargo_toml, "rb") as f:
+                    ws_cargo = tomllib.load(f)
+                ws_edition = ws_cargo.get("workspace", {}).get("package", {}).get("edition")
+                if ws_edition:
+                    return ws_edition
+
+        # Fallback to modern default when workspace can't be resolved
+        return "2021"
+
+    return edition
 
 
 def get_lib_path(cargo: dict, crate_dir: Path) -> str | None:

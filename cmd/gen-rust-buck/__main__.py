@@ -66,7 +66,7 @@ def main():
     cargo = parse_cargo_toml(crate_dir)
     crate_name = get_crate_name(cargo, fallback_name)
     version = cargo.get("package", {}).get("version", "0.0.0")
-    edition = get_edition(cargo)
+    edition = get_edition(cargo, crate_dir=crate_dir)
     crate_root = get_lib_path(cargo, crate_dir)
     deps, named_deps = get_dependencies(cargo, available_crates)
     proc_macro = is_proc_macro(cargo)
