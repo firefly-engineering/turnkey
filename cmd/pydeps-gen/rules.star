@@ -1,0 +1,19 @@
+# pydeps-gen - generate python-deps.toml from pyproject.toml
+load("@prelude//:rules.bzl", "rust_binary")
+
+rust_binary(
+    name = "pydeps-gen",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2024",
+    deps = [
+        "rustdeps//vendor/anyhow:anyhow",
+        "rustdeps//vendor/clap:clap",
+        "rustdeps//vendor/serde:serde",
+        "rustdeps//vendor/serde_json:serde_json",
+        "rustdeps//vendor/toml:toml",
+        "rustdeps//vendor/ureq:ureq",
+        # Native library for ring (TLS crypto) - Buck2 doesn't propagate native deps through Rust libs
+        "rustdeps//vendor/ring@0.17.14:ring_core_0_17_14__",
+    ],
+    visibility = ["PUBLIC"],
+)

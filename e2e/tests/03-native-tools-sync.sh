@@ -113,8 +113,8 @@ func main() {
 }
 EOF
 
-# Update BUCK to include the new dependency
-cat > BUCK << 'EOF'
+# Update rules.star to include the new dependency
+cat > rules.star << 'EOF'
 go_binary(
     name = "hello-go",
     srcs = ["main.go"],

@@ -1,6 +1,6 @@
 # gen-rust-buck Nix package
 #
-# Builds the gen-rust-buck tool that generates BUCK files for Rust crates.
+# Builds the gen-rust-buck tool that generates rules.star files for Rust crates.
 # This tool is used by rust-deps-cell.nix to create Buck2 build files
 # for vendored Rust dependencies.
 { pkgs, lib }:
@@ -32,7 +32,7 @@ pkgs.writeShellApplication {
   '';
 
   meta = {
-    description = "Generate BUCK files for Rust crates";
+    description = "Generate rules.star files for Rust crates";
     homepage = "https://github.com/firefly-engineering/turnkey";
     license = lib.licenses.mit;
     mainProgram = "gen-rust-buck";

@@ -1,7 +1,7 @@
 [package]
 name = "rustdeps-gen"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
 description = "Generate rust-deps.toml from Cargo.lock for Buck2/Nix integration"
 
 [[bin]]
@@ -9,7 +9,7 @@ name = "rustdeps-gen"
 path = "src/main.rs"
 
 [dependencies]
-anyhow = "1"
-base64 = "0.22"
-cargo-lock = "10"
-clap = { version = "4", features = ["derive"] }
+anyhow.workspace = true
+base64.workspace = true
+cargo-lock.workspace = true
+clap.workspace = true

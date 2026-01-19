@@ -1,7 +1,7 @@
 # Rust dependencies cell builder
 #
 # Reads a rust-deps.toml file and builds a Buck2 cell containing
-# all crate dependencies with BUCK files for rust_library targets.
+# all crate dependencies with rules.star files for rust_library targets.
 #
 # The TOML file format (supports multiple versions of same crate):
 #   [deps."crate-name@1.0.0"]
@@ -27,7 +27,7 @@
 let
   depsCell = import ../lib/deps-cell { inherit pkgs lib; };
 
-  # Import tools for feature unification and BUCK generation
+  # Import tools for feature unification and rules.star generation
   genRustBuck = import ../packages/gen-rust-buck.nix { inherit pkgs lib; };
   computeUnifiedFeatures = import ../packages/compute-unified-features.nix { inherit pkgs lib; };
 

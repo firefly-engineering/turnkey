@@ -12,13 +12,13 @@ import (
 
 // SrcListResult contains the result of a source file list comparison.
 type SrcListResult struct {
-	// Stale is true if the BUCK file's srcs don't match actual files.
+	// Stale is true if the rules.star file's srcs don't match actual files.
 	Stale bool
 
-	// BuckFile is the path to the BUCK file.
+	// BuckFile is the path to the rules.star file.
 	BuckFile string
 
-	// DeclaredSrcs are the source files declared in the BUCK file.
+	// DeclaredSrcs are the source files declared in the rules.star file.
 	DeclaredSrcs []string
 
 	// ActualSrcs are the source files found on disk.
@@ -31,7 +31,7 @@ type SrcListResult struct {
 	Extra []string
 }
 
-// CheckGoSrcList compares the Go source files declared in a BUCK file
+// CheckGoSrcList compares the Go source files declared in a rules.star file
 // against the actual .go files in the directory. Test files (*_test.go)
 // are compared separately from regular source files.
 //
@@ -39,7 +39,7 @@ type SrcListResult struct {
 func CheckGoSrcList(buckFile string) (*SrcListResult, error) {
 	dir := filepath.Dir(buckFile)
 
-	// Parse declared sources from BUCK file
+	// Parse declared sources from rules.star file
 	declaredSrcs, err := parseBuckSrcs(buckFile, "go_library")
 	if err != nil {
 		return nil, err
@@ -54,12 +54,12 @@ func CheckGoSrcList(buckFile string) (*SrcListResult, error) {
 	return compareSrcLists(buckFile, declaredSrcs, actualSrcs), nil
 }
 
-// CheckGoTestSrcList compares the Go test files declared in a BUCK file
+// CheckGoTestSrcList compares the Go test files declared in a rules.star file
 // against the actual *_test.go files in the directory.
 func CheckGoTestSrcList(buckFile string) (*SrcListResult, error) {
 	dir := filepath.Dir(buckFile)
 
-	// Parse declared test sources from BUCK file
+	// Parse declared test sources from rules.star file
 	declaredSrcs, err := parseBuckSrcs(buckFile, "go_test")
 	if err != nil {
 		return nil, err
@@ -74,7 +74,7 @@ func CheckGoTestSrcList(buckFile string) (*SrcListResult, error) {
 	return compareSrcLists(buckFile, declaredSrcs, actualSrcs), nil
 }
 
-// parseBuckSrcs extracts the srcs list from a specific rule type in a BUCK file.
+// parseBuckSrcs extracts the srcs list from a specific rule type in a rules.star file.
 // This is a simple regex-based parser that handles common patterns.
 func parseBuckSrcs(buckFile, ruleType string) ([]string, error) {
 	content, err := os.ReadFile(buckFile)

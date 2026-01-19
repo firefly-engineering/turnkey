@@ -186,8 +186,8 @@ for var in $(env | grep '^TURNKEY_CELL_' | cut -d= -f1); do
 done
 EOF
 
-step "Adding BUCK file for build"
-cat > BUCK << 'EOF'
+step "Adding rules.star file for build"
+cat > rules.star << 'EOF'
 go_binary(
     name = "server",
     srcs = ["main.go"],

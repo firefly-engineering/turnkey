@@ -8,7 +8,7 @@ import (
 
 func TestParseBuckSrcs_SingleLine(t *testing.T) {
 	dir := t.TempDir()
-	buckFile := filepath.Join(dir, "BUCK")
+	buckFile := filepath.Join(dir, "rules.star")
 
 	content := `load("@prelude//:rules.bzl", "go_library")
 
@@ -41,7 +41,7 @@ go_library(
 
 func TestParseBuckSrcs_MultiLine(t *testing.T) {
 	dir := t.TempDir()
-	buckFile := filepath.Join(dir, "BUCK")
+	buckFile := filepath.Join(dir, "rules.star")
 
 	content := `load("@prelude//:rules.bzl", "go_library", "go_test")
 
@@ -84,7 +84,7 @@ go_test(
 
 func TestParseBuckSrcs_NoRule(t *testing.T) {
 	dir := t.TempDir()
-	buckFile := filepath.Join(dir, "BUCK")
+	buckFile := filepath.Join(dir, "rules.star")
 
 	content := `load("@prelude//:rules.bzl", "go_library")
 
@@ -153,8 +153,8 @@ func TestGlobGoSrcs(t *testing.T) {
 func TestCheckGoSrcList_InSync(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `go_library(
     name = "lib",
     srcs = ["main.go", "helper.go"],
@@ -186,8 +186,8 @@ func TestCheckGoSrcList_InSync(t *testing.T) {
 func TestCheckGoSrcList_ExtraFile(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file with only main.go
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file with only main.go
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `go_library(
     name = "lib",
     srcs = ["main.go"],
@@ -222,8 +222,8 @@ func TestCheckGoSrcList_ExtraFile(t *testing.T) {
 func TestCheckGoSrcList_MissingFile(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file declaring files
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file declaring files
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `go_library(
     name = "lib",
     srcs = ["main.go", "missing.go"],
@@ -256,8 +256,8 @@ func TestCheckGoSrcList_MissingFile(t *testing.T) {
 func TestCheckGoTestSrcList(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file with go_test
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file with go_test
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `go_library(
     name = "lib",
     srcs = ["main.go"],

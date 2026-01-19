@@ -169,31 +169,31 @@ commit_changes "Fix corrupted deps file"
 step "Verifying build works after fixing corruption"
 run_in_devshell_script "buck2 build //:hello"
 
-section "Test 4: Invalid BUCK File Recovery"
+section "Test 4: Invalid rules.star File Recovery"
 
-# Step 16: Corrupt the BUCK file
-step "Corrupting BUCK file"
-echo "this is not valid Starlark {{ garbage" > BUCK
+# Step 16: Corrupt the rules.star file
+step "Corrupting rules.star file"
+echo "this is not valid Starlark {{ garbage" > rules.star
 stage_for_flake
-commit_changes "Intentionally corrupted BUCK file"
+commit_changes "Intentionally corrupted rules.star file"
 
 # Step 17: Verify clear error message
-step "Verifying clear error for invalid BUCK file"
+step "Verifying clear error for invalid rules.star file"
 if run_in_devshell_script "buck2 build //:hello" 2>&1 | tee /tmp/buck-error.log; then
-  echo "ERROR: Build should have failed with invalid BUCK file" >&2
+  echo "ERROR: Build should have failed with invalid rules.star file" >&2
   exit 1
 fi
 
-# Verify error message mentions BUCK or syntax
+# Verify error message mentions rules.star or syntax
 if grep -qi "syntax\|error\|parse\|invalid" /tmp/buck-error.log; then
   echo "Error message mentions syntax/parse issue (good)"
 else
   echo "WARNING: Error message may not be clear about syntax issue"
 fi
 
-# Step 18: Fix BUCK file
-step "Fixing BUCK file"
-cat > BUCK << 'EOF'
+# Step 18: Fix rules.star file
+step "Fixing rules.star file"
+cat > rules.star << 'EOF'
 go_binary(
     name = "hello",
     srcs = ["main.go"],
@@ -202,10 +202,10 @@ go_binary(
 )
 EOF
 stage_for_flake
-commit_changes "Fix BUCK file"
+commit_changes "Fix rules.star file"
 
 # Step 19: Verify build works after fix
-step "Verifying build works after fixing BUCK file"
+step "Verifying build works after fixing rules.star file"
 run_in_devshell_script "buck2 build //:hello"
 
 section "PASS: Error recovery and diagnostics"

@@ -5,6 +5,7 @@
 #   - cratesio: Rust crates from crates.io
 #   - pypi: Python packages from PyPI
 #   - goproxy: Go modules from proxy.golang.org
+#   - url/npm: Direct URL download (for npm tarballs, etc.)
 
 { pkgs, lib }:
 
@@ -20,6 +21,8 @@ rec {
       fetchPyPI fetchSpec
     else if fetchSpec.type == "goproxy" then
       fetchGoProxy fetchSpec
+    else if fetchSpec.type == "url" || fetchSpec.type == "npm" then
+      fetchUrl fetchSpec
     else
       throw "Unknown fetch type: ${fetchSpec.type}";
 
@@ -48,6 +51,15 @@ rec {
       inherit (fetchSpec) url;
       sha256 = fetchSpec.sha256;
       extension = "tar.gz";
+    };
+
+  # Fetch from a URL (for npm packages and other tarballs)
+  # fetchSpec: { type, url, hash }
+  # The hash should be an SRI hash (sha512-...)
+  fetchUrl = fetchSpec:
+    pkgs.fetchurl {
+      inherit (fetchSpec) url;
+      hash = fetchSpec.hash;
     };
 
   # Fetch from Go module proxy
@@ -91,5 +103,11 @@ rec {
   mkGoProxySpec = { modulePath, version, sha256 }: {
     type = "goproxy";
     inherit modulePath version sha256;
+  };
+
+  # Helper to create a fetch spec for URL (npm packages, etc.)
+  mkUrlSpec = { url, hash }: {
+    type = "url";
+    inherit url hash;
   };
 }

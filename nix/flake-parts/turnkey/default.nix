@@ -44,7 +44,26 @@ in
           type = types.lazyAttrsOf types.package;
           default = { };
           defaultText = "Default registry from nix/registry";
-          description = "Default registry mapping toolchain names to packages (inherited by all shells)";
+          description = ''
+            Complete registry override. When set, replaces the default registry entirely.
+            Prefer using registryExtensions to add packages without duplicating defaults.
+          '';
+        };
+
+        registryExtensions = mkOption {
+          type = types.lazyAttrsOf types.package;
+          default = { };
+          example = lib.literalExpression ''
+            {
+              beads = inputs.beads.packages.''${system}.default;
+              myTool = pkgs.myTool;
+            }
+          '';
+          description = ''
+            Extend the default registry with additional packages.
+            These are merged on top of the default registry, so you only need
+            to specify additions rather than duplicating all defaults.
+          '';
         };
 
         wrapNativeTools = mkOption {
@@ -368,6 +387,56 @@ in
               '';
             };
           };
+
+          # ==========================================================================
+          # JavaScript/TypeScript language support
+          # ==========================================================================
+          javascript = {
+            enable = mkOption {
+              type = types.bool;
+              default = true;
+              description = "Enable JavaScript/TypeScript dependency management for Buck2";
+            };
+
+            cell = mkOption {
+              type = types.nullOr types.package;
+              default = null;
+              description = ''
+                Nix derivation containing the JavaScript dependencies cell.
+                When set, a 'jsdeps' cell will be added to .buckconfig
+                and symlinked to .turnkey/jsdeps.
+
+                Prefer using depsFile instead for declarative configuration.
+              '';
+            };
+
+            depsFile = mkOption {
+              type = types.nullOr types.path;
+              default = null;
+              example = lib.literalExpression "./js-deps.toml";
+              description = ''
+                Path to js-deps.toml file declaring JavaScript package dependencies.
+                When set, turnkey will build the jsdeps cell automatically.
+              '';
+            };
+
+            lockFile = mkOption {
+              type = types.str;
+              default = "pnpm-lock.yaml";
+              description = ''
+                Relative path to pnpm-lock.yaml file (for staleness checking and regeneration).
+              '';
+            };
+
+            includeDevDependencies = mkOption {
+              type = types.bool;
+              default = false;
+              description = ''
+                Include dev dependencies when generating js-deps.toml.
+                Passed as --include-dev to jsdeps-gen.
+              '';
+            };
+          };
         };
       };
     }
@@ -383,9 +452,20 @@ in
     let
       cfg = config.turnkey.toolchains;
 
-      # Load default registry if user didn't provide one
+      # Load default registry and merge with extensions
       defaultRegistry = import ../../registry { inherit pkgs lib; };
-      baseRegistry = if cfg.registry == { } then defaultRegistry else cfg.registry;
+
+      # Registry merging:
+      # 1. Start with default registry
+      # 2. Merge registryExtensions on top (allows adding packages without duplication)
+      # 3. If registry is explicitly set (non-empty), use that as complete override
+      baseRegistry =
+        if cfg.registry != { } then
+          # Complete override - user specified full registry
+          cfg.registry
+        else
+          # Default + extensions
+          defaultRegistry // cfg.registryExtensions;
 
       # Build the turnkey-prelude derivation (Nix-backed prelude cell)
       turnkeyPrelude = import ../../buck2/prelude.nix { inherit pkgs lib; };
@@ -470,6 +550,20 @@ in
         else
           null;
 
+      # Build jsdeps cell from javascript.depsFile if specified and exists
+      # Only built if javascript.enable is true
+      jsdepsCell =
+        if cfg.buck2.javascript.enable then
+          if cfg.buck2.javascript.depsFile != null && builtins.pathExists cfg.buck2.javascript.depsFile then
+            import ../../buck2/js-deps-cell.nix {
+              inherit pkgs lib;
+              depsFile = cfg.buck2.javascript.depsFile;
+            }
+          else
+            cfg.buck2.javascript.cell
+        else
+          null;
+
       # Resolve the prelude path based on strategy
       # - nix: use turnkeyPrelude (or user-specified derivation)
       # - bundled: use "bundled://"
@@ -537,6 +631,18 @@ in
                 else null;
               pyprojectFile = cfg.buck2.python.pyprojectFile;
               lockFile = cfg.buck2.python.lockFile;
+            };
+
+            # JavaScript language configuration
+            javascript = {
+              enable = cfg.buck2.javascript.enable;
+              cell = jsdepsCell;
+              depsFile =
+                if cfg.buck2.javascript.depsFile != null
+                then builtins.baseNameOf cfg.buck2.javascript.depsFile
+                else null;
+              lockFile = cfg.buck2.javascript.lockFile;
+              includeDevDependencies = cfg.buck2.javascript.includeDevDependencies;
             };
           };
         };

@@ -90,10 +90,10 @@ rec {
     cd $out
     ${if fixup != null then fixup else ""}
 
-    # Generate BUCK file
-    cat > $out/BUCK << 'BUCK'
+    # Generate rules.star file
+    cat > $out/rules.star << 'RULES'
     ${buckContent}
-    BUCK
+    RULES
   '';
 
   # Build a complete JavaScript dependency cell
@@ -150,20 +150,20 @@ rec {
       chmod -R u+w "$out/vendor/${name}"
     '') depPackages)}
 
-    # Generate root BUCK file with aliases
-    cat > $out/BUCK << 'BUCK'
+    # Generate root rules.star file with aliases
+    cat > $out/rules.star << 'RULES'
     ${rootBuckContent}
-    BUCK
+    RULES
 
     # Generate cell .buckconfig
-    cat > $out/.buckconfig << 'BUCKCONFIG'
+    cat > $out/.buckconfig << 'CELLCONFIG'
     [cells]
         jsdeps = .
         prelude = prelude
 
     [buildfile]
-        name = BUCK
-    BUCKCONFIG
+        name = rules.star
+    CELLCONFIG
   '';
 
   # ==========================================================================

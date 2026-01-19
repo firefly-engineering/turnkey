@@ -129,8 +129,8 @@ func TestExtractRustDepCrate(t *testing.T) {
 func TestCheckRustSrcList_InSync(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `rust_library(
     name = "mylib",
     srcs = ["lib.rs", "helper.rs"],
@@ -162,8 +162,8 @@ func TestCheckRustSrcList_InSync(t *testing.T) {
 func TestCheckRustSrcList_ExtraFile(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `rust_library(
     name = "mylib",
     srcs = ["lib.rs"],
@@ -198,8 +198,8 @@ func TestCheckRustSrcList_ExtraFile(t *testing.T) {
 func TestCheckRustUses_InSync(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `rust_library(
     name = "mylib",
     srcs = ["lib.rs"],
@@ -237,8 +237,8 @@ fn main() {}
 func TestCheckRustUses_MissingDep(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file without deps
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file without deps
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `rust_library(
     name = "mylib",
     srcs = ["lib.rs"],
@@ -275,8 +275,8 @@ fn main() {}
 func TestCachedCheckRustPackage(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `rust_library(
     name = "lib",
     srcs = ["lib.rs"],

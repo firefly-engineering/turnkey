@@ -6,6 +6,13 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     devenv.url = "github:cachix/devenv";
 
+    # Required by devenv for container support (even if unused)
+    nix2container = {
+      url = "github:nlewo/nix2container";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    mk-shell-bin.url = "github:rrbutani/nix-mk-shell-bin";
+
     # Beads - distributed git-backed graph issue tracker for AI agents
     beads = {
       url = "github:steveyegge/beads/v0.46.0";
@@ -83,6 +90,7 @@
           packages.tk = import ./nix/packages/tk.nix { inherit pkgs lib; };
           packages.tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
           packages.e2e-runner = import ./nix/packages/e2e-runner.nix { inherit pkgs lib; };
+          packages.jsdeps-gen = import ./nix/packages/jsdeps-gen.nix { inherit pkgs lib; };
           packages.turnkey-prelude = import ./nix/buck2/prelude.nix { inherit pkgs lib; };
 
           # Configure turnkey to use our local toolchain files
@@ -91,40 +99,13 @@
             enable = true;
             declarationFiles = {
               default = ./toolchain.toml; # Creates devShells.default with buck2 + nix + beads + go
-              ci = ./toolchain.ci.toml; # Creates devShells.ci with just nix
             };
             # Extend the default registry with packages from flake inputs
-            registry = {
-              buck2 = pkgs.buck2;
-              nix = pkgs.nix;
+            # (standard toolchains like buck2, nix, go, tk, etc. come from default registry)
+            registryExtensions = {
               beads = inputs.beads.packages.${system}.default;
               beads_viewer = inputs.beads_viewer.packages.${system}.default;
               jj = inputs.jj.packages.${system}.default;
-              # Language toolchains for Buck2 integration
-              go = pkgs.go;
-              rust = pkgs.rustc;
-              cargo = pkgs.cargo;
-              reindeer = pkgs.reindeer;
-              python = pkgs.python3;
-              uv = pkgs.uv;  # Python package manager for lock file generation
-              cxx = pkgs.stdenv.cc;
-              # Use clangUseLLVM which has lld integration for -fuse-ld=lld to work
-              clang = pkgs.llvmPackages.clangUseLLVM;
-              lld = pkgs.lld;
-              # JavaScript/TypeScript (no Buck2 toolchain, but available in shell for genrule)
-              nodejs = pkgs.nodejs;
-              typescript = pkgs.nodePackages.typescript;
-              # Internal tools
-              godeps-gen = config.packages.godeps-gen;
-              pydeps-gen = config.packages.pydeps-gen;
-              rustdeps-gen = config.packages.rustdeps-gen;
-              gobuckify = config.packages.gobuckify;
-              tk = config.packages.tk;
-              tw = config.packages.tw;
-              # Note: go, cargo, uv are automatically wrapped by flake-parts module
-              # when wrapNativeTools = true (the default)
-              # Python testing
-              pytest = pkgs.python3Packages.pytest;
             };
             # Enable Buck2 toolchain generation
             buck2 = {
@@ -150,6 +131,12 @@
               python = {
                 enable = true;
                 depsFile = ./python-deps.toml; # Python package dependencies
+              };
+
+              # JavaScript/TypeScript dependencies
+              javascript = {
+                enable = true;
+                depsFile = ./js-deps.toml; # npm package dependencies
               };
             };
           };

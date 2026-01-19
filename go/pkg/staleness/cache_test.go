@@ -23,8 +23,8 @@ func TestCacheLoadSave(t *testing.T) {
 
 	// Create and populate cache
 	cache := NewCache()
-	cache.entries["test/BUCK"] = &CacheEntry{
-		BuckFile:     "test/BUCK",
+	cache.entries["test/rules.star"] = &CacheEntry{
+		BuckFile:     "test/rules.star",
 		SrcListHash:  "abc123",
 		ImportHash:   "def456",
 		BuckFileHash: "ghi789",
@@ -43,9 +43,9 @@ func TestCacheLoadSave(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entry := loaded.Get("test/BUCK")
+	entry := loaded.Get("test/rules.star")
 	if entry == nil {
-		t.Fatal("expected entry for test/BUCK")
+		t.Fatal("expected entry for test/rules.star")
 	}
 
 	if entry.SrcListHash != "abc123" {
@@ -70,8 +70,8 @@ func TestCacheLoadNonExistent(t *testing.T) {
 func TestCacheNeedsCheck(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create a BUCK file
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create a rules.star file
+	buckFile := filepath.Join(dir, "rules.star")
 	if err := os.WriteFile(buckFile, []byte("content"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -105,34 +105,34 @@ func TestCacheNeedsCheck(t *testing.T) {
 		t.Error("expected NeedsCheck=true when imports changed")
 	}
 
-	// Modified BUCK file should need checking
+	// Modified rules.star file should need checking
 	if err := os.WriteFile(buckFile, []byte("modified"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if !cache.NeedsCheck(buckFile, srcFiles, imports) {
-		t.Error("expected NeedsCheck=true when BUCK file changed")
+		t.Error("expected NeedsCheck=true when rules.star file changed")
 	}
 }
 
 func TestCacheRemove(t *testing.T) {
 	cache := NewCache()
-	cache.entries["test/BUCK"] = &CacheEntry{BuckFile: "test/BUCK"}
+	cache.entries["test/rules.star"] = &CacheEntry{BuckFile: "test/rules.star"}
 
-	if cache.Get("test/BUCK") == nil {
+	if cache.Get("test/rules.star") == nil {
 		t.Fatal("expected entry before remove")
 	}
 
-	cache.Remove("test/BUCK")
+	cache.Remove("test/rules.star")
 
-	if cache.Get("test/BUCK") != nil {
+	if cache.Get("test/rules.star") != nil {
 		t.Error("expected nil after remove")
 	}
 }
 
 func TestCacheClear(t *testing.T) {
 	cache := NewCache()
-	cache.entries["a/BUCK"] = &CacheEntry{BuckFile: "a/BUCK"}
-	cache.entries["b/BUCK"] = &CacheEntry{BuckFile: "b/BUCK"}
+	cache.entries["a/rules.star"] = &CacheEntry{BuckFile: "a/rules.star"}
+	cache.entries["b/rules.star"] = &CacheEntry{BuckFile: "b/rules.star"}
 
 	cache.Clear()
 
@@ -160,8 +160,8 @@ func TestHashStrings(t *testing.T) {
 func TestCachedCheckGoPackage(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `go_library(
     name = "lib",
     package_name = "github.com/example/lib",
@@ -240,12 +240,12 @@ func TestFindBuckFiles(t *testing.T) {
 		}
 	}
 
-	// Create BUCK files
+	// Create rules.star files
 	buckPaths := []string{
-		"BUCK",
-		"pkg/a/BUCK",
-		"pkg/b/BUCK",
-		".hidden/BUCK", // Should be skipped
+		"rules.star",
+		"pkg/a/rules.star",
+		"pkg/b/rules.star",
+		".hidden/rules.star", // Should be skipped
 	}
 
 	for _, p := range buckPaths {
@@ -262,7 +262,7 @@ func TestFindBuckFiles(t *testing.T) {
 
 	// Should find 3 (excluding .hidden)
 	if len(found) != 3 {
-		t.Errorf("expected 3 BUCK files, got %d: %v", len(found), found)
+		t.Errorf("expected 3 rules.star files, got %d: %v", len(found), found)
 	}
 }
 

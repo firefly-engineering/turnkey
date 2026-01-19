@@ -5,7 +5,7 @@
 #   - mkPythonDepsCell: Build a complete Python dependency cell
 #
 # Python dependencies are fetched from PyPI.
-# BUCK files are generated per-dependency (simple python_library rules).
+# rules.star files are generated per-dependency (simple python_library rules).
 
 { pkgs, lib }:
 
@@ -76,10 +76,10 @@ rec {
     cd $out
     ${if fixup != null then fixup else ""}
 
-    # Generate BUCK file
-    cat > $out/BUCK << 'BUCK'
+    # Generate rules.star file
+    cat > $out/rules.star << 'RULES'
     ${buckContent}
-    BUCK
+    RULES
   '';
 
   # Build a complete Python dependency cell
@@ -121,14 +121,14 @@ rec {
     '') depPackages)}
 
     # Generate cell .buckconfig
-    cat > $out/.buckconfig << 'BUCKCONFIG'
+    cat > $out/.buckconfig << 'CELLCONFIG'
     [cells]
         pydeps = .
         prelude = prelude
 
     [buildfile]
-        name = BUCK
-    BUCKCONFIG
+        name = rules.star
+    CELLCONFIG
   '';
 
   # ==========================================================================

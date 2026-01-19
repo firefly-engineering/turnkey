@@ -2,7 +2,7 @@
 //
 // Configuration is stored in .turnkey/sync.toml and defines:
 // - Dependency staleness rules (go.mod → go-deps.toml)
-// - BUCK file staleness rules (coming soon)
+// - rules.star file staleness rules (coming soon)
 //
 // Example config:
 //
@@ -37,8 +37,8 @@ type Config struct {
 	// and need to regenerate dependency declarations.
 	Deps []DepsRule `toml:"deps"`
 
-	// Buck defines BUCK file staleness rules (future).
-	// These track when source files change and need to regenerate BUCK files.
+	// Buck defines rules.star file staleness rules (future).
+	// These track when source files change and need to regenerate rules.star files.
 	Buck []BuckRule `toml:"buck"`
 
 	// Wrappers defines tool wrapper rules for auto-sync.
@@ -67,7 +67,7 @@ type DepsRule struct {
 	Enabled *bool `toml:"enabled,omitempty"`
 }
 
-// BuckRule defines a staleness rule for BUCK file generation.
+// BuckRule defines a staleness rule for rules.star file generation.
 // (Reserved for future implementation)
 type BuckRule struct {
 	// Name is a human-readable identifier for this rule.
@@ -76,7 +76,7 @@ type BuckRule struct {
 	// Patterns defines which source files trigger BUCK regeneration.
 	Patterns []string `toml:"patterns"`
 
-	// Generator is the command to regenerate BUCK files.
+	// Generator is the command to regenerate rules.star files.
 	Generator []string `toml:"generator"`
 
 	// Enabled controls whether this rule is active (default: true).

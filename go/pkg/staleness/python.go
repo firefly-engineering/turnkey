@@ -10,12 +10,12 @@ import (
 	"strings"
 )
 
-// CheckPythonSrcList compares the Python source files declared in a BUCK file
+// CheckPythonSrcList compares the Python source files declared in a rules.star file
 // against the actual .py files in the directory.
 func CheckPythonSrcList(buckFile string) (*SrcListResult, error) {
 	dir := filepath.Dir(buckFile)
 
-	// Parse declared sources from BUCK file
+	// Parse declared sources from rules.star file
 	declaredSrcs, err := parseBuckSrcs(buckFile, "python_library")
 	if err != nil {
 		return nil, err
@@ -38,12 +38,12 @@ func CheckPythonSrcList(buckFile string) (*SrcListResult, error) {
 	return compareSrcLists(buckFile, declaredSrcs, actualSrcs), nil
 }
 
-// CheckPythonTestSrcList compares the Python test files declared in a BUCK file
+// CheckPythonTestSrcList compares the Python test files declared in a rules.star file
 // against the actual test .py files in the directory.
 func CheckPythonTestSrcList(buckFile string) (*SrcListResult, error) {
 	dir := filepath.Dir(buckFile)
 
-	// Parse declared test sources from BUCK file
+	// Parse declared test sources from rules.star file
 	declaredSrcs, err := parseBuckSrcs(buckFile, "python_test")
 	if err != nil {
 		return nil, err
@@ -83,13 +83,13 @@ func globPythonSrcs(dir string, testOnly bool) ([]string, error) {
 
 // PythonImportResult contains the result of a Python import comparison.
 type PythonImportResult struct {
-	// Stale is true if the BUCK file's deps don't match actual imports.
+	// Stale is true if the rules.star file's deps don't match actual imports.
 	Stale bool
 
-	// BuckFile is the path to the BUCK file.
+	// BuckFile is the path to the rules.star file.
 	BuckFile string
 
-	// DeclaredDeps are the dependency targets declared in the BUCK file.
+	// DeclaredDeps are the dependency targets declared in the rules.star file.
 	DeclaredDeps []string
 
 	// ActualImports are the external package names found in Python source files.
@@ -103,11 +103,11 @@ type PythonImportResult struct {
 }
 
 // CheckPythonImports compares the Python imports in source files against
-// the deps declared in the BUCK file.
+// the deps declared in the rules.star file.
 func CheckPythonImports(buckFile string) (*PythonImportResult, error) {
 	dir := filepath.Dir(buckFile)
 
-	// Parse declared deps from BUCK file
+	// Parse declared deps from rules.star file
 	declaredDeps, err := parseBuckDeps(buckFile, "python_library")
 	if err != nil {
 		return nil, err
@@ -327,10 +327,10 @@ func extractPythonDepPkg(dep string) string {
 
 // PythonPackageResult contains the result of a Python package staleness check.
 type PythonPackageResult struct {
-	// BuckFile is the path to the BUCK file.
+	// BuckFile is the path to the rules.star file.
 	BuckFile string
 
-	// Stale is true if the BUCK file needs regeneration.
+	// Stale is true if the rules.star file needs regeneration.
 	Stale bool
 
 	// FromCache is true if the result came from cache.

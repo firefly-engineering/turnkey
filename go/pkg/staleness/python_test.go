@@ -141,8 +141,8 @@ func TestExtractPythonDepPkg(t *testing.T) {
 func TestCheckPythonSrcList_InSync(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `python_library(
     name = "mylib",
     srcs = ["main.py", "helper.py"],
@@ -174,8 +174,8 @@ func TestCheckPythonSrcList_InSync(t *testing.T) {
 func TestCheckPythonSrcList_ExtraFile(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `python_library(
     name = "mylib",
     srcs = ["main.py"],
@@ -210,8 +210,8 @@ func TestCheckPythonSrcList_ExtraFile(t *testing.T) {
 func TestCheckPythonImports_InSync(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `python_library(
     name = "mylib",
     srcs = ["main.py"],
@@ -250,8 +250,8 @@ def main():
 func TestCheckPythonImports_MissingDep(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file without deps
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file without deps
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `python_library(
     name = "mylib",
     srcs = ["main.py"],
@@ -289,8 +289,8 @@ def main():
 func TestCachedCheckPythonPackage(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create BUCK file
-	buckFile := filepath.Join(dir, "BUCK")
+	// Create rules.star file
+	buckFile := filepath.Join(dir, "rules.star")
 	buckContent := `python_library(
     name = "lib",
     srcs = ["main.py"],

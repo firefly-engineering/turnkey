@@ -1,4 +1,4 @@
-"""BUCK file generation for Rust crates."""
+"""rules.star file generation for Rust crates."""
 
 from python.cargo.toml import (
     normalize_crate_name,

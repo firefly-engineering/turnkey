@@ -1,4 +1,4 @@
-"""BUCK file generation for Rust crates."""
+"""rules.star file generation for Rust crates."""
 
 from .generator import (
     find_matching_version,

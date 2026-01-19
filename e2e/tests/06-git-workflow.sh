@@ -66,7 +66,7 @@ github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 EOF
 
-cat > BUCK << 'EOF'
+cat > rules.star << 'EOF'
 go_binary(
     name = "hello",
     srcs = ["cmd/hello/main.go"],
@@ -155,8 +155,8 @@ github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 EOF
 
-# Update BUCK to use new dependency
-cat > BUCK << 'EOF'
+# Update rules.star to use new dependency
+cat > rules.star << 'EOF'
 go_binary(
     name = "hello",
     srcs = ["cmd/hello/main.go"],

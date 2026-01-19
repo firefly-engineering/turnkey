@@ -9,12 +9,12 @@ import (
 	"strings"
 )
 
-// CheckRustSrcList compares the Rust source files declared in a BUCK file
+// CheckRustSrcList compares the Rust source files declared in a rules.star file
 // against the actual .rs files in the directory.
 func CheckRustSrcList(buckFile string) (*SrcListResult, error) {
 	dir := filepath.Dir(buckFile)
 
-	// Parse declared sources from BUCK file
+	// Parse declared sources from rules.star file
 	declaredSrcs, err := parseBuckSrcs(buckFile, "rust_library")
 	if err != nil {
 		return nil, err
@@ -37,12 +37,12 @@ func CheckRustSrcList(buckFile string) (*SrcListResult, error) {
 	return compareSrcLists(buckFile, declaredSrcs, actualSrcs), nil
 }
 
-// CheckRustTestSrcList compares the Rust test files declared in a BUCK file
+// CheckRustTestSrcList compares the Rust test files declared in a rules.star file
 // against the actual test .rs files in the directory.
 func CheckRustTestSrcList(buckFile string) (*SrcListResult, error) {
 	dir := filepath.Dir(buckFile)
 
-	// Parse declared test sources from BUCK file
+	// Parse declared test sources from rules.star file
 	declaredSrcs, err := parseBuckSrcs(buckFile, "rust_test")
 	if err != nil {
 		return nil, err
@@ -114,13 +114,13 @@ func globRustTestSrcs(dir string) ([]string, error) {
 
 // RustImportResult contains the result of a Rust use statement comparison.
 type RustImportResult struct {
-	// Stale is true if the BUCK file's deps don't match actual use statements.
+	// Stale is true if the rules.star file's deps don't match actual use statements.
 	Stale bool
 
-	// BuckFile is the path to the BUCK file.
+	// BuckFile is the path to the rules.star file.
 	BuckFile string
 
-	// DeclaredDeps are the dependency targets declared in the BUCK file.
+	// DeclaredDeps are the dependency targets declared in the rules.star file.
 	DeclaredDeps []string
 
 	// ActualUses are the external crate names found in Rust source files.
@@ -134,11 +134,11 @@ type RustImportResult struct {
 }
 
 // CheckRustUses compares the Rust use statements in source files against
-// the deps declared in the BUCK file.
+// the deps declared in the rules.star file.
 func CheckRustUses(buckFile string) (*RustImportResult, error) {
 	dir := filepath.Dir(buckFile)
 
-	// Parse declared deps from BUCK file
+	// Parse declared deps from rules.star file
 	declaredDeps, err := parseBuckDeps(buckFile, "rust_library")
 	if err != nil {
 		return nil, err
@@ -297,10 +297,10 @@ func extractRustDepCrate(dep string) string {
 
 // RustPackageResult contains the result of a Rust package staleness check.
 type RustPackageResult struct {
-	// BuckFile is the path to the BUCK file.
+	// BuckFile is the path to the rules.star file.
 	BuckFile string
 
-	// Stale is true if the BUCK file needs regeneration.
+	// Stale is true if the rules.star file needs regeneration.
 	Stale bool
 
 	// FromCache is true if the result came from cache.
