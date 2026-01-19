@@ -31,9 +31,6 @@ tk build //docs:all
 
 ## Historical Reference
 
-Research and design documents kept for historical reference:
-
-- `design-use-turnkey.md` - Design document for use_turnkey direnv function
-- `fuse-composition-research.md` - Research on FUSE-based repository composition
 - `designs/` - Design documents for planned features
 - `plans/` - Implementation plans
+- `research/` - Research documents and technology evaluations
