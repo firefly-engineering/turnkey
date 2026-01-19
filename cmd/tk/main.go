@@ -471,6 +471,9 @@ func delegateToBuck2(args []string) {
 		os.Exit(1)
 	}
 
+	// Transform --isolation-dir to use .turnkey prefix
+	args = transformIsolationDir(args)
+
 	if verbose {
 		fmt.Fprintf(os.Stderr, "tk: executing buck2 %v\n", args)
 	}
@@ -482,6 +485,54 @@ func delegateToBuck2(args []string) {
 		fmt.Fprintf(os.Stderr, "tk: failed to exec buck2: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// transformIsolationDir transforms --isolation-dir values to use .turnkey prefix.
+// This ensures all isolation directories are hidden from Go/Cargo/pytest.
+//
+// Transformation rules:
+//   - --isolation-dir=foo     -> --isolation-dir=.turnkey-foo
+//   - --isolation-dir=.custom -> --isolation-dir=.custom (already dotted, pass through)
+//   - No --isolation-dir      -> unchanged (uses .turnkey from buckconfig)
+func transformIsolationDir(args []string) []string {
+	result := make([]string, 0, len(args))
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
+		// Handle --isolation-dir=value format
+		if strings.HasPrefix(arg, "--isolation-dir=") {
+			value := strings.TrimPrefix(arg, "--isolation-dir=")
+			transformed := transformIsolationDirValue(value)
+			result = append(result, "--isolation-dir="+transformed)
+			continue
+		}
+
+		// Handle --isolation-dir value format (two separate args)
+		if arg == "--isolation-dir" && i+1 < len(args) {
+			value := args[i+1]
+			transformed := transformIsolationDirValue(value)
+			result = append(result, "--isolation-dir", transformed)
+			i++ // Skip the next arg since we consumed it
+			continue
+		}
+
+		result = append(result, arg)
+	}
+
+	return result
+}
+
+// transformIsolationDirValue transforms an isolation dir value.
+// If it already starts with ".", it's passed through unchanged.
+// Otherwise, it's prefixed with ".turnkey-".
+func transformIsolationDirValue(value string) string {
+	if strings.HasPrefix(value, ".") {
+		// Already starts with dot, pass through
+		return value
+	}
+	// Prefix with .turnkey-
+	return ".turnkey-" + value
 }
 
 func printHelp() {
@@ -518,16 +569,25 @@ Commands that pass through directly (no sync):
 
 Unknown commands default to syncing first (safe default).
 
+Isolation Directory:
+  tk transforms --isolation-dir to use .turnkey prefix, ensuring build
+  artifacts are hidden from Go/Cargo/pytest (which ignore dot directories).
+
+  --isolation-dir=foo     -> buck2 --isolation-dir=.turnkey-foo
+  --isolation-dir=.custom -> buck2 --isolation-dir=.custom (unchanged)
+  (no flag)               -> uses .turnkey from buckconfig
+
 Configuration:
   tk reads .turnkey/sync.toml for staleness rules.
 
 Examples:
-  tk build //some:target          # sync then build
-  tk test //some:target           # sync then test
-  tk --no-sync build //some:target # skip sync
-  tk sync                         # just run sync
-  tk check                        # check staleness
-  tk clean                        # clean (no sync needed)
-  tk --dry-run sync               # show what would be synced
+  tk build //some:target              # sync then build
+  tk test //some:target               # sync then test
+  tk --no-sync build //some:target    # skip sync
+  tk sync                             # just run sync
+  tk check                            # check staleness
+  tk clean                            # clean (no sync needed)
+  tk --dry-run sync                   # show what would be synced
+  tk --isolation-dir=test build //foo # uses .turnkey-test isolation
 `)
 }
