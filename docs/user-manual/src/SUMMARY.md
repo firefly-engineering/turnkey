@@ -2,6 +2,12 @@
 
 [Introduction](./introduction.md)
 
+# Vision
+
+- [Why Turnkey](./vision/why-turnkey.md)
+- [Core Principles](./vision/core-principles.md)
+- [Architecture Overview](./vision/architecture.md)
+
 # Getting Started
 
 - [Installation](./getting-started/installation.md)
