@@ -12,6 +12,7 @@ members = [
     "cmd/pydeps-gen",
     "cmd/rustdeps-gen",
     "cmd/rustfeatures-gen",
+    "cmd/soldeps-gen",
     "examples/rust-hello",
     "examples/rust-hello-deps",
     "rust/prefetch-cache",

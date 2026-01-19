@@ -2,6 +2,7 @@
 #
 # Provides a dispatch mechanism to fetch sources from different origins:
 #   - github: GitHub repositories
+#   - git: Generic git repositories (for Foundry deps, etc.)
 #   - cratesio: Rust crates from crates.io
 #   - pypi: Python packages from PyPI
 #   - goproxy: Go modules from proxy.golang.org
@@ -15,6 +16,8 @@ rec {
   fetch = fetchSpec:
     if fetchSpec.type == "github" then
       fetchGitHub fetchSpec
+    else if fetchSpec.type == "git" then
+      fetchGit fetchSpec
     else if fetchSpec.type == "cratesio" then
       fetchCratesIO fetchSpec
     else if fetchSpec.type == "pypi" then
@@ -33,6 +36,16 @@ rec {
       inherit (fetchSpec) owner repo rev;
       sha256 = fetchSpec.sha256;
       sparseCheckout = fetchSpec.sparseCheckout or [];
+    };
+
+  # Fetch from a generic git repository
+  # fetchSpec: { type, url, rev, hash, ?submodules }
+  # Used for Foundry/Solidity dependencies that reference git repos
+  fetchGit = fetchSpec:
+    builtins.fetchGit {
+      inherit (fetchSpec) url rev;
+      allRefs = true;
+      submodules = fetchSpec.submodules or false;
     };
 
   # Fetch from crates.io
@@ -86,6 +99,12 @@ rec {
     type = "github";
     inherit owner repo rev sha256 sparseCheckout;
   };
+
+  # Helper to create a fetch spec for generic git repos (Foundry deps, etc.)
+  mkGitSpec = { url, rev, hash ? null, submodules ? false }: {
+    type = "git";
+    inherit url rev submodules;
+  } // lib.optionalAttrs (hash != null) { inherit hash; };
 
   # Helper to create a fetch spec for crates.io
   mkCratesIOSpec = { crateName, version, sha256 }: {

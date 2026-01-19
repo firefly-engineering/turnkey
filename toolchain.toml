@@ -26,8 +26,9 @@ typescript = {}
 biome = {}  # Fast linter and formatter for JS/TS/JSON
 
 # Solidity toolchain
-solc = {}      # Solidity compiler
-foundry = {}   # Ethereum dev toolkit (forge, cast, anvil)
+solc = {}         # Solidity compiler
+foundry = {}      # Ethereum dev toolkit (forge, cast, anvil)
+soldeps-gen = {}  # Tool for generating solidity-deps.toml from foundry.toml
 
 # Documentation tools
 mdbook = {}

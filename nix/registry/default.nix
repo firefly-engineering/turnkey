@@ -64,6 +64,7 @@
   # ==========================================================================
   solc = pkgs.solc;  # Solidity compiler
   foundry = pkgs.foundry;  # Ethereum dev toolkit (forge, cast, anvil)
+  soldeps-gen = import ../packages/soldeps-gen.nix { inherit pkgs lib; };
 
   # ==========================================================================
   # Documentation tooling
