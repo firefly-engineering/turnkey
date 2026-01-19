@@ -224,6 +224,7 @@
           forge_path = "${registry.foundry}/bin/forge";
           cast_path = "${registry.foundry}/bin/cast";
           anvil_path = "${registry.foundry}/bin/anvil";
+          soldeps_path = ".turnkey/soldeps";
         };
       }
     ];

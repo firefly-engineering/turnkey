@@ -12,8 +12,6 @@ solidity_library(
     deps = [
         "soldeps//:openzeppelin_contracts",
     ],
-    # Auto-generate remappings from the soldeps cell
-    soldeps_cell = ".turnkey/soldeps",
     optimizer = True,
     optimizer_runs = 200,
     visibility = ["PUBLIC"],
@@ -35,8 +33,6 @@ solidity_test(
         ":token_lib",
         "soldeps//:forge_std",
     ],
-    # Auto-generate remappings from the soldeps cell
-    soldeps_cell = ".turnkey/soldeps",
     fuzz_runs = 256,
     visibility = ["PUBLIC"],
 )

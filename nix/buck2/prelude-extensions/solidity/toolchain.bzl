@@ -43,6 +43,7 @@ def _system_solidity_toolchain_impl(ctx: AnalysisContext) -> list[Provider]:
         forge = forge_run_info,
         cast = cast_run_info,
         anvil = anvil_run_info,
+        soldeps_path = ctx.attrs.soldeps_path,
     )
 
     return [
@@ -81,6 +82,11 @@ system_solidity_toolchain = rule(
             attrs.string(),
             default = None,
             doc = "Path to the Foundry anvil binary (for local node)",
+        ),
+        "soldeps_path": attrs.option(
+            attrs.string(),
+            default = None,
+            doc = "Path to the soldeps cell directory for automatic import remapping",
         ),
     },
     is_toolchain_rule = True,

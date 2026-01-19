@@ -11,7 +11,7 @@ def _solidity_test_impl(ctx: AnalysisContext) -> list[Provider]:
     """Implementation of solidity_test rule.
 
     Runs Solidity tests using Foundry's forge test command.
-    Remappings are auto-generated from soldeps_cell if provided.
+    Remappings are auto-generated from the toolchain's soldeps path.
     """
     toolchain = ctx.attrs._solidity_toolchain[SolidityToolchainInfo]
 
@@ -185,10 +185,10 @@ cd "$WORK_DIR"
     for artifact in dep_artifacts:
         test_cmd.add(artifact)
 
-    # Add soldeps cell path if provided
-    if ctx.attrs.soldeps_cell:
+    # Add soldeps cell path from toolchain for auto-remapping
+    if toolchain.soldeps_path:
         test_cmd.add("--soldeps-cell")
-        test_cmd.add(ctx.attrs.soldeps_cell)
+        test_cmd.add(toolchain.soldeps_path)
 
     # Create run info for test execution
     run_info = RunInfo(args = test_cmd)
@@ -215,16 +215,11 @@ solidity_test = rule(
             default = [],
             doc = "Dependencies (solidity_library targets or filegroups from soldeps)",
         ),
-        "soldeps_cell": attrs.option(
-            attrs.string(),
-            default = None,
-            doc = "Path to the soldeps cell directory. When set, remappings are auto-generated from the cell's remappings.txt.",
-        ),
         "remappings": attrs.dict(
             key = attrs.string(),
             value = attrs.string(),
             default = {},
-            doc = "Additional import remappings. Usually not needed when using soldeps_cell.",
+            doc = "Additional import remappings. Usually not needed as remappings are auto-generated from the toolchain's soldeps.",
         ),
         "fuzz_runs": attrs.option(
             attrs.int(),

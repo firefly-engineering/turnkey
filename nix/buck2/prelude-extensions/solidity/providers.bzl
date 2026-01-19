@@ -14,6 +14,7 @@ SolidityToolchainInfo = provider(
         "forge": provider_field(typing.Any, default = None),  # RunInfo for forge (testing)
         "cast": provider_field(typing.Any, default = None),  # RunInfo for cast (interactions)
         "anvil": provider_field(typing.Any, default = None),  # RunInfo for anvil (local node)
+        "soldeps_path": provider_field(typing.Any, default = None),  # str - path to soldeps cell for auto-remapping
     },
 )
 

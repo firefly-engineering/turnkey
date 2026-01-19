@@ -149,10 +149,10 @@ done
     for src in ctx.attrs.srcs:
         compile_cmd.add(src)
 
-    # Add soldeps cell path if we have a soldeps_cell attribute
-    if ctx.attrs.soldeps_cell:
+    # Add soldeps cell path from toolchain for auto-remapping
+    if toolchain.soldeps_path:
         compile_cmd.add("--soldeps-cell")
-        compile_cmd.add(ctx.attrs.soldeps_cell)
+        compile_cmd.add(toolchain.soldeps_path)
 
     # Add explicit remappings (these should be path-based, not Buck targets)
     if all_remappings:
@@ -201,16 +201,11 @@ solidity_library = rule(
             default = [],
             doc = "Dependencies (other solidity_library targets or filegroups from soldeps)",
         ),
-        "soldeps_cell": attrs.option(
-            attrs.string(),
-            default = None,
-            doc = "Path to the soldeps cell directory. When set, remappings are auto-generated from the cell's remappings.txt.",
-        ),
         "remappings": attrs.dict(
             key = attrs.string(),
             value = attrs.string(),
             default = {},
-            doc = "Additional import remappings. Usually not needed when using soldeps_cell.",
+            doc = "Additional import remappings. Usually not needed as remappings are auto-generated from the toolchain's soldeps.",
         ),
         "solc_version": attrs.option(
             attrs.string(),
@@ -230,5 +225,5 @@ solidity_library = rule(
             providers = [SolidityToolchainInfo],
         ),
     },
-    doc = "Compiles Solidity sources to bytecode and ABI. Use soldeps_cell for automatic remapping generation.",
+    doc = "Compiles Solidity sources to bytecode and ABI. Remappings are auto-generated from the toolchain.",
 )
