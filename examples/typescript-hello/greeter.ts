@@ -1,9 +1,9 @@
 // A simple greeter module
 
 export function greet(name: string): string {
-  return `Hello, ${name}!`;
+	return `Hello, ${name}!`;
 }
 
 export function greetWorld(): string {
-  return greet("World");
+	return greet("World");
 }

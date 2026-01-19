@@ -11,5 +11,8 @@ console.log(`Sum of doubled: ${sum}`);
 
 // Use some lodash utilities
 const names = ["Alice", "Bob", "Charlie"];
-const greeting = _.join(_.map(names, (name: string) => `Hello, ${name}!`), "\n");
-console.log("\n" + greeting);
+const greeting = _.join(
+	_.map(names, (name: string) => `Hello, ${name}!`),
+	"\n",
+);
+console.log(`\n${greeting}`);
