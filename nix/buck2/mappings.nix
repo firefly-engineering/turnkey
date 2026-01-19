@@ -223,6 +223,8 @@
         # Dynamic attrs resolved at build time from registry
         dynamicAttrs = registry: {
           mdbook_path = "${registry.mdbook}/bin/mdbook";
+          # Output served books to .turnkey/books/ to keep source tree clean
+          serve_output_dir = ".turnkey/books";
         };
       }
     ];

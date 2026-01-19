@@ -20,6 +20,7 @@ def _system_mdbook_toolchain_impl(ctx: AnalysisContext) -> list[Provider]:
 
     toolchain_info = MdbookToolchainInfo(
         mdbook = mdbook_run_info,
+        serve_output_dir = ctx.attrs.serve_output_dir,
     )
 
     return [
@@ -32,6 +33,11 @@ system_mdbook_toolchain = rule(
     attrs = {
         "mdbook_path": attrs.string(
             doc = "Path to the mdbook binary",
+        ),
+        "serve_output_dir": attrs.option(
+            attrs.string(),
+            default = None,
+            doc = "Directory for serve output relative to project root (e.g. '.turnkey/books'). If not set, outputs to book/ in the source directory.",
         ),
     },
     is_toolchain_rule = True,

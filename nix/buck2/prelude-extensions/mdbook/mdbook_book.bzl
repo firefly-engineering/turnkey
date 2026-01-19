@@ -84,22 +84,55 @@ def _mdbook_book_impl(ctx: AnalysisContext) -> list[Provider]:
 
     # Get the book directory from book_toml path
     # book_toml is like "docs/user-manual/book.toml", we need "docs/user-manual"
-    serve_lines = [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        "",
-        "# Arguments: mdbook_path book_toml [serve args]",
-        "MDBOOK=$1",
-        "BOOK_TOML=$2",
-        "shift 2",
-        "",
-        "# Get the directory containing book.toml",
-        'BOOK_DIR=$(dirname "$BOOK_TOML")',
-        "",
-        "# Run mdbook serve from the book directory",
-        'cd "$BOOK_DIR"',
-        '"$MDBOOK" serve "$@"',
-    ]
+    serve_output_dir = toolchain.serve_output_dir
+
+    if serve_output_dir:
+        # Custom output directory configured in toolchain
+        serve_lines = [
+            "#!/usr/bin/env bash",
+            "set -euo pipefail",
+            "",
+            "# Arguments: mdbook_path book_toml [serve args]",
+            "MDBOOK=$1",
+            "BOOK_TOML=$2",
+            "shift 2",
+            "",
+            "# Get the directory containing book.toml",
+            'BOOK_DIR=$(dirname "$BOOK_TOML")',
+            'BOOK_NAME=$(basename "$BOOK_DIR")',
+            "",
+            "# Find project root (where .buckconfig is)",
+            'PROJECT_ROOT=$(pwd)',
+            'while [[ "$PROJECT_ROOT" != "/" && ! -f "$PROJECT_ROOT/.buckconfig" ]]; do',
+            '    PROJECT_ROOT=$(dirname "$PROJECT_ROOT")',
+            "done",
+            "",
+            "# Output to configured directory to keep source tree clean",
+            'OUTPUT_DIR="$PROJECT_ROOT/{}/$BOOK_NAME"'.format(serve_output_dir),
+            'mkdir -p "$OUTPUT_DIR"',
+            "",
+            "# Run mdbook serve from the book directory with custom output",
+            'cd "$BOOK_DIR"',
+            '"$MDBOOK" serve --dest-dir "$OUTPUT_DIR" "$@"',
+        ]
+    else:
+        # Default behavior: output to book/ in source directory
+        serve_lines = [
+            "#!/usr/bin/env bash",
+            "set -euo pipefail",
+            "",
+            "# Arguments: mdbook_path book_toml [serve args]",
+            "MDBOOK=$1",
+            "BOOK_TOML=$2",
+            "shift 2",
+            "",
+            "# Get the directory containing book.toml",
+            'BOOK_DIR=$(dirname "$BOOK_TOML")',
+            "",
+            "# Run mdbook serve from the book directory",
+            'cd "$BOOK_DIR"',
+            '"$MDBOOK" serve "$@"',
+        ]
 
     ctx.actions.write(
         serve_script,
