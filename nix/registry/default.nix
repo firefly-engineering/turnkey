@@ -18,6 +18,7 @@
   # Go toolchain
   # ==========================================================================
   go = pkgs.go;
+  golangci-lint = pkgs.golangci-lint;
   godeps-gen = import ../packages/godeps-gen.nix { inherit pkgs lib; };
   gobuckify = import ../packages/gobuckify.nix { inherit pkgs lib; };
 
@@ -38,6 +39,7 @@
   # ==========================================================================
   python = pkgs.python3;
   uv = pkgs.uv;  # Python package manager for lock file generation
+  ruff = pkgs.ruff;  # Python linter and formatter
   pydeps-gen = import ../packages/pydeps-gen.nix { inherit pkgs lib; };
   pytest = pkgs.python3Packages.pytest;
 

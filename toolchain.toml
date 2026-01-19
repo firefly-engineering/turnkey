@@ -8,6 +8,7 @@ buck2 = {}
 # Language toolchains (used by Buck2)
 # These are automatically wrapped with tw for auto-sync when dependency files change
 go = {}
+golangci-lint = {}  # Go linter
 rust = {}
 cargo = {}
 clippy = {}         # Rust linter
@@ -16,6 +17,7 @@ rust-analyzer = {}  # Rust LSP server
 cargo-edit = {}     # Provides cargo add/rm/upgrade
 python = {}
 uv = {}        # Python package manager for lock file generation
+ruff = {}      # Python linter and formatter
 reindeer = {}  # Tool for generating Buck2 targets from Cargo.toml
 
 # JavaScript/TypeScript (no Buck2 toolchain, but available for genrule builds)
