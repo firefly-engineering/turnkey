@@ -34,11 +34,11 @@ pkgs.buildGoModule {
   sourceRoot = "${src.name}/prelude/go/tools/gobuckify";
 
   patches = [
-    ../patches/gobuckify/use-go-directly.patch
-    ../patches/gobuckify/fix-goroutine-closure.patch
-    ../patches/gobuckify/fix-platform-select-syntax.patch
-    ../patches/gobuckify/fix-cross-platform-analysis.patch
-    ../patches/gobuckify/configurable-buildfile-name.patch
+    ../patches/gobuckify/01-use-go-directly.patch
+    ../patches/gobuckify/02-fix-goroutine-closure.patch
+    ../patches/gobuckify/03-fix-platform-select-syntax.patch
+    ../patches/gobuckify/04-fix-cross-platform-analysis.patch
+    ../patches/gobuckify/05-configurable-buildfile-name.patch
   ];
 
   # gobuckify doesn't have a go.mod in the repo (it's a Buck2 project)
