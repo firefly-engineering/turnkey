@@ -26,6 +26,10 @@
   # ==========================================================================
   rust = pkgs.rustc;
   cargo = pkgs.cargo;
+  clippy = pkgs.clippy;
+  rustfmt = pkgs.rustfmt;
+  rust-analyzer = pkgs.rust-analyzer;
+  cargo-edit = pkgs.cargo-edit;  # Provides cargo add/rm/upgrade
   reindeer = pkgs.reindeer;
   rustdeps-gen = import ../packages/rustdeps-gen.nix { inherit pkgs lib; };
 

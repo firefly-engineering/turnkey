@@ -53,7 +53,9 @@ struct PnpmLockfile {
     lockfile_version: String,
     #[serde(default)]
     packages: BTreeMap<String, PnpmPackage>,
+    /// Snapshots section (pnpm v9+) - parsed for schema completeness
     #[serde(default)]
+    #[allow(dead_code)]
     snapshots: BTreeMap<String, PnpmSnapshot>,
 }
 
@@ -68,7 +70,9 @@ struct PnpmPackage {
 }
 
 /// Snapshot entry in pnpm-lock.yaml (v9+)
+/// Parsed for schema completeness; not currently used in processing.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct PnpmSnapshot {
     #[serde(default)]
     dependencies: BTreeMap<String, PnpmSnapshotDep>,
@@ -78,6 +82,7 @@ struct PnpmSnapshot {
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
+#[allow(dead_code)]
 enum PnpmSnapshotDep {
     Simple(String),
     Complex { version: String },
