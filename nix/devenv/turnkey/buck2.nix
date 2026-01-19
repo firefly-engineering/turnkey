@@ -144,6 +144,9 @@ ${generateTargets finalToolchains}
     [cells]
         toolchains = .
         prelude = ${preludeCellPath}
+
+    [buildfile]
+        name = rules.star
     BUCKCONFIG
   '';
 
