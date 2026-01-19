@@ -38,6 +38,7 @@ pkgs.buildGoModule {
     ../patches/gobuckify/fix-goroutine-closure.patch
     ../patches/gobuckify/fix-platform-select-syntax.patch
     ../patches/gobuckify/fix-cross-platform-analysis.patch
+    ../patches/gobuckify/configurable-buildfile-name.patch
   ];
 
   # gobuckify doesn't have a go.mod in the repo (it's a Buck2 project)

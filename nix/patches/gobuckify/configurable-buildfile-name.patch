@@ -1,0 +1,33 @@
+diff --git a/config.go b/config.go
+--- a/config.go
++++ b/config.go
+@@ -26,6 +26,7 @@ type BuckConfig struct {
+ 	DepsAttr               string `json:"deps_attr"`                 // custom attribute for dependencies e.g. "go_external_deps". Default: "deps"
+ 	OSConstraintPrefix     string `json:"os_constraint_prefix"`      // prefix for OS constraint targets in select(), e.g. "config//os:". Default: "" (raw os name)
+ 	ArchConstraintPrefix   string `json:"arch_constraint_prefix"`    // prefix for arch constraint targets in select(), e.g. "config//cpu:". Default: "" (raw arch name)
++	BuildfileName          string `json:"buildfile_name"`            // output filename for build files. Default: "BUCK"
+ }
+
+ // PlatformConfig mapping between goos/goarch and buck os/arch
+@@ -66,6 +67,9 @@ func (c *Config) ensureDefaultValues() {
+ 	if c.BuckConfig.DepsAttr == "" {
+ 		c.BuckConfig.DepsAttr = "deps"
+ 	}
++	if c.BuckConfig.BuildfileName == "" {
++		c.BuckConfig.BuildfileName = "BUCK"
++	}
+ 	if c.BuckConfig.DepsTargetLabelPrefix == "" {
+ 		slog.Info("DepsTargetLabelPrefix is not set, dependencies will be formatted as raw import paths")
+ 	}
+diff --git a/render.go b/render.go
+--- a/render.go
++++ b/render.go
+@@ -89,7 +89,7 @@ func renderBuckFiles(cfg *Config, thirdPartyDir string, targets BuckTargets) err
+ 	for _, target := range targets {
+ 		target := target
+ 		g.Go(func() error {
+-			buckFile := filepath.Join(thirdPartyDir, "vendor", target.ImportPath, "BUCK")
++			buckFile := filepath.Join(thirdPartyDir, "vendor", target.ImportPath, cfg.BuckConfig.BuildfileName)
+ 			f, err := os.Create(buckFile)
+ 			if err != nil {
+ 				return fmt.Errorf("can't create BUCK file: %w", err)
