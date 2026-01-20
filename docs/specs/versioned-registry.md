@@ -388,27 +388,44 @@ This keeps the design simple while supporting the use case.
 
 ### 2. Metadata (Deprecation, EOL)
 
-**Deferred:** Valuable but not in initial implementation.
+**Implemented:** Version entries can include deprecation and EOL metadata.
 
-Future enhancement to add metadata to versions:
+Version entries support two formats:
+1. **Plain derivation** (existing): `"1.23" = final.go_1_23;`
+2. **Extended with metadata** (new):
+   ```nix
+   "1.22" = {
+     package = final.go_1_22;
+     deprecated = true;
+     deprecationMessage = "Use 1.23 instead";
+     eol = "2025-02-01";
+   };
+   ```
 
-```nix
-versions = {
-  "1.22" = {
-    package = final.go_1_22;
-    deprecated = true;
-    deprecationMessage = "Use 1.23 instead";
-    eol = "2025-02-01";
-  };
-};
+**Metadata Fields:**
+- `package` (required for extended format): The actual derivation
+- `deprecated` (bool, optional): Mark version as deprecated
+- `deprecationMessage` (string, optional): Migration guidance shown in warning
+- `eol` (string, optional): End-of-life date in ISO 8601 format (YYYY-MM-DD)
+
+**Behavior:**
+- Warnings emitted via `lib.warn` during Nix evaluation when:
+  - `deprecated = true` is set
+  - EOL date has passed (compared against current date)
+- Warnings include toolchain name, version, and any migration guidance
+- Set `TURNKEY_NO_DEPRECATION_WARNINGS=1` to suppress all deprecation warnings
+
+**Example with warnings:**
+```
+warning: DEPRECATED: Toolchain 'go' version '1.21' is deprecated.
+  Use 1.22 or later instead
+warning: EOL: Toolchain 'python' version '3.9' reached end-of-life on 2025-10-01.
 ```
 
-When implemented, Turnkey should:
-- Warn when instantiating deprecated toolchains
-- Warn when EOL date has passed
-- Provide clear migration guidance
+**Backward Compatibility:**
+Plain derivation entries continue to work unchanged. Detection is based on the presence of the `package` attribute.
 
-See task: **turnkey-xhyu**
+See implementation: `nix/lib/default.nix`
 
 ### 3. Toolchain Groups (Meta-Packages)
 
