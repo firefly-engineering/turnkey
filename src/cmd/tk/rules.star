@@ -5,6 +5,7 @@ go_binary(
     name = "tk",
     srcs = ["main.go"],
     deps = [
+        "//src/go/pkg/localconfig:localconfig",
         "//src/go/pkg/syncconfig:syncconfig",
         "//src/go/pkg/syncer:syncer",
     ],

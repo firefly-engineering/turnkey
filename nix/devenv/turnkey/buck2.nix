@@ -134,19 +134,16 @@ ${generateTargets finalToolchains}
   toolchainsCell = pkgs.runCommand "turnkey-toolchains-cell" { } ''
     mkdir -p $out
 
-    # Create rules.star file
-    cat > $out/rules.star <<'RULES'
+    # Create BUCK file (Buck2's buildfile name setting only applies to root cell)
+    cat > $out/BUCK <<'BUCK'
     ${buckFileContent}
-    RULES
+    BUCK
 
     # Create cell identity .buckconfig
     cat > $out/.buckconfig <<'BUCKCONFIG'
     [cells]
         toolchains = .
         prelude = ${preludeCellPath}
-
-    [buildfile]
-        name = rules.star
     BUCKCONFIG
   '';
 

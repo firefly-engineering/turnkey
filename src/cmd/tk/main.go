@@ -22,6 +22,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/localconfig"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncer"
 )
@@ -44,6 +45,7 @@ var passThroughCommands = []string{
 // Flags
 var (
 	noSync  bool
+	noLocal bool
 	verbose bool
 	dryRun  bool
 	quiet   bool
@@ -99,6 +101,9 @@ func parseFlags(args []string) []string {
 		switch args[0] {
 		case "--no-sync":
 			noSync = true
+			args = args[1:]
+		case "--no-local":
+			noLocal = true
 			args = args[1:]
 		case "--verbose", "-v":
 			verbose = true
@@ -460,6 +465,11 @@ func delegateToBuck2(args []string) {
 	// Transform --isolation-dir to use .turnkey prefix
 	args = transformIsolationDir(args)
 
+	// Apply local target overrides if enabled
+	if !noLocal {
+		args = applyLocalOverrides(args)
+	}
+
 	if verbose {
 		fmt.Fprintf(os.Stderr, "tk: executing buck2 %v\n", args)
 	}
@@ -471,6 +481,104 @@ func delegateToBuck2(args []string) {
 		fmt.Fprintf(os.Stderr, "tk: failed to exec buck2: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// applyLocalOverrides loads local.toml and injects target-specific args.
+// It looks for the first target in args (starting with //) and checks
+// if there's an override for it in the config.
+func applyLocalOverrides(args []string) []string {
+	if len(args) == 0 {
+		return args
+	}
+
+	// Find project root to load config
+	root, err := findProjectRoot()
+	if err != nil {
+		if verbose {
+			fmt.Fprintf(os.Stderr, "tk: could not find project root for local config: %v\n", err)
+		}
+		return args
+	}
+
+	// Load local config
+	cfg, err := localconfig.LoadDefaultFrom(root)
+	if err != nil {
+		if verbose {
+			fmt.Fprintf(os.Stderr, "tk: could not load local config: %v\n", err)
+		}
+		return args
+	}
+
+	if !cfg.HasOverrides() {
+		return args
+	}
+
+	// Get the subcommand (first arg)
+	subcommand := args[0]
+
+	// Only apply to run, build, test
+	if subcommand != "run" && subcommand != "build" && subcommand != "test" {
+		return args
+	}
+
+	// Find the target (first arg starting with //)
+	target := ""
+	for _, arg := range args[1:] {
+		if strings.HasPrefix(arg, "//") {
+			target = arg
+			break
+		}
+		// Stop at -- separator
+		if arg == "--" {
+			break
+		}
+	}
+
+	if target == "" {
+		return args
+	}
+
+	// Look up override
+	override := cfg.GetOverride(subcommand, target)
+	if override == nil || len(override.Args) == 0 {
+		return args
+	}
+
+	if verbose {
+		fmt.Fprintf(os.Stderr, "tk: applying local override for %s %s: %v\n", subcommand, target, override.Args)
+	}
+
+	// Inject args after existing -- or add new --
+	return injectArgsAfterSeparator(args, override.Args)
+}
+
+// injectArgsAfterSeparator appends args after the -- separator.
+// If no -- exists, it adds one and then the args.
+func injectArgsAfterSeparator(args []string, toInject []string) []string {
+	// Find existing -- separator
+	separatorIdx := -1
+	for i, arg := range args {
+		if arg == "--" {
+			separatorIdx = i
+			break
+		}
+	}
+
+	if separatorIdx == -1 {
+		// No separator, add -- and args at the end
+		result := make([]string, 0, len(args)+1+len(toInject))
+		result = append(result, args...)
+		result = append(result, "--")
+		result = append(result, toInject...)
+		return result
+	}
+
+	// Insert args after --
+	result := make([]string, 0, len(args)+len(toInject))
+	result = append(result, args[:separatorIdx+1]...)
+	result = append(result, toInject...)
+	result = append(result, args[separatorIdx+1:]...)
+	return result
 }
 
 // transformIsolationDir transforms --isolation-dir values to use .turnkey prefix.
@@ -531,6 +639,7 @@ the build graph, ensuring generated files are up-to-date.
 
 tk-specific flags (must come before subcommand):
   --no-sync    Skip sync, run buck2 directly
+  --no-local   Skip local target overrides from .turnkey/local.toml
   --verbose    Show what tk is doing
   -v           Same as --verbose
   --quiet      Suppress non-error output
@@ -563,13 +672,29 @@ Isolation Directory:
   --isolation-dir=.custom -> buck2 --isolation-dir=.custom (unchanged)
   (no flag)               -> uses .turnkey from buckconfig
 
+Local Target Overrides:
+  tk reads .turnkey/local.toml for per-developer target overrides.
+  This file is not committed to git, allowing local customization.
+
+  Example .turnkey/local.toml:
+    [run."//docs/user-manual"]
+    args = ["-n", "192.168.1.100"]
+
+    [test."//src/..."]
+    args = ["--verbose"]
+
+  The args are injected after -- when running that target.
+  Use --no-local to skip applying local overrides.
+
 Configuration:
   tk reads .turnkey/sync.toml for staleness rules.
+  tk reads .turnkey/local.toml for local target overrides.
 
 Examples:
   tk build //some:target              # sync then build
   tk test //some:target               # sync then test
   tk --no-sync build //some:target    # skip sync
+  tk --no-local run //target          # skip local overrides
   tk sync                             # just run sync
   tk check                            # check staleness
   tk clean                            # clean (no sync needed)
