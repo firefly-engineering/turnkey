@@ -8,13 +8,13 @@ Turnkey bridges declarative TOML configuration with Nix package resolution, prov
 
 - **Simple Configuration**: Declare toolchains in `toolchain.toml`
 - **Reproducible Environments**: Nix ensures consistent tool versions across machines
-- **Buck2 Integration**: First-class support for Buck2 build system
-- **Language Support**: Go, Rust, Python, TypeScript, and more
+- **Incremental Builds**: Fast, cached builds that only rebuild what changed
+- **Language Support**: Go, Rust, Python, TypeScript, Solidity, Jsonnet, and more
 
 ## Key Features
 
 - Declarative toolchain management via TOML
-- Automatic dependency cell generation for Buck2
+- Automatic dependency cell generation for the build system
 - Native tool wrappers with auto-sync (`go`, `cargo`, `uv`)
 - Modular Nix flake integration
 
@@ -23,7 +23,7 @@ Turnkey bridges declarative TOML configuration with Nix package resolution, prov
 Turnkey is designed for teams who:
 
 - Want reproducible development environments
-- Use or are adopting Buck2 as their build system
+- Need fast, incremental builds across multiple languages
 - Need to manage multiple language toolchains
 - Value declarative, version-controlled configuration
 

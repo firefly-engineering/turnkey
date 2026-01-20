@@ -1,6 +1,8 @@
 # Architecture Overview
 
-Turnkey combines three powerful technologies - **Nix**, **Buck2**, and **devenv** - into a cohesive developer experience. This chapter explains how these pieces fit together.
+Turnkey combines three powerful technologies - **Nix**, an **incremental build system**, and **devenv** - into a cohesive developer experience. This chapter explains how these pieces fit together.
+
+> **Current Implementation:** Turnkey uses Buck2 as its incremental build system. The architecture is designed to potentially support other systems like Bazel in the future.
 
 ## The Three Pillars
 
@@ -8,9 +10,9 @@ Turnkey combines three powerful technologies - **Nix**, **Buck2**, and **devenv*
 ┌─────────────────────────────────────────────────────────────┐
 │                     Developer Experience                     │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │ go build    │  │ buck2 build │  │ IDE / LSP           │  │
-│  │ cargo test  │  │ buck2 test  │  │ Autocomplete        │  │
-│  │ pytest      │  │ buck2 run   │  │ Go to definition    │  │
+│  │ go build    │  │ tk build    │  │ IDE / LSP           │  │
+│  │ cargo test  │  │ tk test     │  │ Autocomplete        │  │
+│  │ pytest      │  │ tk run      │  │ Go to definition    │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -19,7 +21,7 @@ Turnkey combines three powerful technologies - **Nix**, **Buck2**, and **devenv*
 │                         Turnkey                              │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │ tw wrappers │  │ tk CLI      │  │ Dep generators      │  │
-│  │ Auto-sync   │  │ Buck2 wrap  │  │ godeps-gen, etc.    │  │
+│  │ Auto-sync   │  │ Build wrap  │  │ godeps-gen, etc.    │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -27,7 +29,7 @@ Turnkey combines three powerful technologies - **Nix**, **Buck2**, and **devenv*
 ┌─────────────────────────────────────────────────────────────┐
 │                    Core Technologies                         │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │    Nix      │  │   Buck2     │  │      devenv         │  │
+│  │    Nix      │  │Build System │  │      devenv         │  │
 │  │ Hermetic    │  │ Incremental │  │ Shell environment   │  │
 │  │ packages    │  │ builds      │  │ configuration       │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘  │
@@ -46,11 +48,11 @@ Nix provides **reproducible package management**. Every tool, compiler, and libr
 
 **Key benefit:** When you enter the development shell, you have the *exact same tools* as every other developer and CI system.
 
-### Buck2: Incremental Build System
+### Incremental Build System (Buck2)
 
-Buck2 provides **fast, incremental, and correct builds**. It tracks dependencies at a fine-grained level and only rebuilds what's necessary.
+The build system provides **fast, incremental, and correct builds**. It tracks dependencies at a fine-grained level and only rebuilds what's necessary.
 
-**What Buck2 provides:**
+**What the build system provides:**
 - Dependency tracking between files and targets
 - Parallel execution of independent tasks
 - Remote caching (share builds across machines)
@@ -71,7 +73,7 @@ devenv provides a **declarative shell environment** configured through Nix. It h
 
 ## The Flow of Data
 
-### From Lock Files to Buck2 Cells
+### From Lock Files to Build System Cells
 
 ```
 ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
@@ -88,8 +90,8 @@ devenv provides a **declarative shell environment** configured through Nix. It h
 
 1. **Native lock files** (go.sum, Cargo.lock, pnpm-lock.yaml) define exact dependency versions
 2. **Dependency generators** (godeps-gen, rustdeps-gen, etc.) parse lock files and output intermediate TOML
-3. **Nix** fetches dependencies with verified hashes and creates Buck2-compatible cells
-4. **Buck2** treats these cells as source code, enabling full incrementality
+3. **Nix** fetches dependencies with verified hashes and creates build-system-compatible cells
+4. **The build system** treats these cells as source code, enabling full incrementality
 
 ### The tw Wrapper Flow
 
@@ -126,7 +128,7 @@ Developer runs: tw go get github.com/foo/bar
                     [Done]
 ```
 
-The `tw` wrapper ensures Buck2's view of dependencies stays synchronized with native tools, without requiring developer intervention.
+The `tw` wrapper ensures the build system's view of dependencies stays synchronized with native tools, without requiring developer intervention.
 
 ## Directory Structure
 
@@ -134,8 +136,8 @@ A typical Turnkey-enabled project looks like:
 
 ```
 project/
-├── .buckconfig              → Symlink to generated config
-├── .buckroot                → Marks project root for Buck2
+├── .buckconfig              → Symlink to generated config (Buck2)
+├── .buckroot                → Marks project root for build system
 ├── .envrc                   → Activates devenv via direnv
 ├── flake.nix                → Nix flake configuration
 ├── flake.lock               → Locked Nix dependencies
@@ -144,7 +146,7 @@ project/
 ├── src/                     → Your source code
 │   ├── cmd/
 │   ├── pkg/
-│   └── rules.star           → Buck2 build rules
+│   └── rules.star           → Build rules
 │
 ├── go.mod                   → Go module definition
 ├── go.sum                   → Go dependency lock
@@ -155,7 +157,7 @@ project/
 ├── rust-deps.toml          → Generated dependency manifest
 │
 └── .turnkey/               → Generated artifacts (gitignored)
-    ├── prelude/            → Buck2 prelude cell
+    ├── prelude/            → Build system prelude cell
     ├── toolchains/         → Toolchain definitions
     ├── godeps/             → Go dependency cell
     ├── rustdeps/           → Rust dependency cell
@@ -174,8 +176,8 @@ project/
 ### What's Generated (Not Committed)
 
 - `.turnkey/` directory (regenerated from lock files)
-- `.buckconfig` (symlinked to Nix store)
-- Buck2 build outputs (`buck-out/`)
+- `.buckconfig` (symlinked to Nix store, Buck2-specific)
+- Build outputs (`buck-out/`)
 
 ## The Toolchain Flow
 
@@ -199,8 +201,8 @@ project/
 
 1. `toolchain.toml` declares what toolchains you need
 2. The **registry** maps toolchain names to Nix packages
-3. **mappings** translate these into Buck2 toolchain targets
-4. Buck2 uses the toolchain targets for builds
+3. **mappings** translate these into build system toolchain targets
+4. The build system uses the toolchain targets for builds
 
 ## Summary
 
@@ -210,7 +212,7 @@ Turnkey's architecture achieves its goals through careful layering:
 |-------|---------------|------------|
 | Top | Developer UX | Native tools, tw/tk wrappers |
 | Middle | Orchestration | Turnkey, dependency generators |
-| Bottom | Execution | Nix (packages), Buck2 (builds), devenv (shell) |
+| Bottom | Execution | Nix (packages), build system (builds), devenv (shell) |
 
 Each layer can be understood independently, and the boundaries are clean enough that you can use partial features without understanding the whole system.
 

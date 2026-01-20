@@ -60,13 +60,13 @@ Turnkey provides this while maintaining a **single source of truth** for depende
 
 Turnkey is designed for teams that want:
 
-**Enterprise-grade infrastructure** without abandoning their existing workflows. Your `go build` still works. Your IDE still works. Your junior developers don't need to learn Buck2 to be productive.
+**Enterprise-grade infrastructure** without abandoning their existing workflows. Your `go build` still works. Your IDE still works. Your junior developers don't need to learn build system internals to be productive.
 
-**A growth path** from prototype to production. Start with normal language tooling. Adopt Buck2 features incrementally as your needs grow. No big-bang rewrites.
+**A growth path** from prototype to production. Start with normal language tooling. Adopt incremental build features as your needs grow. No big-bang rewrites.
 
 **AI-friendly development** with fast feedback loops. AI coding assistants work better when builds are fast and incremental. Turnkey's caching means AI agents can iterate quickly.
 
-**Reproducibility without ceremony**. Nix handles tool versioning. Buck2 handles build caching. You focus on writing code.
+**Reproducibility without ceremony**. Nix handles tool versioning. The build system handles caching. You focus on writing code.
 
 ## The Turnkey Philosophy
 

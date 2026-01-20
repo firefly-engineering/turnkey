@@ -14,13 +14,13 @@ Turnkey provides transparent wrappers (`tw`) around native tools that:
 
 - Pass through all commands unchanged by default
 - Watch for dependency file changes (go.mod, Cargo.lock, etc.)
-- Automatically regenerate Buck2 dependency cells when needed
+- Automatically regenerate build system dependency cells when needed
 - Never block or modify the developer's primary workflow
 
 ```bash
 # The 'tw' wrapper is transparent
 tw go get github.com/foo/bar    # Works exactly like 'go get'
-                                 # But also updates Buck2 deps if go.mod changed
+                                 # But also updates build system deps if go.mod changed
 
 # Or use 'go' directly - it still works
 go build ./...                   # Normal Go build, no Buck2 involved
@@ -56,14 +56,14 @@ your-repo/
 └── .turnkey/
     ├── godeps/            # Virtual cell: Go dependencies
     ├── rustdeps/          # Virtual cell: Rust dependencies
-    └── prelude/           # Virtual cell: Buck2 prelude
+    └── prelude/           # Virtual cell: Build system prelude
 ```
 
-The `.turnkey/` directory contains **cells** - Buck2's unit of code organization. These cells are:
+The `.turnkey/` directory contains **cells** - the build system's unit of code organization. These cells are:
 
 - Generated from your lock files (go.sum, Cargo.lock, etc.)
 - Deterministically reproducible via Nix
-- Treated as source code by Buck2 (enabling caching and incrementality)
+- Treated as source code by the build system (enabling caching and incrementality)
 - Never committed to git (they're derived data)
 
 ### The Result
@@ -81,22 +81,22 @@ Modern CI/CD often wastes enormous resources rebuilding unchanged code. A small 
 
 ### How It Works
 
-Buck2 tracks fine-grained dependencies between:
+The incremental build system tracks fine-grained dependencies between:
 
 - Source files
 - Build rules
 - Test targets
 - Generated artifacts
 
-When a file changes, Buck2 determines the minimal set of actions needed:
+When a file changes, the build system determines the minimal set of actions needed:
 
 ```bash
 # Edit a single Go file
 vim pkg/utils/helper.go
 
-# Buck2 only rebuilds affected targets
-buck2 build //...    # Rebuilds only what depends on helper.go
-buck2 test //...     # Runs only tests that might be affected
+# The build system only rebuilds affected targets
+tk build //...    # Rebuilds only what depends on helper.go
+tk test //...     # Runs only tests that might be affected
 ```
 
 Combined with **remote caching**, this means:
@@ -152,11 +152,11 @@ python = {}
 
 Now your tools are versioned by Nix. "Works on my machine" disappears.
 
-### Level 3: Enable Buck2 Builds
+### Level 3: Enable Incremental Builds
 
 ```bash
-buck2 build //...
-buck2 test //...
+tk build //...
+tk test //...
 ```
 
 Get incremental builds and caching. CI becomes faster.
@@ -176,3 +176,5 @@ You don't have to adopt everything at once. Start with Level 1 or 2. Move to hig
 ---
 
 These four principles - native compatibility, virtual monorepo, incremental builds, and progressive adoption - form the foundation of Turnkey's design. In the next chapter, we'll see how the architecture implements these principles in practice.
+
+> **Note:** Turnkey currently uses Buck2 as its incremental build system. The architecture is designed to potentially support other build systems like Bazel in the future.
