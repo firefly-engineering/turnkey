@@ -33,6 +33,8 @@
 - [Rust](./languages/rust.md)
 - [Python](./languages/python.md)
 - [TypeScript](./languages/typescript.md)
+- [Solidity](./languages/solidity.md)
+- [Jsonnet](./languages/jsonnet.md)
 
 # Reference
 

@@ -73,34 +73,27 @@ go = {}
 buck-out/
 ```
 
-### 4. Update `.envrc` (if using direnv)
+### 4. Create `.envrc` (if using direnv)
 
-Add symlink sync after `use flake`:
+Turnkey provides a direnv library that handles all symlink management automatically:
 
 ```bash
 use flake . --no-pure-eval
 
-# Sync turnkey symlinks on direnv reload
-if [ -n "$TURNKEY_BUCK2_CONFIG" ]; then
-  if [ "$(readlink .buckconfig 2>/dev/null)" != "$TURNKEY_BUCK2_CONFIG" ]; then
-    ln -sf "$TURNKEY_BUCK2_CONFIG" .buckconfig
-  fi
-fi
-if [ -n "$TURNKEY_BUCK2_TOOLCHAINS_CELL" ]; then
-  mkdir -p .turnkey
-  if [ "$(readlink .turnkey/toolchains 2>/dev/null)" != "$TURNKEY_BUCK2_TOOLCHAINS_CELL" ]; then
-    ln -sfn "$TURNKEY_BUCK2_TOOLCHAINS_CELL" .turnkey/toolchains
-  fi
-fi
-for var in $(env | grep '^TURNKEY_CELL_' | cut -d= -f1); do
-  value="${!var}"
-  cell_path="${value%%:*}"
-  cell_deriv="${value#*:}"
-  if [ "$(readlink "$cell_path" 2>/dev/null)" != "$cell_deriv" ]; then
-    mkdir -p "$(dirname "$cell_path")"
-    ln -sfn "$cell_deriv" "$cell_path"
-  fi
-done
+# Source the turnkey library and activate
+source "$TURNKEY_DIRENV_LIB"
+use_turnkey
+```
+
+The `use_turnkey` function handles:
+- Buck2 symlink management (`.buckconfig`, cell symlinks)
+- `watch_file` declarations for automatic reloads
+- Optional dependency file regeneration
+
+Then allow it:
+
+```bash
+direnv allow
 ```
 
 ## Directory Structure
@@ -202,10 +195,13 @@ devenv.shells.default.turnkey.buck2 = {
 
 ## direnv Integration
 
-For automatic environment activation, create `.envrc`:
+For automatic environment activation with full Turnkey support, create `.envrc`:
 
 ```bash
-use flake
+use flake . --no-pure-eval
+
+source "$TURNKEY_DIRENV_LIB"
+use_turnkey
 ```
 
 Then allow it:
@@ -213,6 +209,11 @@ Then allow it:
 ```bash
 direnv allow
 ```
+
+The turnkey direnv library provides additional options:
+- `use_turnkey --skip-regen` - Skip dependency file regeneration
+- `use_turnkey --skip-sync` - Skip symlink synchronization
+- Environment variables like `TURNKEY_SKIP_ALL=1` for CI environments
 
 ## Buck2 Configuration
 
