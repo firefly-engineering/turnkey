@@ -94,7 +94,7 @@ def _mdbook_book_impl(ctx: AnalysisContext) -> list[Provider]:
         "# This allows running multiple mdbook instances simultaneously",
         'if [[ ! " $* " =~ " --port " ]] && [[ ! " $* " =~ " -p " ]]; then',
         "    # Use Python to find a free port (more reliable than parsing ss/netstat)",
-        '    PORT=$(python3 -c "import socket; s=socket.socket(); s.bind((\\'\\', 0)); print(s.getsockname()[1]); s.close()")',
+        "    PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind((\"\", 0)); print(s.getsockname()[1]); s.close()')",
         '    PORT_ARGS="--port $PORT"',
         '    echo "Serving at http://localhost:$PORT"',
         "else",
