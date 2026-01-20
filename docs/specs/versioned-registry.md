@@ -367,40 +367,48 @@ This allows gradual migration from flat registries to versioned ones.
 
 ### 1. Version Aliases
 
-Should we support aliases like `"latest"` or `"lts"`?
+**Resolved:** Not needed as a separate construct.
+
+Version strings are freeform, so aliases can simply be defined as version entries:
 
 ```nix
 go = {
   versions = {
-    "1.21" = pkgs.go_1_21;
-    "1.22" = pkgs.go_1_22;
-    "1.23" = pkgs.go_1_23;
-  };
-  aliases = {
-    "latest" = "1.23";
-    "previous" = "1.22";
+    "1.21" = final.go_1_21;
+    "1.22" = final.go_1_22;
+    "1.23" = final.go_1_23;
+    "latest" = final.go_1_23;  # Alias is just another entry
+    "lts" = final.go_1_22;
   };
   default = "1.23";
 };
 ```
 
-**Recommendation:** Start without aliases. Add if needed later.
+This keeps the design simple while supporting the use case.
 
-### 2. Metadata
+### 2. Metadata (Deprecation, EOL)
 
-Should versions carry metadata beyond the derivation?
+**Deferred:** Valuable but not in initial implementation.
+
+Future enhancement to add metadata to versions:
 
 ```nix
 versions = {
   "1.22" = {
-    package = pkgs.go_1_22;
-    deprecated = false;
-    eol = "2025-02-01";  # End of life date
+    package = final.go_1_22;
+    deprecated = true;
+    deprecationMessage = "Use 1.23 instead";
+    eol = "2025-02-01";
   };
 };
 ```
 
-**Recommendation:** Start with just derivations. Metadata can be added later without breaking changes.
+When implemented, Turnkey should:
+- Warn when instantiating deprecated toolchains
+- Warn when EOL date has passed
+- Provide clear migration guidance
+
+See task: **turnkey-xhyu**
 
 ### 3. Toolchain Groups (Meta-Packages)
 
@@ -480,9 +488,22 @@ The helper handles merging automatically - registry authors just define their pa
 
 ### 5. Per-System Version Availability
 
-Not all versions may be available on all systems (e.g., old Go on ARM).
+**Resolved:** Registry providers are responsible for per-system availability.
 
-**Recommendation:** Registries should only include versions they can provide. Turnkey should error clearly if a requested version isn't available for the current system.
+Not all versions may be available on all systems (e.g., old Go on ARM). Registries should only include versions they can provide for each system.
+
+When a requested version doesn't exist, Turnkey MUST provide a clear error:
+
+```
+Error: Version '1.19' of toolchain 'go' is not available for system 'aarch64-darwin'.
+
+Available versions for 'go' on this system:
+  - 1.21
+  - 1.22
+  - 1.23 (default)
+
+Hint: Check if this version is supported on your platform, or use a different version.
+```
 
 ---
 
@@ -689,8 +710,16 @@ Turnkey provides these helpers in `turnkey.lib`:
       entry = registry.${name}
         or (throw "Unknown toolchain: ${name}");
       version = spec.version or entry.default;
+      availableVersions = builtins.attrNames entry.versions;
       pkg = entry.versions.${version}
-        or (throw "Unknown version '${version}' for ${name}. Available: ${toString (builtins.attrNames entry.versions)}");
+        or (throw ''
+          Version '${version}' of toolchain '${name}' is not available.
+
+          Available versions for '${name}':
+            ${builtins.concatStringsSep "\n  " (map (v:
+              if v == entry.default then "- ${v} (default)" else "- ${v}"
+            ) availableVersions)}
+        '');
     in pkg;
 
   # Wrap a legacy flat registry to versioned format
