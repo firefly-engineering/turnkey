@@ -402,26 +402,67 @@ versions = {
 
 **Recommendation:** Start with just derivations. Metadata can be added later without breaking changes.
 
-### 3. Toolchain Groups
+### 3. Toolchain Groups (Meta-Packages)
 
-Some toolchains are bundles (rust = rustc + cargo + clippy). How to handle?
+Some toolchains are bundles (rust = rustc + cargo + clippy + rustfmt). These should be handled as **meta-packages** - single entries that combine multiple related tools.
 
-**Option A:** Single entry with meta-package
+**Benefits:**
+- Fewer entries in `toolchain.toml` (`rust = {}` instead of 5 entries)
+- Enforced version consistency across components
+- Simpler mental model ("rust 1.91" is one thing)
+
+**Implementation:** Turnkey provides `mkMetaPackage` helper:
+
+```nix
+mkMetaPackage = { name, components }:
+  pkgs.symlinkJoin {
+    inherit name;
+    paths = builtins.attrValues components;
+    passthru = {
+      inherit components;
+    } // components;  # Allows introspection via e.g. rust.rustc
+  };
+```
+
+**Usage in registry:**
+
 ```nix
 rust = {
   versions = {
-    "1.77" = pkgs.rust-bin.stable."1.77.0".default;  # From rust-overlay
+    "1.91" = turnkey.lib.mkMetaPackage {
+      name = "rust-1.91";
+      components = {
+        rustc = final.rust-bin.stable."1.91.0".minimal;
+        cargo = final.rust-bin.stable."1.91.0".minimal;
+        clippy = final.rust-bin.stable."1.91.0".clippy;
+        rustfmt = final.rust-bin.stable."1.91.0".rustfmt;
+        rust-analyzer = final.rust-analyzer;
+      };
+    };
   };
+  default = "1.91";
+};
+
+go = {
+  versions = {
+    "1.23" = turnkey.lib.mkMetaPackage {
+      name = "go-1.23";
+      components = {
+        go = final.go_1_23;
+        gopls = final.gopls;
+        golangci-lint = final.golangci-lint;
+      };
+    };
+  };
+  default = "1.23";
 };
 ```
 
-**Option B:** Separate entries that must match
-```nix
-rustc = { versions = { "1.77" = ...; }; };
-cargo = { versions = { "1.77" = ...; }; };
-```
-
-**Recommendation:** Option A - treat toolchain groups as single versioned units.
+**Result:**
+- Single derivation with all binaries in `$out/bin`
+- All tools in PATH when package is added to environment
+- Components accessible via `rust.components.rustc` or `rust.rustc` for introspection
+- Buck2 system toolchains work normally (tools found in PATH)
 
 ### 4. Registry Composition
 
@@ -514,26 +555,36 @@ See appendix for a complete example registry flake implementation.
       };
 
       # =====================================================================
-      # Rust
+      # Rust (meta-package: rustc + cargo + clippy + rustfmt + rust-analyzer)
       # Uses final.rust-bin if rust-overlay is composed before this overlay.
-      # Falls back to nixpkgs rustc if not.
       # =====================================================================
-      rust = {
-        versions =
-          if final ? rust-bin then {
-            # rust-overlay provides precise versions
-            "1.75" = final.rust-bin.stable."1.75.0".default;
-            "1.76" = final.rust-bin.stable."1.76.0".default;
-            "1.77" = final.rust-bin.stable."1.77.0".default;
-            "1.78" = final.rust-bin.stable."1.78.0".default;
-            "1.79" = final.rust-bin.stable."1.79.0".default;
-            "1.80" = final.rust-bin.stable."1.80.0".default;
-          } else {
-            # Fallback to nixpkgs (single version)
-            "nixpkgs" = final.rustc;
+      rust =
+        let
+          mkRustMeta = version: turnkey.lib.mkMetaPackage {
+            name = "rust-${version}";
+            components = {
+              rustc = final.rust-bin.stable."${version}.0".minimal;
+              cargo = final.rust-bin.stable."${version}.0".minimal;
+              clippy = final.rust-bin.stable."${version}.0".clippy;
+              rustfmt = final.rust-bin.stable."${version}.0".rustfmt;
+              rust-analyzer = final.rust-analyzer;
+            };
           };
-        default = if final ? rust-bin then "1.80" else "nixpkgs";
-      };
+        in {
+          versions =
+            if final ? rust-bin then {
+              "1.75" = mkRustMeta "1.75";
+              "1.76" = mkRustMeta "1.76";
+              "1.77" = mkRustMeta "1.77";
+              "1.78" = mkRustMeta "1.78";
+              "1.79" = mkRustMeta "1.79";
+              "1.80" = mkRustMeta "1.80";
+            } else {
+              # Fallback to nixpkgs (single version, no meta-package)
+              "nixpkgs" = final.rustc;
+            };
+          default = if final ? rust-bin then "1.80" else "nixpkgs";
+        };
 
       # =====================================================================
       # Node.js
@@ -619,6 +670,17 @@ Turnkey provides these helpers in `turnkey.lib`:
           };
     in {
       turnkeyRegistry = prevRegistry // (builtins.mapAttrs mergeToolchain newPackages);
+    };
+
+  # Create a meta-package combining multiple components
+  # All component binaries end up in $out/bin, available in PATH
+  mkMetaPackage = { name, components }:
+    pkgs.symlinkJoin {
+      inherit name;
+      paths = builtins.attrValues components;
+      passthru = {
+        inherit components;
+      } // components;
     };
 
   # Resolve a toolchain from registry
