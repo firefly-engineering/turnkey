@@ -32,7 +32,7 @@ A valid registry flake MUST expose an **overlay** that adds toolchains to the `t
 
 ```nix
 {
-  overlays.default = turnkey.lib.mkRegistryOverlay (final: {
+  overlays.default = turnkey.lib.mkRegistryOverlay (final: prev: {
     <toolchain-name> = {
       versions = {
         "<version-string>" = <derivation>;
@@ -46,6 +46,8 @@ A valid registry flake MUST expose an **overlay** that adds toolchains to the `t
 }
 ```
 
+The function receives both `final` (for dependencies) and `prev` (for overrides), just like a standard Nix overlay.
+
 ### The mkRegistryOverlay Helper
 
 Turnkey provides a helper function that handles two-level merging:
@@ -58,7 +60,7 @@ Turnkey provides a helper function that handles two-level merging:
 lib.mkRegistryOverlay = packagesFn: final: prev:
   let
     prevRegistry = prev.turnkeyRegistry or {};
-    newPackages = packagesFn final;
+    newPackages = packagesFn final prev;  # Both final and prev available
 
     # Merge a single toolchain: combine versions, override default
     mergeToolchain = name: new:
@@ -80,7 +82,7 @@ lib.mkRegistryOverlay = packagesFn: final: prev:
 1. **Safe composition**: The helper ensures correct merging - registry authors can't forget the pattern
 2. **Additive versions**: Multiple registries can contribute versions to the same toolchain
 3. **Predictable overrides**: Later overlays override `default`, not clobber entire toolchains
-4. **Access to final pkgs**: Registries can reference packages added by other overlays (e.g., `rust-bin`)
+4. **Full overlay power**: Both `final` and `prev` available for package references and overrides
 5. **Lazy evaluation**: Only requested toolchains are evaluated
 
 ### Example Registry Flake
@@ -95,7 +97,7 @@ lib.mkRegistryOverlay = packagesFn: final: prev:
   };
 
   outputs = { self, nixpkgs, turnkey }: {
-    overlays.default = turnkey.lib.mkRegistryOverlay (final: {
+    overlays.default = turnkey.lib.mkRegistryOverlay (final: prev: {
       go = {
         versions = {
           "1.21" = final.go_1_21;
@@ -116,7 +118,8 @@ lib.mkRegistryOverlay = packagesFn: final: prev:
 
       rust = {
         versions = {
-          "1.75" = final.rustc;  # or from rust-overlay via final
+          # Use final.rust-bin if rust-overlay composed before us
+          "1.75" = final.rustc;
           "1.76" = final.rustc;
           "1.77" = final.rustc;
         };
@@ -176,10 +179,16 @@ go = {
   default = "1.22";
 };
 
-# Custom registry adds Go 1.23 and changes default:
-overlays.default = turnkey.lib.mkRegistryOverlay (final: {
+# Custom registry adds Go 1.23, a patched 1.22, and changes default:
+overlays.default = turnkey.lib.mkRegistryOverlay (final: prev: {
   go = {
-    versions = { "1.23" = final.go_1_23; };
+    versions = {
+      "1.23" = final.go_1_23;
+      # Override nixpkgs package with a patch
+      "1.22-patched" = prev.go_1_22.overrideAttrs (old: {
+        patches = old.patches or [] ++ [ ./my-fix.patch ];
+      });
+    };
     default = "1.23";
   };
 
@@ -192,7 +201,7 @@ overlays.default = turnkey.lib.mkRegistryOverlay (final: {
 
 # Result after composition:
 go = {
-  versions = { "1.21" = ...; "1.22" = ...; "1.23" = ...; };  # Merged!
+  versions = { "1.21" = ...; "1.22" = ...; "1.22-patched" = ...; "1.23" = ...; };  # Merged!
   default = "1.23";  # Overridden
 };
 zig = {
@@ -478,7 +487,7 @@ See appendix for a complete example registry flake implementation.
 
   outputs = { self, nixpkgs, turnkey }: {
     # The registry uses mkRegistryOverlay for safe composition
-    overlays.default = turnkey.lib.mkRegistryOverlay (final: {
+    overlays.default = turnkey.lib.mkRegistryOverlay (final: prev: {
       # =====================================================================
       # Go
       # =====================================================================
@@ -593,10 +602,11 @@ Turnkey provides these helpers in `turnkey.lib`:
 ```nix
 {
   # Create a registry overlay with two-level merging
+  # packagesFn receives both final and prev for full overlay power
   mkRegistryOverlay = packagesFn: final: prev:
     let
       prevRegistry = prev.turnkeyRegistry or {};
-      newPackages = packagesFn final;
+      newPackages = packagesFn final prev;
 
       mergeToolchain = name: new:
         let
@@ -677,11 +687,21 @@ Turnkey provides these helpers in `turnkey.lib`:
 
   outputs = { turnkey, ... }: {
     # Adds to/extends any previously composed registry
-    overlays.default = turnkey.lib.mkRegistryOverlay (final: {
+    overlays.default = turnkey.lib.mkRegistryOverlay (final: prev: {
       # Add Go 1.24 and make it the new default
       go = {
         versions = { "1.24" = final.go_1_24; };
         default = "1.24";
+      };
+
+      # Add a patched version of Python
+      python = {
+        versions = {
+          "3.12-patched" = prev.python312.overrideAttrs (old: {
+            patches = old.patches or [] ++ [ ./python-fix.patch ];
+          });
+        };
+        # Don't set default - keep the one from official registry
       };
 
       # Add a toolchain not in the official registry
