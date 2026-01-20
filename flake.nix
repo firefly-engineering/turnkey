@@ -15,13 +15,13 @@
 
     # Beads - distributed git-backed graph issue tracker for AI agents
     beads = {
-      url = "github:steveyegge/beads/v0.46.0";
+      url = "github:steveyegge/beads/v0.47.1";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # Beads Viewer - visualization tool for beads graphs
     beads_viewer = {
-      url = "github:Dicklesworthstone/beads_viewer/v0.12.1";
+      url = "github:Dicklesworthstone/beads_viewer/v0.13.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
