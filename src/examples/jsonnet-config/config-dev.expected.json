@@ -1,0 +1,20 @@
+{
+   "database": {
+      "host": "localhost",
+      "name": "myapp_dev",
+      "pool_size": 5,
+      "port": 5432
+   },
+   "environment": "development",
+   "features": [
+      "auth",
+      "api",
+      "debug-toolbar"
+   ],
+   "logging": {
+      "format": "json",
+      "level": "debug"
+   },
+   "name": "my-app",
+   "version": "1.0.0"
+}
