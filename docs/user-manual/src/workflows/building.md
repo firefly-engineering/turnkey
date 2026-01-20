@@ -17,7 +17,7 @@ tk build //path/to:target
 
 ```bash
 # Build a specific target
-tk build //examples/go-hello:go-hello
+tk build //src/examples/go-hello:go-hello
 
 # Build all targets
 tk build //...
@@ -31,14 +31,29 @@ tk build //... -c release
 
 ## Build Outputs
 
-Buck2 outputs are placed in `buck-out/`:
+Build outputs are placed in `buck-out/.turnkey/`:
 
 ```
 buck-out/
-├── v2/
-│   └── gen/
-│       └── root/
-│           └── path/to/target/
+└── .turnkey/
+    ├── gen/
+    │   └── root/
+    │       └── path/to/target/
+    └── tmp/
+        └── ...
+```
+
+**Why `.turnkey`?** The isolation directory starts with a dot so that language tools ignore it:
+- Go skips directories starting with `.` when scanning for packages
+- Cargo ignores dot-directories
+- pytest ignores dot-directories by default
+
+This prevents errors like Go trying to parse generated `.go` files in build outputs, or pytest collecting test files from there.
+
+To find the output path for a specific target:
+
+```bash
+tk build //path/to:target --show-output
 ```
 
 ## Skipping Sync

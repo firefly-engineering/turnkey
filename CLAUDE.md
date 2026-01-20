@@ -31,21 +31,15 @@ This document provides comprehensive guidance for AI assistants working on the T
 ├── flake.nix                       # Main Nix flake configuration
 ├── flake.lock                      # Locked flake dependencies
 ├── toolchain.toml                  # Example toolchain declaration file
-├── cmd/
-│   ├── tk/                         # tk CLI - Buck2 wrapper with auto-sync
-│   └── tw/                         # tw CLI - Native tool wrapper for auto-sync
-├── docs/
-│   ├── buck2_cell_resolution.md    # Comprehensive Buck2 cell resolution documentation
-│   └── native-tool-wrappers.md     # How go/cargo/uv are wrapped with auto-sync
-└── nix/
-    ├── devenv/
-    │   └── turnkey/
-    │       └── default.nix         # Devenv module for turnkey
-    ├── flake-parts/
-    │   └── turnkey/
-    │       └── default.nix         # Flake-parts module for turnkey
-    └── registry/
-        └── default.nix             # Default toolchain registry mapping names to packages
+├── docs/                           # Documentation
+├── nix/                            # Nix modules, packages, and Buck2 prelude extensions
+└── src/                            # Source code
+    ├── cmd/                        # CLI tools (tk, tw, godeps-gen, etc.)
+    ├── examples/                   # Example projects
+    ├── go/                         # Go packages
+    ├── python/                     # Python packages
+    ├── rust/                       # Rust crates
+    └── testdata/                   # Test fixtures
 ```
 
 ### Directory Organization Principles
@@ -100,7 +94,7 @@ Simple TOML format for declaring which toolchains are needed.
 
 ### CLI Tools
 
-#### `cmd/tk/` - Buck2 Wrapper
+#### `src/cmd/tk/` - Buck2 Wrapper
 The `tk` command wraps `buck2` with automatic dependency sync:
 - Runs `tk sync` before commands that read the build graph (`build`, `test`, `run`, etc.)
 - Pass-through for commands that don't need sync (`clean`, `kill`, etc.)
@@ -111,7 +105,7 @@ tk build //some:target    # Syncs deps first, then runs buck2 build
 tk --no-sync build ...    # Skip sync
 ```
 
-#### `cmd/tw/` - Native Tool Wrapper
+#### `src/cmd/tw/` - Native Tool Wrapper
 The `tw` command wraps native language tools (`go`, `cargo`, `uv`) with auto-sync:
 - Detects when dependency files change after running commands
 - Triggers appropriate sync operation (e.g., `godeps-gen` after `go get`)
@@ -123,9 +117,9 @@ tw -v cargo add serde           # Verbose mode
 ```
 
 **Key packages:**
-- `go/pkg/syncconfig/` - Configuration parsing for `.turnkey/sync.toml`
-- `go/pkg/syncer/` - Sync execution logic
-- `go/pkg/snapshot/` - File hashing for change detection
+- `src/go/pkg/syncconfig/` - Configuration parsing for `.turnkey/sync.toml`
+- `src/go/pkg/syncer/` - Sync execution logic
+- `src/go/pkg/snapshot/` - File hashing for change detection
 - `nix/packages/tw-wrappers.nix` - Shell wrappers that shadow real tools
 
 See `docs/native-tool-wrappers.md` for full documentation.
@@ -242,10 +236,10 @@ This ensures:
 
 ```
 /turnkey/
-├── go.mod                    # Single module: github.com/firefly-engineering/turnkey
-├── go.sum                    # All dependency hashes
-├── go-deps.toml              # Generated for Nix/Buck2
-└── cmd/godeps-gen/main.go    # NO go.mod here - uses root module
+├── go.mod                        # Single module: github.com/firefly-engineering/turnkey
+├── go.sum                        # All dependency hashes
+├── go-deps.toml                  # Generated for Nix/Buck2
+└── src/cmd/godeps-gen/main.go    # NO go.mod here - uses root module
 ```
 
 - All Go code shares one module
@@ -258,11 +252,11 @@ This ensures:
 
 ```
 /turnkey/
-├── Cargo.toml                # [workspace.dependencies] declares ALL shared deps
-├── Cargo.lock                # Single lockfile
-├── rust-deps.toml            # Generated for Nix/Buck2
-└── cmd/jsdeps-gen/
-    └── Cargo.toml            # Uses: serde.workspace = true
+├── Cargo.toml                    # [workspace.dependencies] declares ALL shared deps
+├── Cargo.lock                    # Single lockfile
+├── rust-deps.toml                # Generated for Nix/Buck2
+└── src/cmd/jsdeps-gen/
+    └── Cargo.toml                # Uses: serde.workspace = true
 ```
 
 Adding a dependency:

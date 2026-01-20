@@ -41,28 +41,33 @@ in
         };
 
         registry = mkOption {
-          type = types.lazyAttrsOf types.package;
+          type = types.lazyAttrsOf types.anything;
           default = { };
-          defaultText = "Default registry from nix/registry";
+          defaultText = "Default versioned registry from nix/registry";
           description = ''
             Complete registry override. When set, replaces the default registry entirely.
+            Each entry should have: { versions = { "<ver>" = <pkg>; }; default = "<ver>"; }
             Prefer using registryExtensions to add packages without duplicating defaults.
           '';
         };
 
         registryExtensions = mkOption {
-          type = types.lazyAttrsOf types.package;
+          type = types.lazyAttrsOf types.anything;
           default = { };
           example = lib.literalExpression ''
             {
-              beads = inputs.beads.packages.''${system}.default;
-              myTool = pkgs.myTool;
+              # Single-version entry
+              beads = {
+                versions = { "default" = inputs.beads.packages.''${system}.default; };
+                default = "default";
+              };
+              # Or use the helper: turnkey.lib.single inputs.beads.packages.''${system}.default
             }
           '';
           description = ''
-            Extend the default registry with additional packages.
-            These are merged on top of the default registry, so you only need
-            to specify additions rather than duplicating all defaults.
+            Extend the default registry with additional toolchains.
+            Each entry should have: { versions = { "<ver>" = <pkg>; }; default = "<ver>"; }
+            These are merged on top of the default registry.
           '';
         };
 
@@ -190,7 +195,7 @@ in
                 When enabled, go-deps.toml will be regenerated when go.mod or go.sum
                 are staged for commit.
 
-                Requires godeps-gen in the toolchain registry.
+                godeps-gen is automatically included when go.enable is true.
               '';
             };
 
@@ -205,7 +210,7 @@ in
                 1. First shell entry: go-deps.toml is generated (godeps cell skipped)
                 2. Subsequent entries: Nix uses the generated file
 
-                Requires godeps-gen to be available in PATH.
+                godeps-gen is automatically included when go.enable is true.
               '';
             };
           };
@@ -437,6 +442,47 @@ in
               '';
             };
           };
+
+          # ==========================================================================
+          # Solidity language support
+          # ==========================================================================
+          solidity = {
+            enable = mkOption {
+              type = types.bool;
+              default = true;
+              description = "Enable Solidity dependency management for Buck2";
+            };
+
+            cell = mkOption {
+              type = types.nullOr types.package;
+              default = null;
+              description = ''
+                Nix derivation containing the Solidity dependencies cell.
+                When set, a 'soldeps' cell will be added to .buckconfig
+                and symlinked to .turnkey/soldeps.
+
+                Prefer using depsFile instead for declarative configuration.
+              '';
+            };
+
+            depsFile = mkOption {
+              type = types.nullOr types.path;
+              default = null;
+              example = lib.literalExpression "./solidity-deps.toml";
+              description = ''
+                Path to solidity-deps.toml file declaring Solidity dependencies.
+                When set, turnkey will build the soldeps cell automatically.
+              '';
+            };
+
+            foundryTomlFile = mkOption {
+              type = types.str;
+              default = "foundry.toml";
+              description = ''
+                Relative path to foundry.toml file (for staleness checking and regeneration).
+              '';
+            };
+          };
         };
       };
     }
@@ -452,20 +498,44 @@ in
     let
       cfg = config.turnkey.toolchains;
 
-      # Load default registry and merge with extensions
+      # Import turnkey lib
+      turnkeyLib = import ../../lib { inherit pkgs lib; };
+
+      # Load default versioned registry
       defaultRegistry = import ../../registry { inherit pkgs lib; };
+
+      # Helper for single-version entries
+      single = pkg: {
+        versions = { "default" = pkg; };
+        default = "default";
+      };
+
+      # Merge versioned registries (toolchain level merge, version level merge)
+      mergeRegistries = base: extensions:
+        let
+          mergeToolchain = name: ext:
+            let
+              existing = base.${name} or null;
+            in
+              if existing == null then ext
+              else {
+                versions = (existing.versions or {}) // (ext.versions or {});
+                default = if ext ? default then ext.default else existing.default;
+              };
+        in
+          base // (builtins.mapAttrs mergeToolchain extensions);
 
       # Registry merging:
       # 1. Start with default registry
-      # 2. Merge registryExtensions on top (allows adding packages without duplication)
+      # 2. Merge registryExtensions on top (versions are additive, default overrides)
       # 3. If registry is explicitly set (non-empty), use that as complete override
       baseRegistry =
         if cfg.registry != { } then
           # Complete override - user specified full registry
           cfg.registry
         else
-          # Default + extensions
-          defaultRegistry // cfg.registryExtensions;
+          # Default + extensions with proper merging
+          mergeRegistries defaultRegistry cfg.registryExtensions;
 
       # Build the turnkey-prelude derivation (Nix-backed prelude cell)
       turnkeyPrelude = import ../../buck2/prelude.nix { inherit pkgs lib; };
@@ -482,14 +552,14 @@ in
       wrappableTools = [ "go" "cargo" "uv" ];
 
       # Augment registry with wrappers when wrapNativeTools is enabled
-      # This replaces 'go' with 'tw-go' (which provides the 'go' binary)
+      # This replaces the tool entry with a wrapped version (same versioned structure)
       registry =
         if cfg.wrapNativeTools then
           baseRegistry // (lib.listToAttrs (
             lib.filter (x: x != null) (
               map (tool:
                 if baseRegistry ? ${tool} then
-                  { name = tool; value = twWrappers."tw-${tool}"; }
+                  { name = tool; value = single twWrappers."tw-${tool}"; }
                 else
                   null
               ) wrappableTools
@@ -561,6 +631,20 @@ in
             }
           else
             cfg.buck2.javascript.cell
+        else
+          null;
+
+      # Build soldeps cell from solidity.depsFile if specified and exists
+      # Only built if solidity.enable is true
+      soldepsCell =
+        if cfg.buck2.solidity.enable then
+          if cfg.buck2.solidity.depsFile != null && builtins.pathExists cfg.buck2.solidity.depsFile then
+            import ../../buck2/solidity-deps-cell.nix {
+              inherit pkgs lib;
+              depsFile = cfg.buck2.solidity.depsFile;
+            }
+          else
+            cfg.buck2.solidity.cell
         else
           null;
 
@@ -643,6 +727,17 @@ in
                 else null;
               lockFile = cfg.buck2.javascript.lockFile;
               includeDevDependencies = cfg.buck2.javascript.includeDevDependencies;
+            };
+
+            # Solidity language configuration
+            solidity = {
+              enable = cfg.buck2.solidity.enable;
+              cell = soldepsCell;
+              depsFile =
+                if cfg.buck2.solidity.depsFile != null
+                then builtins.baseNameOf cfg.buck2.solidity.depsFile
+                else null;
+              foundryTomlFile = cfg.buck2.solidity.foundryTomlFile;
             };
           };
         };

@@ -44,8 +44,8 @@ turnkey/
 ### Go Code
 
 1. Edit files in `cmd/`
-2. Build: `tk build //cmd/...`
-3. Run: `tk run //cmd/mytool:mytool`
+2. Build: `tk build //src/cmd/...`
+3. Run: `tk run //src/cmd/mytool:mytool`
 
 ### Documentation
 
@@ -60,7 +60,7 @@ turnkey/
 tk test //...
 
 # Specific package
-tk test //go/pkg/syncer:syncer_test
+tk test //src/go/pkg/syncer:syncer_test
 ```
 
 ## Pre-commit Hooks

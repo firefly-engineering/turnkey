@@ -1,0 +1,13 @@
+[package]
+name = "soldeps-gen"
+version = "0.1.0"
+edition.workspace = true
+description = "Generate solidity-deps.toml from foundry.toml and package.json for Buck2/Nix integration"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+ureq.workspace = true

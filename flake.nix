@@ -15,13 +15,13 @@
 
     # Beads - distributed git-backed graph issue tracker for AI agents
     beads = {
-      url = "github:steveyegge/beads/v0.46.0";
+      url = "github:steveyegge/beads/v0.47.1";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # Beads Viewer - visualization tool for beads graphs
     beads_viewer = {
-      url = "github:Dicklesworthstone/beads_viewer/v0.12.1";
+      url = "github:Dicklesworthstone/beads_viewer/v0.13.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -49,6 +49,18 @@
       flake.devenvModules = {
         turnkey = ./nix/devenv/turnkey;
       };
+
+      # Export turnkey library functions (mkRegistryOverlay, mkMetaPackage, resolveTool, etc.)
+      # These require pkgs, so they're provided per-system
+      flake.lib = builtins.listToAttrs (map (system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          lib = pkgs.lib;
+        in {
+          name = system;
+          value = import ./nix/lib { inherit pkgs lib; };
+        }
+      ) [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ]);
 
       # Flake templates for project initialization
       flake.templates = {
@@ -91,6 +103,7 @@
           packages.tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
           packages.e2e-runner = import ./nix/packages/e2e-runner.nix { inherit pkgs lib; };
           packages.jsdeps-gen = import ./nix/packages/jsdeps-gen.nix { inherit pkgs lib; };
+          packages.soldeps-gen = import ./nix/packages/soldeps-gen.nix { inherit pkgs lib; };
           packages.turnkey-prelude = import ./nix/buck2/prelude.nix { inherit pkgs lib; };
 
           # Configure turnkey to use our local toolchain files
@@ -102,11 +115,15 @@
             };
             # Extend the default registry with packages from flake inputs
             # (standard toolchains like buck2, nix, go, tk, etc. come from default registry)
-            registryExtensions = {
-              beads = inputs.beads.packages.${system}.default;
-              beads_viewer = inputs.beads_viewer.packages.${system}.default;
-              jj = inputs.jj.packages.${system}.default;
-            };
+            # Each entry needs versioned format: { versions = {...}; default = "..."; }
+            registryExtensions =
+              let
+                single = pkg: { versions = { "default" = pkg; }; default = "default"; };
+              in {
+                beads = single inputs.beads.packages.${system}.default;
+                beads_viewer = single inputs.beads_viewer.packages.${system}.default;
+                jj = single inputs.jj.packages.${system}.default;
+              };
             # Enable Buck2 toolchain generation
             buck2 = {
               enable = true;
@@ -137,6 +154,12 @@
               javascript = {
                 enable = true;
                 depsFile = ./js-deps.toml; # npm package dependencies
+              };
+
+              # Solidity dependencies
+              solidity = {
+                enable = true;
+                depsFile = ./solidity-deps.toml;
               };
             };
           };

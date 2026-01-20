@@ -5,6 +5,9 @@ let
 
   # Generate the direnv library script
   direnvLib = import ./direnv-lib.nix { inherit lib pkgs config; };
+
+  # Import turnkey lib for resolution helpers
+  turnkeyLib = import ../../lib { inherit lib pkgs; };
 in
 {
   # Import the Buck2 generation sub-module
@@ -23,9 +26,12 @@ in
     };
 
     registry = lib.mkOption {
-      type = lib.types.lazyAttrsOf lib.types.package;
+      type = lib.types.lazyAttrsOf lib.types.anything;
       default = { };
-      description = "Registry mapping toolchain names to packages (usually inherited from flake-parts)";
+      description = ''
+        Versioned registry mapping toolchain names to version sets.
+        Each entry has the structure: { versions = { "<ver>" = <pkg>; }; default = "<ver>"; }
+      '';
     };
   };
 
@@ -35,19 +41,18 @@ in
         # Parse toolchain.toml
         toolchainDeclaration = builtins.fromTOML (builtins.readFile cfg.declarationFile);
 
-        # Extract toolchain names from the declaration
-        toolchainNames =
-          if toolchainDeclaration ? toolchains then
-            builtins.attrNames toolchainDeclaration.toolchains
-          else
-            [ ];
-
-        # Resolve toolchains to packages from registry
-        resolvedPackages = map (name: cfg.registry.${name}) toolchainNames;
+        # Resolve all toolchains using the versioned registry
+        resolvedPackages = turnkeyLib.resolveToolchains cfg.registry toolchainDeclaration;
       in
       resolvedPackages;
 
     # Export direnv library path
     env.TURNKEY_DIRENV_LIB = "${direnvLib}";
+
+    # Redirect Python bytecode cache to .turnkey to keep source tree clean
+    # Must be set in enterShell with $PWD since env vars are set at build time
+    enterShell = ''
+      export PYTHONPYCACHEPREFIX="$PWD/.turnkey/pycache"
+    '';
   };
 }

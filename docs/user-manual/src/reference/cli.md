@@ -119,13 +119,16 @@ Flags must come before the subcommand:
 | Flag | Description |
 |------|-------------|
 | `--no-sync` | Skip sync, run Buck2 directly |
+| `--no-local` | Skip local target overrides from `.turnkey/local.toml` |
 | `--verbose`, `-v` | Show what tk is doing |
 | `--dry-run`, `-n` | Show what would be synced without doing it |
+| `--quiet`, `-q` | Suppress non-error output |
 | `--help`, `-h` | Show help |
 
 **Examples:**
 ```bash
 tk --no-sync build //...     # skip sync
+tk --no-local run //target   # skip local overrides
 tk --verbose sync            # verbose sync
 tk -v -n sync                # dry-run with verbose output
 ```
@@ -161,6 +164,57 @@ Each `[[deps]]` entry defines:
 - `sources` - Files that trigger regeneration when modified
 - `target` - The generated file
 - `generator` - Command to regenerate the target
+
+#### Local Target Overrides
+
+tk supports per-developer local overrides via `.turnkey/local.toml`. This file is **not committed to git**, allowing each developer to customize target arguments for their local environment.
+
+**Use cases:**
+- Different network addresses for local development
+- Debug flags for specific targets
+- Custom ports or configuration
+
+**Example `.turnkey/local.toml`:**
+```toml
+# Override args for tk run
+[run."//docs/user-manual"]
+args = ["-n", "192.168.1.100"]
+
+# Override args for tk build
+[build."//src/cmd/server:server"]
+args = ["--config=debug"]
+
+# Pattern matching with "..."
+[test."//src/..."]
+args = ["--verbose", "--timeout=60s"]
+```
+
+**How it works:**
+
+When you run a command that matches a configured target:
+```bash
+tk run //docs/user-manual
+# Becomes: buck2 run //docs/user-manual -- -n 192.168.1.100
+```
+
+The args are injected after `--`, which passes them to the target binary.
+
+**Pattern matching:**
+
+Patterns ending with `...` match any target with that prefix:
+- `//src/...` matches `//src:foo`, `//src/pkg:bar`, `//src/cmd/tool:main`
+- `//...` matches any target
+
+**Disable for a single command:**
+```bash
+tk --no-local run //docs/user-manual   # skips local.toml
+```
+
+**Verbose output:**
+```bash
+tk --verbose run //docs/user-manual
+# Output: tk: applying local override for run //docs/user-manual: [-n 192.168.1.100]
+```
 
 ### Shell Integration
 

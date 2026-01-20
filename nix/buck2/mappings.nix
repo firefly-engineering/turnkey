@@ -208,6 +208,35 @@
     implicitDependencies = [ ];
   };
 
+  # Solidity smart contract toolchain
+  # Uses 'solc' as the toolchain name (matches registry entry)
+  solc = {
+    skip = false;
+    targets = [
+      {
+        name = "solc";
+        rule = "system_solidity_toolchain";
+        load = "@prelude//solidity:toolchain.bzl";
+        visibility = [ "PUBLIC" ];
+        # Dynamic attrs resolved at build time from registry
+        dynamicAttrs = registry: {
+          solc_path = "${registry.solc}/bin/solc";
+          forge_path = "${registry.foundry}/bin/forge";
+          cast_path = "${registry.foundry}/bin/cast";
+          anvil_path = "${registry.foundry}/bin/anvil";
+          soldeps_path = ".turnkey/soldeps";
+        };
+      }
+    ];
+    implicitDependencies = [ ];
+  };
+
+  # Foundry toolkit (forge, cast, anvil)
+  foundry = {
+    skip = true;
+    reason = "Ethereum dev toolkit, used as dependency of solidity toolchain";
+  };
+
   # ==========================================================================
   # Documentation Toolchains
   # ==========================================================================
@@ -225,6 +254,26 @@
           mdbook_path = "${registry.mdbook}/bin/mdbook";
           # Output served books to .turnkey/books/ to keep source tree clean
           serve_output_dir = ".turnkey/books";
+        };
+      }
+    ];
+    implicitDependencies = [ ];
+  };
+
+  # ==========================================================================
+  # Data Templating Toolchains
+  # ==========================================================================
+
+  jsonnet = {
+    skip = false;
+    targets = [
+      {
+        name = "jsonnet";
+        rule = "system_jsonnet_toolchain";
+        load = "@prelude//jsonnet:toolchain.bzl";
+        visibility = [ "PUBLIC" ];
+        dynamicAttrs = registry: {
+          jsonnet_path = "${registry.jsonnet}/bin/jsonnet";
         };
       }
     ];

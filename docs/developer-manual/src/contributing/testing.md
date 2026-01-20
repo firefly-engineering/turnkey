@@ -12,13 +12,13 @@ tk test //...
 
 ```bash
 # Go packages
-tk test //go/pkg/syncer:syncer_test
+tk test //src/go/pkg/syncer:syncer_test
 
 # Rust crates
-tk test //rust/prefetch-cache:prefetch-cache-test
+tk test //src/rust/prefetch-cache:prefetch-cache-test
 
 # Python modules
-tk test //python/cargo:test_features
+tk test //src/python/cargo:test_features
 ```
 
 ## Test Categories

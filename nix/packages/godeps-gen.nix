@@ -22,11 +22,11 @@ pkgs.buildGoModule {
     fileset = fs.unions [
       (root + "/go.mod")
       (root + "/go.sum")
-      (root + "/cmd/godeps-gen")
-      (root + "/go/pkg/godeps")
+      (root + "/src/cmd/godeps-gen")
+      (root + "/src/go/pkg/godeps")
     ];
   };
-  subPackages = [ "cmd/godeps-gen" ];
+  subPackages = [ "src/cmd/godeps-gen" ];
 
   vendorHash = "sha256-qpXZKoe+Bwy2LaUy/UzU84Tmr0lmd85JWSe9oqgJuIQ=";
 

@@ -3,7 +3,7 @@
 import { greetWorld } from "./greeter";
 
 function main(): void {
-  console.log(greetWorld());
+	console.log(greetWorld());
 }
 
 main();

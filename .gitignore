@@ -28,3 +28,4 @@ tools/gobuckify/gobuckify
 
 # Rust build artifacts
 target/
+node_modules/

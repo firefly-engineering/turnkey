@@ -22,14 +22,14 @@ pkgs.buildGoModule {
     fileset = fs.unions [
       (root + "/go.mod")
       (root + "/go.sum")
-      (root + "/cmd/tw")
-      (root + "/go/pkg/syncconfig")
-      (root + "/go/pkg/syncer")
-      (root + "/go/pkg/staleness")
-      (root + "/go/pkg/snapshot")
+      (root + "/src/cmd/tw")
+      (root + "/src/go/pkg/syncconfig")
+      (root + "/src/go/pkg/syncer")
+      (root + "/src/go/pkg/staleness")
+      (root + "/src/go/pkg/snapshot")
     ];
   };
-  subPackages = [ "cmd/tw" ];
+  subPackages = [ "src/cmd/tw" ];
 
   vendorHash = "sha256-FfIQwd6lWWP787ZaHHXffPTbdJpYEpwDJoD0tDVwLOM=";
 

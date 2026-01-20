@@ -10,6 +10,9 @@ let
   cfg = config.turnkey;
   buck2Cfg = cfg.buck2;
 
+  # Import turnkey lib for resolution helpers
+  turnkeyLib = import ../../lib { inherit lib pkgs; };
+
   # Detect which languages are enabled from toolchain.toml
   toolchainNames =
     if cfg.declarationFile != null then
@@ -30,11 +33,19 @@ let
     ++ lib.optional hasRust "rust"
   );
 
-  # Get tool paths from registry
-  godepsGen = cfg.registry.godeps-gen or null;
-  pydepsGen = cfg.registry.pydeps-gen or null;
-  rustdepsGen = cfg.registry.rustdeps-gen or null;
-  uv = cfg.registry.uv or null;
+  # Import internal tools directly (not exposed through registry)
+  godepsGen = import ../../packages/godeps-gen.nix { inherit pkgs lib; };
+  pydepsGen = import ../../packages/pydeps-gen.nix { inherit pkgs lib; };
+  rustdepsGen = import ../../packages/rustdeps-gen.nix { inherit pkgs lib; };
+
+  # Helper to resolve a tool from the versioned registry
+  resolveTool = name:
+    let entry = cfg.registry.${name} or null;
+    in if entry == null then null
+       else turnkeyLib.resolveTool cfg.registry name {};
+
+  # uv is a user-facing tool in the registry
+  uv = resolveTool "uv";
 
   # Helper functions (always included)
   helperFunctions = ''

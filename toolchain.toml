@@ -8,18 +8,32 @@ buck2 = {}
 # Language toolchains (used by Buck2)
 # These are automatically wrapped with tw for auto-sync when dependency files change
 go = {}
+golangci-lint = {}  # Go linter
 rust = {}
 cargo = {}
+clippy = {}         # Rust linter
+rustfmt = {}        # Rust formatter
+rust-analyzer = {}  # Rust LSP server
+cargo-edit = {}     # Provides cargo add/rm/upgrade
 python = {}
 uv = {}        # Python package manager for lock file generation
+ruff = {}      # Python linter and formatter
 reindeer = {}  # Tool for generating Buck2 targets from Cargo.toml
 
 # JavaScript/TypeScript (no Buck2 toolchain, but available for genrule builds)
 nodejs = {}
 typescript = {}
+biome = {}  # Fast linter and formatter for JS/TS/JSON
+
+# Solidity toolchain
+solc = {}         # Solidity compiler (also generates Buck2 toolchain)
+foundry = {}      # Ethereum dev toolkit (forge, cast, anvil)
 
 # Documentation tools
 mdbook = {}
+
+# Data templating
+jsonnet = {}  # Jsonnet to JSON compiler
 
 # Development utilities (not Buck2 toolchains)
 nix = {}
@@ -27,8 +41,4 @@ pytest = {}  # Python test runner
 beads = {}
 beads_viewer = {}
 jj = {}
-godeps-gen = {}    # Tool for generating go-deps.toml from go.mod/go.sum
-pydeps-gen = {}    # Tool for generating python-deps.toml from pyproject.toml/requirements.txt
-rustdeps-gen = {}  # Tool for generating rust-deps.toml from Cargo.lock
-jsdeps-gen = {}    # Tool for generating js-deps.toml from pnpm-lock.yaml
-tk = {}            # Turnkey CLI wrapper for buck2 with auto-sync
+tk = {}  # Turnkey CLI wrapper for buck2 with auto-sync

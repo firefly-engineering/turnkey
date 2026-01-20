@@ -21,10 +21,10 @@ pkgs.buildGoModule {
     fileset = fs.unions [
       (root + "/go.mod")
       (root + "/go.sum")
-      (root + "/cmd/cargo-prune-workspace")
+      (root + "/src/cmd/cargo-prune-workspace")
     ];
   };
-  subPackages = [ "cmd/cargo-prune-workspace" ];
+  subPackages = [ "src/cmd/cargo-prune-workspace" ];
 
   vendorHash = "sha256-FfIQwd6lWWP787ZaHHXffPTbdJpYEpwDJoD0tDVwLOM=";
 

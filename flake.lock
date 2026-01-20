@@ -8,16 +8,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1767772289,
-        "narHash": "sha256-PMzLKb0pYKiXdiEXBFe6N4FZ3AaNfvBRZlQBKijtldc=",
+        "lastModified": 1768216872,
+        "narHash": "sha256-DwIR/r1TJnpVd/CT1E2OTkAjU7k9/KHbcVwg5zziFVg=",
         "owner": "steveyegge",
         "repo": "beads",
-        "rev": "812f4e529795df94b680912c996ac9a2ea8e39c6",
+        "rev": "279192c5fbf851d0e47feaa7a5b5a9a6df325866",
         "type": "github"
       },
       "original": {
         "owner": "steveyegge",
-        "ref": "v0.46.0",
+        "ref": "v0.47.1",
         "repo": "beads",
         "type": "github"
       }
@@ -30,16 +30,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1767772687,
-        "narHash": "sha256-qesp5gwR9zlPpmq5BXW110Ab1KJ0M+v8VZJk1AxFw2w=",
+        "lastModified": 1768343907,
+        "narHash": "sha256-lFJPZFeXnhLhfGvZybpSJOi/11xcaP8bn+6KpxljlPM=",
         "owner": "Dicklesworthstone",
         "repo": "beads_viewer",
-        "rev": "fe9f22e612a29d0fafe7d2705529e6480c0806d5",
+        "rev": "09db3df572e7d12803eec78a6939ced4f96cedb7",
         "type": "github"
       },
       "original": {
         "owner": "Dicklesworthstone",
-        "ref": "v0.12.1",
+        "ref": "v0.13.0",
         "repo": "beads_viewer",
         "type": "github"
       }
@@ -431,11 +431,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1767892417,
-        "narHash": "sha256-dhhvQY67aboBk8b0/u0XB6vwHdgbROZT3fJAjyNh5Ww=",
+        "lastModified": 1768564909,
+        "narHash": "sha256-Kell/SpJYVkHWMvnhqJz/8DqQg2b6PguxVWOuadbHCc=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "3497aa5c9457a9d88d71fa93a4a8368816fbeeba",
+        "rev": "e4bae1bd10c9c57b2cf517953ab70060a828ee6f",
         "type": "github"
       },
       "original": {

@@ -12,7 +12,7 @@ tk test //path/to:target-test
 tk test //...
 
 # Run tests matching a pattern
-tk test //examples/...
+tk test //src/examples/...
 ```
 
 ## Language-Specific Tests
@@ -20,19 +20,19 @@ tk test //examples/...
 ### Go Tests
 
 ```bash
-tk test //go/pkg/mypackage:mypackage_test
+tk test //src/go/pkg/mypackage:mypackage_test
 ```
 
 ### Rust Tests
 
 ```bash
-tk test //rust/mycrate:mycrate-test
+tk test //src/rust/mycrate:mycrate-test
 ```
 
 ### Python Tests
 
 ```bash
-tk test //python/mymodule:test
+tk test //src/python/mymodule:test
 ```
 
 ## Test Output
