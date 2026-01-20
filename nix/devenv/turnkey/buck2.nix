@@ -66,10 +66,38 @@ let
     ) finalToolchains
   );
 
-  # Resolve runtime dependencies to actual packages from registry
+  # Import turnkey lib for resolution helpers
+  turnkeyLib = import ../../lib { inherit lib pkgs; };
+
+  # Resolve runtime dependencies to actual packages from versioned registry
   runtimePackages = builtins.filter (p: p != null) (
-    map (name: turnkeyCfg.registry.${name} or null) runtimeDeps
+    map (name:
+      let entry = turnkeyCfg.registry.${name} or null;
+      in if entry == null then null
+         else turnkeyLib.resolveTool turnkeyCfg.registry name {}
+    ) runtimeDeps
   );
+
+  # Create a resolved registry for dynamicAttrs (maps toolchain names to packages)
+  # This allows mappings.nix dynamicAttrs functions to use ${registry.clang}/bin/clang
+  resolvedRegistry = builtins.mapAttrs (name: entry:
+    turnkeyLib.resolveTool turnkeyCfg.registry name {}
+  ) turnkeyCfg.registry;
+
+  # Internal generator packages (not exposed through registry, added to shell automatically)
+  # These are turnkey implementation details, not user-configurable toolchains
+  internalPackages = let
+    godepsGen = import ../../packages/godeps-gen.nix { inherit pkgs lib; };
+    rustdepsGen = import ../../packages/rustdeps-gen.nix { inherit pkgs lib; };
+    pydepsGen = import ../../packages/pydeps-gen.nix { inherit pkgs lib; };
+    jsdepsGen = import ../../packages/jsdeps-gen.nix { inherit pkgs lib; };
+    soldepsGen = import ../../packages/soldeps-gen.nix { inherit pkgs lib; };
+  in
+    lib.optional cfg.go.enable godepsGen
+    ++ lib.optional cfg.rust.enable rustdepsGen
+    ++ lib.optional cfg.python.enable pydepsGen
+    ++ lib.optional cfg.javascript.enable jsdepsGen
+    ++ lib.optional cfg.solidity.enable soldepsGen;
 
   # Generate load statements for rules.star file
   generateLoads =
@@ -106,7 +134,7 @@ let
             staticAttrs = t.attrs or { };
             # Dynamic attrs resolved from registry (e.g., absolute paths to compilers)
             dynamicAttrs =
-              if t ? dynamicAttrs then t.dynamicAttrs turnkeyCfg.registry else { };
+              if t ? dynamicAttrs then t.dynamicAttrs resolvedRegistry else { };
             # Merge: dynamic attrs override static attrs
             attrs = staticAttrs // dynamicAttrs;
             attrLines =
@@ -505,8 +533,8 @@ in
           When enabled, go-deps.toml will be regenerated when go.mod or go.sum
           are staged for commit.
 
-          Note: Requires godeps-gen in the shell's packages and nix-prefetch-github
-          available for hash fetching.
+          Note: godeps-gen is automatically included when go.enable is true.
+          Requires nix-prefetch-github for hash fetching.
         '';
       };
 
@@ -521,7 +549,7 @@ in
           1. First shell entry: go-deps.toml is generated (godeps cell skipped)
           2. Subsequent entries: Nix uses the generated file
 
-          Requires godeps-gen to be available in PATH (add to registry or packages).
+          godeps-gen is automatically included when go.enable is true.
         '';
       };
     };
@@ -804,8 +832,10 @@ in
   };
 
   config = lib.mkIf (cfg.enable && turnkeyCfg.enable) {
-    # Add runtime dependencies to shell (e.g., clang for cxx toolchain)
-    packages = runtimePackages;
+    # Add runtime dependencies and internal tools to shell
+    # - runtimePackages: tools needed in PATH for Buck2 actions (e.g., clang for cxx)
+    # - internalPackages: turnkey generators (godeps-gen, etc.) based on enabled languages
+    packages = runtimePackages ++ internalPackages;
 
     # Export paths for debugging and inspection
     env = {
@@ -819,7 +849,7 @@ in
     } // nixCellsEnvVars
       # Store tk's share path for shell completion setup
       // lib.optionalAttrs (turnkeyCfg.registry ? tk) {
-        TURNKEY_TK_SHARE = "${turnkeyCfg.registry.tk}/share";
+        TURNKEY_TK_SHARE = "${resolvedRegistry.tk}/share";
       }
       # Suppress devenv task trace output when quiet mode is enabled
       // lib.optionalAttrs cfg.quiet {

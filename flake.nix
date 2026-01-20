@@ -50,6 +50,18 @@
         turnkey = ./nix/devenv/turnkey;
       };
 
+      # Export turnkey library functions (mkRegistryOverlay, mkMetaPackage, resolveTool, etc.)
+      # These require pkgs, so they're provided per-system
+      flake.lib = builtins.listToAttrs (map (system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          lib = pkgs.lib;
+        in {
+          name = system;
+          value = import ./nix/lib { inherit pkgs lib; };
+        }
+      ) [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ]);
+
       # Flake templates for project initialization
       flake.templates = {
         default = {
@@ -103,11 +115,15 @@
             };
             # Extend the default registry with packages from flake inputs
             # (standard toolchains like buck2, nix, go, tk, etc. come from default registry)
-            registryExtensions = {
-              beads = inputs.beads.packages.${system}.default;
-              beads_viewer = inputs.beads_viewer.packages.${system}.default;
-              jj = inputs.jj.packages.${system}.default;
-            };
+            # Each entry needs versioned format: { versions = {...}; default = "..."; }
+            registryExtensions =
+              let
+                single = pkg: { versions = { "default" = pkg; }; default = "default"; };
+              in {
+                beads = single inputs.beads.packages.${system}.default;
+                beads_viewer = single inputs.beads_viewer.packages.${system}.default;
+                jj = single inputs.jj.packages.${system}.default;
+              };
             # Enable Buck2 toolchain generation
             buck2 = {
               enable = true;

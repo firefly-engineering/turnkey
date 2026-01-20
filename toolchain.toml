@@ -28,7 +28,6 @@ biome = {}  # Fast linter and formatter for JS/TS/JSON
 # Solidity toolchain
 solc = {}         # Solidity compiler (also generates Buck2 toolchain)
 foundry = {}      # Ethereum dev toolkit (forge, cast, anvil)
-soldeps-gen = {}  # Tool for generating solidity-deps.toml from foundry.toml
 
 # Documentation tools
 mdbook = {}
@@ -42,8 +41,4 @@ pytest = {}  # Python test runner
 beads = {}
 beads_viewer = {}
 jj = {}
-godeps-gen = {}    # Tool for generating go-deps.toml from go.mod/go.sum
-pydeps-gen = {}    # Tool for generating python-deps.toml from pyproject.toml/requirements.txt
-rustdeps-gen = {}  # Tool for generating rust-deps.toml from Cargo.lock
-jsdeps-gen = {}    # Tool for generating js-deps.toml from pnpm-lock.yaml
-tk = {}            # Turnkey CLI wrapper for buck2 with auto-sync
+tk = {}  # Turnkey CLI wrapper for buck2 with auto-sync

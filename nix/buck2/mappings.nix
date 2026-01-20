@@ -237,12 +237,6 @@
     reason = "Ethereum dev toolkit, used as dependency of solidity toolchain";
   };
 
-  # Solidity dependency generator
-  soldeps-gen = {
-    skip = true;
-    reason = "Generates solidity-deps.toml from foundry.toml, not a Buck2 toolchain";
-  };
-
   # ==========================================================================
   # Documentation Toolchains
   # ==========================================================================

@@ -1,87 +1,100 @@
+# Default versioned registry mapping toolchain names to packages
+# This provides all standard toolchains that turnkey supports out of the box.
+#
+# Structure:
+#   <toolchain> = {
+#     versions = { "<version>" = <derivation>; ... };
+#     default = "<version>";
+#   };
+#
+# Users can extend via registryExtensions or custom overlays using mkRegistryOverlay.
 { pkgs, lib ? pkgs.lib }:
 
-# Default registry mapping toolchain names to nixpkgs derivations
-# This provides all standard toolchains that turnkey supports out of the box.
-# Users can extend this via registryExtensions without duplicating these entries.
-{
+let
+  # Import custom packages (user-facing tools only)
+  jrsonnet = import ../packages/jrsonnet.nix { inherit pkgs lib; };
+  tk = import ../packages/tk.nix { inherit pkgs lib; };
+  tw = import ../packages/tw.nix { inherit pkgs lib; };
+
+  # Helper for single-version entries (most common case for now)
+  single = pkg: {
+    versions = { "default" = pkg; };
+    default = "default";
+  };
+
+in {
   # ==========================================================================
   # Build systems
   # ==========================================================================
-  buck2 = pkgs.buck2;
+  buck2 = single pkgs.buck2;
 
   # ==========================================================================
   # Nix tooling
   # ==========================================================================
-  nix = pkgs.nix;
+  nix = single pkgs.nix;
 
   # ==========================================================================
   # Go toolchain
   # ==========================================================================
-  go = pkgs.go;
-  golangci-lint = pkgs.golangci-lint;
-  godeps-gen = import ../packages/godeps-gen.nix { inherit pkgs lib; };
-  gobuckify = import ../packages/gobuckify.nix { inherit pkgs lib; };
+  go = single pkgs.go;
+  golangci-lint = single pkgs.golangci-lint;
 
   # ==========================================================================
   # Rust toolchain
   # ==========================================================================
-  rust = pkgs.rustc;
-  cargo = pkgs.cargo;
-  clippy = pkgs.clippy;
-  rustfmt = pkgs.rustfmt;
-  rust-analyzer = pkgs.rust-analyzer;
-  cargo-edit = pkgs.cargo-edit;  # Provides cargo add/rm/upgrade
-  reindeer = pkgs.reindeer;
-  rustdeps-gen = import ../packages/rustdeps-gen.nix { inherit pkgs lib; };
+  rust = single pkgs.rustc;
+  cargo = single pkgs.cargo;
+  clippy = single pkgs.clippy;
+  rustfmt = single pkgs.rustfmt;
+  rust-analyzer = single pkgs.rust-analyzer;
+  cargo-edit = single pkgs.cargo-edit;  # Provides cargo add/rm/upgrade
+  reindeer = single pkgs.reindeer;
 
   # ==========================================================================
   # Python toolchain
   # ==========================================================================
-  python = pkgs.python3;
-  uv = pkgs.uv;  # Python package manager for lock file generation
-  ruff = pkgs.ruff;  # Python linter and formatter
-  pydeps-gen = import ../packages/pydeps-gen.nix { inherit pkgs lib; };
-  pytest = pkgs.python3Packages.pytest;
+  python = single pkgs.python3;
+  uv = single pkgs.uv;  # Python package manager for lock file generation
+  ruff = single pkgs.ruff;  # Python linter and formatter
+  pytest = single pkgs.python3Packages.pytest;
 
   # ==========================================================================
   # C/C++ toolchain
   # ==========================================================================
-  cxx = pkgs.stdenv.cc;
+  cxx = single pkgs.stdenv.cc;
   # Use clangUseLLVM which has lld integration for -fuse-ld=lld to work
-  clang = pkgs.llvmPackages.clangUseLLVM;
-  lld = pkgs.lld;
+  clang = single pkgs.llvmPackages.clangUseLLVM;
+  lld = single pkgs.lld;
 
   # ==========================================================================
   # JavaScript/TypeScript toolchain
   # ==========================================================================
-  nodejs = pkgs.nodejs;
-  typescript = pkgs.nodePackages.typescript;
-  biome = pkgs.biome;  # Fast linter and formatter for JS/TS/JSON
-  jsdeps-gen = import ../packages/jsdeps-gen.nix { inherit pkgs lib; };
+  nodejs = single pkgs.nodejs;
+  typescript = single pkgs.nodePackages.typescript;
+  biome = single pkgs.biome;  # Fast linter and formatter for JS/TS/JSON
 
   # ==========================================================================
   # Solidity toolchain
   # ==========================================================================
   # The 'solidity' entry is for the Buck2 toolchain - it provides solc in PATH
   # Use 'solc' and 'foundry' directly if you need specific tools
-  solidity = pkgs.solc;  # Buck2 toolchain entry (provides solc)
-  solc = pkgs.solc;  # Solidity compiler
-  foundry = pkgs.foundry;  # Ethereum dev toolkit (forge, cast, anvil)
-  soldeps-gen = import ../packages/soldeps-gen.nix { inherit pkgs lib; };
+  solidity = single pkgs.solc;  # Buck2 toolchain entry (provides solc)
+  solc = single pkgs.solc;  # Solidity compiler
+  foundry = single pkgs.foundry;  # Ethereum dev toolkit (forge, cast, anvil)
 
   # ==========================================================================
   # Data templating
   # ==========================================================================
-  jsonnet = import ../packages/jrsonnet.nix { inherit pkgs lib; };  # Rust implementation (fastest)
+  jsonnet = single jrsonnet;  # Rust implementation (fastest)
 
   # ==========================================================================
   # Documentation tooling
   # ==========================================================================
-  mdbook = pkgs.mdbook;
+  mdbook = single pkgs.mdbook;
 
   # ==========================================================================
   # Turnkey CLI tools
   # ==========================================================================
-  tk = import ../packages/tk.nix { inherit pkgs lib; };
-  tw = import ../packages/tw.nix { inherit pkgs lib; };
+  tk = single tk;
+  tw = single tw;
 }
