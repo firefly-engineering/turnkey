@@ -72,7 +72,7 @@
   # ==========================================================================
   # Data templating
   # ==========================================================================
-  jsonnet = pkgs.go-jsonnet;  # Go implementation (faster than C++)
+  jsonnet = import ../packages/jrsonnet.nix { inherit pkgs lib; };  # Rust implementation (fastest)
 
   # ==========================================================================
   # Documentation tooling
