@@ -1109,6 +1109,68 @@ in
           nix flake check --no-build --impure
         '';
       };
+
+      # Starlark syntax validation using Buck2
+      starlark-lint = {
+        enable = true;
+        name = "starlark-lint";
+        description = "Lint Starlark files (rules.star, BUCK, etc.)";
+        files = "(rules\\.star|BUCK|\\.bzl)$";
+        pass_filenames = true;
+        entry = ''
+          ${pkgs.buck2}/bin/buck2 starlark lint
+        '';
+      };
+
+      # TOML syntax validation
+      toml-syntax-check = {
+        enable = true;
+        name = "toml-syntax-check";
+        description = "Check TOML syntax validity";
+        files = "\\.toml$";
+        pass_filenames = true;
+        entry = ''
+          ${pkgs.python3}/bin/python -c '
+import tomllib
+import sys
+errors = 0
+for path in sys.argv[1:]:
+    try:
+        with open(path, "rb") as f:
+            tomllib.load(f)
+    except Exception as e:
+        print(f"TOML syntax error in {path}: {e}", file=sys.stderr)
+        errors += 1
+if errors:
+    sys.exit(1)
+'
+        '';
+      };
+
+      # JSON syntax validation
+      json-syntax-check = {
+        enable = true;
+        name = "json-syntax-check";
+        description = "Check JSON syntax validity";
+        files = "\\.json$";
+        pass_filenames = true;
+        entry = ''
+          ${pkgs.python3}/bin/python -c '
+import json
+import sys
+errors = 0
+for path in sys.argv[1:]:
+    try:
+        with open(path, "r") as f:
+            json.load(f)
+    except Exception as e:
+        print(f"JSON syntax error in {path}: {e}", file=sys.stderr)
+        errors += 1
+if errors:
+    sys.exit(1)
+'
+        '';
+      };
     };
   };
 }
