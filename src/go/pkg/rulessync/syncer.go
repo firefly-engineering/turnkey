@@ -31,6 +31,10 @@ type Config struct {
 
 	// Verbose enables verbose output.
 	Verbose bool
+
+	// Force if true, syncs all files even if they appear up-to-date.
+	// When false, uses mtime-based staleness detection to skip files.
+	Force bool
 }
 
 // Syncer orchestrates rules.star synchronization.
@@ -61,6 +65,9 @@ type SyncResult struct {
 
 	// Updated is true if the file was modified.
 	Updated bool
+
+	// Skipped is true if the file was skipped due to staleness check.
+	Skipped bool
 
 	// Added lists dependencies that were added.
 	Added []string
@@ -116,20 +123,34 @@ func (s *Syncer) SyncDirectory(dir string) ([]SyncResult, error) {
 func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 	result := &SyncResult{Path: rulesPath}
 
-	// Parse the rules.star file
+	// Determine package directory
+	pkgDir := filepath.Dir(rulesPath)
+
+	// Parse the rules.star file to detect language
 	f, err := starlark.ParseFile(rulesPath)
 	if err != nil {
 		return nil, fmt.Errorf("parsing rules.star: %w", err)
 	}
-
-	// Determine package directory
-	pkgDir := filepath.Dir(rulesPath)
 
 	// Detect language from rules.star content
 	language := s.detectLanguage(f)
 	if language == "" {
 		// Can't determine language, skip
 		return result, nil
+	}
+
+	// Check staleness before running extractor (unless Force mode)
+	if !s.config.Force {
+		stale, err := s.isStale(rulesPath, pkgDir, language)
+		if err != nil {
+			// On error, assume stale to be safe
+			if s.config.Verbose {
+				fmt.Fprintf(os.Stderr, "  staleness check failed for %s: %v\n", rulesPath, err)
+			}
+		} else if !stale {
+			result.Skipped = true
+			return result, nil
+		}
 	}
 
 	// Run extractor for this package
@@ -231,6 +252,80 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 
 	result.Updated = modified
 	return result, nil
+}
+
+// isStale checks if rules.star needs updating based on source file mtimes.
+// Returns true if any source file is newer than rules.star.
+func (s *Syncer) isStale(rulesPath, pkgDir, language string) (bool, error) {
+	// Get rules.star mtime
+	rulesInfo, err := os.Stat(rulesPath)
+	if err != nil {
+		return true, err // If we can't stat rules.star, assume stale
+	}
+	rulesMtime := rulesInfo.ModTime()
+
+	// Get source file patterns for this language
+	patterns := sourcePatterns(language)
+	if len(patterns) == 0 {
+		return true, nil // Unknown language, assume stale
+	}
+
+	// Walk the directory and check mtimes
+	var newerCount int
+	err = filepath.Walk(pkgDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip hidden directories and common non-source directories
+		if info.IsDir() {
+			name := info.Name()
+			if name == "vendor" || name == "node_modules" || name == "testdata" ||
+				name == "__pycache__" || name == ".venv" || name == "target" ||
+				strings.HasPrefix(name, ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Check if file matches any source pattern
+		for _, pattern := range patterns {
+			matched, _ := filepath.Match(pattern, info.Name())
+			if matched {
+				if info.ModTime().After(rulesMtime) {
+					newerCount++
+					// Found a newer file, we're done
+					return filepath.SkipAll
+				}
+				break
+			}
+		}
+		return nil
+	})
+
+	if err != nil && err != filepath.SkipAll {
+		return true, err
+	}
+
+	return newerCount > 0, nil
+}
+
+// sourcePatterns returns file patterns for source files in a given language.
+func sourcePatterns(language string) []string {
+	switch language {
+	case "go":
+		return []string{"*.go"}
+	case "rust":
+		return []string{"*.rs", "Cargo.toml"}
+	case "python":
+		return []string{"*.py"}
+	case "typescript":
+		return []string{"*.ts", "*.tsx", "*.js", "*.jsx", "*.mjs", "*.cjs"}
+	case "solidity":
+		return []string{"*.sol"}
+	default:
+		return nil
+	}
 }
 
 // detectLanguage determines the language from rules.star content.

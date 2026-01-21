@@ -50,8 +50,11 @@ func runRulesCheck(args []string) int {
 
 	// Parse check-specific flags
 	var targetDir string
+	var forceCheck bool
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--all", "-a", "--force", "-f":
+			forceCheck = true
 		case "--verbose", "-v":
 			verbose = true
 		case "--quiet", "-q":
@@ -75,6 +78,7 @@ func runRulesCheck(args []string) int {
 		ProjectRoot: root,
 		DryRun:      true,
 		Verbose:     verbose,
+		Force:       forceCheck,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tk rules: %v\n", err)
@@ -89,7 +93,16 @@ func runRulesCheck(args []string) int {
 
 	anyNeedsUpdate := false
 	checkedCount := 0
+	skippedCount := 0
 	for _, result := range results {
+		if result.Skipped {
+			skippedCount++
+			if verbose {
+				relPath, _ := filepath.Rel(root, result.Path)
+				fmt.Fprintf(os.Stderr, "SKIPPED: %s (up-to-date)\n", relPath)
+			}
+			continue
+		}
 		checkedCount++
 		if result.Updated {
 			anyNeedsUpdate = true
@@ -122,7 +135,11 @@ func runRulesCheck(args []string) int {
 	}
 
 	if !quiet {
-		fmt.Fprintf(os.Stderr, "tk rules: all rules.star files up-to-date (%d checked)\n", checkedCount)
+		fmt.Fprintf(os.Stderr, "tk rules: all rules.star files up-to-date (%d checked", checkedCount)
+		if skippedCount > 0 {
+			fmt.Fprintf(os.Stderr, ", %d skipped", skippedCount)
+		}
+		fmt.Fprintln(os.Stderr, ")")
 	}
 	return 0
 }
@@ -137,11 +154,12 @@ func runRulesSync(args []string) int {
 
 	// Parse sync-specific flags
 	var targetDir string
+	var forceSync bool
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
-		case "--all", "-a":
-			// --all is now the default behavior (always sync all)
+		case "--all", "-a", "--force", "-f":
+			forceSync = true
 		case "--verbose", "-v":
 			verbose = true
 		case "--quiet", "-q":
@@ -167,6 +185,7 @@ func runRulesSync(args []string) int {
 		ProjectRoot: root,
 		DryRun:      dryRun,
 		Verbose:     verbose,
+		Force:       forceSync,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tk rules: %v\n", err)
@@ -182,6 +201,7 @@ func runRulesSync(args []string) int {
 
 	// Report results
 	updatedCount := 0
+	skippedCount := 0
 	errorCount := 0
 
 	for _, result := range results {
@@ -196,7 +216,12 @@ func runRulesSync(args []string) int {
 			}
 		}
 
-		if result.Updated {
+		if result.Skipped {
+			skippedCount++
+			if verbose {
+				fmt.Fprintf(os.Stderr, "SKIPPED: %s (up-to-date)\n", relPath)
+			}
+		} else if result.Updated {
 			updatedCount++
 			if dryRun {
 				fmt.Fprintf(os.Stderr, "WOULD UPDATE: %s\n", relPath)
@@ -219,10 +244,14 @@ func runRulesSync(args []string) int {
 	// Summary
 	if !quiet {
 		if dryRun {
-			fmt.Fprintf(os.Stderr, "\ntk rules: would update %d file(s)\n", updatedCount)
+			fmt.Fprintf(os.Stderr, "\ntk rules: would update %d file(s)", updatedCount)
 		} else {
-			fmt.Fprintf(os.Stderr, "\ntk rules: updated %d file(s)\n", updatedCount)
+			fmt.Fprintf(os.Stderr, "\ntk rules: updated %d file(s)", updatedCount)
 		}
+		if skippedCount > 0 {
+			fmt.Fprintf(os.Stderr, ", skipped %d (up-to-date)", skippedCount)
+		}
+		fmt.Fprintln(os.Stderr)
 	}
 
 	if errorCount > 0 {
@@ -236,19 +265,24 @@ func printRulesHelp() {
 	fmt.Fprintln(os.Stderr, `Usage: tk rules <command> [options] [path]
 
 Commands:
-  check              Check if rules.star files are stale
-  sync               Update stale rules.star files
+  check              Check if rules.star files need updates
+  sync               Update rules.star files with detected dependencies
   help               Show this help
 
 Options:
-  --all, -a          Sync all files (not just stale ones)
-  --verbose, -v      Show detailed output
+  --all, -a          Process all files (skip staleness detection)
+  --force, -f        Same as --all
+  --verbose, -v      Show detailed output including skipped files
   --quiet, -q        Suppress output
   --dry-run, -n      Show what would be changed without writing
 
+Staleness Detection:
+  By default, only files where source files are newer than rules.star
+  are processed. Use --all or --force to check/sync all files.
+
 Examples:
-  tk rules check                    # Check all rules.star files
-  tk rules check src/cmd/tk         # Check specific directory
+  tk rules check                    # Check stale rules.star files
+  tk rules check --all              # Check all rules.star files
   tk rules sync                     # Update stale rules.star files
   tk rules sync --all               # Force update all files
   tk rules sync src/cmd/tk          # Sync specific directory
