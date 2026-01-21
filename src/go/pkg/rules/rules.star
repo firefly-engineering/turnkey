@@ -5,6 +5,7 @@ go_library(
     srcs = glob(["*.go"]),
     deps = [
         "godeps//vendor/github.com/pelletier/go-toml/v2:v2",
+        "godeps//vendor/go.starlark.net/syntax:syntax",
     ],
     visibility = ["PUBLIC"],
 )
