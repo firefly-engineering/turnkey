@@ -462,11 +462,28 @@ func isTestTarget(rule string) bool {
 }
 
 // mergeWithPreserved merges new deps with preserved deps from old list.
-// TODO: Implement preserve marker support
+// Preserves:
+// - Local target deps (starting with ":") - these are manual same-package deps
+// - TODO: deps between preserve markers
 func mergeWithPreserved(oldDeps, newDeps []string) []string {
-	// For now, just return new deps
-	// Future: parse preserve markers and keep those deps
-	return newDeps
+	// Build set of new deps for deduplication
+	seen := make(map[string]bool)
+	for _, d := range newDeps {
+		seen[d] = true
+	}
+
+	// Preserve local target deps from old list (e.g., ":mylib")
+	// These are manual dependencies on same-package targets
+	var preserved []string
+	for _, d := range oldDeps {
+		if strings.HasPrefix(d, ":") && !seen[d] {
+			preserved = append(preserved, d)
+			seen[d] = true
+		}
+	}
+
+	// Return preserved deps first, then new deps
+	return append(preserved, newDeps...)
 }
 
 // diffDeps returns added and removed deps.

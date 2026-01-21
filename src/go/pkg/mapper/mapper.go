@@ -87,6 +87,9 @@ type PythonConfig struct {
 	// ProjectRoot is the Python project root directory.
 	ProjectRoot string
 
+	// InternalPrefix is the Buck2 path prefix for internal packages (e.g., "src/python").
+	InternalPrefix string
+
 	// ExternalCell is the Buck2 cell for external deps (e.g., "pydeps").
 	ExternalCell string
 
@@ -323,8 +326,9 @@ func loadRustDeps(path string) (map[string]bool, error) {
 // detectPythonConfig auto-detects Python configuration from the project.
 func detectPythonConfig(projectRoot string) (*PythonConfig, error) {
 	cfg := &PythonConfig{
-		ExternalCell: "pydeps",
-		ExternalDeps: make(map[string]bool),
+		ExternalCell:   "pydeps",
+		InternalPrefix: "src/python", // Default monorepo layout
+		ExternalDeps:   make(map[string]bool),
 	}
 
 	// Check for pyproject.toml
@@ -433,8 +437,8 @@ func detectSolidityConfig(projectRoot string) (*SolidityConfig, error) {
 	}
 	cfg.ProjectRoot = projectRoot
 
-	// Load sol-deps.toml
-	depsPath := filepath.Join(projectRoot, "sol-deps.toml")
+	// Load solidity-deps.toml
+	depsPath := filepath.Join(projectRoot, "solidity-deps.toml")
 	if deps, err := loadSolidityDeps(depsPath); err == nil {
 		cfg.DepsFile = depsPath
 		cfg.ExternalDeps = deps
@@ -862,6 +866,26 @@ func (m *Mapper) mapPythonInternalImport(modulePath string) MappedDep {
 // mapPythonExternalImport maps an external Python import to a Buck2 target.
 func (m *Mapper) mapPythonExternalImport(modulePath string) MappedDep {
 	cfg := m.config.Python
+
+	// Check for internal monorepo imports first
+	// Pattern: "python.<pkg>.<module>" -> "//src/python/<pkg>:<pkg>"
+	if strings.HasPrefix(modulePath, "python.") {
+		parts := strings.SplitN(modulePath, ".", 3)
+		if len(parts) >= 2 {
+			pkgName := parts[1] // e.g., "cargo" from "python.cargo.toml"
+			// Verify the package directory exists (use full path for stat)
+			pkgDir := filepath.Join(cfg.InternalPrefix, pkgName)
+			fullPkgDir := filepath.Join(cfg.ProjectRoot, pkgDir)
+			if _, err := os.Stat(fullPkgDir); err == nil {
+				target := fmt.Sprintf("//%s:%s", pkgDir, pkgName)
+				return MappedDep{
+					Target:     target,
+					Type:       DependencyInternal,
+					ImportPath: modulePath,
+				}
+			}
+		}
+	}
 
 	// Get top-level package name
 	topLevel := modulePath
