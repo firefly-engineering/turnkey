@@ -73,6 +73,9 @@ func main() {
 	case "check":
 		exitCode := runCheck()
 		os.Exit(exitCode)
+	case "rules":
+		exitCode := runRules(args[1:])
+		os.Exit(exitCode)
 	case "completion":
 		exitCode := runCompletion(args[1:])
 		os.Exit(exitCode)
