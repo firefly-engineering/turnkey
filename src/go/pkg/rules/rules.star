@@ -12,7 +12,10 @@ go_library(
 
 go_test(
     name = "rules_test",
-    srcs = glob(["*_test.go"]),
-    deps = [":rules"],
+    srcs = glob(["*_test.go"]) + glob(["*.go"]),
+    deps = [
+        "godeps//vendor/github.com/pelletier/go-toml/v2:v2",
+        "godeps//vendor/go.starlark.net/syntax:syntax",
+    ],
     visibility = ["PUBLIC"],
 )
