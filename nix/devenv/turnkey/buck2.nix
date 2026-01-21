@@ -413,6 +413,17 @@ ${generateTargets finalToolchains}
     #
     # To customize, modify your flake.nix buck2 options.
 
+    # Rules.star auto-sync configuration
+    # When enabled, tk automatically updates rules.star deps before build commands.
+    [rules]
+    enabled = ${lib.boolToString cfg.rules.enabled}
+    auto_sync = ${lib.boolToString cfg.rules.autoSync}
+    strict = ${lib.boolToString cfg.rules.strict}
+
+    [rules.go]
+    internal_prefix = ${builtins.toJSON cfg.rules.go.internalPrefix}
+    external_cell = ${builtins.toJSON cfg.rules.go.externalCell}
+
     ${lib.concatMapStringsSep "\n" formatSyncRule syncRules}
   '';
 
@@ -728,6 +739,72 @@ in
         description = ''
           Relative path to foundry.toml file (for staleness checking).
         '';
+      };
+    };
+
+    # ==========================================================================
+    # Rules.star auto-sync configuration
+    # ==========================================================================
+    rules = {
+      enabled = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Enable automatic rules.star synchronization before Buck2 commands.
+
+          When enabled, tk will check rules.star files for staleness and
+          update them automatically (if auto_sync is true) or warn (if false).
+
+          Use --no-rules-sync to skip this check, or --strict-rules for CI.
+        '';
+      };
+
+      autoSync = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Automatically update stale rules.star files.
+
+          When true (default), stale rules.star files are updated before build.
+          When false, tk only warns about stale files.
+        '';
+      };
+
+      strict = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Fail if rules.star files would change (CI mode).
+
+          When true, tk will exit with error if any rules.star file needs updating.
+          This is useful for CI to ensure rules.star files are committed up-to-date.
+
+          Can also be enabled per-invocation with --strict-rules flag.
+        '';
+      };
+
+      go = {
+        internalPrefix = lib.mkOption {
+          type = lib.types.str;
+          default = "//src/go";
+          description = ''
+            Buck2 target prefix for internal Go packages.
+
+            Example: "//src/go" means imports from github.com/org/repo/src/go/pkg/foo
+            will be mapped to //src/go/pkg/foo:foo
+          '';
+        };
+
+        externalCell = lib.mkOption {
+          type = lib.types.str;
+          default = "godeps";
+          description = ''
+            Buck2 cell for external Go dependencies.
+
+            Example: "godeps" means external imports will be mapped to
+            godeps//vendor/github.com/foo/bar:bar
+          '';
+        };
       };
     };
 
