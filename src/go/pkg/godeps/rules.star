@@ -29,10 +29,6 @@ go_test(
         "prefetch_test.go",
     ],
     target_under_test = ":godeps",
-    deps = [
-        # turnkey:auto-start
-        "godeps//vendor/golang.org/x/mod/modfile:modfile",
-        # turnkey:auto-end
-    ],
+    deps = [],
     visibility = ["PUBLIC"],
 )

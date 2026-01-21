@@ -20,11 +20,6 @@ go_test(
     name = "rules_test",
     srcs = glob(["*_test.go"]),
     target_under_test = ":rules",
-    deps = [
-        # turnkey:auto-start
-        "godeps//vendor/github.com/pelletier/go-toml/v2:v2",
-        "godeps//vendor/go.starlark.net/syntax:syntax",
-        # turnkey:auto-end
-    ],
+    deps = [],
     visibility = ["PUBLIC"],
 )

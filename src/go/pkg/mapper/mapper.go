@@ -443,23 +443,27 @@ func detectSolidityConfig(projectRoot string) (*SolidityConfig, error) {
 	return cfg, nil
 }
 
-// loadSolidityDeps loads package names from sol-deps.toml.
+// loadSolidityDeps loads package names from solidity-deps.toml.
+// Handles the [[package]] format used by soldeps-gen.
 func loadSolidityDeps(path string) (map[string]bool, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
+	// solidity-deps.toml uses [[package]] array format, not [deps] map
 	var depsFile struct {
-		Deps map[string]interface{} `toml:"deps"`
+		Package []struct {
+			Name string `toml:"name"`
+		} `toml:"package"`
 	}
 	if err := toml.Unmarshal(content, &depsFile); err != nil {
 		return nil, err
 	}
 
 	result := make(map[string]bool)
-	for dep := range depsFile.Deps {
-		result[dep] = true
+	for _, pkg := range depsFile.Package {
+		result[pkg.Name] = true
 	}
 	return result, nil
 }
@@ -837,18 +841,21 @@ func (m *Mapper) mapPythonImport(imp extraction.Import) MappedDep {
 
 // mapPythonInternalImport maps an internal Python import to a Buck2 target.
 func (m *Mapper) mapPythonInternalImport(modulePath string) MappedDep {
-	// Convert Python module path to Buck2 target
-	// e.g., "src.python.cfg" -> "//src/python/cfg:cfg"
-	parts := strings.Split(modulePath, ".")
-	relPath := strings.Join(parts, "/")
-	targetName := parts[len(parts)-1]
+	// Relative imports starting with . (like .module or ..module) are internal to the same package
+	// They don't represent cross-target dependencies - skip them
+	// (The files are already part of the same target's srcs)
+	if strings.HasPrefix(modulePath, ".") {
+		return MappedDep{
+			ImportPath: modulePath,
+			Type:       DependencyStdLib, // Use StdLib type to skip (will be filtered out)
+		}
+	}
 
-	target := fmt.Sprintf("//%s:%s", relPath, targetName)
-
+	// Absolute internal imports would need more context to resolve
+	// For now, skip them as we can't determine the target without more info
 	return MappedDep{
-		Target:     target,
-		Type:       DependencyInternal,
 		ImportPath: modulePath,
+		Type:       DependencyStdLib, // Skip - can't resolve without project context
 	}
 }
 
@@ -953,14 +960,12 @@ func (m *Mapper) mapTypescriptImport(imp extraction.Import) MappedDep {
 
 // mapTypescriptInternalImport maps an internal TypeScript import to a Buck2 target.
 func (m *Mapper) mapTypescriptInternalImport(modulePath string) MappedDep {
-	// Relative imports like ./foo or ../bar are internal
-	// Convert relative path to Buck2 target
-	// This is complex because we need the context of where the import is from
-	// For now, we'll treat relative imports as internal without full path resolution
+	// Relative imports like ./foo or ../bar are internal to the same package
+	// They don't represent cross-target dependencies - skip them
+	// (The files are already part of the same target's srcs)
 	return MappedDep{
-		Target:     modulePath,
-		Type:       DependencyInternal,
 		ImportPath: modulePath,
+		Type:       DependencyStdLib, // Use StdLib type to skip (will be filtered out)
 	}
 }
 
@@ -1076,11 +1081,12 @@ func (m *Mapper) mapSolidityImport(imp extraction.Import) MappedDep {
 
 // mapSolidityInternalImport maps an internal Solidity import to a Buck2 target.
 func (m *Mapper) mapSolidityInternalImport(importPath string) MappedDep {
-	// Relative imports like ./Foo.sol or ../Bar.sol are internal
+	// Relative imports like ./Foo.sol or ../Bar.sol are internal to the same package
+	// They don't represent cross-target dependencies - skip them
+	// (The files are already part of the same target's srcs)
 	return MappedDep{
-		Target:     importPath,
-		Type:       DependencyInternal,
 		ImportPath: importPath,
+		Type:       DependencyStdLib, // Use StdLib type to skip (will be filtered out)
 	}
 }
 

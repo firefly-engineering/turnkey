@@ -19,10 +19,6 @@ go_test(
     name = "localconfig_test",
     srcs = ["localconfig_test.go"],
     target_under_test = ":localconfig",
-    deps = [
-        # turnkey:auto-start
-        "godeps//vendor/github.com/pelletier/go-toml/v2:v2",
-        # turnkey:auto-end
-    ],
+    deps = [],
     visibility = ["PUBLIC"],
 )

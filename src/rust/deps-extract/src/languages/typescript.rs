@@ -100,23 +100,36 @@ pub fn extract(dir: &Path, exclude_patterns: &[&str]) -> anyhow::Result<Result> 
         let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
         while let Some(match_) = matches.next() {
             for capture in match_.captures {
-                let node = capture.node;
-                let text = node.utf8_text(source.as_bytes())?;
+                // Capture indices:
+                // 0 = @import_source (from import statements)
+                // 1 = @export_source (from export statements)
+                // 2 = @func_name (function identifier in call_expression)
+                // 3 = @require_arg (string argument in require() calls)
+                // 4 = @dynamic_import (string argument in import() calls)
 
-                // Remove quotes from string literals
-                let module_path = text.trim_matches(|c| c == '"' || c == '\'' || c == '`');
-
-                // Skip require if function name isn't "require"
+                // Skip @func_name captures - we only care about string arguments
                 if capture.index == 2 {
-                    // This is @require_arg, check if function was "require"
-                    let func_capture = match_.captures.iter().find(|c| c.index == 1);
+                    continue;
+                }
+
+                // For @require_arg (index 3), verify the function name is "require"
+                if capture.index == 3 {
+                    let func_capture = match_.captures.iter().find(|c| c.index == 2);
                     if let Some(fc) = func_capture {
                         let func_name = fc.node.utf8_text(source.as_bytes())?;
                         if func_name != "require" {
                             continue;
                         }
+                    } else {
+                        continue;
                     }
                 }
+
+                let node = capture.node;
+                let text = node.utf8_text(source.as_bytes())?;
+
+                // Remove quotes from string literals
+                let module_path = text.trim_matches(|c| c == '"' || c == '\'' || c == '`');
 
                 let (pkg_name, kind) = classify_ts_import(module_path);
 
