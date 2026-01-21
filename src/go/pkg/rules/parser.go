@@ -44,15 +44,13 @@ func (p *Parser) Parse(path, content string) (*RulesFile, error) {
 		RawContent: content,
 	}
 
-	// Extract hash from comments if present
-	for _, comment := range f.Stmts {
-		if c, ok := comment.(*syntax.CommentBlock); ok {
-			for _, line := range c.Lines {
-				if strings.Contains(line.Text, "Auto-managed by turnkey") {
-					if idx := strings.Index(line.Text, "Hash:"); idx >= 0 {
-						rf.Hash = strings.TrimSpace(line.Text[idx+5:])
-					}
-				}
+	// Extract hash from comments in the raw content
+	// Starlark AST doesn't preserve comments, so we parse them from the raw content
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "#") && strings.Contains(line, "Auto-managed by turnkey") {
+			if idx := strings.Index(line, "Hash:"); idx >= 0 {
+				rf.Hash = strings.TrimSpace(line[idx+5:])
 			}
 		}
 	}
@@ -101,9 +99,8 @@ func (p *Parser) parseTargetCall(call *syntax.CallExpr, content string) *Target 
 		ruleName = fn.Name
 	case *syntax.DotExpr:
 		// Handle cases like module.rule_name
-		if ident, ok := fn.Name.(*syntax.Ident); ok {
-			ruleName = ident.Name
-		}
+		// DotExpr.Name is an *syntax.Ident
+		ruleName = fn.Name.Name
 	default:
 		return nil
 	}
@@ -186,7 +183,6 @@ func (p *Parser) parseDepsWithMarkers(expr syntax.Expr, content string) (all, au
 
 	// Extract the deps section from content to find markers
 	lines := strings.Split(content, "\n")
-	inAutoSection := false
 	inPreserveSection := false
 
 	// Track which deps are in which section based on line positions
@@ -200,17 +196,10 @@ func (p *Parser) parseDepsWithMarkers(expr syntax.Expr, content string) (all, au
 	}
 
 	// Scan lines for markers and categorize deps
+	// Everything not in a preserve section is considered auto-managed
 	for lineNum := startLine; lineNum <= endLine && lineNum <= len(lines); lineNum++ {
 		line := lines[lineNum-1] // lines are 1-indexed
 
-		if strings.Contains(line, MarkerAutoStart) {
-			inAutoSection = true
-			continue
-		}
-		if strings.Contains(line, MarkerAutoEnd) {
-			inAutoSection = false
-			continue
-		}
 		if strings.Contains(line, MarkerPreserveStart) {
 			inPreserveSection = true
 			continue
@@ -225,7 +214,7 @@ func (p *Parser) parseDepsWithMarkers(expr syntax.Expr, content string) (all, au
 			if inPreserveSection {
 				preserved = append(preserved, dep)
 			} else {
-				// Default to auto (including when in auto section or no markers)
+				// Everything outside preserve section is auto-managed
 				auto = append(auto, dep)
 			}
 		}
