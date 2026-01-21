@@ -5,7 +5,38 @@ import (
 )
 
 // SetDeps sets the deps attribute of the target.
+// If the deps attribute has markers, it only updates the auto-managed section.
 func (t *Target) SetDeps(deps []string) {
+	attr := t.GetAttribute("deps")
+	if attr == nil {
+		// No existing deps, create as simple list
+		t.setStringList("deps", deps)
+		return
+	}
+
+	// Check if existing deps have markers
+	if depsVal, ok := attr.Value.(DepsValue); ok {
+		// Preserve the preserved section, update only auto section
+		if depsVal.HasMarkers {
+			// Check if auto deps changed
+			if stringSlicesEqual(depsVal.AutoDeps, deps) {
+				return // No change
+			}
+
+			newDepsVal := DepsValue{
+				AutoDeps:      deps,
+				PreservedDeps: depsVal.PreservedDeps,
+				HasMarkers:    true,
+			}
+			attr.Value = newDepsVal
+			attr.modified = true
+			t.modified = true
+			t.modifiedAttrs["deps"] = true
+			return
+		}
+	}
+
+	// No markers or not a DepsValue, use simple list
 	t.setStringList("deps", deps)
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"go.starlark.net/syntax"
 )
@@ -133,6 +134,14 @@ func parseAttribute(name string, expr *syntax.BinaryExpr, source []byte) (*Attri
 		span: spanFromNode(expr, source),
 	}
 
+	// Special handling for deps attribute to support markers
+	if name == "deps" {
+		if list, ok := expr.Y.(*syntax.ListExpr); ok {
+			attr.Value = parseDepsValue(list, source)
+			return attr, nil
+		}
+	}
+
 	attr.Value = parseValue(expr.Y, source)
 
 	return attr, nil
@@ -208,6 +217,101 @@ func parseListValue(list *syntax.ListExpr, source []byte) AttributeValue {
 		Expr:         list,
 		originalText: extractText(list, source),
 	}
+}
+
+// parseDepsValue parses a deps attribute with marker support.
+// It looks for turnkey:auto-start/end and turnkey:preserve-start/end markers.
+func parseDepsValue(list *syntax.ListExpr, source []byte) AttributeValue {
+	// Get the original text for this list
+	text := extractText(list, source)
+
+	// Check for markers
+	hasAutoStart := strings.Contains(text, "# turnkey:auto-start")
+	hasAutoEnd := strings.Contains(text, "# turnkey:auto-end")
+	hasPreserveStart := strings.Contains(text, "# turnkey:preserve-start")
+	hasPreserveEnd := strings.Contains(text, "# turnkey:preserve-end")
+
+	// If no markers, parse as regular string list
+	if !hasAutoStart && !hasAutoEnd && !hasPreserveStart && !hasPreserveEnd {
+		return parseListValue(list, source)
+	}
+
+	// Parse with markers
+	depsValue := DepsValue{
+		HasMarkers: true,
+	}
+
+	// Parse the text line by line to extract deps in each section
+	lines := strings.Split(text, "\n")
+	inAutoSection := false
+	inPreserveSection := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		// Check for markers
+		if strings.Contains(trimmed, "# turnkey:auto-start") {
+			inAutoSection = true
+			continue
+		}
+		if strings.Contains(trimmed, "# turnkey:auto-end") {
+			inAutoSection = false
+			continue
+		}
+		if strings.Contains(trimmed, "# turnkey:preserve-start") {
+			inPreserveSection = true
+			continue
+		}
+		if strings.Contains(trimmed, "# turnkey:preserve-end") {
+			inPreserveSection = false
+			continue
+		}
+
+		// Skip empty lines, brackets, and pure comments
+		if trimmed == "" || trimmed == "[" || trimmed == "]" || trimmed == "]," {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+
+		// Extract the dep string
+		dep := extractDepFromLine(trimmed)
+		if dep == "" {
+			continue
+		}
+
+		if inAutoSection {
+			depsValue.AutoDeps = append(depsValue.AutoDeps, dep)
+		} else if inPreserveSection {
+			depsValue.PreservedDeps = append(depsValue.PreservedDeps, dep)
+		}
+		// Deps outside markers are ignored (they'll be in one section or another after sync)
+	}
+
+	return depsValue
+}
+
+// extractDepFromLine extracts a dependency string from a line like `"//foo:bar",`
+func extractDepFromLine(line string) string {
+	// Remove trailing comma
+	line = strings.TrimSuffix(line, ",")
+	line = strings.TrimSpace(line)
+
+	// Remove inline comments
+	if idx := strings.Index(line, "#"); idx != -1 {
+		line = strings.TrimSpace(line[:idx])
+	}
+
+	// Unquote the string
+	if strings.HasPrefix(line, `"`) && strings.HasSuffix(line, `"`) {
+		s, err := strconv.Unquote(line)
+		if err == nil {
+			return s
+		}
+	}
+
+	return ""
 }
 
 // spanFromNode creates a Span from a syntax.Node.

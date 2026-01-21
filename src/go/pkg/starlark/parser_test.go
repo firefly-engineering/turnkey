@@ -321,3 +321,162 @@ func TestWriteModified(t *testing.T) {
 		t.Error("Output should contain unchanged mylib_test target")
 	}
 }
+
+const sampleWithMarkers = `load("@prelude//:rules.bzl", "go_library")
+
+go_library(
+    name = "mylib",
+    srcs = ["foo.go"],
+    deps = [
+        # turnkey:auto-start
+        "//auto:dep1",
+        "//auto:dep2",
+        # turnkey:auto-end
+        # turnkey:preserve-start
+        "//manual:special",
+        # turnkey:preserve-end
+    ],
+    visibility = ["PUBLIC"],
+)
+`
+
+func TestParseWithMarkers(t *testing.T) {
+	f, err := Parse("test.star", []byte(sampleWithMarkers))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	lib := f.GetTarget("mylib")
+	if lib == nil {
+		t.Fatal("Target not found")
+	}
+
+	// Check deps attribute is DepsValue with markers
+	attr := lib.GetAttribute("deps")
+	if attr == nil {
+		t.Fatal("deps attribute not found")
+	}
+
+	depsVal, ok := attr.Value.(DepsValue)
+	if !ok {
+		t.Fatalf("Expected DepsValue, got %T", attr.Value)
+	}
+
+	if !depsVal.HasMarkers {
+		t.Error("Expected HasMarkers to be true")
+	}
+
+	// Check auto deps
+	if len(depsVal.AutoDeps) != 2 {
+		t.Errorf("Expected 2 auto deps, got %d: %v", len(depsVal.AutoDeps), depsVal.AutoDeps)
+	}
+	if depsVal.AutoDeps[0] != "//auto:dep1" {
+		t.Errorf("Expected //auto:dep1, got %s", depsVal.AutoDeps[0])
+	}
+
+	// Check preserved deps
+	if len(depsVal.PreservedDeps) != 1 {
+		t.Errorf("Expected 1 preserved dep, got %d: %v", len(depsVal.PreservedDeps), depsVal.PreservedDeps)
+	}
+	if depsVal.PreservedDeps[0] != "//manual:special" {
+		t.Errorf("Expected //manual:special, got %s", depsVal.PreservedDeps[0])
+	}
+
+	// Check GetDeps returns all
+	allDeps := lib.GetDeps()
+	if len(allDeps) != 3 {
+		t.Errorf("Expected 3 total deps, got %d", len(allDeps))
+	}
+
+	// Check GetAutoDeps
+	autoDeps := lib.GetAutoDeps()
+	if len(autoDeps) != 2 {
+		t.Errorf("Expected 2 auto deps from GetAutoDeps, got %d", len(autoDeps))
+	}
+
+	// Check GetPreservedDeps
+	preservedDeps := lib.GetPreservedDeps()
+	if len(preservedDeps) != 1 {
+		t.Errorf("Expected 1 preserved dep from GetPreservedDeps, got %d", len(preservedDeps))
+	}
+}
+
+func TestSetDepsPreservesMarkers(t *testing.T) {
+	f, err := Parse("test.star", []byte(sampleWithMarkers))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	lib := f.GetTarget("mylib")
+
+	// Update auto deps
+	lib.SetDeps([]string{"//new:dep1", "//new:dep2", "//new:dep3"})
+
+	// Check that preserved deps are still there
+	preservedDeps := lib.GetPreservedDeps()
+	if len(preservedDeps) != 1 {
+		t.Errorf("Expected 1 preserved dep after SetDeps, got %d", len(preservedDeps))
+	}
+	if preservedDeps[0] != "//manual:special" {
+		t.Errorf("Preserved dep changed: got %s", preservedDeps[0])
+	}
+
+	// Check that auto deps were updated
+	autoDeps := lib.GetAutoDeps()
+	if len(autoDeps) != 3 {
+		t.Errorf("Expected 3 auto deps after SetDeps, got %d", len(autoDeps))
+	}
+
+	// Write and verify output
+	output := string(f.Write())
+
+	// Should contain new deps
+	if !strings.Contains(output, `"//new:dep1"`) {
+		t.Error("Output should contain new dep")
+	}
+
+	// Should contain preserved dep
+	if !strings.Contains(output, `"//manual:special"`) {
+		t.Error("Output should contain preserved dep")
+	}
+
+	// Should contain markers
+	if !strings.Contains(output, "# turnkey:auto-start") {
+		t.Error("Output should contain auto-start marker")
+	}
+	if !strings.Contains(output, "# turnkey:preserve-start") {
+		t.Error("Output should contain preserve-start marker")
+	}
+}
+
+func TestRoundTripWithMarkers(t *testing.T) {
+	f, err := Parse("test.star", []byte(sampleWithMarkers))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	// Write without modifications
+	output := string(f.Write())
+
+	// Parse again
+	f2, err := Parse("test.star", []byte(output))
+	if err != nil {
+		t.Fatalf("Second parse failed: %v", err)
+	}
+
+	lib := f2.GetTarget("mylib")
+	if lib == nil {
+		t.Fatal("Target not found after round-trip")
+	}
+
+	// Verify deps are preserved
+	autoDeps := lib.GetAutoDeps()
+	if len(autoDeps) != 2 {
+		t.Errorf("Expected 2 auto deps after round-trip, got %d", len(autoDeps))
+	}
+
+	preservedDeps := lib.GetPreservedDeps()
+	if len(preservedDeps) != 1 {
+		t.Errorf("Expected 1 preserved dep after round-trip, got %d", len(preservedDeps))
+	}
+}

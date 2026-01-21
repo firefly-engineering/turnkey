@@ -168,6 +168,9 @@ func writeValue(b *strings.Builder, value AttributeValue, indent string) {
 	case StringListValue:
 		writeStringList(b, v.Values, indent)
 
+	case DepsValue:
+		writeDepsValue(b, v, indent)
+
 	case BoolValue:
 		if v.Value {
 			b.WriteString("True")
@@ -185,6 +188,55 @@ func writeValue(b *strings.Builder, value AttributeValue, indent string) {
 		// Use original text for complex expressions
 		b.WriteString(v.originalText)
 	}
+}
+
+// writeDepsValue writes a deps list with markers.
+func writeDepsValue(b *strings.Builder, deps DepsValue, indent string) {
+	if !deps.HasMarkers {
+		// No markers, write as simple list
+		writeStringList(b, deps.RawDeps, indent)
+		return
+	}
+
+	// Write with markers
+	allEmpty := len(deps.AutoDeps) == 0 && len(deps.PreservedDeps) == 0
+	if allEmpty {
+		b.WriteString("[]")
+		return
+	}
+
+	b.WriteString("[\n")
+
+	// Write auto-managed deps
+	if len(deps.AutoDeps) > 0 || len(deps.PreservedDeps) > 0 {
+		b.WriteString(indent)
+		b.WriteString("    # turnkey:auto-start\n")
+		for _, dep := range deps.AutoDeps {
+			b.WriteString(indent)
+			b.WriteString("    ")
+			b.WriteString(strconv.Quote(dep))
+			b.WriteString(",\n")
+		}
+		b.WriteString(indent)
+		b.WriteString("    # turnkey:auto-end\n")
+	}
+
+	// Write preserved deps
+	if len(deps.PreservedDeps) > 0 {
+		b.WriteString(indent)
+		b.WriteString("    # turnkey:preserve-start\n")
+		for _, dep := range deps.PreservedDeps {
+			b.WriteString(indent)
+			b.WriteString("    ")
+			b.WriteString(strconv.Quote(dep))
+			b.WriteString(",\n")
+		}
+		b.WriteString(indent)
+		b.WriteString("    # turnkey:preserve-end\n")
+	}
+
+	b.WriteString(indent)
+	b.WriteString("]")
 }
 
 // writeStringList writes a list of strings.

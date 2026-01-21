@@ -141,6 +141,38 @@ type StringListValue struct {
 func (v StringListValue) Type() AttributeType { return TypeStringList }
 func (v StringListValue) String() string      { return "[...]" }
 
+// DepsValue is a deps list with support for preserved sections.
+// It tracks auto-managed deps (between turnkey:auto-start/end markers)
+// and preserved deps (between turnkey:preserve-start/end markers).
+type DepsValue struct {
+	// AutoDeps are dependencies managed by turnkey (can be regenerated).
+	AutoDeps []string
+
+	// PreservedDeps are dependencies that should not be modified.
+	PreservedDeps []string
+
+	// HasMarkers indicates whether the original had turnkey markers.
+	// If false, the entire deps list is treated as auto-managed.
+	HasMarkers bool
+
+	// RawDeps is used when there are no markers - the entire list.
+	RawDeps []string
+}
+
+func (v DepsValue) Type() AttributeType { return TypeStringList }
+func (v DepsValue) String() string      { return "[...]" }
+
+// AllDeps returns all deps (auto + preserved) in order.
+func (v DepsValue) AllDeps() []string {
+	if !v.HasMarkers {
+		return v.RawDeps
+	}
+	result := make([]string, 0, len(v.AutoDeps)+len(v.PreservedDeps))
+	result = append(result, v.AutoDeps...)
+	result = append(result, v.PreservedDeps...)
+	return result
+}
+
 // BoolValue is a boolean attribute value.
 type BoolValue struct {
 	Value bool
@@ -220,6 +252,7 @@ func (t *Target) GetAttribute(name string) *Attribute {
 }
 
 // GetDeps returns the deps attribute as a list of strings, or nil if not present.
+// For DepsValue with markers, it returns all deps (auto + preserved).
 func (t *Target) GetDeps() []string {
 	attr := t.GetAttribute("deps")
 	if attr == nil {
@@ -227,6 +260,40 @@ func (t *Target) GetDeps() []string {
 	}
 	if list, ok := attr.Value.(StringListValue); ok {
 		return list.Values
+	}
+	if deps, ok := attr.Value.(DepsValue); ok {
+		return deps.AllDeps()
+	}
+	return nil
+}
+
+// GetAutoDeps returns only the auto-managed deps (for DepsValue with markers).
+// For regular StringListValue, returns all deps.
+func (t *Target) GetAutoDeps() []string {
+	attr := t.GetAttribute("deps")
+	if attr == nil {
+		return nil
+	}
+	if deps, ok := attr.Value.(DepsValue); ok {
+		if deps.HasMarkers {
+			return deps.AutoDeps
+		}
+		return deps.RawDeps
+	}
+	if list, ok := attr.Value.(StringListValue); ok {
+		return list.Values
+	}
+	return nil
+}
+
+// GetPreservedDeps returns only the preserved deps (for DepsValue with markers).
+func (t *Target) GetPreservedDeps() []string {
+	attr := t.GetAttribute("deps")
+	if attr == nil {
+		return nil
+	}
+	if deps, ok := attr.Value.(DepsValue); ok {
+		return deps.PreservedDeps
 	}
 	return nil
 }
