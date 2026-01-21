@@ -9,7 +9,7 @@ go_binary(
     deps = [
         # turnkey:auto-start
         "//src/go/pkg/localconfig:localconfig",
-        "//src/go/pkg/rules:rules",
+        "//src/go/pkg/rulessync:rulessync",
         "//src/go/pkg/syncconfig:syncconfig",
         "//src/go/pkg/syncer:syncer",
         # turnkey:auto-end

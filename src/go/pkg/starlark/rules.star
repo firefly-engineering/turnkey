@@ -14,8 +14,6 @@ go_test(
     name = "starlark_test",
     srcs = glob(["*_test.go"]),
     target_under_test = ":starlark",
-    deps = [
-        "godeps//vendor/go.starlark.net/syntax:syntax",
-    ],
+    deps = [],
     visibility = ["PUBLIC"],
 )

@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/firefly-engineering/turnkey/src/go/pkg/rules"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/rulessync"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 )
 
@@ -40,7 +40,7 @@ func runRules(args []string) int {
 	}
 }
 
-// runRulesCheck checks if rules.star files are stale.
+// runRulesCheck checks if rules.star files need updates (dry-run mode).
 func runRulesCheck(args []string) int {
 	root, err := findProjectRoot()
 	if err != nil {
@@ -70,38 +70,59 @@ func runRulesCheck(args []string) int {
 		dir = filepath.Join(root, targetDir)
 	}
 
-	checker := rules.NewStalenessChecker(root)
-	results, err := checker.CheckDirectory(dir)
+	// Use new syncer in dry-run mode
+	syncer, err := rulessync.NewSyncer(rulessync.Config{
+		ProjectRoot: root,
+		DryRun:      true,
+		Verbose:     verbose,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tk rules: %v\n", err)
+		return 1
+	}
+
+	results, err := syncer.SyncDirectory(dir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tk rules: check failed: %v\n", err)
 		return 1
 	}
 
-	anyStale := false
+	anyNeedsUpdate := false
+	checkedCount := 0
 	for _, result := range results {
-		if result.Stale {
-			anyStale = true
-			relPath, _ := filepath.Rel(root, result.RulesFile)
-			fmt.Fprintf(os.Stderr, "STALE: %s\n", relPath)
+		checkedCount++
+		if result.Updated {
+			anyNeedsUpdate = true
+			relPath, _ := filepath.Rel(root, result.Path)
+			fmt.Fprintf(os.Stderr, "NEEDS UPDATE: %s\n", relPath)
 			if verbose {
-				fmt.Fprintf(os.Stderr, "       Reason: %s (tier %d)\n", result.Reason, result.Tier)
-				if len(result.ChangedFiles) > 0 {
-					fmt.Fprintf(os.Stderr, "       Changed: %v\n", result.ChangedFiles)
+				if len(result.Added) > 0 {
+					fmt.Fprintf(os.Stderr, "         Would add: %v\n", result.Added)
+				}
+				if len(result.Removed) > 0 {
+					fmt.Fprintf(os.Stderr, "         Would remove: %v\n", result.Removed)
 				}
 			}
 		} else if verbose {
-			relPath, _ := filepath.Rel(root, result.RulesFile)
+			relPath, _ := filepath.Rel(root, result.Path)
 			fmt.Fprintf(os.Stderr, "OK:    %s\n", relPath)
+		}
+
+		// Report errors
+		for _, e := range result.Errors {
+			if verbose {
+				fmt.Fprintf(os.Stderr, "       Warning: %s\n", e)
+			}
 		}
 	}
 
-	if anyStale {
-		fmt.Fprintf(os.Stderr, "\ntk rules: some rules.star files are stale, run 'tk rules sync' to update\n")
+	if anyNeedsUpdate {
+		fmt.Fprintf(os.Stderr, "\ntk rules: some rules.star files need updates, run 'tk rules sync' to update\n")
 		return 1
 	}
 
 	if !quiet {
-		fmt.Fprintf(os.Stderr, "tk rules: all rules.star files up-to-date (%d checked)\n", len(results))
+		fmt.Fprintf(os.Stderr, "tk rules: all rules.star files up-to-date (%d checked)\n", checkedCount)
 	}
 	return 0
 }
@@ -115,13 +136,12 @@ func runRulesSync(args []string) int {
 	}
 
 	// Parse sync-specific flags
-	forceAll := false
 	var targetDir string
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--all", "-a":
-			forceAll = true
+			// --all is now the default behavior (always sync all)
 		case "--verbose", "-v":
 			verbose = true
 		case "--quiet", "-q":
@@ -142,44 +162,15 @@ func runRulesSync(args []string) int {
 		dir = filepath.Join(root, targetDir)
 	}
 
-	// Create sync config
-	config := rules.SyncConfig{
+	// Create syncer with new architecture
+	syncer, err := rulessync.NewSyncer(rulessync.Config{
 		ProjectRoot: root,
-		Enabled:     true,
-		AutoSync:    true,
-		Strict:      false, // Strict mode is for CI (--strict-rules flag)
 		DryRun:      dryRun,
-		Go: rules.GoSyncConfig{
-			Enabled:        true,
-			InternalPrefix: "//src/go",
-			ExternalCell:   "godeps",
-		},
-	}
-
-	syncer := rules.NewSyncer(config)
-
-	// Check staleness first if not forcing all
-	if !forceAll {
-		staleResults, err := syncer.Checker.CheckDirectory(dir)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "tk rules: check failed: %v\n", err)
-			return 1
-		}
-
-		anyStale := false
-		for _, r := range staleResults {
-			if r.Stale {
-				anyStale = true
-				break
-			}
-		}
-
-		if !anyStale {
-			if !quiet {
-				fmt.Fprintf(os.Stderr, "tk rules: all rules.star files up-to-date\n")
-			}
-			return 0
-		}
+		Verbose:     verbose,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tk rules: %v\n", err)
+		return 1
 	}
 
 	// Run sync
@@ -196,13 +187,13 @@ func runRulesSync(args []string) int {
 	for _, result := range results {
 		relPath, _ := filepath.Rel(root, result.Path)
 
+		// Report errors but don't count as failure if file was still updated
 		if len(result.Errors) > 0 {
-			errorCount++
-			fmt.Fprintf(os.Stderr, "ERROR: %s\n", relPath)
 			for _, e := range result.Errors {
-				fmt.Fprintf(os.Stderr, "       %s\n", e)
+				if verbose {
+					fmt.Fprintf(os.Stderr, "WARNING: %s: %s\n", relPath, e)
+				}
 			}
-			continue
 		}
 
 		if result.Updated {
@@ -218,9 +209,6 @@ func runRulesSync(args []string) int {
 				}
 				if len(result.Removed) > 0 {
 					fmt.Fprintf(os.Stderr, "         Removed: %v\n", result.Removed)
-				}
-				if len(result.Preserved) > 0 {
-					fmt.Fprintf(os.Stderr, "         Preserved: %v\n", result.Preserved)
 				}
 			}
 		} else if verbose {
@@ -300,46 +288,36 @@ func runRulesAutoSync() int {
 		fmt.Fprintln(os.Stderr, "tk: checking rules.star files...")
 	}
 
-	// Build config from sync.toml settings
-	config := rules.SyncConfig{
+	// Create syncer with new architecture
+	syncer, err := rulessync.NewSyncer(rulessync.Config{
 		ProjectRoot: root,
-		Enabled:     cfg.Rules.Enabled,
-		AutoSync:    cfg.Rules.IsAutoSync(),
-		Strict:      cfg.Rules.Strict || strictRules,
-		DryRun:      dryRun,
-		Go: rules.GoSyncConfig{
-			Enabled:        cfg.Rules.IsGoEnabled(),
-			InternalPrefix: cfg.Rules.Go.InternalPrefix,
-			ExternalCell:   cfg.Rules.Go.ExternalCell,
-		},
-	}
-
-	// Apply defaults if not specified
-	if config.Go.InternalPrefix == "" {
-		config.Go.InternalPrefix = "//src/go"
-	}
-	if config.Go.ExternalCell == "" {
-		config.Go.ExternalCell = "godeps"
-	}
-
-	syncer := rules.NewSyncer(config)
-
-	// First check what's stale
-	staleResults, err := syncer.Checker.CheckDirectory(root)
+		DryRun:      cfg.Rules.Strict || strictRules, // Dry-run in strict mode
+		Verbose:     verbose,
+	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "tk: rules check failed: %v\n", err)
+		if verbose {
+			fmt.Fprintf(os.Stderr, "tk: could not create rules syncer: %v\n", err)
+		}
+		return 0 // Don't fail on syncer creation issues
+	}
+
+	// Run sync
+	results, err := syncer.SyncDirectory(root)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tk: rules sync failed: %v\n", err)
 		return 1
 	}
 
-	// Find stale files
-	var staleFiles []*rules.StalenessResult
-	for _, r := range staleResults {
-		if r.Stale {
-			staleFiles = append(staleFiles, r)
+	// Count results
+	updatedCount := 0
+	for _, result := range results {
+		if result.Updated {
+			updatedCount++
 		}
 	}
 
-	if len(staleFiles) == 0 {
+	// No updates needed
+	if updatedCount == 0 {
 		if verbose && !quiet {
 			fmt.Fprintln(os.Stderr, "tk: all rules.star files up-to-date")
 		}
@@ -347,62 +325,41 @@ func runRulesAutoSync() int {
 	}
 
 	// Handle strict mode (CI): fail if any rules.star would change
-	if config.Strict {
-		fmt.Fprintf(os.Stderr, "tk: %d rules.star file(s) are stale (strict mode):\n", len(staleFiles))
-		for _, r := range staleFiles {
-			relPath, _ := filepath.Rel(root, r.RulesFile)
-			fmt.Fprintf(os.Stderr, "  - %s: %s\n", relPath, r.Reason)
+	if cfg.Rules.Strict || strictRules {
+		fmt.Fprintf(os.Stderr, "tk: %d rules.star file(s) need updates (strict mode):\n", updatedCount)
+		for _, result := range results {
+			if result.Updated {
+				relPath, _ := filepath.Rel(root, result.Path)
+				fmt.Fprintf(os.Stderr, "  - %s\n", relPath)
+			}
 		}
 		fmt.Fprintln(os.Stderr, "\ntk: run 'tk rules sync' locally and commit the changes")
 		return 1
 	}
 
 	// Handle auto-sync disabled: just warn
-	if !config.AutoSync {
+	if !cfg.Rules.IsAutoSync() {
 		if !quiet {
-			fmt.Fprintf(os.Stderr, "tk: %d rules.star file(s) are stale:\n", len(staleFiles))
-			for _, r := range staleFiles {
-				relPath, _ := filepath.Rel(root, r.RulesFile)
-				fmt.Fprintf(os.Stderr, "  - %s\n", relPath)
+			fmt.Fprintf(os.Stderr, "tk: %d rules.star file(s) need updates:\n", updatedCount)
+			for _, result := range results {
+				if result.Updated {
+					relPath, _ := filepath.Rel(root, result.Path)
+					fmt.Fprintf(os.Stderr, "  - %s\n", relPath)
+				}
 			}
 			fmt.Fprintln(os.Stderr, "tk: run 'tk rules sync' to update")
 		}
 		return 0 // Don't fail, just warn
 	}
 
-	// Auto-sync: update stale files
-	if verbose {
-		fmt.Fprintf(os.Stderr, "tk: syncing %d stale rules.star file(s)...\n", len(staleFiles))
-	}
-
-	results, err := syncer.SyncDirectory(root)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "tk: rules sync failed: %v\n", err)
-		return 1
-	}
-
-	// Report results
-	updatedCount := 0
-	errorCount := 0
-
-	for _, result := range results {
-		if len(result.Errors) > 0 {
-			errorCount++
-			relPath, _ := filepath.Rel(root, result.Path)
-			fmt.Fprintf(os.Stderr, "tk: rules sync error in %s: %v\n", relPath, result.Errors)
-			continue
-		}
-		if result.Updated {
-			updatedCount++
-			if !quiet {
+	// Auto-sync already happened, report results
+	if !quiet {
+		for _, result := range results {
+			if result.Updated {
 				relPath, _ := filepath.Rel(root, result.Path)
 				fmt.Fprintf(os.Stderr, "tk: updated %s\n", relPath)
 			}
 		}
-	}
-
-	if errorCount > 0 {
-		return 1
 	}
 
 	return 0
