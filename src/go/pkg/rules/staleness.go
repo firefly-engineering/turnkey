@@ -90,32 +90,48 @@ func (c *StalenessChecker) Check(rulesFile string, sourceFiles []string) (*Stale
 	}
 
 	// Tier 2: Modification time
+	mtimeStale := false
+	var mtimeChanged []string
 	if c.UseMtime {
-		stale, changed, err := c.checkMtime(rulesInfo.ModTime(), sourceFiles)
+		var err error
+		mtimeStale, mtimeChanged, err = c.checkMtime(rulesInfo.ModTime(), sourceFiles)
 		if err != nil {
 			return nil, fmt.Errorf("mtime check failed: %w", err)
 		}
-		if stale {
-			result.Stale = true
-			result.Reason = fmt.Sprintf("source files newer than rules.star: %v", changed)
-			result.Tier = 2
-			result.ChangedFiles = changed
-			return result, nil
-		}
 	}
 
-	// Tier 3: Content hash
-	if c.UseHash {
+	// Tier 3: Content hash (most accurate)
+	// Run this if mtime indicates stale OR if hash checking is enabled
+	if c.UseHash && (mtimeStale || !c.UseMtime) {
 		stale, reason, err := c.checkHash(rulesFile, sourceFiles)
 		if err != nil {
-			// Hash check failed, but we've passed other tiers
-			// Consider it fresh to avoid false positives
+			// Hash check failed - fall back to mtime result
+			if mtimeStale {
+				result.Stale = true
+				result.Reason = fmt.Sprintf("source files newer than rules.star: %v (hash check failed: %v)", mtimeChanged, err)
+				result.Tier = 2
+				result.ChangedFiles = mtimeChanged
+				return result, nil
+			}
 		} else if stale {
+			// Hash confirms staleness
 			result.Stale = true
 			result.Reason = reason
 			result.Tier = 3
 			return result, nil
+		} else {
+			// Hash says fresh - trust it over mtime (mtime was a false positive)
+			result.Stale = false
+			result.Reason = reason
+			return result, nil
 		}
+	} else if mtimeStale {
+		// Hash checking disabled, use mtime result
+		result.Stale = true
+		result.Reason = fmt.Sprintf("source files newer than rules.star: %v", mtimeChanged)
+		result.Tier = 2
+		result.ChangedFiles = mtimeChanged
+		return result, nil
 	}
 
 	result.Stale = false
@@ -216,15 +232,53 @@ func (c *StalenessChecker) checkHash(rulesFile string, sourceFiles []string) (bo
 		return false, "", fmt.Errorf("failed to parse rules file: %w", err)
 	}
 
-	if rf.Hash == "" {
-		// No hash stored, can't determine staleness this way
-		return false, "no hash stored in rules.star", nil
+	// Get the directory containing rules.star
+	dir := filepath.Dir(rulesFile)
+
+	// Only check Go files for now (supported language)
+	if !isSupportedLanguageDir(dir) {
+		return false, "unsupported language", nil
 	}
 
-	// TODO: Compute current deps hash by parsing source files
-	// This requires the detector and mapper to be implemented
-	// For now, skip this tier
-	return false, "hash comparison not yet implemented", nil
+	// Create detector and mapper
+	detector, err := NewGoImportDetector(c.ProjectRoot)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to create detector: %w", err)
+	}
+
+	imports, err := detector.DetectImports(dir)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to detect imports: %w", err)
+	}
+
+	mapper, err := NewGoMapper(c.ProjectRoot)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to create mapper: %w", err)
+	}
+
+	// Map imports to deps
+	deps, _ := mapper.MapImports(imports)
+
+	// Convert to targets and compute hash
+	targets := DepsToTargets(deps)
+	computedHash := ComputeDepsHash(targets)
+
+	// Compare hashes
+	if rf.Hash == "" {
+		// No hash stored in file - check if there are any deps
+		if len(targets) == 0 {
+			// No deps detected, and no hash stored - consider fresh
+			return false, "no deps detected", nil
+		}
+		// Deps detected but no hash stored - stale
+		return true, "no hash stored, deps detected", nil
+	}
+
+	if rf.Hash != computedHash {
+		return true, fmt.Sprintf("hash mismatch: stored=%s computed=%s", rf.Hash, computedHash), nil
+	}
+
+	return false, "hash matches", nil
 }
 
 // CheckDirectory checks all rules.star files in a directory.
@@ -237,9 +291,20 @@ func (c *StalenessChecker) CheckDirectory(dir string) ([]*StalenessResult, error
 			return err
 		}
 
+		// Skip directories that should be ignored
+		if info.IsDir() && shouldSkipDirectory(info.Name()) {
+			return filepath.SkipDir
+		}
+
 		if info.Name() == "rules.star" {
 			// Find source files in the same directory
 			sourceDir := filepath.Dir(path)
+
+			// Only check directories with supported languages (Go for now)
+			if !isSupportedLanguageDir(sourceDir) {
+				return nil // Skip unsupported languages
+			}
+
 			sourceFiles, err := c.findSourceFiles(sourceDir)
 			if err != nil {
 				return fmt.Errorf("failed to find source files for %s: %w", path, err)
@@ -257,6 +322,16 @@ func (c *StalenessChecker) CheckDirectory(dir string) ([]*StalenessResult, error
 	})
 
 	return results, err
+}
+
+// isSupportedLanguageDir returns true if the directory contains files from a supported language.
+// Currently only Go is supported.
+func isSupportedLanguageDir(dir string) bool {
+	// Check for Go files
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*.go")); len(matches) > 0 {
+		return true
+	}
+	return false
 }
 
 // findSourceFiles finds source files in a directory based on common patterns.

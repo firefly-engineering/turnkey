@@ -48,10 +48,26 @@ func runRulesCheck(args []string) int {
 		return 1
 	}
 
+	// Parse check-specific flags
+	var targetDir string
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--verbose", "-v":
+			verbose = true
+		case "--quiet", "-q":
+			quiet = true
+		default:
+			// Assume it's a directory path
+			if args[i] != "" && args[i][0] != '-' {
+				targetDir = args[i]
+			}
+		}
+	}
+
 	// Determine directory to check
 	dir := root
-	if len(args) > 0 && args[0] != "" && args[0][0] != '-' {
-		dir = filepath.Join(root, args[0])
+	if targetDir != "" {
+		dir = filepath.Join(root, targetDir)
 	}
 
 	checker := rules.NewStalenessChecker(root)

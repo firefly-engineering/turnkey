@@ -93,7 +93,18 @@ func (s *Syncer) SyncDirectory(dir string) ([]*SyncResult, error) {
 			return err
 		}
 
+		// Skip directories that should be ignored
+		if info.IsDir() && shouldSkipDirectory(info.Name()) {
+			return filepath.SkipDir
+		}
+
 		if info.Name() == "rules.star" {
+			// Only sync directories with supported languages (Go for now)
+			sourceDir := filepath.Dir(path)
+			if !isSupportedLanguageDir(sourceDir) {
+				return nil // Skip unsupported languages
+			}
+
 			result, err := s.SyncFile(path)
 			if err != nil {
 				results = append(results, &SyncResult{
@@ -109,6 +120,22 @@ func (s *Syncer) SyncDirectory(dir string) ([]*SyncResult, error) {
 	})
 
 	return results, err
+}
+
+// shouldSkipDirectory returns true if the directory should be skipped during scanning.
+func shouldSkipDirectory(name string) bool {
+	// Skip hidden directories
+	if strings.HasPrefix(name, ".") {
+		return true
+	}
+
+	// Skip known build/output directories
+	switch name {
+	case "buck-out", "node_modules", "vendor", "__pycache__", "target":
+		return true
+	}
+
+	return false
 }
 
 // SyncFile synchronizes a single rules.star file.
@@ -158,6 +185,11 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 	newDepTargets := DepsToTargets(newDeps)
 	sort.Strings(newDepTargets)
 
+	// Check if hash is missing (needs update to add hash header)
+	computedHash := ComputeDepsHash(newDepTargets)
+	hashMissing := rf.Hash == ""
+	hashChanged := rf.Hash != "" && rf.Hash != computedHash
+
 	// Update each target in the rules file
 	for _, target := range rf.Targets {
 		// Compute changes
@@ -170,6 +202,11 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 		}
 
 		result.Preserved = append(result.Preserved, target.PreservedDeps...)
+	}
+
+	// Also mark as updated if hash needs to be added/updated
+	if hashMissing || hashChanged {
+		result.Updated = true
 	}
 
 	// If no changes needed, return early
