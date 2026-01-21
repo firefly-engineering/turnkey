@@ -20,6 +20,7 @@
 - [Buck2 Integration](./configuration/buck2-integration.md)
 - [The .turnkey Directory](./configuration/turnkey-directory.md)
 - [Shell Environment](./configuration/shell-environment.md)
+- [IDE Integration](./configuration/ide-integration.md)
 
 # Workflows
 
