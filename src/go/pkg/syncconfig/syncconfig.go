@@ -158,6 +158,11 @@ type WrapperRule struct {
 	// This must match the Name field of a [[deps]] rule.
 	DepsRule string `toml:"deps_rule"`
 
+	// PostCommands are commands to run after the main command if files changed.
+	// Each command is run in sequence before the sync operation.
+	// Example: ["go mod tidy"] to clean up go.mod after go get.
+	PostCommands []string `toml:"post_commands"`
+
 	// Enabled controls whether this wrapper is active (default: true).
 	Enabled *bool `toml:"enabled,omitempty"`
 }
