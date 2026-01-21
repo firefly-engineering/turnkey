@@ -42,9 +42,10 @@ type Config struct {
 	ProjectRoot string
 
 	// Language-specific configuration
-	Go     *GoConfig
-	Rust   *RustConfig
-	Python *PythonConfig
+	Go         *GoConfig
+	Rust       *RustConfig
+	Python     *PythonConfig
+	TypeScript *TypeScriptConfig
 }
 
 // GoConfig holds Go-specific configuration.
@@ -92,6 +93,21 @@ type PythonConfig struct {
 	DepsFile string
 
 	// ExternalDeps maps package names to their entries from python-deps.toml.
+	ExternalDeps map[string]bool
+}
+
+// TypeScriptConfig holds TypeScript/JavaScript-specific configuration.
+type TypeScriptConfig struct {
+	// ProjectRoot is the TypeScript project root directory.
+	ProjectRoot string
+
+	// ExternalCell is the Buck2 cell for external deps (e.g., "jsdeps").
+	ExternalCell string
+
+	// DepsFile is the path to js-deps.toml.
+	DepsFile string
+
+	// ExternalDeps maps package names to their entries from js-deps.toml.
 	ExternalDeps map[string]bool
 }
 
@@ -145,6 +161,21 @@ func New(cfg Config) (*Mapper, error) {
 		if cfg.Python.ExternalDeps == nil && cfg.Python.DepsFile != "" {
 			if deps, err := loadPythonDeps(cfg.Python.DepsFile); err == nil {
 				m.config.Python.ExternalDeps = deps
+			}
+		}
+	}
+
+	// Auto-detect TypeScript configuration if not provided
+	if cfg.TypeScript == nil {
+		tsCfg, err := detectTypescriptConfig(cfg.ProjectRoot)
+		if err == nil {
+			m.config.TypeScript = tsCfg
+		}
+	} else {
+		// Load external deps if not already loaded
+		if cfg.TypeScript.ExternalDeps == nil && cfg.TypeScript.DepsFile != "" {
+			if deps, err := loadTypescriptDeps(cfg.TypeScript.DepsFile); err == nil {
+				m.config.TypeScript.ExternalDeps = deps
 			}
 		}
 	}
@@ -303,6 +334,54 @@ func loadPythonDeps(path string) (map[string]bool, error) {
 	return result, nil
 }
 
+// detectTypescriptConfig auto-detects TypeScript configuration from the project.
+func detectTypescriptConfig(projectRoot string) (*TypeScriptConfig, error) {
+	cfg := &TypeScriptConfig{
+		ExternalCell: "jsdeps",
+		ExternalDeps: make(map[string]bool),
+	}
+
+	// Check for package.json or tsconfig.json
+	packagePath := filepath.Join(projectRoot, "package.json")
+	tsconfigPath := filepath.Join(projectRoot, "tsconfig.json")
+	if _, err := os.Stat(packagePath); err != nil {
+		if _, err := os.Stat(tsconfigPath); err != nil {
+			return nil, fmt.Errorf("no package.json or tsconfig.json found")
+		}
+	}
+	cfg.ProjectRoot = projectRoot
+
+	// Load js-deps.toml
+	depsPath := filepath.Join(projectRoot, "js-deps.toml")
+	if deps, err := loadTypescriptDeps(depsPath); err == nil {
+		cfg.DepsFile = depsPath
+		cfg.ExternalDeps = deps
+	}
+
+	return cfg, nil
+}
+
+// loadTypescriptDeps loads package names from js-deps.toml.
+func loadTypescriptDeps(path string) (map[string]bool, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var depsFile struct {
+		Deps map[string]interface{} `toml:"deps"`
+	}
+	if err := toml.Unmarshal(content, &depsFile); err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]bool)
+	for dep := range depsFile.Deps {
+		result[dep] = true
+	}
+	return result, nil
+}
+
 // MapExtractionResult converts an extraction result to mapped dependencies.
 func (m *Mapper) MapExtractionResult(result *extraction.Result) (map[string]PackageMapping, error) {
 	mappings := make(map[string]PackageMapping)
@@ -348,6 +427,11 @@ func (m *Mapper) mapPackage(language string, pkg extraction.Package) PackageMapp
 	case "python":
 		mapping.Deps, mapping.UnmappedImports = m.mapPythonImports(pkg.Imports)
 		testDeps, testUnmapped := m.mapPythonImports(pkg.TestImports)
+		mapping.TestDeps = testDeps
+		mapping.UnmappedImports = append(mapping.UnmappedImports, testUnmapped...)
+	case "typescript":
+		mapping.Deps, mapping.UnmappedImports = m.mapTypescriptImports(pkg.Imports)
+		testDeps, testUnmapped := m.mapTypescriptImports(pkg.TestImports)
 		mapping.TestDeps = testDeps
 		mapping.UnmappedImports = append(mapping.UnmappedImports, testUnmapped...)
 	default:
@@ -717,6 +801,128 @@ func (m *Mapper) isKnownPythonDep(packageName string) bool {
 	}
 
 	return m.config.Python.ExternalDeps[packageName]
+}
+
+// mapTypescriptImports maps TypeScript imports to Buck2 dependencies.
+func (m *Mapper) mapTypescriptImports(imports []extraction.Import) (deps []MappedDep, unmapped []string) {
+	if m.config.TypeScript == nil {
+		for _, imp := range imports {
+			unmapped = append(unmapped, imp.Path)
+		}
+		return
+	}
+
+	seen := make(map[string]bool)
+
+	for _, imp := range imports {
+		dep := m.mapTypescriptImport(imp)
+
+		switch dep.Type {
+		case DependencyStdLib:
+			// Skip stdlib (Node.js builtins)
+			continue
+		case DependencyUnmapped:
+			unmapped = append(unmapped, imp.Path)
+			continue
+		}
+
+		// Deduplicate
+		if !seen[dep.Target] {
+			seen[dep.Target] = true
+			deps = append(deps, dep)
+		}
+	}
+
+	// Sort for consistent output
+	sort.Slice(deps, func(i, j int) bool {
+		return deps[i].Target < deps[j].Target
+	})
+
+	return deps, unmapped
+}
+
+// mapTypescriptImport maps a single TypeScript import to a Buck2 dependency.
+func (m *Mapper) mapTypescriptImport(imp extraction.Import) MappedDep {
+	// Handle by kind
+	switch imp.Kind {
+	case extraction.ImportKindStdlib:
+		return MappedDep{
+			ImportPath: imp.Path,
+			Type:       DependencyStdLib,
+		}
+
+	case extraction.ImportKindInternal:
+		return m.mapTypescriptInternalImport(imp.Path)
+
+	case extraction.ImportKindExternal:
+		return m.mapTypescriptExternalImport(imp.Path)
+	}
+
+	return MappedDep{
+		ImportPath: imp.Path,
+		Type:       DependencyUnmapped,
+	}
+}
+
+// mapTypescriptInternalImport maps an internal TypeScript import to a Buck2 target.
+func (m *Mapper) mapTypescriptInternalImport(modulePath string) MappedDep {
+	// Relative imports like ./foo or ../bar are internal
+	// Convert relative path to Buck2 target
+	// This is complex because we need the context of where the import is from
+	// For now, we'll treat relative imports as internal without full path resolution
+	return MappedDep{
+		Target:     modulePath,
+		Type:       DependencyInternal,
+		ImportPath: modulePath,
+	}
+}
+
+// mapTypescriptExternalImport maps an external TypeScript import to a Buck2 target.
+func (m *Mapper) mapTypescriptExternalImport(modulePath string) MappedDep {
+	cfg := m.config.TypeScript
+
+	// Get the package name (handle scoped packages like @org/pkg)
+	pkgName := modulePath
+	if strings.HasPrefix(modulePath, "@") {
+		// Scoped package: @org/pkg/subpath -> @org/pkg
+		parts := strings.SplitN(modulePath, "/", 3)
+		if len(parts) >= 2 {
+			pkgName = parts[0] + "/" + parts[1]
+		}
+	} else {
+		// Regular package: pkg/subpath -> pkg
+		parts := strings.SplitN(modulePath, "/", 2)
+		pkgName = parts[0]
+	}
+
+	// Check if this package is in js-deps.toml
+	if !m.isKnownTypescriptDep(pkgName) {
+		return MappedDep{
+			ImportPath: modulePath,
+			Type:       DependencyUnmapped,
+		}
+	}
+
+	// Use the package name for the target
+	// e.g., "react" -> "jsdeps//vendor/react:react"
+	// e.g., "@types/node" -> "jsdeps//vendor/@types/node:node"
+	targetName := filepath.Base(pkgName)
+	target := fmt.Sprintf("%s//vendor/%s:%s", cfg.ExternalCell, pkgName, targetName)
+
+	return MappedDep{
+		Target:     target,
+		Type:       DependencyExternal,
+		ImportPath: modulePath,
+	}
+}
+
+// isKnownTypescriptDep checks if a package is in js-deps.toml.
+func (m *Mapper) isKnownTypescriptDep(packageName string) bool {
+	if m.config.TypeScript == nil || m.config.TypeScript.ExternalDeps == nil {
+		return false
+	}
+
+	return m.config.TypeScript.ExternalDeps[packageName]
 }
 
 // ApplyToRulesStar applies mapped dependencies to a rules.star file.
