@@ -15,6 +15,7 @@ members = [
     "src/cmd/soldeps-gen",
     "src/examples/rust-hello",
     "src/examples/rust-hello-deps",
+    "src/rust/deps-extract",
     "src/rust/prefetch-cache",
 ]
 
@@ -39,6 +40,15 @@ sha2 = "0.10"
 tempfile = "3.10"
 toml = "0.8"
 ureq = { version = "2", features = ["json"] }
+walkdir = "2.5"
+
+# Tree-sitter for source code parsing
+tree-sitter = "0.25"
+tree-sitter-language = "0.1"
+tree-sitter-python = "0.23"
+tree-sitter-rust = "0.23"
+tree-sitter-typescript = "0.23"
+tree-sitter-solidity = "1.2.13"
 
 # Workspace member references (for path dependencies between crates)
 prefetch-cache = { path = "src/rust/prefetch-cache" }
