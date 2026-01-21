@@ -235,29 +235,11 @@ func (c *StalenessChecker) checkHash(rulesFile string, sourceFiles []string) (bo
 	// Get the directory containing rules.star
 	dir := filepath.Dir(rulesFile)
 
-	// Only check Go files for now (supported language)
-	if !isSupportedLanguageDir(dir) {
-		return false, "unsupported language", nil
-	}
-
-	// Create detector and mapper
-	detector, err := NewGoImportDetector(c.ProjectRoot)
+	// Detect language and get deps
+	deps, err := c.detectDepsForLanguage(dir)
 	if err != nil {
-		return false, "", fmt.Errorf("failed to create detector: %w", err)
+		return false, "", err
 	}
-
-	imports, err := detector.DetectImports(dir)
-	if err != nil {
-		return false, "", fmt.Errorf("failed to detect imports: %w", err)
-	}
-
-	mapper, err := NewGoMapper(c.ProjectRoot)
-	if err != nil {
-		return false, "", fmt.Errorf("failed to create mapper: %w", err)
-	}
-
-	// Map imports to deps
-	deps, _ := mapper.MapImports(imports)
 
 	// Convert to targets and compute hash
 	targets := DepsToTargets(deps)
@@ -279,6 +261,147 @@ func (c *StalenessChecker) checkHash(rulesFile string, sourceFiles []string) (bo
 	}
 
 	return false, "hash matches", nil
+}
+
+// detectDepsForLanguage detects dependencies based on the language in the directory.
+func (c *StalenessChecker) detectDepsForLanguage(dir string) ([]Dependency, error) {
+	// Check for Go files
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*.go")); len(matches) > 0 {
+		return c.detectGoDeps(dir)
+	}
+
+	// Check for Rust files
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*.rs")); len(matches) > 0 {
+		return c.detectRustDeps(dir)
+	}
+
+	// Check for Python files
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*.py")); len(matches) > 0 {
+		return c.detectPythonDeps(dir)
+	}
+
+	// Check for TypeScript files
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*.ts")); len(matches) > 0 {
+		return c.detectTypeScriptDeps(dir)
+	}
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*.tsx")); len(matches) > 0 {
+		return c.detectTypeScriptDeps(dir)
+	}
+
+	// Check for Solidity files
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*.sol")); len(matches) > 0 {
+		return c.detectSolidityDeps(dir)
+	}
+	if matches, _ := filepath.Glob(filepath.Join(dir, "src", "*.sol")); len(matches) > 0 {
+		return c.detectSolidityDeps(dir)
+	}
+
+	return nil, fmt.Errorf("unsupported language in %s", dir)
+}
+
+// detectGoDeps detects Go dependencies from source files.
+func (c *StalenessChecker) detectGoDeps(dir string) ([]Dependency, error) {
+	detector, err := NewGoImportDetector(c.ProjectRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Go detector: %w", err)
+	}
+
+	imports, err := detector.DetectImports(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect Go imports: %w", err)
+	}
+
+	mapper, err := NewGoMapper(c.ProjectRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Go mapper: %w", err)
+	}
+
+	deps, _ := mapper.MapImports(imports)
+	return deps, nil
+}
+
+// detectRustDeps detects Rust dependencies from source files.
+func (c *StalenessChecker) detectRustDeps(dir string) ([]Dependency, error) {
+	detector, err := NewRustImportDetector(c.ProjectRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Rust detector: %w", err)
+	}
+
+	imports, err := detector.DetectImports(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect Rust imports: %w", err)
+	}
+
+	mapper, err := NewRustMapper(c.ProjectRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Rust mapper: %w", err)
+	}
+
+	deps, _ := mapper.MapImports(imports)
+	return deps, nil
+}
+
+// detectPythonDeps detects Python dependencies from source files.
+func (c *StalenessChecker) detectPythonDeps(dir string) ([]Dependency, error) {
+	detector, err := NewPythonImportDetector(c.ProjectRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Python detector: %w", err)
+	}
+
+	imports, err := detector.DetectImports(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect Python imports: %w", err)
+	}
+
+	mapper, err := NewPythonMapper(c.ProjectRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Python mapper: %w", err)
+	}
+
+	deps, _ := mapper.MapImports(imports)
+	return deps, nil
+}
+
+// detectTypeScriptDeps detects TypeScript/JavaScript dependencies from source files.
+func (c *StalenessChecker) detectTypeScriptDeps(dir string) ([]Dependency, error) {
+	detector, err := NewTypeScriptImportDetector(c.ProjectRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create TypeScript detector: %w", err)
+	}
+
+	imports, err := detector.DetectImports(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect TypeScript imports: %w", err)
+	}
+
+	mapper, err := NewTypeScriptMapper(c.ProjectRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create TypeScript mapper: %w", err)
+	}
+
+	deps, _ := mapper.MapImports(imports)
+	return deps, nil
+}
+
+// detectSolidityDeps detects Solidity dependencies from source files.
+func (c *StalenessChecker) detectSolidityDeps(dir string) ([]Dependency, error) {
+	detector, err := NewSolidityImportDetector(c.ProjectRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Solidity detector: %w", err)
+	}
+
+	imports, err := detector.DetectImports(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect Solidity imports: %w", err)
+	}
+
+	mapper, err := NewSolidityMapper(c.ProjectRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Solidity mapper: %w", err)
+	}
+
+	deps, _ := mapper.MapImports(imports)
+	return deps, nil
 }
 
 // CheckDirectory checks all rules.star files in a directory.
@@ -325,10 +448,32 @@ func (c *StalenessChecker) CheckDirectory(dir string) ([]*StalenessResult, error
 }
 
 // isSupportedLanguageDir returns true if the directory contains files from a supported language.
-// Currently only Go is supported.
 func isSupportedLanguageDir(dir string) bool {
 	// Check for Go files
 	if matches, _ := filepath.Glob(filepath.Join(dir, "*.go")); len(matches) > 0 {
+		return true
+	}
+	// Check for Rust files
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*.rs")); len(matches) > 0 {
+		return true
+	}
+	// Check for Python files
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*.py")); len(matches) > 0 {
+		return true
+	}
+	// Check for TypeScript files
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*.ts")); len(matches) > 0 {
+		return true
+	}
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*.tsx")); len(matches) > 0 {
+		return true
+	}
+	// Check for Solidity files
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*.sol")); len(matches) > 0 {
+		return true
+	}
+	// Also check src/ subdirectory for Solidity
+	if matches, _ := filepath.Glob(filepath.Join(dir, "src", "*.sol")); len(matches) > 0 {
 		return true
 	}
 	return false

@@ -1,4 +1,6 @@
-# TypeScript app for multi-language demo
+# Auto-managed by turnkey. Hash: e3b0c44298fc1c14
+# Manual sections marked with turnkey:preserve-start/end are not modified.
+
 load("@prelude//typescript:typescript.bzl", "typescript_binary", "typescript_library")
 
 typescript_library(
@@ -9,8 +11,6 @@ typescript_library(
 
 typescript_binary(
     name = "hello-typescript",
-    main = "main.ts",
     srcs = ["main.ts"],
-    deps = [":greeter"],
     visibility = ["PUBLIC"],
 )

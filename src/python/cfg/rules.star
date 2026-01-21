@@ -1,3 +1,6 @@
+# Auto-managed by turnkey. Hash: e3b0c44298fc1c14
+# Manual sections marked with turnkey:preserve-start/end are not modified.
+
 load("@prelude//:rules.bzl", "python_library", "python_test")
 
 python_library(
@@ -8,13 +11,11 @@ python_library(
         "parser.py",
         "target.py",
     ],
-    base_module = "python.cfg",
     visibility = ["PUBLIC"],
 )
 
 python_test(
     name = "test",
     srcs = ["test_parser.py"],
-    base_module = "python.cfg",
-    deps = [":cfg"],
+    visibility = ["PUBLIC"],
 )

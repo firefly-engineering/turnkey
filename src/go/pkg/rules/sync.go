@@ -27,6 +27,18 @@ type SyncConfig struct {
 
 	// Go-specific configuration.
 	Go GoSyncConfig
+
+	// Rust-specific configuration.
+	Rust RustSyncConfig
+
+	// Python-specific configuration.
+	Python PythonSyncConfig
+
+	// TypeScript-specific configuration.
+	TypeScript TypeScriptSyncConfig
+
+	// Solidity-specific configuration.
+	Solidity SoliditySyncConfig
 }
 
 // GoSyncConfig configures Go-specific sync behavior.
@@ -39,6 +51,34 @@ type GoSyncConfig struct {
 
 	// ExternalCell is the Buck2 cell for external deps.
 	ExternalCell string
+}
+
+// RustSyncConfig configures Rust-specific sync behavior.
+type RustSyncConfig struct {
+	Enabled        bool
+	InternalPrefix string
+	ExternalCell   string
+}
+
+// PythonSyncConfig configures Python-specific sync behavior.
+type PythonSyncConfig struct {
+	Enabled        bool
+	InternalPrefix string
+	ExternalCell   string
+}
+
+// TypeScriptSyncConfig configures TypeScript/JavaScript-specific sync behavior.
+type TypeScriptSyncConfig struct {
+	Enabled        bool
+	InternalPrefix string
+	ExternalCell   string
+}
+
+// SoliditySyncConfig configures Solidity-specific sync behavior.
+type SoliditySyncConfig struct {
+	Enabled        bool
+	InternalPrefix string
+	ExternalCell   string
 }
 
 // SyncResult contains the result of a sync operation.
@@ -167,6 +207,14 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 	switch lang {
 	case "go":
 		newDeps, unmapped, err = s.detectGoDeps(dir)
+	case "rust":
+		newDeps, unmapped, err = s.detectRustDeps(dir)
+	case "python":
+		newDeps, unmapped, err = s.detectPythonDeps(dir)
+	case "typescript":
+		newDeps, unmapped, err = s.detectTypeScriptDeps(dir)
+	case "solidity":
+		newDeps, unmapped, err = s.detectSolidityDeps(dir)
 	default:
 		result.Errors = append(result.Errors, fmt.Sprintf("unsupported language: %s", lang))
 		return result, nil
@@ -259,9 +307,15 @@ func (s *Syncer) detectLanguage(dir string) string {
 	if matches, _ := filepath.Glob(filepath.Join(dir, "*.ts")); len(matches) > 0 {
 		return "typescript"
 	}
+	if matches, _ := filepath.Glob(filepath.Join(dir, "*.tsx")); len(matches) > 0 {
+		return "typescript"
+	}
 
-	// Check for Solidity files
+	// Check for Solidity files (including in src/ subdirectory)
 	if matches, _ := filepath.Glob(filepath.Join(dir, "*.sol")); len(matches) > 0 {
+		return "solidity"
+	}
+	if matches, _ := filepath.Glob(filepath.Join(dir, "src", "*.sol")); len(matches) > 0 {
 		return "solidity"
 	}
 
@@ -299,6 +353,118 @@ func (s *Syncer) detectGoDeps(dir string) ([]Dependency, []Import, error) {
 	// Map imports to dependencies
 	deps, unmapped := mapper.MapImports(imports)
 
+	return deps, unmapped, nil
+}
+
+// detectRustDeps detects Rust dependencies from source files.
+func (s *Syncer) detectRustDeps(dir string) ([]Dependency, []Import, error) {
+	detector, err := NewRustImportDetector(s.Config.ProjectRoot)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	imports, err := detector.DetectImports(dir)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	mapper, err := NewRustMapper(s.Config.ProjectRoot)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if s.Config.Rust.InternalPrefix != "" {
+		mapper.SetInternalPrefix(s.Config.Rust.InternalPrefix)
+	}
+	if s.Config.Rust.ExternalCell != "" {
+		mapper.SetExternalCell(s.Config.Rust.ExternalCell)
+	}
+
+	deps, unmapped := mapper.MapImports(imports)
+	return deps, unmapped, nil
+}
+
+// detectPythonDeps detects Python dependencies from source files.
+func (s *Syncer) detectPythonDeps(dir string) ([]Dependency, []Import, error) {
+	detector, err := NewPythonImportDetector(s.Config.ProjectRoot)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	imports, err := detector.DetectImports(dir)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	mapper, err := NewPythonMapper(s.Config.ProjectRoot)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if s.Config.Python.InternalPrefix != "" {
+		mapper.SetInternalPrefix(s.Config.Python.InternalPrefix)
+	}
+	if s.Config.Python.ExternalCell != "" {
+		mapper.SetExternalCell(s.Config.Python.ExternalCell)
+	}
+
+	deps, unmapped := mapper.MapImports(imports)
+	return deps, unmapped, nil
+}
+
+// detectTypeScriptDeps detects TypeScript/JavaScript dependencies from source files.
+func (s *Syncer) detectTypeScriptDeps(dir string) ([]Dependency, []Import, error) {
+	detector, err := NewTypeScriptImportDetector(s.Config.ProjectRoot)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	imports, err := detector.DetectImports(dir)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	mapper, err := NewTypeScriptMapper(s.Config.ProjectRoot)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if s.Config.TypeScript.InternalPrefix != "" {
+		mapper.SetInternalPrefix(s.Config.TypeScript.InternalPrefix)
+	}
+	if s.Config.TypeScript.ExternalCell != "" {
+		mapper.SetExternalCell(s.Config.TypeScript.ExternalCell)
+	}
+
+	deps, unmapped := mapper.MapImports(imports)
+	return deps, unmapped, nil
+}
+
+// detectSolidityDeps detects Solidity dependencies from source files.
+func (s *Syncer) detectSolidityDeps(dir string) ([]Dependency, []Import, error) {
+	detector, err := NewSolidityImportDetector(s.Config.ProjectRoot)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	imports, err := detector.DetectImports(dir)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	mapper, err := NewSolidityMapper(s.Config.ProjectRoot)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if s.Config.Solidity.InternalPrefix != "" {
+		mapper.SetInternalPrefix(s.Config.Solidity.InternalPrefix)
+	}
+	if s.Config.Solidity.ExternalCell != "" {
+		mapper.SetExternalCell(s.Config.Solidity.ExternalCell)
+	}
+
+	deps, unmapped := mapper.MapImports(imports)
 	return deps, unmapped, nil
 }
 

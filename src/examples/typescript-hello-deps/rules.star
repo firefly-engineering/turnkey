@@ -1,17 +1,15 @@
-# TypeScript example with npm dependencies
-#
-# This example demonstrates using npm packages with typescript_binary.
-# The lodash package is fetched from npm and linked via the jsdeps cell.
+# Auto-managed by turnkey. Hash: 4be24c3291bfaffe
+# Manual sections marked with turnkey:preserve-start/end are not modified.
 
 load("@prelude//typescript:typescript.bzl", "typescript_binary")
 
 typescript_binary(
     name = "typescript-hello-deps",
-    main = "main.ts",
     srcs = ["main.ts"],
-    npm_deps = [
+    deps = [
+        # turnkey:auto-start
         "jsdeps//:lodash",
-        "jsdeps//:types_lodash",
+        # turnkey:auto-end
     ],
     visibility = ["PUBLIC"],
 )
