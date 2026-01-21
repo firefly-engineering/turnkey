@@ -92,12 +92,23 @@ let
     pydepsGen = import ../../packages/pydeps-gen.nix { inherit pkgs lib; };
     jsdepsGen = import ../../packages/jsdeps-gen.nix { inherit pkgs lib; };
     soldepsGen = import ../../packages/soldeps-gen.nix { inherit pkgs lib; };
+    # deps-extract is the unified tree-sitter based import extractor for rules.star sync
+    # Built with only the features needed for enabled languages
+    depsExtract = import ../../packages/deps-extract.nix {
+      inherit pkgs lib;
+      enablePython = cfg.python.enable;
+      enableRust = cfg.rust.enable;
+      enableTypescript = cfg.javascript.enable;
+      enableSolidity = cfg.solidity.enable;
+    };
   in
     lib.optional cfg.go.enable godepsGen
     ++ lib.optional cfg.rust.enable rustdepsGen
     ++ lib.optional cfg.python.enable pydepsGen
     ++ lib.optional cfg.javascript.enable jsdepsGen
-    ++ lib.optional cfg.solidity.enable soldepsGen;
+    ++ lib.optional cfg.solidity.enable soldepsGen
+    # Always include deps-extract (used by tk rules sync for all non-Go languages)
+    ++ [ depsExtract ];
 
   # Generate load statements for rules.star file
   generateLoads =

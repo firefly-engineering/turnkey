@@ -4,14 +4,23 @@ version = "0.1.0"
 edition.workspace = true
 description = "Extract dependencies from source files using tree-sitter"
 
+[features]
+default = ["python", "rust", "typescript", "solidity"]
+python = ["dep:tree-sitter-python"]
+rust = ["dep:tree-sitter-rust"]
+typescript = ["dep:tree-sitter-typescript"]
+solidity = ["dep:tree-sitter-solidity"]
+
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tree-sitter.workspace = true
-tree-sitter-python.workspace = true
-tree-sitter-rust.workspace = true
-tree-sitter-typescript.workspace = true
-tree-sitter-solidity.workspace = true
 walkdir.workspace = true
+
+# Optional language-specific tree-sitter grammars
+tree-sitter-python = { workspace = true, optional = true }
+tree-sitter-rust = { workspace = true, optional = true }
+tree-sitter-typescript = { workspace = true, optional = true }
+tree-sitter-solidity = { workspace = true, optional = true }

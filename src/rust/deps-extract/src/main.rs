@@ -46,15 +46,32 @@ fn main() -> anyhow::Result<()> {
     };
 
     let result = match args.lang.as_str() {
+        #[cfg(feature = "python")]
         "python" => languages::python::extract(&args.dir, &exclude_patterns)?,
+
+        #[cfg(feature = "rust")]
         "rust" => languages::rust::extract(&args.dir, &exclude_patterns)?,
+
+        #[cfg(feature = "typescript")]
         "typescript" | "ts" | "javascript" | "js" => {
             languages::typescript::extract(&args.dir, &exclude_patterns)?
         }
+
+        #[cfg(feature = "solidity")]
         "solidity" | "sol" => languages::solidity::extract(&args.dir, &exclude_patterns)?,
+
         _ => {
             eprintln!("Unsupported language: {}", args.lang);
-            eprintln!("Supported: python, rust, typescript, solidity");
+            eprint!("Supported:");
+            #[cfg(feature = "python")]
+            eprint!(" python");
+            #[cfg(feature = "rust")]
+            eprint!(" rust");
+            #[cfg(feature = "typescript")]
+            eprint!(" typescript");
+            #[cfg(feature = "solidity")]
+            eprint!(" solidity");
+            eprintln!();
             std::process::exit(1);
         }
     };
