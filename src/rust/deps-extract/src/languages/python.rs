@@ -137,11 +137,12 @@ pub fn extract(dir: &Path, exclude_patterns: &[&str]) -> anyhow::Result<Result> 
                     classify_import(text)
                 };
 
-                // Get top-level module for deduplication
-                let top_level = module_name.split('.').next().unwrap_or(&module_name);
+                // Deduplicate by package path (e.g., "python.cargo" from "python.cargo.toml")
+                // This allows both "python.cfg" and "python.cargo" to be captured
+                let pkg_path = get_python_package_path(&module_name);
 
-                if !seen.contains(top_level) {
-                    seen.insert(top_level.to_string());
+                if !seen.contains(&pkg_path) {
+                    seen.insert(pkg_path);
                     imports.push(Import {
                         path: module_name,
                         kind,
@@ -191,6 +192,21 @@ fn should_exclude(name: &str, patterns: &[&str]) -> bool {
     }
 
     false
+}
+
+/// Get the package path for deduplication purposes.
+/// "python.cargo.toml" -> "python.cargo"
+/// "python.cfg" -> "python.cfg"
+/// "requests" -> "requests"
+fn get_python_package_path(module: &str) -> String {
+    let parts: Vec<&str> = module.split('.').collect();
+    if parts.len() <= 2 {
+        // Single module or two-level: use as-is
+        module.to_string()
+    } else {
+        // Three or more levels: use first two (package path)
+        format!("{}.{}", parts[0], parts[1])
+    }
 }
 
 /// Classify a Python import as stdlib, external, or internal.

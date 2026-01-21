@@ -153,6 +153,12 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 		break
 	}
 
+	// Filter out self-references (deps pointing to the current package)
+	// e.g., when syncing src/python/cargo, filter out //src/python/cargo:cargo
+	selfTarget := computeSelfTarget(pkgDir, s.config.ProjectRoot)
+	pkgMapping.Deps = filterSelfReference(pkgMapping.Deps, selfTarget)
+	pkgMapping.TestDeps = filterSelfReference(pkgMapping.TestDeps, selfTarget)
+
 	// Report unmapped imports
 	for _, unmapped := range pkgMapping.UnmappedImports {
 		result.Errors = append(result.Errors, fmt.Sprintf("unmapped import: %s", unmapped))
@@ -180,14 +186,16 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 		if isTestTarget(target.Rule) {
 			oldDeps := target.GetDeps()
 
-			// Check if test has target_under_test - if so, library deps come transitively
+			// Check if test has target_under_test or local target deps (":foo")
+			// If so, library deps come transitively - don't add them directly
 			hasTargetUnderTest := target.GetStringAttr("target_under_test") != ""
+			hasLocalTargetDep := hasLocalDep(oldDeps)
 
 			var newDeps []string
 			seen := make(map[string]bool)
 
-			if !hasTargetUnderTest {
-				// No target_under_test, so include library deps
+			if !hasTargetUnderTest && !hasLocalTargetDep {
+				// No target_under_test and no local deps, so include library deps
 				for _, d := range mapper.DepsToTargets(pkgMapping.Deps) {
 					if !seen[d] {
 						seen[d] = true
@@ -459,6 +467,42 @@ func isLibraryTarget(rule string) bool {
 // isTestTarget returns true if the rule is a test target.
 func isTestTarget(rule string) bool {
 	return strings.HasSuffix(rule, "_test") || strings.Contains(rule, "test")
+}
+
+// hasLocalDep returns true if deps contains a local target dep (":foo").
+func hasLocalDep(deps []string) bool {
+	for _, d := range deps {
+		if strings.HasPrefix(d, ":") {
+			return true
+		}
+	}
+	return false
+}
+
+// computeSelfTarget computes the Buck target for the current package.
+// e.g., "/path/to/src/python/cargo" with projectRoot "/path/to" -> "//src/python/cargo:cargo"
+func computeSelfTarget(pkgDir, projectRoot string) string {
+	relPath, err := filepath.Rel(projectRoot, pkgDir)
+	if err != nil {
+		return ""
+	}
+	// relPath is like "src/python/cargo"
+	targetName := filepath.Base(relPath)
+	return fmt.Sprintf("//%s:%s", relPath, targetName)
+}
+
+// filterSelfReference removes deps that match the selfTarget.
+func filterSelfReference(deps []mapper.MappedDep, selfTarget string) []mapper.MappedDep {
+	if selfTarget == "" {
+		return deps
+	}
+	var filtered []mapper.MappedDep
+	for _, dep := range deps {
+		if dep.Target != selfTarget {
+			filtered = append(filtered, dep)
+		}
+	}
+	return filtered
 }
 
 // mergeWithPreserved merges new deps with preserved deps from old list.
