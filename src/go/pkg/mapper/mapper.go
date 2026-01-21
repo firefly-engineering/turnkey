@@ -42,8 +42,9 @@ type Config struct {
 	ProjectRoot string
 
 	// Language-specific configuration
-	Go   *GoConfig
-	Rust *RustConfig
+	Go     *GoConfig
+	Rust   *RustConfig
+	Python *PythonConfig
 }
 
 // GoConfig holds Go-specific configuration.
@@ -77,6 +78,21 @@ type RustConfig struct {
 
 	// WorkspacePackages maps crate names to their relative paths.
 	WorkspacePackages map[string]string
+}
+
+// PythonConfig holds Python-specific configuration.
+type PythonConfig struct {
+	// ProjectRoot is the Python project root directory.
+	ProjectRoot string
+
+	// ExternalCell is the Buck2 cell for external deps (e.g., "pydeps").
+	ExternalCell string
+
+	// DepsFile is the path to python-deps.toml.
+	DepsFile string
+
+	// ExternalDeps maps package names to their entries from python-deps.toml.
+	ExternalDeps map[string]bool
 }
 
 // Mapper converts extraction results to Buck2 targets.
@@ -114,6 +130,21 @@ func New(cfg Config) (*Mapper, error) {
 		if cfg.Rust.ExternalDeps == nil && cfg.Rust.DepsFile != "" {
 			if deps, err := loadRustDeps(cfg.Rust.DepsFile); err == nil {
 				m.config.Rust.ExternalDeps = deps
+			}
+		}
+	}
+
+	// Auto-detect Python configuration if not provided
+	if cfg.Python == nil {
+		pythonCfg, err := detectPythonConfig(cfg.ProjectRoot)
+		if err == nil {
+			m.config.Python = pythonCfg
+		}
+	} else {
+		// Load external deps if not already loaded
+		if cfg.Python.ExternalDeps == nil && cfg.Python.DepsFile != "" {
+			if deps, err := loadPythonDeps(cfg.Python.DepsFile); err == nil {
+				m.config.Python.ExternalDeps = deps
 			}
 		}
 	}
@@ -227,6 +258,51 @@ func loadRustDeps(path string) (map[string]bool, error) {
 	return result, nil
 }
 
+// detectPythonConfig auto-detects Python configuration from the project.
+func detectPythonConfig(projectRoot string) (*PythonConfig, error) {
+	cfg := &PythonConfig{
+		ExternalCell: "pydeps",
+		ExternalDeps: make(map[string]bool),
+	}
+
+	// Check for pyproject.toml
+	pyprojectPath := filepath.Join(projectRoot, "pyproject.toml")
+	if _, err := os.Stat(pyprojectPath); err != nil {
+		return nil, fmt.Errorf("no pyproject.toml found")
+	}
+	cfg.ProjectRoot = projectRoot
+
+	// Load python-deps.toml
+	depsPath := filepath.Join(projectRoot, "python-deps.toml")
+	if deps, err := loadPythonDeps(depsPath); err == nil {
+		cfg.DepsFile = depsPath
+		cfg.ExternalDeps = deps
+	}
+
+	return cfg, nil
+}
+
+// loadPythonDeps loads package names from python-deps.toml.
+func loadPythonDeps(path string) (map[string]bool, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var depsFile struct {
+		Deps map[string]interface{} `toml:"deps"`
+	}
+	if err := toml.Unmarshal(content, &depsFile); err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]bool)
+	for dep := range depsFile.Deps {
+		result[dep] = true
+	}
+	return result, nil
+}
+
 // MapExtractionResult converts an extraction result to mapped dependencies.
 func (m *Mapper) MapExtractionResult(result *extraction.Result) (map[string]PackageMapping, error) {
 	mappings := make(map[string]PackageMapping)
@@ -267,6 +343,11 @@ func (m *Mapper) mapPackage(language string, pkg extraction.Package) PackageMapp
 	case "rust":
 		mapping.Deps, mapping.UnmappedImports = m.mapRustImports(pkg.Imports)
 		testDeps, testUnmapped := m.mapRustImports(pkg.TestImports)
+		mapping.TestDeps = testDeps
+		mapping.UnmappedImports = append(mapping.UnmappedImports, testUnmapped...)
+	case "python":
+		mapping.Deps, mapping.UnmappedImports = m.mapPythonImports(pkg.Imports)
+		testDeps, testUnmapped := m.mapPythonImports(pkg.TestImports)
 		mapping.TestDeps = testDeps
 		mapping.UnmappedImports = append(mapping.UnmappedImports, testUnmapped...)
 	default:
@@ -520,6 +601,122 @@ func (m *Mapper) isKnownRustDep(crateName string) bool {
 	}
 
 	return m.config.Rust.ExternalDeps[crateName]
+}
+
+// mapPythonImports maps Python imports to Buck2 dependencies.
+func (m *Mapper) mapPythonImports(imports []extraction.Import) (deps []MappedDep, unmapped []string) {
+	if m.config.Python == nil {
+		for _, imp := range imports {
+			unmapped = append(unmapped, imp.Path)
+		}
+		return
+	}
+
+	seen := make(map[string]bool)
+
+	for _, imp := range imports {
+		dep := m.mapPythonImport(imp)
+
+		switch dep.Type {
+		case DependencyStdLib:
+			// Skip stdlib
+			continue
+		case DependencyUnmapped:
+			unmapped = append(unmapped, imp.Path)
+			continue
+		}
+
+		// Deduplicate
+		if !seen[dep.Target] {
+			seen[dep.Target] = true
+			deps = append(deps, dep)
+		}
+	}
+
+	// Sort for consistent output
+	sort.Slice(deps, func(i, j int) bool {
+		return deps[i].Target < deps[j].Target
+	})
+
+	return deps, unmapped
+}
+
+// mapPythonImport maps a single Python import to a Buck2 dependency.
+func (m *Mapper) mapPythonImport(imp extraction.Import) MappedDep {
+	// Handle by kind
+	switch imp.Kind {
+	case extraction.ImportKindStdlib:
+		return MappedDep{
+			ImportPath: imp.Path,
+			Type:       DependencyStdLib,
+		}
+
+	case extraction.ImportKindInternal:
+		return m.mapPythonInternalImport(imp.Path)
+
+	case extraction.ImportKindExternal:
+		return m.mapPythonExternalImport(imp.Path)
+	}
+
+	return MappedDep{
+		ImportPath: imp.Path,
+		Type:       DependencyUnmapped,
+	}
+}
+
+// mapPythonInternalImport maps an internal Python import to a Buck2 target.
+func (m *Mapper) mapPythonInternalImport(modulePath string) MappedDep {
+	// Convert Python module path to Buck2 target
+	// e.g., "src.python.cfg" -> "//src/python/cfg:cfg"
+	parts := strings.Split(modulePath, ".")
+	relPath := strings.Join(parts, "/")
+	targetName := parts[len(parts)-1]
+
+	target := fmt.Sprintf("//%s:%s", relPath, targetName)
+
+	return MappedDep{
+		Target:     target,
+		Type:       DependencyInternal,
+		ImportPath: modulePath,
+	}
+}
+
+// mapPythonExternalImport maps an external Python import to a Buck2 target.
+func (m *Mapper) mapPythonExternalImport(modulePath string) MappedDep {
+	cfg := m.config.Python
+
+	// Get top-level package name
+	topLevel := modulePath
+	if idx := strings.Index(modulePath, "."); idx > 0 {
+		topLevel = modulePath[:idx]
+	}
+
+	// Check if this package is in python-deps.toml
+	if !m.isKnownPythonDep(topLevel) {
+		return MappedDep{
+			ImportPath: modulePath,
+			Type:       DependencyUnmapped,
+		}
+	}
+
+	// Use the top-level package name for the target
+	// e.g., "requests" -> "pydeps//vendor/requests:requests"
+	target := fmt.Sprintf("%s//vendor/%s:%s", cfg.ExternalCell, topLevel, topLevel)
+
+	return MappedDep{
+		Target:     target,
+		Type:       DependencyExternal,
+		ImportPath: modulePath,
+	}
+}
+
+// isKnownPythonDep checks if a package is in python-deps.toml.
+func (m *Mapper) isKnownPythonDep(packageName string) bool {
+	if m.config.Python == nil || m.config.Python.ExternalDeps == nil {
+		return false
+	}
+
+	return m.config.Python.ExternalDeps[packageName]
 }
 
 // ApplyToRulesStar applies mapped dependencies to a rules.star file.

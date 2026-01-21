@@ -239,6 +239,8 @@ func (s *Syncer) detectLanguage(f *starlark.File) string {
 			return "python"
 		case strings.HasPrefix(target.Rule, "typescript_"), strings.HasPrefix(target.Rule, "js_"):
 			return "typescript"
+		case strings.HasPrefix(target.Rule, "solidity_"), strings.HasPrefix(target.Rule, "sol_"):
+			return "solidity"
 		}
 	}
 	return ""
@@ -251,6 +253,8 @@ func (s *Syncer) runExtractor(language, pkgDir string) (*extraction.Result, erro
 		return s.runGoExtractor(pkgDir)
 	case "rust":
 		return s.runRustExtractor(pkgDir)
+	case "python":
+		return s.runPythonExtractor(pkgDir)
 	default:
 		return nil, fmt.Errorf("unsupported language: %s", language)
 	}
@@ -431,6 +435,36 @@ func (s *Syncer) extractRustDepsDirectly(pkgDir string) (*extraction.Result, err
 	}
 
 	return result, nil
+}
+
+// runPythonExtractor runs python-deps-extract on a directory.
+func (s *Syncer) runPythonExtractor(pkgDir string) (*extraction.Result, error) {
+	extractorPath := "python-deps-extract"
+
+	// Check if extractor exists
+	_, err := exec.LookPath(extractorPath)
+	if err != nil {
+		// No built-in fallback for Python (need the extractor)
+		return nil, fmt.Errorf("python-deps-extract not found in PATH")
+	}
+
+	cmd := exec.Command(extractorPath, pkgDir)
+	cmd.Dir = s.config.ProjectRoot
+
+	output, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return nil, fmt.Errorf("extractor failed: %s", string(exitErr.Stderr))
+		}
+		return nil, fmt.Errorf("running extractor: %w", err)
+	}
+
+	var result extraction.Result
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, fmt.Errorf("parsing extractor output: %w", err)
+	}
+
+	return &result, nil
 }
 
 // extractGoImportsDirectly uses go list directly when extractor isn't available.
