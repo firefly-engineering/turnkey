@@ -249,6 +249,8 @@ func (s *Syncer) runExtractor(language, pkgDir string) (*extraction.Result, erro
 	switch language {
 	case "go":
 		return s.runGoExtractor(pkgDir)
+	case "rust":
+		return s.runRustExtractor(pkgDir)
 	default:
 		return nil, fmt.Errorf("unsupported language: %s", language)
 	}
@@ -285,6 +287,150 @@ func (s *Syncer) runGoExtractor(pkgDir string) (*extraction.Result, error) {
 	}
 
 	return &result, nil
+}
+
+// runRustExtractor runs rust-deps-extract on a directory.
+func (s *Syncer) runRustExtractor(pkgDir string) (*extraction.Result, error) {
+	extractorPath := "rust-deps-extract"
+
+	// Check if extractor exists, fall back to cargo metadata directly
+	_, err := exec.LookPath(extractorPath)
+	if err != nil {
+		return s.extractRustDepsDirectly(pkgDir)
+	}
+
+	cmd := exec.Command(extractorPath, pkgDir)
+	cmd.Dir = s.config.ProjectRoot
+
+	output, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return nil, fmt.Errorf("extractor failed: %s", string(exitErr.Stderr))
+		}
+		return nil, fmt.Errorf("running extractor: %w", err)
+	}
+
+	var result extraction.Result
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, fmt.Errorf("parsing extractor output: %w", err)
+	}
+
+	return &result, nil
+}
+
+// extractRustDepsDirectly uses cargo metadata directly when extractor isn't available.
+func (s *Syncer) extractRustDepsDirectly(pkgDir string) (*extraction.Result, error) {
+	result := extraction.NewResult("rust")
+
+	cmd := exec.Command("cargo", "metadata", "--format-version", "1", "--no-deps")
+	cmd.Dir = pkgDir
+
+	output, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return nil, fmt.Errorf("cargo metadata failed: %s", string(exitErr.Stderr))
+		}
+		return nil, fmt.Errorf("running cargo metadata: %w", err)
+	}
+
+	var metadata struct {
+		Packages []struct {
+			Name         string `json:"name"`
+			ID           string `json:"id"`
+			ManifestPath string `json:"manifest_path"`
+			Dependencies []struct {
+				Name   string  `json:"name"`
+				Source *string `json:"source"`
+				Kind   *string `json:"kind"`
+				Path   *string `json:"path"`
+			} `json:"dependencies"`
+			Targets []struct {
+				Kind    []string `json:"kind"`
+				SrcPath string   `json:"src_path"`
+			} `json:"targets"`
+		} `json:"packages"`
+		WorkspaceMembers []string `json:"workspace_members"`
+		WorkspaceRoot    string   `json:"workspace_root"`
+	}
+
+	if err := json.Unmarshal(output, &metadata); err != nil {
+		return nil, fmt.Errorf("parsing cargo metadata: %w", err)
+	}
+
+	// Build workspace member set
+	workspaceMembers := make(map[string]bool)
+	for _, id := range metadata.WorkspaceMembers {
+		workspaceMembers[id] = true
+	}
+
+	// Build workspace package name set
+	workspacePackages := make(map[string]bool)
+	for _, pkg := range metadata.Packages {
+		if workspaceMembers[pkg.ID] {
+			workspacePackages[pkg.Name] = true
+		}
+	}
+
+	for _, pkg := range metadata.Packages {
+		if !workspaceMembers[pkg.ID] {
+			continue
+		}
+
+		// Calculate relative path
+		pkgPath := filepath.Dir(pkg.ManifestPath)
+		relPath, err := filepath.Rel(metadata.WorkspaceRoot, pkgPath)
+		if err != nil {
+			relPath = pkgPath
+		}
+
+		// Collect source files
+		var files []string
+		for _, target := range pkg.Targets {
+			srcPath, err := filepath.Rel(metadata.WorkspaceRoot, target.SrcPath)
+			if err != nil {
+				srcPath = target.SrcPath
+			}
+			files = append(files, srcPath)
+		}
+
+		// Classify dependencies
+		var imports []extraction.Import
+		var testImports []extraction.Import
+
+		for _, dep := range pkg.Dependencies {
+			var kind extraction.ImportKind
+			if dep.Source == nil {
+				// Path dependency
+				if workspacePackages[dep.Name] {
+					kind = extraction.ImportKindInternal
+				} else {
+					kind = extraction.ImportKindInternal
+				}
+			} else {
+				kind = extraction.ImportKindExternal
+			}
+
+			imp := extraction.Import{
+				Path: dep.Name,
+				Kind: kind,
+			}
+
+			if dep.Kind != nil && *dep.Kind == "dev" {
+				testImports = append(testImports, imp)
+			} else {
+				imports = append(imports, imp)
+			}
+		}
+
+		result.AddPackage(extraction.Package{
+			Path:        relPath,
+			Files:       files,
+			Imports:     imports,
+			TestImports: testImports,
+		})
+	}
+
+	return result, nil
 }
 
 // extractGoImportsDirectly uses go list directly when extractor isn't available.
