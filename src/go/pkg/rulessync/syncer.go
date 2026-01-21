@@ -81,9 +81,42 @@ type SyncResult struct {
 
 // SyncDirectory syncs all rules.star files in a directory tree.
 func (s *Syncer) SyncDirectory(dir string) ([]SyncResult, error) {
-	// Find all Go packages with rules.star
 	var results []SyncResult
 
+	// If not forcing, use git status to find only directories with changes
+	if !s.config.Force {
+		changedDirs, err := s.getChangedDirectories(dir)
+		if err != nil {
+			// Fall back to full walk on git error
+			if s.config.Verbose {
+				fmt.Fprintf(os.Stderr, "  git status failed, falling back to full walk: %v\n", err)
+			}
+		} else if len(changedDirs) == 0 {
+			// No changes detected by git
+			return results, nil
+		} else {
+			// Only process rules.star files in changed directories
+			for pkgDir := range changedDirs {
+				rulesPath := filepath.Join(pkgDir, "rules.star")
+				if _, err := os.Stat(rulesPath); err != nil {
+					continue // No rules.star in this directory
+				}
+
+				result, err := s.SyncFile(rulesPath)
+				if err != nil {
+					results = append(results, SyncResult{
+						Path:   rulesPath,
+						Errors: []string{err.Error()},
+					})
+				} else {
+					results = append(results, *result)
+				}
+			}
+			return results, nil
+		}
+	}
+
+	// Force mode or git fallback: walk entire tree
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -252,6 +285,70 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 
 	result.Updated = modified
 	return result, nil
+}
+
+// getChangedDirectories uses git status to find directories with changed source files.
+// Returns a map of absolute directory paths that have uncommitted changes.
+func (s *Syncer) getChangedDirectories(dir string) (map[string]bool, error) {
+	cmd := exec.Command("git", "status", "--porcelain", "-uall")
+	cmd.Dir = s.config.ProjectRoot
+
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git status failed: %w", err)
+	}
+
+	changedDirs := make(map[string]bool)
+
+	for _, line := range strings.Split(string(output), "\n") {
+		if len(line) < 4 {
+			continue
+		}
+
+		// Parse git status output: "XY filename" or "XY orig -> renamed"
+		filePath := strings.TrimSpace(line[3:])
+		if idx := strings.Index(filePath, " -> "); idx >= 0 {
+			filePath = filePath[idx+4:] // Use the destination of rename
+		}
+
+		// Get absolute path
+		absPath := filepath.Join(s.config.ProjectRoot, filePath)
+
+		// Check if this is a source file we care about
+		ext := filepath.Ext(filePath)
+		isSource := false
+		switch ext {
+		case ".go", ".rs", ".py", ".ts", ".tsx", ".js", ".jsx", ".sol":
+			isSource = true
+		}
+		// Also check for Cargo.toml changes
+		if filepath.Base(filePath) == "Cargo.toml" {
+			isSource = true
+		}
+
+		if !isSource {
+			continue
+		}
+
+		// Get the directory containing this file
+		fileDir := filepath.Dir(absPath)
+
+		// Walk up the directory tree to find rules.star
+		// A change in src/cmd/tk/main.go should trigger src/cmd/tk/rules.star
+		for d := fileDir; strings.HasPrefix(d, s.config.ProjectRoot); d = filepath.Dir(d) {
+			rulesPath := filepath.Join(d, "rules.star")
+			if _, err := os.Stat(rulesPath); err == nil {
+				changedDirs[d] = true
+				break
+			}
+			// Don't go above the search directory
+			if d == dir || d == s.config.ProjectRoot {
+				break
+			}
+		}
+	}
+
+	return changedDirs, nil
 }
 
 // isStale checks if rules.star needs updating based on source file mtimes.
