@@ -146,12 +146,10 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 		return result, nil
 	}
 
-	// Find the package mapping (should be just one for single-directory extraction)
-	var pkgMapping mapper.PackageMapping
-	for _, m := range mappings {
-		pkgMapping = m
-		break
-	}
+	// Merge all package mappings
+	// For languages with subdirectories (like Solidity with src/ and test/),
+	// combine deps from all packages
+	pkgMapping := mergePackageMappings(mappings)
 
 	// Filter out self-references (deps pointing to the current package)
 	// e.g., when syncing src/python/cargo, filter out //src/python/cargo:cargo
@@ -503,6 +501,35 @@ func filterSelfReference(deps []mapper.MappedDep, selfTarget string) []mapper.Ma
 		}
 	}
 	return filtered
+}
+
+// mergePackageMappings combines mappings from multiple packages.
+// This is needed for languages that have subdirectory structure (e.g., Solidity with src/ and test/).
+func mergePackageMappings(mappings map[string]mapper.PackageMapping) mapper.PackageMapping {
+	var result mapper.PackageMapping
+	seenDeps := make(map[string]bool)
+	seenTestDeps := make(map[string]bool)
+
+	for _, m := range mappings {
+		// Collect library deps (deduplicated)
+		for _, dep := range m.Deps {
+			if !seenDeps[dep.Target] {
+				seenDeps[dep.Target] = true
+				result.Deps = append(result.Deps, dep)
+			}
+		}
+		// Collect test deps (deduplicated)
+		for _, dep := range m.TestDeps {
+			if !seenTestDeps[dep.Target] {
+				seenTestDeps[dep.Target] = true
+				result.TestDeps = append(result.TestDeps, dep)
+			}
+		}
+		// Collect unmapped imports
+		result.UnmappedImports = append(result.UnmappedImports, m.UnmappedImports...)
+	}
+
+	return result
 }
 
 // mergeWithPreserved merges new deps with preserved deps from old list.
