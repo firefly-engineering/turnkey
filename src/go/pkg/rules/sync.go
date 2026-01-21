@@ -571,6 +571,8 @@ func (s *Syncer) updateTargetDepsInContent(content, targetName string, newDeps, 
 			for j := i - 1; j >= 0; j-- {
 				if strings.Contains(lines[j], "(") {
 					targetStartLine = j
+					// We're already inside the target, so start bracketCount at 1
+					bracketCount = 1
 					break
 				}
 			}

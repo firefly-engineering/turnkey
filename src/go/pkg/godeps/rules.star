@@ -5,6 +5,7 @@ load("@prelude//:rules.bzl", "go_library", "go_test")
 
 go_library(
     name = "godeps",
+    package_name = "github.com/firefly-engineering/turnkey/src/go/pkg/godeps",
     srcs = [
         "output.go",
         "parser.go",
@@ -27,6 +28,7 @@ go_test(
         "parser_test.go",
         "prefetch_test.go",
     ],
+    target_under_test = ":godeps",
     deps = [
         # turnkey:auto-start
         "godeps//vendor/golang.org/x/mod/modfile:modfile",

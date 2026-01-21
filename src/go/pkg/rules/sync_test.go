@@ -244,14 +244,30 @@ func TestSyncer_GenerateNewContent(t *testing.T) {
 		Parser: NewParser(),
 	}
 
+	// Provide RawContent for in-place editing
+	rawContent := `load("@prelude//:rules.bzl", "go_library")
+
+go_library(
+    name = "mylib",
+    srcs = ["*.go"],
+    deps = [
+        "//old:dep",
+    ],
+    visibility = ["PUBLIC"],
+)
+`
+
 	rf := &RulesFile{
-		Path:  "/project/pkg/rules.star",
-		Loads: []string{`load("@prelude//:rules.bzl", "go_library")`},
+		Path:       "/project/pkg/rules.star",
+		RawContent: rawContent,
+		Loads:      []string{`load("@prelude//:rules.bzl", "go_library")`},
 		Targets: []*Target{
 			{
 				Name:          "mylib",
 				Rule:          "go_library",
 				Srcs:          []string{"*.go"},
+				StartLine:     3,
+				EndLine:       9,
 				PreservedDeps: []string{"//custom:dep"},
 			},
 		},
