@@ -3,10 +3,7 @@
 
 python_binary(
     name = "hello-python",
-    deps = [
-        # turnkey:auto-start
-        "pydeps//vendor/six:six",
-        # turnkey:auto-end
-    ],
+    main = "hello.py",
+    deps = ["pydeps//vendor/six:six"],
     visibility = ["PUBLIC"],
 )

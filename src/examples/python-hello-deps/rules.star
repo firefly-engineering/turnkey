@@ -5,10 +5,9 @@ load("@prelude//:rules.bzl", "python_binary")
 
 python_binary(
     name = "python-hello-deps",
+    main = "hello.py",
     deps = [
-        # turnkey:auto-start
         "pydeps//vendor/six:six",
-        # turnkey:auto-end
     ],
     visibility = ["PUBLIC"],
 )

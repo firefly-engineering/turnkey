@@ -5,11 +5,11 @@ load("@prelude//typescript:typescript.bzl", "typescript_binary")
 
 typescript_binary(
     name = "typescript-hello-deps",
+    main = "main.ts",
     srcs = ["main.ts"],
-    deps = [
-        # turnkey:auto-start
+    npm_deps = [
         "jsdeps//:lodash",
-        # turnkey:auto-end
+        "jsdeps//:types_lodash",
     ],
     visibility = ["PUBLIC"],
 )

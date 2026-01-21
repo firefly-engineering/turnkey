@@ -6,10 +6,9 @@ load("@prelude//:rules.bzl", "rust_binary")
 rust_binary(
     name = "rust-hello-deps",
     srcs = ["main.rs"],
+    edition = "2024",
     deps = [
-        # turnkey:auto-start
         "rustdeps//vendor/itoa:itoa",
-        # turnkey:auto-end
     ],
     visibility = ["PUBLIC"],
 )

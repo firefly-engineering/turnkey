@@ -495,29 +495,230 @@ func diffDeps(old, new []string) (added, removed []string) {
 	return added, removed
 }
 
-// generateNewContent generates updated rules.star content.
+// generateNewContent generates updated rules.star content by editing in place.
+// This preserves all original attributes and only updates the deps sections.
 func (s *Syncer) generateNewContent(rf *RulesFile, newDeps []string) (string, error) {
-	var lines []string
+	content := rf.RawContent
+	lines := strings.Split(content, "\n")
 
-	// Add header with hash
+	// Compute new hash
 	hash := ComputeDepsHash(newDeps)
-	lines = append(lines, s.Parser.GenerateHeader(hash))
 
-	// Add load statements
-	for _, load := range rf.Loads {
-		lines = append(lines, load)
-	}
-	if len(rf.Loads) > 0 {
-		lines = append(lines, "")
+	// Update or add header
+	content = s.updateHeader(lines, hash)
+
+	// Process targets in reverse order so line numbers don't shift
+	// as we modify earlier parts of the file
+	for i := len(rf.Targets) - 1; i >= 0; i-- {
+		target := rf.Targets[i]
+		// Re-parse to get current line numbers after header update
+		content = s.updateTargetDepsInContent(content, target.Name, newDeps, target.PreservedDeps)
 	}
 
-	// Generate each target
-	for i, target := range rf.Targets {
-		if i > 0 {
-			lines = append(lines, "")
+	return content, nil
+}
+
+// updateHeader updates or adds the turnkey header with hash.
+func (s *Syncer) updateHeader(lines []string, hash string) string {
+	header := fmt.Sprintf("# Auto-managed by turnkey. Hash: %s\n# Manual sections marked with turnkey:preserve-start/end are not modified.", hash)
+
+	// Check if there's already a turnkey header
+	if len(lines) > 0 && strings.HasPrefix(lines[0], "# Auto-managed by turnkey") {
+		// Replace existing header (first two lines)
+		if len(lines) > 1 && strings.HasPrefix(lines[1], "# Manual sections") {
+			lines = lines[2:]
+		} else {
+			lines = lines[1:]
 		}
-		lines = append(lines, s.Parser.GenerateTarget(target, newDeps))
+		return header + "\n" + strings.Join(lines, "\n")
 	}
 
-	return strings.Join(lines, "\n") + "\n", nil
+	// Check if first line is a comment (preserve it or add header before)
+	if len(lines) > 0 && strings.HasPrefix(strings.TrimSpace(lines[0]), "#") {
+		// There's an existing comment block - replace it with our header
+		// Skip comment lines until we find a non-comment
+		i := 0
+		for i < len(lines) && strings.HasPrefix(strings.TrimSpace(lines[i]), "#") {
+			i++
+		}
+		// Skip any blank lines after comments
+		for i < len(lines) && strings.TrimSpace(lines[i]) == "" {
+			i++
+		}
+		return header + "\n\n" + strings.Join(lines[i:], "\n")
+	}
+
+	// No existing header - add new one
+	return header + "\n\n" + strings.Join(lines, "\n")
+}
+
+// updateTargetDepsInContent finds a target by name and updates its deps section.
+func (s *Syncer) updateTargetDepsInContent(content, targetName string, newDeps, preservedDeps []string) string {
+	lines := strings.Split(content, "\n")
+	indent := "        " // Default 8 spaces for deps items
+
+	// Find the target by looking for name = "targetName"
+	targetStartLine := -1
+	targetEndLine := -1
+	bracketCount := 0
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		// Look for target name
+		if strings.Contains(trimmed, fmt.Sprintf(`name = "%s"`, targetName)) {
+			// Found the target - now find its start (opening paren before this line)
+			for j := i - 1; j >= 0; j-- {
+				if strings.Contains(lines[j], "(") {
+					targetStartLine = j
+					break
+				}
+			}
+		}
+
+		// Track bracket depth to find target end
+		if targetStartLine >= 0 && targetEndLine < 0 {
+			for _, ch := range line {
+				if ch == '(' {
+					bracketCount++
+				} else if ch == ')' {
+					bracketCount--
+					if bracketCount == 0 {
+						targetEndLine = i
+						break
+					}
+				}
+			}
+		}
+
+		if targetEndLine >= 0 {
+			break
+		}
+	}
+
+	if targetStartLine < 0 || targetEndLine < 0 {
+		// Target not found - return content unchanged
+		return content
+	}
+
+	// Find the deps = [ line within this target
+	depsStartLine := -1
+	depsEndLine := -1
+	depsIndent := ""
+	depsBracketCount := 0
+
+	for i := targetStartLine; i <= targetEndLine && i < len(lines); i++ {
+		line := lines[i]
+		trimmed := strings.TrimSpace(line)
+
+		// Find "deps = [" (but not "npm_deps" or similar)
+		if depsStartLine < 0 && strings.HasPrefix(trimmed, "deps") && strings.Contains(trimmed, "=") && strings.Contains(line, "[") {
+			depsStartLine = i
+			// Extract the indentation
+			depsIndent = line[:len(line)-len(strings.TrimLeft(line, " \t"))]
+			indent = depsIndent + "    " // Add 4 more spaces for items
+			depsBracketCount = 1
+			// Check if the opening bracket is on this line
+			if !strings.Contains(trimmed, "],") {
+				continue
+			}
+		}
+
+		// Track bracket depth to find deps end
+		if depsStartLine >= 0 && depsEndLine < 0 && i > depsStartLine {
+			for _, ch := range line {
+				if ch == '[' {
+					depsBracketCount++
+				} else if ch == ']' {
+					depsBracketCount--
+					if depsBracketCount == 0 {
+						depsEndLine = i
+						break
+					}
+				}
+			}
+		}
+
+		if depsEndLine >= 0 {
+			break
+		}
+	}
+
+	if depsStartLine < 0 {
+		// No deps section found - don't add one automatically
+		// (the original file structure should be preserved)
+		return content
+	}
+
+	// Generate new deps content
+	var newDepsLines []string
+	newDepsLines = append(newDepsLines, depsIndent+"deps = [")
+	newDepsLines = append(newDepsLines, indent+MarkerAutoStart)
+	for _, dep := range newDeps {
+		newDepsLines = append(newDepsLines, fmt.Sprintf("%s\"%s\",", indent, dep))
+	}
+	newDepsLines = append(newDepsLines, indent+MarkerAutoEnd)
+
+	// Add preserved deps if any
+	if len(preservedDeps) > 0 {
+		newDepsLines = append(newDepsLines, indent+MarkerPreserveStart)
+		for _, dep := range preservedDeps {
+			newDepsLines = append(newDepsLines, fmt.Sprintf("%s\"%s\",", indent, dep))
+		}
+		newDepsLines = append(newDepsLines, indent+MarkerPreserveEnd)
+	}
+
+	newDepsLines = append(newDepsLines, depsIndent+"],")
+
+	// Replace the deps section
+	var result []string
+	result = append(result, lines[:depsStartLine]...)
+	result = append(result, newDepsLines...)
+	result = append(result, lines[depsEndLine+1:]...)
+
+	return strings.Join(result, "\n")
+}
+
+// addDepsSection adds a deps section to a target that doesn't have one.
+func (s *Syncer) addDepsSection(content string, target *Target, newDeps []string) string {
+	if len(newDeps) == 0 {
+		return content // Nothing to add
+	}
+
+	lines := strings.Split(content, "\n")
+	indent := "    "      // 4 spaces for deps =
+	itemIndent := "        " // 8 spaces for items
+
+	// Find a good place to insert deps (after name = or srcs =)
+	insertLine := target.StartLine // Default to start of target
+
+	for i := target.StartLine - 1; i < target.EndLine && i < len(lines); i++ {
+		line := lines[i]
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "name =") || strings.HasPrefix(trimmed, "srcs =") {
+			insertLine = i + 1
+			// Extract indentation from this line
+			indent = line[:len(line)-len(strings.TrimLeft(line, " \t"))]
+			itemIndent = indent + "    "
+		}
+	}
+
+	// Generate deps section
+	var depsLines []string
+	depsLines = append(depsLines, indent+"deps = [")
+	depsLines = append(depsLines, itemIndent+MarkerAutoStart)
+	for _, dep := range newDeps {
+		depsLines = append(depsLines, fmt.Sprintf("%s\"%s\",", itemIndent, dep))
+	}
+	depsLines = append(depsLines, itemIndent+MarkerAutoEnd)
+	depsLines = append(depsLines, indent+"],")
+
+	// Insert deps section
+	result := strings.Join(lines[:insertLine], "\n")
+	result += "\n" + strings.Join(depsLines, "\n")
+	if insertLine < len(lines) {
+		result += "\n" + strings.Join(lines[insertLine:], "\n")
+	}
+
+	return result
 }

@@ -11,6 +11,8 @@ typescript_library(
 
 typescript_binary(
     name = "hello-typescript",
+    main = "main.ts",
     srcs = ["main.ts"],
+    deps = [":greeter"],
     visibility = ["PUBLIC"],
 )
