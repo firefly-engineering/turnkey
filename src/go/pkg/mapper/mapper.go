@@ -46,6 +46,7 @@ type Config struct {
 	Rust       *RustConfig
 	Python     *PythonConfig
 	TypeScript *TypeScriptConfig
+	Solidity   *SolidityConfig
 }
 
 // GoConfig holds Go-specific configuration.
@@ -108,6 +109,21 @@ type TypeScriptConfig struct {
 	DepsFile string
 
 	// ExternalDeps maps package names to their entries from js-deps.toml.
+	ExternalDeps map[string]bool
+}
+
+// SolidityConfig holds Solidity-specific configuration.
+type SolidityConfig struct {
+	// ProjectRoot is the Solidity project root directory.
+	ProjectRoot string
+
+	// ExternalCell is the Buck2 cell for external deps (e.g., "soldeps").
+	ExternalCell string
+
+	// DepsFile is the path to sol-deps.toml.
+	DepsFile string
+
+	// ExternalDeps maps package names to their entries from sol-deps.toml.
 	ExternalDeps map[string]bool
 }
 
@@ -176,6 +192,21 @@ func New(cfg Config) (*Mapper, error) {
 		if cfg.TypeScript.ExternalDeps == nil && cfg.TypeScript.DepsFile != "" {
 			if deps, err := loadTypescriptDeps(cfg.TypeScript.DepsFile); err == nil {
 				m.config.TypeScript.ExternalDeps = deps
+			}
+		}
+	}
+
+	// Auto-detect Solidity configuration if not provided
+	if cfg.Solidity == nil {
+		solCfg, err := detectSolidityConfig(cfg.ProjectRoot)
+		if err == nil {
+			m.config.Solidity = solCfg
+		}
+	} else {
+		// Load external deps if not already loaded
+		if cfg.Solidity.ExternalDeps == nil && cfg.Solidity.DepsFile != "" {
+			if deps, err := loadSolidityDeps(cfg.Solidity.DepsFile); err == nil {
+				m.config.Solidity.ExternalDeps = deps
 			}
 		}
 	}
@@ -382,6 +413,57 @@ func loadTypescriptDeps(path string) (map[string]bool, error) {
 	return result, nil
 }
 
+// detectSolidityConfig auto-detects Solidity configuration from the project.
+func detectSolidityConfig(projectRoot string) (*SolidityConfig, error) {
+	cfg := &SolidityConfig{
+		ExternalCell: "soldeps",
+		ExternalDeps: make(map[string]bool),
+	}
+
+	// Check for foundry.toml or hardhat.config.js/ts
+	foundryPath := filepath.Join(projectRoot, "foundry.toml")
+	hardhatJsPath := filepath.Join(projectRoot, "hardhat.config.js")
+	hardhatTsPath := filepath.Join(projectRoot, "hardhat.config.ts")
+	if _, err := os.Stat(foundryPath); err != nil {
+		if _, err := os.Stat(hardhatJsPath); err != nil {
+			if _, err := os.Stat(hardhatTsPath); err != nil {
+				return nil, fmt.Errorf("no foundry.toml or hardhat.config found")
+			}
+		}
+	}
+	cfg.ProjectRoot = projectRoot
+
+	// Load sol-deps.toml
+	depsPath := filepath.Join(projectRoot, "sol-deps.toml")
+	if deps, err := loadSolidityDeps(depsPath); err == nil {
+		cfg.DepsFile = depsPath
+		cfg.ExternalDeps = deps
+	}
+
+	return cfg, nil
+}
+
+// loadSolidityDeps loads package names from sol-deps.toml.
+func loadSolidityDeps(path string) (map[string]bool, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var depsFile struct {
+		Deps map[string]interface{} `toml:"deps"`
+	}
+	if err := toml.Unmarshal(content, &depsFile); err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]bool)
+	for dep := range depsFile.Deps {
+		result[dep] = true
+	}
+	return result, nil
+}
+
 // MapExtractionResult converts an extraction result to mapped dependencies.
 func (m *Mapper) MapExtractionResult(result *extraction.Result) (map[string]PackageMapping, error) {
 	mappings := make(map[string]PackageMapping)
@@ -432,6 +514,11 @@ func (m *Mapper) mapPackage(language string, pkg extraction.Package) PackageMapp
 	case "typescript":
 		mapping.Deps, mapping.UnmappedImports = m.mapTypescriptImports(pkg.Imports)
 		testDeps, testUnmapped := m.mapTypescriptImports(pkg.TestImports)
+		mapping.TestDeps = testDeps
+		mapping.UnmappedImports = append(mapping.UnmappedImports, testUnmapped...)
+	case "solidity":
+		mapping.Deps, mapping.UnmappedImports = m.mapSolidityImports(pkg.Imports)
+		testDeps, testUnmapped := m.mapSolidityImports(pkg.TestImports)
 		mapping.TestDeps = testDeps
 		mapping.UnmappedImports = append(mapping.UnmappedImports, testUnmapped...)
 	default:
@@ -923,6 +1010,126 @@ func (m *Mapper) isKnownTypescriptDep(packageName string) bool {
 	}
 
 	return m.config.TypeScript.ExternalDeps[packageName]
+}
+
+// mapSolidityImports maps Solidity imports to Buck2 dependencies.
+func (m *Mapper) mapSolidityImports(imports []extraction.Import) (deps []MappedDep, unmapped []string) {
+	if m.config.Solidity == nil {
+		for _, imp := range imports {
+			unmapped = append(unmapped, imp.Path)
+		}
+		return
+	}
+
+	seen := make(map[string]bool)
+
+	for _, imp := range imports {
+		dep := m.mapSolidityImport(imp)
+
+		switch dep.Type {
+		case DependencyStdLib:
+			// Solidity has no stdlib, skip
+			continue
+		case DependencyUnmapped:
+			unmapped = append(unmapped, imp.Path)
+			continue
+		}
+
+		// Deduplicate
+		if !seen[dep.Target] {
+			seen[dep.Target] = true
+			deps = append(deps, dep)
+		}
+	}
+
+	// Sort for consistent output
+	sort.Slice(deps, func(i, j int) bool {
+		return deps[i].Target < deps[j].Target
+	})
+
+	return deps, unmapped
+}
+
+// mapSolidityImport maps a single Solidity import to a Buck2 dependency.
+func (m *Mapper) mapSolidityImport(imp extraction.Import) MappedDep {
+	// Handle by kind
+	switch imp.Kind {
+	case extraction.ImportKindStdlib:
+		// Solidity has no stdlib
+		return MappedDep{
+			ImportPath: imp.Path,
+			Type:       DependencyStdLib,
+		}
+
+	case extraction.ImportKindInternal:
+		return m.mapSolidityInternalImport(imp.Path)
+
+	case extraction.ImportKindExternal:
+		return m.mapSolidityExternalImport(imp.Path)
+	}
+
+	return MappedDep{
+		ImportPath: imp.Path,
+		Type:       DependencyUnmapped,
+	}
+}
+
+// mapSolidityInternalImport maps an internal Solidity import to a Buck2 target.
+func (m *Mapper) mapSolidityInternalImport(importPath string) MappedDep {
+	// Relative imports like ./Foo.sol or ../Bar.sol are internal
+	return MappedDep{
+		Target:     importPath,
+		Type:       DependencyInternal,
+		ImportPath: importPath,
+	}
+}
+
+// mapSolidityExternalImport maps an external Solidity import to a Buck2 target.
+func (m *Mapper) mapSolidityExternalImport(importPath string) MappedDep {
+	cfg := m.config.Solidity
+
+	// Get the package name (handle scoped packages like @openzeppelin/contracts)
+	pkgName := importPath
+	if strings.HasPrefix(importPath, "@") {
+		// Scoped package: @org/pkg/subpath -> @org/pkg
+		parts := strings.SplitN(importPath, "/", 3)
+		if len(parts) >= 2 {
+			pkgName = parts[0] + "/" + parts[1]
+		}
+	} else {
+		// Regular package: pkg/subpath -> pkg
+		parts := strings.SplitN(importPath, "/", 2)
+		pkgName = parts[0]
+	}
+
+	// Check if this package is in sol-deps.toml
+	if !m.isKnownSolidityDep(pkgName) {
+		return MappedDep{
+			ImportPath: importPath,
+			Type:       DependencyUnmapped,
+		}
+	}
+
+	// Use the package name for the target
+	// e.g., "forge-std" -> "soldeps//vendor/forge-std:forge-std"
+	// e.g., "@openzeppelin/contracts" -> "soldeps//vendor/@openzeppelin/contracts:contracts"
+	targetName := filepath.Base(pkgName)
+	target := fmt.Sprintf("%s//vendor/%s:%s", cfg.ExternalCell, pkgName, targetName)
+
+	return MappedDep{
+		Target:     target,
+		Type:       DependencyExternal,
+		ImportPath: importPath,
+	}
+}
+
+// isKnownSolidityDep checks if a package is in sol-deps.toml.
+func (m *Mapper) isKnownSolidityDep(packageName string) bool {
+	if m.config.Solidity == nil || m.config.Solidity.ExternalDeps == nil {
+		return false
+	}
+
+	return m.config.Solidity.ExternalDeps[packageName]
 }
 
 // ApplyToRulesStar applies mapped dependencies to a rules.star file.

@@ -257,6 +257,8 @@ func (s *Syncer) runExtractor(language, pkgDir string) (*extraction.Result, erro
 		return s.runPythonExtractor(pkgDir)
 	case "typescript":
 		return s.runTypescriptExtractor(pkgDir)
+	case "solidity":
+		return s.runSolidityExtractor(pkgDir)
 	default:
 		return nil, fmt.Errorf("unsupported language: %s", language)
 	}
@@ -478,6 +480,36 @@ func (s *Syncer) runTypescriptExtractor(pkgDir string) (*extraction.Result, erro
 	if err != nil {
 		// No built-in fallback for TypeScript (need the extractor)
 		return nil, fmt.Errorf("ts-deps-extract not found in PATH")
+	}
+
+	cmd := exec.Command(extractorPath, pkgDir)
+	cmd.Dir = s.config.ProjectRoot
+
+	output, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return nil, fmt.Errorf("extractor failed: %s", string(exitErr.Stderr))
+		}
+		return nil, fmt.Errorf("running extractor: %w", err)
+	}
+
+	var result extraction.Result
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, fmt.Errorf("parsing extractor output: %w", err)
+	}
+
+	return &result, nil
+}
+
+// runSolidityExtractor runs sol-deps-extract on a directory.
+func (s *Syncer) runSolidityExtractor(pkgDir string) (*extraction.Result, error) {
+	extractorPath := "sol-deps-extract"
+
+	// Check if extractor exists
+	_, err := exec.LookPath(extractorPath)
+	if err != nil {
+		// No built-in fallback for Solidity (need the extractor)
+		return nil, fmt.Errorf("sol-deps-extract not found in PATH")
 	}
 
 	cmd := exec.Command(extractorPath, pkgDir)
