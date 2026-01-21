@@ -8,8 +8,8 @@ python_library(
     ],
     base_module = "python.buck",
     deps = [
-        "//src/python/cfg:cfg",
         "//src/python/cargo:cargo",
+        "//src/python/cfg:cfg",
     ],
     visibility = ["PUBLIC"],
 )

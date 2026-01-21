@@ -59,6 +59,7 @@ e2e/
 | git-workflow | Branch switching with deps | turnkey-m5t |
 | reproducibility | Same build across machines | turnkey-s52 |
 | error-recovery | Error handling and recovery | turnkey-dw7 |
+| rules-star-sync | Auto-sync rules.star deps | turnkey-rlv3 |
 
 ## Writing Tests
 

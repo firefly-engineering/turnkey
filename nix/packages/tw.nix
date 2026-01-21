@@ -31,7 +31,7 @@ pkgs.buildGoModule {
   };
   subPackages = [ "src/cmd/tw" ];
 
-  vendorHash = "sha256-FfIQwd6lWWP787ZaHHXffPTbdJpYEpwDJoD0tDVwLOM=";
+  vendorHash = "sha256-JKYuooBnREx9FIvz51BCGaS+YFmfSZQHNzKMI7lfAOM=";
 
   meta = {
     description = "Turnkey wrapper for native language tools with auto-sync";

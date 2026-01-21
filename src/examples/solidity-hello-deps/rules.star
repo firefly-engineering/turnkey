@@ -1,7 +1,5 @@
-# Solidity example - ERC20 Token with OpenZeppelin dependencies
-#
-# This example demonstrates Solidity dependency management with external packages.
-# Dependencies are declared in the root solidity-deps.toml (monorepo pattern).
+# Auto-managed by turnkey. Hash: 446de74d3a15cad3
+# Manual sections marked with turnkey:preserve-start/end are not modified.
 
 load("@prelude//solidity:solidity.bzl", "solidity_contract", "solidity_library", "solidity_test")
 
@@ -29,10 +27,7 @@ solidity_contract(
 solidity_test(
     name = "token_test",
     srcs = ["test/MyToken.t.sol"],
-    deps = [
-        ":token_lib",
-        "soldeps//:forge_std",
-    ],
+    deps = [":token_lib"],
     fuzz_runs = 256,
     visibility = ["PUBLIC"],
 )

@@ -86,6 +86,22 @@ def _mdbook_book_impl(ctx: AnalysisContext) -> list[Provider]:
     # book_toml is like "docs/user-manual/book.toml", we need "docs/user-manual"
     serve_output_dir = toolchain.serve_output_dir
 
+    # Port selection logic: find a free port so we can print the actual URL
+    # This allows running multiple mdbook instances simultaneously
+    port_logic = [
+        "",
+        "# Find a free port unless user explicitly passed --port or -p",
+        "# This allows running multiple mdbook instances simultaneously",
+        'if [[ ! " $* " =~ " --port " ]] && [[ ! " $* " =~ " -p " ]]; then',
+        "    # Use Python to find a free port (more reliable than parsing ss/netstat)",
+        "    PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind((\"\", 0)); print(s.getsockname()[1]); s.close()')",
+        '    PORT_ARGS="--port $PORT"',
+        '    echo "Serving at http://localhost:$PORT"',
+        "else",
+        '    PORT_ARGS=""',
+        "fi",
+    ]
+
     if serve_output_dir:
         # Custom output directory configured in toolchain
         serve_lines = [
@@ -110,10 +126,12 @@ def _mdbook_book_impl(ctx: AnalysisContext) -> list[Provider]:
             "# Output to configured directory to keep source tree clean",
             'OUTPUT_DIR="$PROJECT_ROOT/{}/$BOOK_NAME"'.format(serve_output_dir),
             'mkdir -p "$OUTPUT_DIR"',
+        ] + port_logic + [
             "",
             "# Run mdbook serve from the book directory with custom output",
             'cd "$BOOK_DIR"',
-            '"$MDBOOK" serve --dest-dir "$OUTPUT_DIR" "$@"',
+            '# shellcheck disable=SC2086',
+            '"$MDBOOK" serve --dest-dir "$OUTPUT_DIR" $PORT_ARGS "$@"',
         ]
     else:
         # Default behavior: output to book/ in source directory
@@ -128,10 +146,12 @@ def _mdbook_book_impl(ctx: AnalysisContext) -> list[Provider]:
             "",
             "# Get the directory containing book.toml",
             'BOOK_DIR=$(dirname "$BOOK_TOML")',
+        ] + port_logic + [
             "",
             "# Run mdbook serve from the book directory",
             'cd "$BOOK_DIR"',
-            '"$MDBOOK" serve "$@"',
+            '# shellcheck disable=SC2086',
+            '"$MDBOOK" serve $PORT_ARGS "$@"',
         ]
 
     ctx.actions.write(

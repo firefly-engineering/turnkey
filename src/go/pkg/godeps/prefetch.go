@@ -214,7 +214,8 @@ func (p *UberGoPrefetcher) Prefetch(importPath, version string) (string, error) 
 }
 
 // GoProxyPrefetcher fetches modules from proxy.golang.org as a fallback.
-// This works for any public Go module but produces zip-based hashes.
+// This works for any public Go module and produces hashes compatible with
+// Nix fetchzip (which unpacks and strips the root directory).
 type GoProxyPrefetcher struct {
 	Logger io.Writer
 }
@@ -225,6 +226,7 @@ func (p *GoProxyPrefetcher) Supports(importPath string) bool {
 }
 
 // Prefetch downloads the module zip from proxy.golang.org and computes the hash.
+// The hash is computed on the unpacked content to match Nix fetchzip behavior.
 func (p *GoProxyPrefetcher) Prefetch(importPath, version string) (string, error) {
 	// URL encode the module path for proxy.golang.org
 	// Handles / -> ! conversion and uppercase -> !lowercase per module proxy protocol
@@ -236,7 +238,8 @@ func (p *GoProxyPrefetcher) Prefetch(importPath, version string) (string, error)
 		_, _ = fmt.Fprintf(p.Logger, "prefetching %s@%s from proxy.golang.org...\n", importPath, version)
 	}
 
-	return runNixPrefetchURL(url)
+	// Use unpack=true to match Nix fetchzip behavior (unpacks zip and strips root)
+	return runNixPrefetchURL(url, true)
 }
 
 // escapeModulePath escapes a module path for use in proxy.golang.org URLs.
@@ -255,13 +258,23 @@ func escapeModulePath(path string) string {
 }
 
 // runNixPrefetchURL runs nix-prefetch-url (or nix-prefetch-cached) and returns the SRI hash.
-func runNixPrefetchURL(url string) (string, error) {
+// Use unpack=true for archives that will be extracted by fetchzip.
+func runNixPrefetchURL(url string, unpack bool) (string, error) {
 	// Try nix-prefetch-cached first (with caching), fall back to nix-prefetch-url
-	cmd := exec.Command("nix-prefetch-cached", url)
+	args := []string{url}
+	if unpack {
+		args = []string{"--unpack", url}
+	}
+	cmd := exec.Command("nix-prefetch-cached", args...)
 	output, err := cmd.Output()
 	if err != nil {
 		// Fallback to nix-prefetch-url if cached version not available
-		cmd = exec.Command("nix-prefetch-url", "--type", "sha256", url)
+		args = []string{"--type", "sha256"}
+		if unpack {
+			args = append(args, "--unpack")
+		}
+		args = append(args, url)
+		cmd = exec.Command("nix-prefetch-url", args...)
 		output, err = cmd.Output()
 		if err != nil {
 			return "", fmt.Errorf("nix-prefetch-url failed: %w", err)

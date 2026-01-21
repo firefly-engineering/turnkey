@@ -1,0 +1,192 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs on new pushes to same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  # ===========================================================================
+  # Tier 1: Syntax & Lint (fast-fail, ~30s)
+  # ===========================================================================
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Check flake syntax
+        run: nix flake check --no-build --impure
+
+  # ===========================================================================
+  # Tier 2: Build Verification (~90s)
+  # ===========================================================================
+  build-prelude:
+    name: Build Prelude
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Build turnkey-prelude
+        run: nix build .#turnkey-prelude --no-link
+
+  build-tools:
+    name: Build Tools
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Build tk
+        run: nix build .#tk --no-link
+
+      - name: Build godeps-gen
+        run: nix build .#godeps-gen --no-link
+
+      - name: Build rustdeps-gen
+        run: nix build .#rustdeps-gen --no-link
+
+      - name: Build pydeps-gen
+        run: nix build .#pydeps-gen --no-link
+
+      - name: Build jsdeps-gen
+        run: nix build .#jsdeps-gen --no-link
+
+  devshell:
+    name: Devshell
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Enter devshell
+        run: nix develop --impure -c true
+
+  # ===========================================================================
+  # Tier 3: Integration - Buck2 builds & tests for each language (~2min)
+  # ===========================================================================
+  integration:
+    name: Integration
+    runs-on: ubuntu-latest
+    needs: [build-prelude, build-tools, devshell]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Go - build
+        run: nix develop --impure -c buck2 build //src/examples/go-hello:go-hello
+
+      - name: Rust - build & test
+        run: |
+          nix develop --impure -c buck2 build //src/examples/rust-hello:rust-hello
+          nix develop --impure -c buck2 test //src/examples/rust-hello:rust-hello-test
+
+      - name: Python - build & test
+        run: |
+          nix develop --impure -c buck2 build //src/examples/python-hello:python-hello
+          nix develop --impure -c buck2 test //src/examples/python-hello:python-hello-test
+
+      - name: TypeScript - build
+        run: nix develop --impure -c buck2 build //src/examples/typescript-hello:typescript-hello
+
+      - name: Solidity - build & test
+        run: |
+          nix develop --impure -c buck2 build //src/examples/solidity-hello:counter
+          nix develop --impure -c buck2 test //src/examples/solidity-hello:counter_test
+
+      - name: Jsonnet - build & test
+        run: |
+          nix develop --impure -c buck2 build //src/examples/jsonnet-config:config-dev
+          nix develop --impure -c buck2 test //src/examples/jsonnet-config:common-test
+
+  # ===========================================================================
+  # E2E Tests (on main push OR with e2e-test label)
+  # ===========================================================================
+  e2e:
+    name: E2E - ${{ matrix.test }}
+    runs-on: ubuntu-latest
+    needs: [integration]
+    if: |
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.labels.*.name, 'e2e-test')
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - greenfield-template
+          - ci-headless
+          - multi-language
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Run E2E test (${{ matrix.test }})
+        run: |
+          chmod +x e2e/harness/runner.sh
+          TURNKEY_E2E_DIR="$PWD/e2e" \
+          TURNKEY_VERBOSE=1 \
+            ./e2e/harness/runner.sh ${{ matrix.test }}
+        env:
+          TURNKEY_NON_INTERACTIVE: "1"
+
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ matrix.test }}-logs
+          path: /tmp/turnkey-e2e-*
+          retention-days: 7
+
+  # ===========================================================================
+  # Summary job for branch protection
+  # ===========================================================================
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [lint, build-prelude, build-tools, devshell, integration]
+    if: always()
+    steps:
+      - name: Check required jobs
+        run: |
+          check_result() {
+            local result="$1"
+            [[ "$result" == "success" ]]
+          }
+
+          failed=false
+
+          check_result "${{ needs.lint.result }}" || failed=true
+          check_result "${{ needs.build-prelude.result }}" || failed=true
+          check_result "${{ needs.build-tools.result }}" || failed=true
+          check_result "${{ needs.devshell.result }}" || failed=true
+          check_result "${{ needs.integration.result }}" || failed=true
+
+          if [[ "$failed" == "true" ]]; then
+            echo "One or more required jobs failed"
+            exit 1
+          fi
+          echo "All required jobs passed!"

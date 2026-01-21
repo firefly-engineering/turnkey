@@ -1,7 +1,5 @@
-# Python example with external package dependencies via pydeps cell
-#
-# Dependencies are declared in python-deps.toml and vendored by Nix.
-# The pydeps cell is auto-generated and symlinked to .turnkey/pydeps
+# Auto-managed by turnkey. Hash: f388892cc619788f
+# Manual sections marked with turnkey:preserve-start/end are not modified.
 
 load("@prelude//:rules.bzl", "python_binary")
 

@@ -452,6 +452,11 @@ name = "rustversion"
 version = "1.0.22"
 hash = "sha256-1Ejjt+8zEI5SXTBTVh0pK3LGNeq94QdAncmBu9CBeRw="
 
+[deps."same-file@1.0.6"]
+name = "same-file"
+version = "1.0.6"
+hash = "sha256-vx4h6NPBZLJxlyAboIz1INpbAZuTIw2BHXnaEgAFs7M="
+
 [deps."saphyr-parser-bw@0.0.601"]
 name = "saphyr-parser-bw"
 version = "0.0.601"
@@ -522,6 +527,11 @@ name = "stable_deref_trait"
 version = "1.2.1"
 hash = "sha256-Nha8xpy6Qa4bV/zC5ojob23IEgFOPjiOpdFtx2Q4Luo="
 
+[deps."streaming-iterator@0.1.9"]
+name = "streaming-iterator"
+version = "0.1.9"
+hash = "sha256-qJkQqSbBzuZA02UJwCQGY8dJ9SITGwHGizDcZtld798="
+
 [deps."strsim@0.11.1"]
 name = "strsim"
 version = "0.11.1"
@@ -552,20 +562,20 @@ name = "thiserror"
 version = "1.0.69"
 hash = "sha256-a8ne8R60VHTMEWZewsuMzH4UqluPMQprtriVnnkkNvo="
 
-[deps."thiserror@2.0.17"]
+[deps."thiserror@2.0.18"]
 name = "thiserror"
-version = "2.0.17"
-hash = "sha256-/omXkjx1HdyK8ayDx3mmpKnyoN//TMW6Ykdytx614cY="
+version = "2.0.18"
+hash = "sha256-h4IG0gaZA85mH1oEKMWJNDa3zJNyAq4xziU1+r/ziCU="
 
 [deps."thiserror-impl@1.0.69"]
 name = "thiserror-impl"
 version = "1.0.69"
 hash = "sha256-YAZkQB2KhIQ+3ZDYs1Bxmr0Csbr8zrzpm9jORO15yZw="
 
-[deps."thiserror-impl@2.0.17"]
+[deps."thiserror-impl@2.0.18"]
 name = "thiserror-impl"
-version = "2.0.17"
-hash = "sha256-RSYqUM0ya3xetW6+JSeS/KUYhirsYkOL0TEczxgJ5YE="
+version = "2.0.18"
+hash = "sha256-Cv2RQLNSoLYvMzgumtjZeBsmEqqq9t5eIKe7z6P+lzY="
 
 [deps."tinystr@0.8.2"]
 name = "tinystr"
@@ -591,6 +601,36 @@ hash = "sha256-iK1BPbvNHq0hbYMDFNQUV+uZJD5XRkMC+onZDgxAHqA="
 name = "toml_write"
 version = "0.1.2"
 hash = "sha256-dlmBPtel5EIlOeOxRPt4pOodNkg52WniCRh83K8AXIE="
+
+[deps."tree-sitter@0.25.10"]
+name = "tree-sitter"
+version = "0.25.10"
+hash = "sha256-XrejNZtdDpHMXwPznGMef5Slk4GMz0RMWluj7WsYqLw="
+
+[deps."tree-sitter-language@0.1.6"]
+name = "tree-sitter-language"
+version = "0.1.6"
+hash = "sha256-uyVLb716omi0uK1vCMwKdl9lmUvkyqdSLVwEEyei7M8="
+
+[deps."tree-sitter-python@0.23.6"]
+name = "tree-sitter-python"
+version = "0.23.6"
+hash = "sha256-tPNeT+zHKuR1mLxh6HKha0/c/YGW6hG2+N/bK2L2Sd0="
+
+[deps."tree-sitter-rust@0.23.3"]
+name = "tree-sitter-rust"
+version = "0.23.3"
+hash = "sha256-npxxU3ycDU1vtL7VEad/yw4BhtADj22JlDs1iFwZHnc="
+
+[deps."tree-sitter-solidity@1.2.13"]
+name = "tree-sitter-solidity"
+version = "1.2.13"
+hash = "sha256-cV2XuGLLsDSmp0uAmiA65DY9lT/PRLY9/C0aHra/I84="
+
+[deps."tree-sitter-typescript@0.23.2"]
+name = "tree-sitter-typescript"
+version = "0.23.2"
+hash = "sha256-V5bl0InyQymx1vSoRwEJ6SCEUnFoOu9jaoogtofIXxI="
 
 [deps."typenum@1.19.0"]
 name = "typenum"
@@ -637,6 +677,11 @@ name = "version_check"
 version = "0.9.5"
 hash = "sha256-tQZZutDs8hU+nNvD5jUzLJMyp3OcblIinn2y52wIA6c="
 
+[deps."walkdir@2.5.0"]
+name = "walkdir"
+version = "2.5.0"
+hash = "sha256-mNo0SgS03VMXXhZBEwzjBkCvSaTIuXQdnWO7ukZVl5Y="
+
 [deps."wasi@0.11.1+wasi-snapshot-preview1"]
 name = "wasi"
 version = "0.11.1+wasi-snapshot-preview1"
@@ -676,6 +721,11 @@ hash = "sha256-fbMPU3TdqGdjvYFi6gx2P6fFLj11UJ5CYedg0YYA+9E="
 name = "webpki-roots"
 version = "1.0.5"
 hash = "sha256-FK6mTRJxRmQwcNvIFV1X66DC9tfkDL5Q2j59nae96uI="
+
+[deps."winapi-util@0.1.11"]
+name = "winapi-util"
+version = "0.1.11"
+hash = "sha256-28/CiT9fwalxeRUMD5rkTtqwbJs8r10gSS6qCLQa/hU="
 
 [deps."windows-core@0.62.2"]
 name = "windows-core"
@@ -872,8 +922,8 @@ name = "zerovec-derive"
 version = "0.11.2"
 hash = "sha256-p5fY9PeXZvjJ7QFRZjmV7Tm2LhLBtdrU8RGPTnOZru4="
 
-[deps."zmij@1.0.14"]
+[deps."zmij@1.0.16"]
 name = "zmij"
-version = "1.0.14"
-hash = "sha256-AyF0rsmUrlewyLAIHw+lDLt1Xry/2zAvg2zhKlDPJNI="
+version = "1.0.16"
+hash = "sha256-bGFMMMZ/xA8IJ1/n5e4Dq1TY0yAcfZxUCecQv6ckiO4="
 

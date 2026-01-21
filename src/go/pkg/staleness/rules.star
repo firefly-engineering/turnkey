@@ -1,4 +1,5 @@
-# Staleness detection library for turnkey sync
+# Auto-managed by turnkey. Hash: e3b0c44298fc1c14
+# Manual sections marked with turnkey:preserve-start/end are not modified.
 
 load("@prelude//:rules.bzl", "go_library", "go_test")
 
@@ -27,4 +28,5 @@ go_test(
         "staleness_test.go",
     ],
     target_under_test = ":staleness",
+    visibility = ["PUBLIC"],
 )

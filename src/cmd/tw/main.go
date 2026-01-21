@@ -46,6 +46,7 @@ var defaultWrapperRules = map[string]*syncconfig.WrapperRule{
 		MutatingSubcommands: []string{"get", "mod"},
 		WatchFiles:          []string{"go.mod", "go.sum"},
 		DepsRule:            "go",
+		PostCommands:        []string{"go mod tidy"},
 	},
 	"cargo": {
 		Name:                "cargo",
@@ -152,7 +153,24 @@ func main() {
 	// Check for changes
 	if snapshot.Changed(beforeSnap, afterSnap) {
 		if verbose {
-			fmt.Fprintf(os.Stderr, "tw: detected changes in %v, running sync\n", rule.WatchFiles)
+			fmt.Fprintf(os.Stderr, "tw: detected changes in %v\n", rule.WatchFiles)
+		}
+
+		// Run post-commands (e.g., "go mod tidy" after "go get")
+		for _, postCmd := range rule.PostCommands {
+			if verbose {
+				fmt.Fprintf(os.Stderr, "tw: running post-command: %s\n", postCmd)
+			}
+			postExitCode := runPostCommand(postCmd, root)
+			if postExitCode != 0 {
+				fmt.Fprintf(os.Stderr, "tw: post-command %q failed with exit code %d\n", postCmd, postExitCode)
+				// Continue with sync anyway - the post-command failure shouldn't block sync
+			}
+		}
+
+		// Run sync
+		if verbose {
+			fmt.Fprintf(os.Stderr, "tw: running sync\n")
 		}
 		syncExitCode := runSyncForRule(cfg, rule, root)
 		if syncExitCode != 0 {
@@ -227,6 +245,34 @@ func runTool(name string, args []string) int {
 // This is used when no sync is needed - we just pass through.
 func runToolAndExit(name string, args []string) {
 	os.Exit(runTool(name, args))
+}
+
+// runPostCommand runs a post-command string (e.g., "go mod tidy").
+func runPostCommand(cmdStr, dir string) int {
+	parts := strings.Fields(cmdStr)
+	if len(parts) == 0 {
+		return 0
+	}
+
+	toolPath := findRealTool(parts[0])
+	if toolPath == "" {
+		fmt.Fprintf(os.Stderr, "tw: post-command tool %q not found\n", parts[0])
+		return 1
+	}
+
+	cmd := exec.Command(toolPath, parts[1:]...)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err := cmd.Run()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return exitErr.ExitCode()
+		}
+		return 1
+	}
+	return 0
 }
 
 // runSyncForRule runs the sync operation for the specified deps rule.
@@ -314,11 +360,16 @@ tw-specific flags (must come before tool name):
   -h           Same as --help
 
 Examples:
-  tw go get github.com/foo/bar    # runs go get, syncs if go.mod changed
+  tw go get github.com/foo/bar    # runs go get, then go mod tidy, then sync
   tw cargo add serde              # runs cargo add, syncs if Cargo.lock changed
   tw uv add requests              # runs uv add, syncs if pyproject.toml changed
   tw go build ./...               # just runs go build (not a mutating command)
-  tw --no-sync go get foo         # runs go get without syncing
+  tw --no-sync go get foo         # runs go get without post-commands or sync
+
+Default behavior for Go:
+  After 'go get' or 'go mod' commands, tw automatically runs 'go mod tidy'
+  to ensure direct/indirect dependencies are correctly classified before
+  syncing go-deps.toml.
 
 Configuration:
   tw reads wrapper rules from .turnkey/sync.toml:
@@ -329,6 +380,7 @@ Configuration:
   mutating_subcommands = ["get", "mod"]
   watch_files = ["go.mod", "go.sum"]
   deps_rule = "go"
+  post_commands = ["go mod tidy"]  # run after main command, before sync
 
 Environment:
   TURNKEY_NO_WRAP=1   Bypass tw wrapper entirely (use real tool)

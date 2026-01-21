@@ -1,4 +1,6 @@
-# godeps - Go dependency parsing and prefetching library
+# Auto-managed by turnkey. Hash: 114130d7def66570
+# Manual sections marked with turnkey:preserve-start/end are not modified.
+
 load("@prelude//:rules.bzl", "go_library", "go_test")
 
 go_library(
@@ -11,7 +13,9 @@ go_library(
         "types.go",
     ],
     deps = [
+        # turnkey:auto-start
         "godeps//vendor/golang.org/x/mod/modfile:modfile",
+        # turnkey:auto-end
     ],
     visibility = ["PUBLIC"],
 )
@@ -24,9 +28,7 @@ go_test(
         "parser_test.go",
         "prefetch_test.go",
     ],
-    deps = [
-        "godeps//vendor/golang.org/x/mod/modfile:modfile",
-    ],
-    resources = ["//src/testdata:godeps_fixtures"],
     target_under_test = ":godeps",
+    deps = [],
+    visibility = ["PUBLIC"],
 )

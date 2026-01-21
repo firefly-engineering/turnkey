@@ -28,11 +28,17 @@ pkgs.buildGoModule {
       (root + "/src/go/pkg/syncconfig")
       (root + "/src/go/pkg/syncer")
       (root + "/src/go/pkg/staleness")
+      (root + "/src/go/pkg/rules")
+      # rulessync and its dependencies
+      (root + "/src/go/pkg/rulessync")
+      (root + "/src/go/pkg/mapper")
+      (root + "/src/go/pkg/extraction")
+      (root + "/src/go/pkg/starlark")
     ];
   };
   subPackages = [ "src/cmd/tk" ];
 
-  vendorHash = "sha256-FfIQwd6lWWP787ZaHHXffPTbdJpYEpwDJoD0tDVwLOM=";
+  vendorHash = "sha256-Vgqdy+jGLYByPiGY8z45+nSYo5YHpmlyHjmfAcYEyjU=";
 
   # buck2 is needed at build time to generate shell completions
   nativeBuildInputs = [ pkgs.buck2 pkgs.installShellFiles ];

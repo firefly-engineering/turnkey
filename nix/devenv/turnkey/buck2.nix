@@ -92,12 +92,23 @@ let
     pydepsGen = import ../../packages/pydeps-gen.nix { inherit pkgs lib; };
     jsdepsGen = import ../../packages/jsdeps-gen.nix { inherit pkgs lib; };
     soldepsGen = import ../../packages/soldeps-gen.nix { inherit pkgs lib; };
+    # deps-extract is the unified tree-sitter based import extractor for rules.star sync
+    # Built with only the features needed for enabled languages
+    depsExtract = import ../../packages/deps-extract.nix {
+      inherit pkgs lib;
+      enablePython = cfg.python.enable;
+      enableRust = cfg.rust.enable;
+      enableTypescript = cfg.javascript.enable;
+      enableSolidity = cfg.solidity.enable;
+    };
   in
     lib.optional cfg.go.enable godepsGen
     ++ lib.optional cfg.rust.enable rustdepsGen
     ++ lib.optional cfg.python.enable pydepsGen
     ++ lib.optional cfg.javascript.enable jsdepsGen
-    ++ lib.optional cfg.solidity.enable soldepsGen;
+    ++ lib.optional cfg.solidity.enable soldepsGen
+    # Always include deps-extract (used by tk rules sync for all non-Go languages)
+    ++ [ depsExtract ];
 
   # Generate load statements for rules.star file
   generateLoads =
@@ -412,6 +423,17 @@ ${generateTargets finalToolchains}
     # - pythonDepsFile → python deps rule
     #
     # To customize, modify your flake.nix buck2 options.
+
+    # Rules.star auto-sync configuration
+    # When enabled, tk automatically updates rules.star deps before build commands.
+    [rules]
+    enabled = ${lib.boolToString cfg.rules.enabled}
+    auto_sync = ${lib.boolToString cfg.rules.autoSync}
+    strict = ${lib.boolToString cfg.rules.strict}
+
+    [rules.go]
+    internal_prefix = ${builtins.toJSON cfg.rules.go.internalPrefix}
+    external_cell = ${builtins.toJSON cfg.rules.go.externalCell}
 
     ${lib.concatMapStringsSep "\n" formatSyncRule syncRules}
   '';
@@ -728,6 +750,72 @@ in
         description = ''
           Relative path to foundry.toml file (for staleness checking).
         '';
+      };
+    };
+
+    # ==========================================================================
+    # Rules.star auto-sync configuration
+    # ==========================================================================
+    rules = {
+      enabled = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Enable automatic rules.star synchronization before Buck2 commands.
+
+          When enabled, tk will check rules.star files for staleness and
+          update them automatically (if auto_sync is true) or warn (if false).
+
+          Use --no-rules-sync to skip this check, or --strict-rules for CI.
+        '';
+      };
+
+      autoSync = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Automatically update stale rules.star files.
+
+          When true (default), stale rules.star files are updated before build.
+          When false, tk only warns about stale files.
+        '';
+      };
+
+      strict = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Fail if rules.star files would change (CI mode).
+
+          When true, tk will exit with error if any rules.star file needs updating.
+          This is useful for CI to ensure rules.star files are committed up-to-date.
+
+          Can also be enabled per-invocation with --strict-rules flag.
+        '';
+      };
+
+      go = {
+        internalPrefix = lib.mkOption {
+          type = lib.types.str;
+          default = "//src/go";
+          description = ''
+            Buck2 target prefix for internal Go packages.
+
+            Example: "//src/go" means imports from github.com/org/repo/src/go/pkg/foo
+            will be mapped to //src/go/pkg/foo:foo
+          '';
+        };
+
+        externalCell = lib.mkOption {
+          type = lib.types.str;
+          default = "godeps";
+          description = ''
+            Buck2 cell for external Go dependencies.
+
+            Example: "godeps" means external imports will be mapped to
+            godeps//vendor/github.com/foo/bar:bar
+          '';
+        };
       };
     };
 
@@ -1107,6 +1195,68 @@ in
         pass_filenames = false;
         entry = ''
           nix flake check --no-build --impure
+        '';
+      };
+
+      # Starlark syntax validation using Buck2
+      starlark-lint = {
+        enable = true;
+        name = "starlark-lint";
+        description = "Lint Starlark files (rules.star, BUCK, etc.)";
+        files = "(rules\\.star|BUCK|\\.bzl)$";
+        pass_filenames = true;
+        entry = ''
+          ${pkgs.buck2}/bin/buck2 starlark lint
+        '';
+      };
+
+      # TOML syntax validation
+      toml-syntax-check = {
+        enable = true;
+        name = "toml-syntax-check";
+        description = "Check TOML syntax validity";
+        files = "\\.toml$";
+        pass_filenames = true;
+        entry = ''
+          ${pkgs.python3}/bin/python -c '
+import tomllib
+import sys
+errors = 0
+for path in sys.argv[1:]:
+    try:
+        with open(path, "rb") as f:
+            tomllib.load(f)
+    except Exception as e:
+        print(f"TOML syntax error in {path}: {e}", file=sys.stderr)
+        errors += 1
+if errors:
+    sys.exit(1)
+'
+        '';
+      };
+
+      # JSON syntax validation
+      json-syntax-check = {
+        enable = true;
+        name = "json-syntax-check";
+        description = "Check JSON syntax validity";
+        files = "\\.json$";
+        pass_filenames = true;
+        entry = ''
+          ${pkgs.python3}/bin/python -c '
+import json
+import sys
+errors = 0
+for path in sys.argv[1:]:
+    try:
+        with open(path, "r") as f:
+            json.load(f)
+    except Exception as e:
+        print(f"JSON syntax error in {path}: {e}", file=sys.stderr)
+        errors += 1
+if errors:
+    sys.exit(1)
+'
         '';
       };
     };

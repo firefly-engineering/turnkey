@@ -44,11 +44,13 @@ var passThroughCommands = []string{
 
 // Flags
 var (
-	noSync  bool
-	noLocal bool
-	verbose bool
-	dryRun  bool
-	quiet   bool
+	noSync      bool
+	noRulesSync bool
+	strictRules bool
+	noLocal     bool
+	verbose     bool
+	dryRun      bool
+	quiet       bool
 )
 
 func main() {
@@ -73,6 +75,9 @@ func main() {
 	case "check":
 		exitCode := runCheck()
 		os.Exit(exitCode)
+	case "rules":
+		exitCode := runRules(args[1:])
+		os.Exit(exitCode)
 	case "completion":
 		exitCode := runCompletion(args[1:])
 		os.Exit(exitCode)
@@ -90,6 +95,13 @@ func main() {
 		}
 	}
 
+	// Run rules sync if enabled (after deps sync, before buck2)
+	if needsSync && !noRulesSync {
+		if exitCode := runRulesAutoSync(); exitCode != 0 {
+			os.Exit(exitCode)
+		}
+	}
+
 	// Delegate to buck2
 	delegateToBuck2(args)
 }
@@ -101,6 +113,12 @@ func parseFlags(args []string) []string {
 		switch args[0] {
 		case "--no-sync":
 			noSync = true
+			args = args[1:]
+		case "--no-rules-sync":
+			noRulesSync = true
+			args = args[1:]
+		case "--strict-rules":
+			strictRules = true
 			args = args[1:]
 		case "--no-local":
 			noLocal = true
@@ -638,20 +656,23 @@ tk automatically runs sync operations before buck2 commands that read
 the build graph, ensuring generated files are up-to-date.
 
 tk-specific flags (must come before subcommand):
-  --no-sync    Skip sync, run buck2 directly
-  --no-local   Skip local target overrides from .turnkey/local.toml
-  --verbose    Show what tk is doing
-  -v           Same as --verbose
-  --quiet      Suppress non-error output
-  -q           Same as --quiet
-  --dry-run    Show what would be synced without doing it
-  -n           Same as --dry-run
-  --help       Show this help
-  -h           Same as --help
+  --no-sync         Skip dependency sync, run buck2 directly
+  --no-rules-sync   Skip rules.star sync (still runs deps sync)
+  --strict-rules    Fail if rules.star files would change (CI mode)
+  --no-local        Skip local target overrides from .turnkey/local.toml
+  --verbose         Show what tk is doing
+  -v                Same as --verbose
+  --quiet           Suppress non-error output
+  -q                Same as --quiet
+  --dry-run         Show what would be synced without doing it
+  -n                Same as --dry-run
+  --help            Show this help
+  -h                Same as --help
 
 tk-specific subcommands:
-  sync         Run sync manually
-  check        Check if files are stale without regenerating
+  sync         Run dependency sync manually
+  check        Check if dependency files are stale
+  rules        Manage rules.star files (check, sync)
   completion   Generate shell completion scripts (bash, zsh, fish)
 
 All other subcommands are delegated to buck2.

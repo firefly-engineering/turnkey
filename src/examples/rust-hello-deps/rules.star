@@ -1,7 +1,5 @@
-# Rust example with external crate dependencies
-#
-# Uses the `itoa` crate for efficient integer-to-string conversion.
-# Dependencies are managed via rust-deps.toml and the rustdeps cell.
+# Auto-managed by turnkey. Hash: 562a8597d84e1607
+# Manual sections marked with turnkey:preserve-start/end are not modified.
 
 load("@prelude//:rules.bzl", "rust_binary")
 
