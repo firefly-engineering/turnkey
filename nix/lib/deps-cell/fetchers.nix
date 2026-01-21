@@ -77,6 +77,8 @@ rec {
 
   # Fetch from Go module proxy
   # fetchSpec: { type, modulePath, version, sha256 }
+  # Note: Go module zips have a single root directory "modulePath@version/"
+  # so we let fetchzip strip it (the default behavior) to get clean paths.
   fetchGoProxy = fetchSpec:
     let
       # Escape uppercase letters in module path for proxy URL
@@ -91,7 +93,7 @@ rec {
     pkgs.fetchzip {
       url = "https://proxy.golang.org/${escapedPath}/@v/${fetchSpec.version}.zip";
       sha256 = fetchSpec.sha256;
-      stripRoot = false;
+      # stripRoot = true by default, which strips the "modulePath@version/" root
     };
 
   # Helper to create a fetch spec for GitHub

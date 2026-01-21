@@ -15,7 +15,7 @@ hash = "sha256-VKUrpSaGzkewNSyE0sB6PWVIQiraY7UxE5Wve+76UFk="
 
 [deps."go.starlark.net"]
 version = "v0.0.0-20260102030733-3fee463870c9"
-hash = "sha256-1J8wF0qI1/yuwSqh8k4bL00l6gVcY5IH17oIuWsLOX4="
+hash = "sha256-5b2LBr4Q5UhcO6iBKXr6vjjstjUt6uZT9gCWDXojeOo="
 
 [deps."golang.org/x/mod"]
 version = "v0.31.0"
