@@ -27,10 +27,7 @@ solidity_contract(
 solidity_test(
     name = "token_test",
     srcs = ["test/MyToken.t.sol"],
-    deps = [
-        ":token_lib",
-        "soldeps//:forge_std",
-    ],
+    deps = [":token_lib"],
     fuzz_runs = 256,
     visibility = ["PUBLIC"],
 )
