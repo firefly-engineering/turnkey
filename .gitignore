@@ -26,6 +26,11 @@ tools/gobuckify/gobuckify
 /rustdeps-gen
 /tk
 
+# Vendor directories - vendoring in the repo is DISALLOWED
+# All dependencies must go through Nix-backed cells (.turnkey/godeps/, etc.)
+# See docs/dependency-management.md for details
+vendor/
+
 # Rust build artifacts
 target/
 node_modules/
