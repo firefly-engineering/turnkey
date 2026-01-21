@@ -1132,7 +1132,7 @@ func (m *Mapper) mapSolidityExternalImport(importPath string) MappedDep {
 		pkgName = parts[0]
 	}
 
-	// Check if this package is in sol-deps.toml
+	// Check if this package is in solidity-deps.toml
 	if !m.isKnownSolidityDep(pkgName) {
 		return MappedDep{
 			ImportPath: importPath,
@@ -1140,17 +1140,29 @@ func (m *Mapper) mapSolidityExternalImport(importPath string) MappedDep {
 		}
 	}
 
-	// Use the package name for the target
-	// e.g., "forge-std" -> "soldeps//vendor/forge-std:forge-std"
-	// e.g., "@openzeppelin/contracts" -> "soldeps//vendor/@openzeppelin/contracts:contracts"
-	targetName := filepath.Base(pkgName)
-	target := fmt.Sprintf("%s//vendor/%s:%s", cfg.ExternalCell, pkgName, targetName)
+	// Convert package name to target name (snake_case at cell root)
+	// e.g., "forge-std" -> "soldeps//:forge_std"
+	// e.g., "@openzeppelin/contracts" -> "soldeps//:openzeppelin_contracts"
+	targetName := solidityPkgToTarget(pkgName)
+	target := fmt.Sprintf("%s//:%s", cfg.ExternalCell, targetName)
 
 	return MappedDep{
 		Target:     target,
 		Type:       DependencyExternal,
 		ImportPath: importPath,
 	}
+}
+
+// solidityPkgToTarget converts a Solidity package name to a Buck2 target name.
+// "@openzeppelin/contracts" -> "openzeppelin_contracts"
+// "forge-std" -> "forge_std"
+func solidityPkgToTarget(pkgName string) string {
+	// Remove @ prefix
+	name := strings.TrimPrefix(pkgName, "@")
+	// Replace / and - with _
+	name = strings.ReplaceAll(name, "/", "_")
+	name = strings.ReplaceAll(name, "-", "_")
+	return name
 }
 
 // isKnownSolidityDep checks if a package is in sol-deps.toml.
