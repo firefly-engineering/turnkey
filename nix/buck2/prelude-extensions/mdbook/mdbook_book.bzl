@@ -94,7 +94,7 @@ def _mdbook_book_impl(ctx: AnalysisContext) -> list[Provider]:
         "# This allows running multiple mdbook instances simultaneously",
         'if [[ ! " $* " =~ " --port " ]] && [[ ! " $* " =~ " -p " ]]; then',
         "    # Use Python to find a free port (more reliable than parsing ss/netstat)",
-        "    PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind((\"\", 0)); print(s.getsockname()[1]); s.close()')",
+        '    PORT=$("$PYTHON3" -c \'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()\')',
         '    PORT_ARGS="--port $PORT"',
         '    echo "Serving at http://localhost:$PORT"',
         "else",
@@ -108,10 +108,11 @@ def _mdbook_book_impl(ctx: AnalysisContext) -> list[Provider]:
             "#!/usr/bin/env bash",
             "set -euo pipefail",
             "",
-            "# Arguments: mdbook_path book_toml [serve args]",
+            "# Arguments: mdbook_path book_toml python3_path [serve args]",
             "MDBOOK=$1",
             "BOOK_TOML=$2",
-            "shift 2",
+            "PYTHON3=$3",
+            "shift 3",
             "",
             "# Get the directory containing book.toml",
             'BOOK_DIR=$(dirname "$BOOK_TOML")',
@@ -139,10 +140,11 @@ def _mdbook_book_impl(ctx: AnalysisContext) -> list[Provider]:
             "#!/usr/bin/env bash",
             "set -euo pipefail",
             "",
-            "# Arguments: mdbook_path book_toml [serve args]",
+            "# Arguments: mdbook_path book_toml python3_path [serve args]",
             "MDBOOK=$1",
             "BOOK_TOML=$2",
-            "shift 2",
+            "PYTHON3=$3",
+            "shift 3",
             "",
             "# Get the directory containing book.toml",
             'BOOK_DIR=$(dirname "$BOOK_TOML")',
@@ -160,10 +162,11 @@ def _mdbook_book_impl(ctx: AnalysisContext) -> list[Provider]:
         is_executable = True,
     )
 
-    # RunInfo for serve - just needs mdbook path and book.toml location
+    # RunInfo for serve - just needs mdbook path, book.toml location, and python3 path
     serve_cmd = cmd_args(serve_script)
     serve_cmd.add(toolchain.mdbook.args)
     serve_cmd.add(ctx.attrs.book_toml)
+    serve_cmd.add(toolchain.python_path)
 
     run_info = RunInfo(args = serve_cmd)
 

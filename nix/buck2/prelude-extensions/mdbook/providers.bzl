@@ -9,6 +9,7 @@ MdbookToolchainInfo = provider(
     doc = "Information about the mdbook toolchain.",
     fields = {
         "mdbook": provider_field(typing.Any, default = None),  # RunInfo
+        "python_path": provider_field(typing.Any, default = None),  # str
         "serve_output_dir": provider_field(typing.Any, default = None),  # str, e.g. ".turnkey/books"
     },
 )

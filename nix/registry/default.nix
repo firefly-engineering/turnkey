@@ -93,6 +93,7 @@ in
   # Data templating
   # ==========================================================================
   jsonnet = single jrsonnet; # Rust implementation (fastest)
+  jq = single pkgs.jq;
 
   # ==========================================================================
   # Documentation tooling

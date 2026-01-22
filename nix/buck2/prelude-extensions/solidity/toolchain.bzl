@@ -17,6 +17,7 @@ def _system_solidity_toolchain_impl(ctx: AnalysisContext) -> list[Provider]:
     forge_path = ctx.attrs.forge_path
     cast_path = ctx.attrs.cast_path
     anvil_path = ctx.attrs.anvil_path
+    jq_path = ctx.attrs.jq_path
 
     # Create RunInfo for solc
     solc_run_info = RunInfo(args = cmd_args(solc_path))
@@ -35,6 +36,7 @@ def _system_solidity_toolchain_impl(ctx: AnalysisContext) -> list[Provider]:
     forge_run_info = RunInfo(args = cmd_args(forge_path)) if forge_path else None
     cast_run_info = RunInfo(args = cmd_args(cast_path)) if cast_path else None
     anvil_run_info = RunInfo(args = cmd_args(anvil_path)) if anvil_path else None
+    jq_run_info = RunInfo(args = cmd_args(jq_path)) if jq_path else None
 
     toolchain_info = SolidityToolchainInfo(
         solc = solc_run_info,
@@ -43,6 +45,7 @@ def _system_solidity_toolchain_impl(ctx: AnalysisContext) -> list[Provider]:
         forge = forge_run_info,
         cast = cast_run_info,
         anvil = anvil_run_info,
+        jq = jq_run_info,
         soldeps_path = ctx.attrs.soldeps_path,
     )
 
@@ -82,6 +85,11 @@ system_solidity_toolchain = rule(
             attrs.string(),
             default = None,
             doc = "Path to the Foundry anvil binary (for local node)",
+        ),
+        "jq_path": attrs.option(
+            attrs.string(),
+            default = None,
+            doc = "Path to the jq binary (for data processing)",
         ),
         "soldeps_path": attrs.option(
             attrs.string(),
