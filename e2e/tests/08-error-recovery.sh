@@ -141,7 +141,8 @@ cp go-deps.toml go-deps.toml.backup
 step "Creating corrupted go-deps.toml"
 echo "this is not valid TOML { [ garbage" > go-deps.toml
 stage_for_flake
-commit_changes "Intentionally corrupted deps file"
+# Use --no-verify to bypass TOML syntax check - we're testing error recovery
+git commit -m "Intentionally corrupted deps file" --quiet --no-verify
 
 # Step 13: Verify Nix gives clear error about corrupted TOML
 step "Verifying clear error message for corrupted deps file"
@@ -175,7 +176,8 @@ section "Test 4: Invalid rules.star File Recovery"
 step "Corrupting rules.star file"
 echo "this is not valid Starlark {{ garbage" > rules.star
 stage_for_flake
-commit_changes "Intentionally corrupted rules.star file"
+# Use --no-verify to bypass Starlark lint - we're testing error recovery
+git commit -m "Intentionally corrupted rules.star file" --quiet --no-verify
 
 # Step 17: Verify clear error message
 step "Verifying clear error for invalid rules.star file"

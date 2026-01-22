@@ -158,17 +158,28 @@ run_in_devshell_script << 'PHASE2'
 PHASE2
 
 step "Capturing output hashes (first build)"
-# Find outputs using find (most reliable)
+# Find outputs using find with timeout to avoid hangs
 # Go binary is named 'hello-go'
 # Rust library produces .rmeta (metadata) file, not .rlib for rust_library
-# Python binary produces a .pex file
-go_output=$(find buck-out -name "hello-go" -type f ! -name "*.d" ! -name "*.dwp" 2>/dev/null | head -1)
-rust_output=$(find buck-out/v2/gen/root -name "libgreeting*.rmeta" -type f 2>/dev/null | head -1)
-python_output=$(find buck-out/v2/gen/root -name "hello-python.pex" -type f 2>/dev/null | head -1)
+# Python binary produces a .pex or just an executable file
+echo "Searching for build outputs..."
+echo "PWD: $(pwd)"
 
-echo "Go output: $go_output"
-echo "Rust output: $rust_output"
-echo "Python output: $python_output"
+# Use timeout and -maxdepth to avoid slow searches
+# Search from buck-out root since structure may vary (.turnkey/gen or v2/gen)
+go_output=$(timeout 30 find buck-out -maxdepth 15 -name "hello-go" -type f ! -name "*.d" ! -name "*.dwp" 2>/dev/null | head -1)
+echo "Go output: ${go_output:-<not found>}"
+
+rust_output=$(timeout 30 find buck-out -maxdepth 15 -name "libgreeting*.rmeta" -type f 2>/dev/null | head -1)
+echo "Rust output: ${rust_output:-<not found>}"
+
+# Python might produce .pex or a plain executable
+python_output=$(timeout 30 find buck-out -maxdepth 15 \( -name "hello-python.pex" -o -name "hello-python" \) -type f 2>/dev/null | head -1)
+echo "Python output: ${python_output:-<not found>}"
+
+# Debug: show buck-out structure
+echo "buck-out structure (first 30 lines):"
+find buck-out -maxdepth 5 -type f 2>/dev/null | head -30 || echo "  <empty or error>"
 
 assert_not_empty "$go_output" "Go binary path should not be empty" || exit 1
 assert_not_empty "$rust_output" "Rust library path should not be empty" || exit 1
@@ -196,10 +207,15 @@ PHASE3
 
 # Step 12: Capture hashes again
 step "Capturing output hashes (second build)"
-# Find outputs again
-go_output2=$(find buck-out -name "hello-go" -type f ! -name "*.d" ! -name "*.dwp" 2>/dev/null | head -1)
-rust_output2=$(find buck-out/v2/gen/root -name "libgreeting*.rmeta" -type f 2>/dev/null | head -1)
-python_output2=$(find buck-out/v2/gen/root -name "hello-python.pex" -type f 2>/dev/null | head -1)
+# Find outputs again with timeout and maxdepth
+# Search from buck-out root since structure may vary
+go_output2=$(timeout 30 find buck-out -maxdepth 15 -name "hello-go" -type f ! -name "*.d" ! -name "*.dwp" 2>/dev/null | head -1)
+rust_output2=$(timeout 30 find buck-out -maxdepth 15 -name "libgreeting*.rmeta" -type f 2>/dev/null | head -1)
+python_output2=$(timeout 30 find buck-out -maxdepth 15 \( -name "hello-python.pex" -o -name "hello-python" \) -type f 2>/dev/null | head -1)
+
+echo "Go output (build 2): ${go_output2:-<not found>}"
+echo "Rust output (build 2): ${rust_output2:-<not found>}"
+echo "Python output (build 2): ${python_output2:-<not found>}"
 
 assert_not_empty "$go_output2" "Go binary path should not be empty (build 2)" || exit 1
 assert_not_empty "$rust_output2" "Rust library path should not be empty (build 2)" || exit 1

@@ -52,15 +52,26 @@
 
       # Export turnkey library functions (mkRegistryOverlay, mkMetaPackage, resolveTool, etc.)
       # These require pkgs, so they're provided per-system
-      flake.lib = builtins.listToAttrs (map (system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
-          lib = pkgs.lib;
-        in {
-          name = system;
-          value = import ./nix/lib { inherit pkgs lib; };
-        }
-      ) [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ]);
+      flake.lib = builtins.listToAttrs (
+        map
+          (
+            system:
+            let
+              pkgs = nixpkgs.legacyPackages.${system};
+              lib = pkgs.lib;
+            in
+            {
+              name = system;
+              value = import ./nix/lib { inherit pkgs lib; };
+            }
+          )
+          [
+            "x86_64-linux"
+            "aarch64-linux"
+            "x86_64-darwin"
+            "aarch64-darwin"
+          ]
+      );
 
       # Flake templates for project initialization
       flake.templates = {
@@ -97,8 +108,10 @@
           packages.nix-prefetch-cached = import ./nix/packages/nix-prefetch-cached.nix { inherit pkgs lib; };
           packages.pydeps-gen = import ./nix/packages/pydeps-gen.nix { inherit pkgs lib; };
           packages.rustdeps-gen = import ./nix/packages/rustdeps-gen.nix { inherit pkgs lib; };
-          packages.gobuckify = import ./nix/packages/gobuckify.nix { inherit pkgs lib; };
-          packages.cargo-prune-workspace = import ./nix/packages/cargo-prune-workspace.nix { inherit pkgs lib; };
+          packages.buckgen = import ./nix/packages/buckgen.nix { inherit pkgs lib; };
+          packages.cargo-prune-workspace = import ./nix/packages/cargo-prune-workspace.nix {
+            inherit pkgs lib;
+          };
           packages.tk = import ./nix/packages/tk.nix { inherit pkgs lib; };
           packages.tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
           packages.e2e-runner = import ./nix/packages/e2e-runner.nix { inherit pkgs lib; };
@@ -119,8 +132,14 @@
             # Each entry needs versioned format: { versions = {...}; default = "..."; }
             registryExtensions =
               let
-                single = pkg: { versions = { "default" = pkg; }; default = "default"; };
-              in {
+                single = pkg: {
+                  versions = {
+                    "default" = pkg;
+                  };
+                  default = "default";
+                };
+              in
+              {
                 beads = single inputs.beads.packages.${system}.default;
                 beads_viewer = single inputs.beads_viewer.packages.${system}.default;
                 jj = single inputs.jj.packages.${system}.default;
