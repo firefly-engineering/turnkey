@@ -67,6 +67,10 @@ func ScanPackage(dir, importPath string, platforms []Platform) (*GoPackage, erro
 		var platformFiles []string
 
 		for _, f := range files {
+			// Skip test files - they shouldn't contribute to library deps
+			if f.IsTest {
+				continue
+			}
 			if MatchesPlatform(f, p) {
 				platformFiles = append(platformFiles, filepath.Base(f.Path))
 				for _, imp := range f.Imports {
