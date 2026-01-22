@@ -40,6 +40,10 @@ func RenderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) error {
 		if isStdLib(dep) {
 			continue
 		}
+		// Skip self-references (package importing itself or parent)
+		if dep == pkg.ImportPath || strings.HasPrefix(pkg.ImportPath, dep+"/") {
+			continue
+		}
 		fmt.Fprintf(w, "        %q,\n", importToTarget(dep, cfg))
 	}
 	fmt.Fprintf(w, "    ]")
@@ -65,9 +69,14 @@ func RenderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) error {
 			// Check if any non-stdlib deps
 			var filteredDeps []string
 			for _, d := range deps {
-				if !isStdLib(d) {
-					filteredDeps = append(filteredDeps, importToTarget(d, cfg))
+				if isStdLib(d) {
+					continue
 				}
+				// Skip self-references
+				if d == pkg.ImportPath || strings.HasPrefix(pkg.ImportPath, d+"/") {
+					continue
+				}
+				filteredDeps = append(filteredDeps, importToTarget(d, cfg))
 			}
 			if len(filteredDeps) == 0 {
 				continue
