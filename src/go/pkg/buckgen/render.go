@@ -31,6 +31,7 @@ func RenderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) error {
 
 	fmt.Fprintf(w, "%s(\n", cfg.Buck.GoLibraryRule)
 	fmt.Fprintf(w, "    name = %q,\n", targetName)
+	fmt.Fprintf(w, "    package_name = %q,\n", pkg.ImportPath)
 	fmt.Fprintf(w, "    srcs = glob([\"*.go\"]),\n")
 	fmt.Fprintf(w, "    visibility = [\"PUBLIC\"],\n")
 
