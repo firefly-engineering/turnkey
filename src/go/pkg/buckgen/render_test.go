@@ -51,8 +51,18 @@ func TestRenderPackage(t *testing.T) {
 
 	output := buf.String()
 
-	// Check for common dep
-	if !strings.Contains(output, "\"godeps//vendor/github.com/example/common:common\"") {
+	// Check for native.glob with extended file patterns
+	if !strings.Contains(output, "native.glob([\"*.go\", \"*.s\", \"*.h\", \"*.c\", \"*.cc\", \"*.cpp\", \"*.S\"])") {
+		t.Errorf("output missing native.glob with extended patterns: %s", output)
+	}
+
+	// Check for header_namespace
+	if !strings.Contains(output, "header_namespace = \"\"") {
+		t.Errorf("output missing header_namespace: %s", output)
+	}
+
+	// Check for common dep (default prefix is "godeps//", not "godeps//vendor/")
+	if !strings.Contains(output, "\"godeps//github.com/example/common:common\"") {
 		t.Errorf("output missing common dep: %s", output)
 	}
 
@@ -65,8 +75,43 @@ func TestRenderPackage(t *testing.T) {
 	if !strings.Contains(output, "\"config//os:linux\": [") {
 		t.Errorf("output missing linux constraint: %s", output)
 	}
-	if !strings.Contains(output, "\"godeps//vendor/github.com/example/linuxonly:linuxonly\"") {
+	if !strings.Contains(output, "\"godeps//github.com/example/linuxonly:linuxonly\"") {
 		t.Errorf("output missing linux-only dep: %s", output)
+	}
+}
+
+func TestRenderPackageNoDeps(t *testing.T) {
+	// Test that packages with no external dependencies don't have a deps attribute
+	pkg := &goparse.GoPackage{
+		Name:       "nodeps",
+		ImportPath: "golang.org/x/sys/cpu",
+		Imports: map[goparse.Platform][]string{
+			{OS: "linux", Arch: "amd64"}: {"fmt", "os"}, // only stdlib
+		},
+	}
+
+	cfg := DefaultConfig()
+	var buf bytes.Buffer
+	err := RenderPackage(&buf, pkg, cfg)
+	if err != nil {
+		t.Fatalf("RenderPackage failed: %v", err)
+	}
+
+	output := buf.String()
+
+	// Should NOT contain deps attribute when there are no external deps
+	if strings.Contains(output, "deps = [") {
+		t.Errorf("output should not have deps attribute when no external deps: %s", output)
+	}
+
+	// Should contain native.glob
+	if !strings.Contains(output, "native.glob") {
+		t.Errorf("output missing native.glob: %s", output)
+	}
+
+	// Should contain header_namespace
+	if !strings.Contains(output, "header_namespace = \"\"") {
+		t.Errorf("output missing header_namespace: %s", output)
 	}
 }
 

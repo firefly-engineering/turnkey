@@ -32,11 +32,13 @@ func RenderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) error {
 	fmt.Fprintf(w, "%s(\n", cfg.Buck.GoLibraryRule)
 	fmt.Fprintf(w, "    name = %q,\n", targetName)
 	fmt.Fprintf(w, "    package_name = %q,\n", pkg.ImportPath)
-	fmt.Fprintf(w, "    srcs = glob([\"*.go\"]),\n")
+	// Include Go, assembly, and C/C++ source files that may be part of Go packages
+	fmt.Fprintf(w, "    srcs = native.glob([\"*.go\", \"*.s\", \"*.h\", \"*.c\", \"*.cc\", \"*.cpp\", \"*.S\"]),\n")
+	fmt.Fprintf(w, "    header_namespace = \"\",\n")
 	fmt.Fprintf(w, "    visibility = [\"PUBLIC\"],\n")
 
-	// Dependencies
-	fmt.Fprintf(w, "    %s = [\n", cfg.Buck.DepsAttr)
+	// Collect all dependencies (common + platform-specific)
+	var commonDeps []string
 	for _, dep := range normalized.Common {
 		if isStdLib(dep) {
 			continue
@@ -45,14 +47,15 @@ func RenderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) error {
 		if dep == pkg.ImportPath || strings.HasPrefix(pkg.ImportPath, dep+"/") {
 			continue
 		}
-		fmt.Fprintf(w, "        %q,\n", importToTarget(dep, cfg))
+		commonDeps = append(commonDeps, importToTarget(dep, cfg))
 	}
-	fmt.Fprintf(w, "    ]")
 
-	// Platform-specific dependencies using select()
+	// Collect platform-specific dependencies
+	var platformDeps []struct {
+		constraint string
+		deps       []string
+	}
 	if len(normalized.Platform) > 0 {
-		fmt.Fprintln(w, " + select({")
-
 		// Sort platforms for deterministic output
 		var platforms []goparse.Platform
 		for p := range normalized.Platform {
@@ -67,7 +70,6 @@ func RenderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) error {
 
 		for _, p := range platforms {
 			deps := normalized.Platform[p]
-			// Check if any non-stdlib deps
 			var filteredDeps []string
 			for _, d := range deps {
 				if isStdLib(d) {
@@ -79,21 +81,38 @@ func RenderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) error {
 				}
 				filteredDeps = append(filteredDeps, importToTarget(d, cfg))
 			}
-			if len(filteredDeps) == 0 {
-				continue
+			if len(filteredDeps) > 0 {
+				constraint := findConstraint(p, cfg)
+				platformDeps = append(platformDeps, struct {
+					constraint string
+					deps       []string
+				}{constraint, filteredDeps})
 			}
-
-			constraint := findConstraint(p, cfg)
-			fmt.Fprintf(w, "        %q: [\n", constraint)
-			for _, d := range filteredDeps {
-				fmt.Fprintf(w, "            %q,\n", d)
-			}
-			fmt.Fprintf(w, "        ],\n")
 		}
-		fmt.Fprintln(w, "        \"DEFAULT\": [],")
-		fmt.Fprint(w, "    })")
 	}
-	fmt.Fprintln(w, ",")
+
+	// Only output deps attribute if there are actual dependencies
+	if len(commonDeps) > 0 || len(platformDeps) > 0 {
+		fmt.Fprintf(w, "    %s = [\n", cfg.Buck.DepsAttr)
+		for _, dep := range commonDeps {
+			fmt.Fprintf(w, "        %q,\n", dep)
+		}
+		fmt.Fprintf(w, "    ]")
+
+		if len(platformDeps) > 0 {
+			fmt.Fprintln(w, " + select({")
+			for _, pd := range platformDeps {
+				fmt.Fprintf(w, "        %q: [\n", pd.constraint)
+				for _, d := range pd.deps {
+					fmt.Fprintf(w, "            %q,\n", d)
+				}
+				fmt.Fprintf(w, "        ],\n")
+			}
+			fmt.Fprintln(w, "        \"DEFAULT\": [],")
+			fmt.Fprint(w, "    })")
+		}
+		fmt.Fprintln(w, ",")
+	}
 	fmt.Fprintln(w, ")")
 
 	return nil
