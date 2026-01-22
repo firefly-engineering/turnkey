@@ -24,8 +24,13 @@ func RenderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) error {
 
 	normalized := NormalizeDeps(pkg.Imports)
 
+	// Use directory name (last component of import path) as target name for consistency.
+	// This ensures deps can reference targets without knowing the Go package name.
+	// e.g., github.com/pelletier/go-toml/v2 -> target name "v2"
+	targetName := filepath.Base(pkg.ImportPath)
+
 	fmt.Fprintf(w, "%s(\n", cfg.Buck.GoLibraryRule)
-	fmt.Fprintf(w, "    name = %q,\n", pkg.Name)
+	fmt.Fprintf(w, "    name = %q,\n", targetName)
 	fmt.Fprintf(w, "    srcs = glob([\"*.go\"]),\n")
 	fmt.Fprintf(w, "    visibility = [\"PUBLIC\"],\n")
 
@@ -160,9 +165,11 @@ func isStdLib(importPath string) bool {
 }
 
 func importToTarget(importPath string, cfg *Config) string {
+	// Use directory name (last path component) as target name.
+	// This matches the target name generation in RenderPackage.
 	parts := strings.Split(importPath, "/")
 	name := parts[len(parts)-1]
-	return fmt.Sprintf("%svendor/%s:%s", cfg.Buck.DepsTargetLabelPrefix, importPath, name)
+	return fmt.Sprintf("%s%s:%s", cfg.Buck.DepsTargetLabelPrefix, importPath, name)
 }
 
 func findConstraint(p goparse.Platform, cfg *Config) string {
