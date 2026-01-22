@@ -311,10 +311,10 @@ When incorporating external tools that need modifications, **never duplicate sou
 ```
 nix/
 ├── packages/
-│   └── gobuckify.nix      # Package definition (fetches + patches)
+│   └── jrsonnet.nix      # Package definition (fetches + patches)
 └── patches/
-    └── gobuckify/         # One directory per patched software
-        └── use-go-directly.patch
+    └── jrsonnet/         # One directory per patched software
+        └── fix-something.patch
 ```
 
 ### Pattern: Fetch and Patch
@@ -368,24 +368,23 @@ cd repo
 git diff > /path/to/turnkey/nix/patches/tool-name/description.patch
 ```
 
-### Example: gobuckify
+### Example: jrsonnet
 
-gobuckify is fetched from facebook/buck2 and patched to use `go` directly:
+jrsonnet is fetched from CertainLach/jrsonnet and can be patched if needed:
 
 ```nix
-# nix/packages/gobuckify.nix
+# nix/packages/jrsonnet.nix
 src = pkgs.fetchFromGitHub {
-  owner = "facebook";
-  repo = "buck2";
-  rev = "54ad016...";
+  owner = "CertainLach";
+  repo = "jrsonnet";
+  rev = "v0.5.0-pre9";
   hash = "sha256-...";
-  sparseCheckout = [ "prelude/go/tools/gobuckify" ];
 };
 
-patches = [ ../patches/gobuckify/use-go-directly.patch ];
+# patches = [ ../patches/jrsonnet/fix-something.patch ];
 ```
 
-The patch modifies one function to use `$GO_BINARY` or `go` instead of `buck2 run`.
+This pattern keeps upstream as source of truth while allowing local modifications.
 
 ## Development Workflows
 

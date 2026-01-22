@@ -1,8 +1,8 @@
 # buckgen Nix package
 #
 # Builds the buckgen tool that generates rules.star files for Go dependencies.
-# This replaces gobuckify with a simpler implementation that doesn't require
-# importable Go code (no go.mod/main.go scaffolding needed).
+# This parses Go source files directly without requiring importable code
+# (no go.mod/main.go scaffolding needed).
 { pkgs, lib }:
 
 let

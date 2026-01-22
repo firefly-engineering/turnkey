@@ -16,8 +16,8 @@ func main() {
 
 	cellDir := os.Args[1]
 
-	// Load gobuckify.json config
-	configPath := filepath.Join(cellDir, "gobuckify.json")
+	// Load buckgen.json config
+	configPath := filepath.Join(cellDir, "buckgen.json")
 	cfg, err := buckgen.LoadConfig(configPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)

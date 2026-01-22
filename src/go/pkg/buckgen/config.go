@@ -5,14 +5,14 @@ import (
 	"os"
 )
 
-// Config represents buckgen configuration (compatible with gobuckify.json)
+// Config represents buckgen configuration
 type Config struct {
 	Buck      BuckConfig `json:"buck"`
 	Platforms []Platform `json:"platforms"`
 }
 
 type BuckConfig struct {
-	Preambule             string `json:"preambule"` // Note: gobuckify spells it this way
+	Preambule             string `json:"preambule"` // Note: intentional spelling
 	GoLibraryRule         string `json:"go_library_rule"`
 	DepsTargetLabelPrefix string `json:"deps_target_label_prefix"`
 	DepsAttr              string `json:"deps_attr"`
@@ -49,7 +49,7 @@ func DefaultConfig() *Config {
 	}
 }
 
-// LoadConfig loads config from gobuckify.json
+// LoadConfig loads config from buckgen.json
 func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

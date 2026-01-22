@@ -215,10 +215,10 @@ rec {
         done
 
 
-        # Create gobuckify configuration
-        cat > $out/gobuckify.json << 'GOBUCKIFY_CONFIG'
+        # Create buckgen configuration
+        cat > $out/buckgen.json << 'BUCKGEN_CONFIG'
         ${buckgenConfig}
-        GOBUCKIFY_CONFIG
+        BUCKGEN_CONFIG
 
         # Run buckgen to generate BUCK files
         cd $out
