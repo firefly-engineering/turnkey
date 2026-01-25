@@ -62,7 +62,10 @@
             in
             {
               name = system;
-              value = import ./nix/lib { inherit pkgs lib; };
+              value = import ./nix/lib {
+                inherit pkgs lib;
+                currentTime = self.lastModified or 0;
+              };
             }
           )
           [
