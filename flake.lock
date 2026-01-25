@@ -98,6 +98,7 @@
       "original": {
         "owner": "cachix",
         "repo": "devenv",
+        "rev": "9bfc4a64c3a798ed8fa6cee3a519a9eac5e73cb5",
         "type": "github"
       }
     },
@@ -153,6 +154,7 @@
       "original": {
         "owner": "hercules-ci",
         "repo": "flake-parts",
+        "rev": "80daad04eddbbf5a4d883996a73f3f542fa437ac",
         "type": "github"
       }
     },
@@ -308,6 +310,7 @@
       "original": {
         "owner": "rrbutani",
         "repo": "nix-mk-shell-bin",
+        "rev": "ff5d8bd4d68a347be5042e2f16caee391cd75887",
         "type": "github"
       }
     },
@@ -368,6 +371,7 @@
       "original": {
         "owner": "nlewo",
         "repo": "nix2container",
+        "rev": "66f4b8a47e92aa744ec43acbb5e9185078983909",
         "type": "github"
       }
     },
@@ -440,8 +444,8 @@
       },
       "original": {
         "owner": "NixOS",
-        "ref": "nixos-unstable",
         "repo": "nixpkgs",
+        "rev": "e4bae1bd10c9c57b2cf517953ab70060a828ee6f",
         "type": "github"
       }
     },
