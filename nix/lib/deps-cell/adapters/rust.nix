@@ -7,11 +7,12 @@
 # Rust dependencies are fetched from crates.io.
 # Feature unification and BUCK generation happen during merge phase.
 
-{ pkgs, lib }:
+{ pkgs, lib, genericBuilder }:
 
 let
   fetchers = import ../fetchers.nix { inherit pkgs lib; };
   fixups = import ../fixups { inherit pkgs lib; };
+  inherit (genericBuilder) genericMkDepsCell;
 in
 rec {
   # Build inputs for per-dependency builds
@@ -117,135 +118,65 @@ rec {
     ) deps;
 
     # Features file argument for compute-unified-features
-    # The tool expects a file path, not JSON
     featuresFileArg = if featuresFile != null
       then "${featuresFile}"
       else "";
+
+    # Key to path: Rust keys are already "name@version" format
+    keyToPath = key: key;
+
+    # Parse key for symlink: extract crate name (basePath) and version
+    parseKeyForSymlink = key:
+      let parts = lib.splitString "@" key;
+      in {
+        basePath = lib.head parts;
+        version = if lib.length parts > 1 then lib.elemAt parts 1 else "";
+      };
+
+    # Include both versioned and unversioned crate names for gen-rust-buck
+    versionedNames = lib.attrNames deps;
+    unversionedNames = lib.unique (map (key:
+      lib.head (lib.splitString "@" key)
+    ) versionedNames);
+    allCrateNames = versionedNames ++ unversionedNames;
+
+    # Merge commands: feature unification + BUCK generation
+    mergeCommands = ''
+      # Compute unified features (if tool provided)
+      ${if computeUnifiedFeatures != null then ''
+        echo "Computing unified features..."
+        UNIFIED_FEATURES=$(compute-unified-features "$out/vendor" ${featuresFileArg})
+        export UNIFIED_FEATURES
+      '' else ''
+        UNIFIED_FEATURES="{}"
+        export UNIFIED_FEATURES
+      ''}
+
+      # Generate BUCK files (if tool provided)
+      ${if genRustBuck != null then ''
+        echo "Generating BUCK files..."
+        for dir in "$out/vendor"/*; do
+          if [ -d "$dir" ] && [ -f "$dir/Cargo.toml" ]; then
+            gen-rust-buck "$dir" \
+              '${builtins.toJSON allCrateNames}' \
+              '${builtins.toJSON (lib.attrNames allBuildScriptFixups)}' \
+              "$UNIFIED_FEATURES" \
+              '${builtins.toJSON rustcFlagsRegistry}' \
+              > "$dir/rules.star" || echo "# rules.star generation failed" > "$dir/rules.star"
+          fi
+        done
+      '' else ''
+        echo "No gen-rust-buck tool provided, skipping BUCK generation"
+      ''}
+    '';
   in
-  pkgs.runCommand "rustdeps-cell" {
-    nativeBuildInputs = cellBuildInputs ++
+  genericMkDepsCell {
+    cellName = "rustdeps";
+    inherit depPackages keyToPath parseKeyForSymlink mergeCommands;
+    createSymlinks = true;
+    cellBuildInputs = cellBuildInputs ++
       (if computeUnifiedFeatures != null then [ computeUnifiedFeatures ] else []) ++
       (if genRustBuck != null then [ genRustBuck ] else []);
-    passthru = { inherit depPackages; };
-  } ''
-    mkdir -p $out/vendor
+  };
 
-    # Copy each dep package into vendor/ with versioned path
-    ${lib.concatStringsSep "\n" (lib.mapAttrsToList (key: pkg:
-      let
-        # Use key as directory name (includes version)
-        dirName = key;
-      in ''
-        mkdir -p "$out/vendor/${dirName}"
-        cp -r ${pkg}/* "$out/vendor/${dirName}/"
-        chmod -R u+w "$out/vendor/${dirName}"
-      ''
-    ) depPackages)}
-
-    # Create unversioned symlinks for convenience
-    # Pick highest version when multiple versions exist
-    ${lib.concatStringsSep "\n" (
-      let
-        # Group by crate name
-        byName = lib.groupBy (key:
-          let parts = lib.splitString "@" key;
-          in lib.head parts
-        ) (lib.attrNames deps);
-
-        # For each name, create symlink to highest version
-        mkSymlink = name: keys:
-          let
-            # Sort by version (simple string sort works for semver)
-            sorted = lib.sort (a: b: a > b) keys;
-            highest = lib.head sorted;
-          in
-          if lib.length keys > 0 && lib.hasInfix "@" highest
-          then ''ln -sf "${highest}" "$out/vendor/${name}" 2>/dev/null || true''
-          else "";
-      in
-      lib.mapAttrsToList mkSymlink byName
-    )}
-
-    # Compute unified features (if tool provided)
-    ${if computeUnifiedFeatures != null then ''
-      echo "Computing unified features..."
-      UNIFIED_FEATURES=$(compute-unified-features "$out/vendor" ${featuresFileArg})
-      export UNIFIED_FEATURES
-    '' else ''
-      UNIFIED_FEATURES="{}"
-      export UNIFIED_FEATURES
-    ''}
-
-    # Generate BUCK files (if tool provided)
-    ${if genRustBuck != null then
-      let
-        # Include both versioned (e.g., base64@0.22.1) and unversioned (e.g., base64) names
-        # so that gen-rust-buck can resolve deps either way
-        versionedNames = lib.attrNames deps;
-        unversionedNames = lib.unique (map (key:
-          lib.head (lib.splitString "@" key)
-        ) versionedNames);
-        allCrateNames = versionedNames ++ unversionedNames;
-      in ''
-      echo "Generating BUCK files..."
-      for dir in "$out/vendor"/*; do
-        if [ -d "$dir" ] && [ -f "$dir/Cargo.toml" ]; then
-          gen-rust-buck "$dir" \
-            '${builtins.toJSON allCrateNames}' \
-            '${builtins.toJSON (lib.attrNames allBuildScriptFixups)}' \
-            "$UNIFIED_FEATURES" \
-            '${builtins.toJSON rustcFlagsRegistry}' \
-            > "$dir/rules.star" || echo "# rules.star generation failed" > "$dir/rules.star"
-        fi
-      done
-    '' else ''
-      echo "No gen-rust-buck tool provided, skipping BUCK generation"
-    ''}
-
-    # Generate cell .buckconfig
-    cat > $out/.buckconfig << 'CELLCONFIG'
-    [cells]
-        rustdeps = .
-        prelude = prelude
-
-    [buildfile]
-        name = rules.star
-    CELLCONFIG
-  '';
-
-  # ==========================================================================
-  # Internal Helpers
-  # ==========================================================================
-
-  # Internal mkDepPackage for generic builder compatibility
-  mkDepPackage = { key, depSpec, config, allDeps }:
-    let
-      parts = lib.splitString "@" key;
-      crateName = depSpec.name or (lib.head parts);
-      version = depSpec.version;
-      patchVersion = lib.last (lib.splitString "." version);
-
-      allFixups = (config.buildScriptFixups or {});
-      fixupFn = allFixups.${key} or allFixups.${crateName} or null;
-      fixup = if fixupFn != null then
-        if builtins.isFunction fixupFn then
-          fixupFn { inherit crateName version patchVersion key; vendorPath = "."; }
-        else fixupFn
-      else null;
-
-      flags = (config.rustcFlagsRegistry or {}).${key} or
-              (config.rustcFlagsRegistry or {}).${crateName} or [];
-    in
-    mkRustDepPackage {
-      name = crateName;
-      inherit version;
-      sha256 = depSpec.hash;
-      buildScriptFixup = fixup;
-      rustcFlags = flags;
-    };
-
-  # Merge commands for generic builder
-  mergeCommands = ctx: ''
-    # Rust merge commands are handled directly in mkRustDepsCell
-  '';
 }
