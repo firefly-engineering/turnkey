@@ -6,6 +6,12 @@ rust_binary(
     srcs = glob(["src/**/*.rs"]),
     crate_root = "src/main.rs",
     edition = "2024",
+    features = [
+        "python",
+        "rust",
+        "typescript",
+        "solidity",
+    ],
     deps = [
         "rustdeps//vendor/anyhow:anyhow",
         "rustdeps//vendor/clap:clap",
