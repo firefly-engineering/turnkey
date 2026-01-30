@@ -12,6 +12,7 @@
 #   - thiserror.nix: thiserror (build script)
 #   - ring.nix: ring crypto library (native code compilation)
 #   - rustix.nix: rustix platform flags (rustc flags)
+#   - tree-sitter.nix: tree-sitter WASM stdlib symbols (build script)
 #
 # Build script fixups are functions: context -> string (shell commands)
 # Context includes: { name, version, patchVersion, vendorPath, ... }
@@ -26,6 +27,7 @@ let
   thiserrorFixups = import ./thiserror.nix { inherit lib; };
   ringFixups = import ./ring.nix { inherit lib; };
   rustixFixups = import ./rustix.nix { inherit lib; };
+  treeSitterFixups = import ./tree-sitter.nix { inherit lib; };
 in
 rec {
   # ==========================================================================
@@ -39,7 +41,8 @@ rec {
     (serdeFixups.buildScriptFixups or {})
     // (thiserrorFixups.buildScriptFixups or {})
     // (ringFixups.buildScriptFixups or ringFixups)
-    // (rustixFixups.buildScriptFixups or {});
+    // (rustixFixups.buildScriptFixups or {})
+    // (treeSitterFixups.buildScriptFixups or {});
 
   # ==========================================================================
   # Rustc Flags
@@ -52,7 +55,8 @@ rec {
     (serdeFixups.rustcFlags or {})
     // (thiserrorFixups.rustcFlags or {})
     // (ringFixups.rustcFlags or {})
-    // (rustixFixups.rustcFlags or {});
+    // (rustixFixups.rustcFlags or {})
+    // (treeSitterFixups.rustcFlags or {});
 
   # ==========================================================================
   # Combined (for backward compatibility)

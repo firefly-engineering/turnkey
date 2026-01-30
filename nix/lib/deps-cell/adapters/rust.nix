@@ -85,7 +85,8 @@ rec {
     deps = depsToml.deps or {};
 
     # Merge built-in fixups with user-provided
-    allBuildScriptFixups = (fixups.builtinFixups.rust or {}) // buildScriptFixups;
+    allBuildScriptFixups = (fixups.builtinFixups.rust.buildScriptFixups or {}) // buildScriptFixups;
+    allRustcFlags = (fixups.builtinFixups.rust.rustcFlags or {}) // rustcFlagsRegistry;
 
     # Build individual dep packages
     depPackages = lib.mapAttrs (key: depSpec:
@@ -106,7 +107,7 @@ rec {
         else null;
 
         # Look up rustc flags
-        flags = rustcFlagsRegistry.${key} or rustcFlagsRegistry.${crateName} or [];
+        flags = allRustcFlags.${key} or allRustcFlags.${crateName} or [];
       in
       mkRustDepPackage {
         name = crateName;
