@@ -7,8 +7,9 @@ import (
 
 // Config represents buckgen configuration
 type Config struct {
-	Buck      BuckConfig `json:"buck"`
-	Platforms []Platform `json:"platforms"`
+	Buck          BuckConfig        `json:"buck"`
+	Platforms     []Platform        `json:"platforms"`
+	LocalReplaces map[string]string `json:"local_replaces,omitempty"` // import path -> Buck2 target
 }
 
 type BuckConfig struct {

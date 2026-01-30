@@ -1,5 +1,6 @@
-schema_version = 1
+schema_version = 2
 
-[deps."github.com/google/uuid"]
+[deps."github.com/google/uuid@v1.6.0"]
+import_path = "github.com/google/uuid"
 version = "v1.6.0"
 hash = ""

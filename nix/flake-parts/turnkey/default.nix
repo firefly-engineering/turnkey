@@ -541,6 +541,15 @@ in
                 properly exclude buck-out directories.
               '';
             };
+
+            foundryConfigCheck = mkOption {
+              type = types.bool;
+              default = false;
+              description = ''
+                Add a pre-commit hook that verifies Foundry configuration consistency.
+                Checks that solc_version matches toolchain and dependencies match root.
+              '';
+            };
           };
         };
       };
@@ -833,6 +842,7 @@ in
               rustEditionCheck = cfg.buck2.tk.rustEditionCheck;
               monorepoDepCheck = cfg.buck2.tk.monorepoDepCheck;
               jsTestConfigCheck = cfg.buck2.tk.jsTestConfigCheck;
+              foundryConfigCheck = cfg.buck2.tk.foundryConfigCheck;
             };
           };
         };

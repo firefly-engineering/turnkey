@@ -24,8 +24,12 @@ func TestWriteTOML_BasicOutput(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, `[deps."github.com/foo/bar"]`) {
-		t.Error("missing dependency section")
+	// Schema v2 uses versioned key format: [deps."import-path@version"]
+	if !strings.Contains(output, `[deps."github.com/foo/bar@v1.0.0"]`) {
+		t.Errorf("missing versioned dependency section, got:\n%s", output)
+	}
+	if !strings.Contains(output, `import_path = "github.com/foo/bar"`) {
+		t.Error("missing import_path field")
 	}
 	if !strings.Contains(output, `version = "v1.0.0"`) {
 		t.Error("missing version")
@@ -106,6 +110,12 @@ func TestWriteTOML_WithHeader(t *testing.T) {
 	}
 	if !strings.Contains(output, "To regenerate:") {
 		t.Error("missing regenerate hint")
+	}
+	if !strings.Contains(output, "schema_version = 2") {
+		t.Error("missing or incorrect schema version")
+	}
+	if !strings.Contains(output, "Key format: deps.") {
+		t.Error("missing key format comment")
 	}
 }
 
@@ -206,5 +216,100 @@ func TestFormatHashComment(t *testing.T) {
 				t.Errorf("expected %q, got %q", tt.expected, result)
 			}
 		})
+	}
+}
+
+func TestWriteTOML_WithFetchPath(t *testing.T) {
+	deps := []Dependency{
+		{
+			ImportPath: "github.com/original/pkg",
+			FetchPath:  "github.com/fork/pkg",
+			Version:    "v1.0.0",
+			NixHash:    "sha256-abc123=",
+		},
+	}
+
+	var buf bytes.Buffer
+	opts := OutputOptions{
+		IncludeHeader:         false,
+		IncludeHashWarning:    false,
+		IncludeRegenerateHint: false,
+	}
+
+	err := WriteTOML(&buf, deps, opts)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	// Key should use import_path
+	if !strings.Contains(output, `[deps."github.com/original/pkg@v1.0.0"]`) {
+		t.Errorf("missing versioned dependency section with import_path, got:\n%s", output)
+	}
+	// import_path should be present
+	if !strings.Contains(output, `import_path = "github.com/original/pkg"`) {
+		t.Error("missing import_path field")
+	}
+	// fetch_path should be present since it differs from import_path
+	if !strings.Contains(output, `fetch_path = "github.com/fork/pkg"`) {
+		t.Errorf("missing fetch_path field, got:\n%s", output)
+	}
+}
+
+func TestWriteTOML_NoFetchPathWhenSame(t *testing.T) {
+	deps := []Dependency{
+		{
+			ImportPath: "github.com/foo/bar",
+			FetchPath:  "github.com/foo/bar", // Same as ImportPath
+			Version:    "v1.0.0",
+			NixHash:    "sha256-abc=",
+		},
+	}
+
+	var buf bytes.Buffer
+	opts := OutputOptions{
+		IncludeHeader:         false,
+		IncludeHashWarning:    false,
+		IncludeRegenerateHint: false,
+	}
+
+	err := WriteTOML(&buf, deps, opts)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	// fetch_path should NOT be present when it equals import_path
+	if strings.Contains(output, "fetch_path") {
+		t.Errorf("unexpected fetch_path when same as import_path, got:\n%s", output)
+	}
+}
+
+func TestWriteTOML_NoFetchPathWhenEmpty(t *testing.T) {
+	deps := []Dependency{
+		{
+			ImportPath: "github.com/foo/bar",
+			FetchPath:  "", // Empty FetchPath
+			Version:    "v1.0.0",
+			NixHash:    "sha256-abc=",
+		},
+	}
+
+	var buf bytes.Buffer
+	opts := OutputOptions{
+		IncludeHeader:         false,
+		IncludeHashWarning:    false,
+		IncludeRegenerateHint: false,
+	}
+
+	err := WriteTOML(&buf, deps, opts)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	// fetch_path should NOT be present when empty
+	if strings.Contains(output, "fetch_path") {
+		t.Errorf("unexpected fetch_path when empty, got:\n%s", output)
 	}
 }

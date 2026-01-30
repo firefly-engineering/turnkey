@@ -16,6 +16,7 @@ go_library(
         # turnkey:auto-start
         "godeps//vendor/golang.org/x/mod/modfile:modfile",
         # turnkey:auto-end
+        "//src/go/pkg/prefetchcache:prefetchcache",
     ],
     visibility = ["PUBLIC"],
 )
@@ -29,6 +30,8 @@ go_test(
         "prefetch_test.go",
     ],
     target_under_test = ":godeps",
-    deps = [],
+    deps = [
+        "//src/go/pkg/prefetchcache:prefetchcache",
+    ],
     visibility = ["PUBLIC"],
 )

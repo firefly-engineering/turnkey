@@ -18,7 +18,11 @@ let
   hooks = import ./hooks.nix { inherit lib; };
   fetchers = import ./fetchers.nix { inherit pkgs lib; };
   fixups = import ./fixups { inherit pkgs lib; };
-  adapters = import ./adapters { inherit pkgs lib; };
+
+  # Import adapters with access to generic builder (see below)
+  mkAdapters = genericBuilder: import ./adapters {
+    inherit pkgs lib genericBuilder;
+  };
 
   # Extend lib with our functions for internal use
   libWithDepsCell = lib // {
@@ -31,151 +35,89 @@ let
   phasesExt = import ./phases.nix { lib = libWithDepsCell; };
   hooksExt = import ./hooks.nix { lib = libWithDepsCell; };
 
-in
-rec {
-  # Export sub-modules
-  inherit phases hooks fetchers fixups adapters;
+  # Generic cell builder - the core reusable function
+  genericMkDepsCell = {
+    cellName,                          # "godeps", "rustdeps", etc.
+    depPackages,                       # { key -> derivation } - pre-built by adapter
 
-  # ==========================================================================
-  # Generic Builders (Internal)
-  # ==========================================================================
+    # Directory structure options
+    keyToPath ? (key: key),            # key -> vendor subdirectory path
+    createSymlinks ? false,            # Create unversioned symlinks
+    parseKeyForSymlink ? null,         # key -> { basePath, version } for symlink grouping
 
-  # Build a single dependency package
-  # This is the internal generic builder - language adapters wrap this
-  mkDepPackage = {
-    name,              # Dependency name (e.g., "serde@1.0.219")
-    version,           # Version string
-    language,          # "go" | "rust" | "python"
-    fetchSpec,         # Fetch specification for fetchers.fetch
+    # Merge phase
+    mergeCommands ? "",                # Shell commands after copy
+    cellBuildInputs ? [],              # Build inputs for merge phase
+    rootBuckContent ? null,            # Optional content for root rules.star
 
-    # Optional
-    extraHooks ? {},      # Additional hooks to merge
-    patchCommands ? "",   # Shell commands for patch phase
-    processCommands ? "", # Shell commands for process phase
-    buildInfraCommands ? "", # Shell commands for buildInfra phase
-    nativeBuildInputs ? [], # Additional build inputs
+    # Passthru
+    passthru ? {},
   }:
   let
-    adapter = adapters.${language} or (throw "Unknown language: ${language}");
+    # Generate symlink creation commands
+    symlinkCommands = if createSymlinks && parseKeyForSymlink != null then
+      let
+        # Parse all keys to get basePath and version
+        parsedKeys = lib.mapAttrs (key: _: parseKeyForSymlink key) depPackages;
 
-    # Merge adapter hooks with user hooks
-    allHooks = hooksExt.mergeHooks [
-      (adapter.hooks or {})
-      extraHooks
-    ];
+        # Group keys by basePath
+        byBasePath = lib.groupBy (key: (parsedKeys.${key}).basePath) (lib.attrNames depPackages);
 
-    # Fetch the source
-    src = fetchers.fetch fetchSpec;
-
-    # Build context passed through phases
-    context = {
-      inherit name version language src;
-    };
-
-    # Default phase implementations
-    defaultPhaseImpls = {
-      fetch = _: ""; # Source is fetched via Nix, nothing to do in shell
-      patch = _: patchCommands;
-      process = _: processCommands;
-      buildInfra = _: buildInfraCommands;
-    };
-
-    # Run phases to collect commands
-    result = phasesExt.runDepPhases {
-      hooks = allHooks;
-      phaseImpls = defaultPhaseImpls;
-      inherit context;
-    };
-  in
-  pkgs.runCommand "dep-${language}-${lib.replaceStrings ["/" "@"] ["-" "-"] name}" {
-    nativeBuildInputs = (adapter.buildInputs or []) ++ nativeBuildInputs;
-    inherit src;
-  } ''
-    mkdir -p $out
-    cp -r $src/* $out/
-    chmod -R u+w $out
-
-    # Run patch phase commands
-    cd $out
-    ${result.patchCmds or ""}
-
-    # Run process phase commands
-    ${result.processCmds or ""}
-
-    # Run buildInfra phase commands
-    ${result.buildInfraCmds or ""}
-  '';
-
-  # Build a complete deps cell from individual packages
-  # This is the internal generic builder - language adapters wrap this
-  mkDepsCell = {
-    language,       # "go" | "rust" | "python"
-    depsFile,       # Path to *-deps.toml
-    cellName,       # e.g., "godeps", "rustdeps", "pydeps"
-
-    # Optional
-    languageConfig ? {}, # Language-specific configuration
-    extraHooks ? {},     # Additional hooks for merge phase
-    postMerge ? "",      # Shell commands after merge
-    nativeBuildInputs ? [], # Additional build inputs
-  }:
-  let
-    adapter = adapters.${language} or (throw "Unknown language: ${language}");
-    depsToml = builtins.fromTOML (builtins.readFile depsFile);
-    deps = depsToml.deps or {};
-
-    # Build individual dep packages
-    depPackages = lib.mapAttrs (key: depSpec:
-      adapter.mkDepPackage {
-        inherit key depSpec;
-        config = languageConfig;
-        allDeps = deps;
-      }
-    ) deps;
-
-    # Merge context for hooks
-    mergeContext = {
-      inherit cellName depPackages deps;
-      config = languageConfig;
-    };
-
-    # Merge adapter hooks with user hooks
-    allHooks = hooksExt.mergeHooks [
-      (adapter.cellHooks or {})
-      extraHooks
-    ];
-
-    # Pre/post merge hook commands
-    preMergeCmds = if allHooks ? preMerge then allHooks.preMerge mergeContext else "";
-    postMergeCmds = if allHooks ? postMerge then allHooks.postMerge mergeContext else "";
+        # For each basePath, find highest version and create symlink
+        mkSymlink = basePath: keys:
+          let
+            versions = map (key: (parsedKeys.${key}).version) keys;
+            # Sort versions descending (simple string sort works for semver)
+            sortedVersions = lib.sort (a: b: a > b) versions;
+            highestVersion = lib.head sortedVersions;
+            # Find the key with the highest version
+            highestKey = lib.findFirst (key: (parsedKeys.${key}).version == highestVersion) (lib.head keys) keys;
+            targetPath = keyToPath highestKey;
+            # Get parent directory path for mkdir
+            parentDir = lib.concatStringsSep "/" (lib.init (lib.splitString "/" basePath));
+            # Get relative path from basePath to targetPath
+            # For simple cases like "serde" -> "serde@1.0.219", just use the target name
+            baseDepth = lib.length (lib.splitString "/" basePath);
+            targetName = lib.last (lib.splitString "/" targetPath);
+          in ''
+            # Create parent directories for symlink
+            ${if parentDir != "" then ''mkdir -p "$out/vendor/${parentDir}"'' else ""}
+            # Create symlink: ${basePath} -> ${targetPath}
+            ln -sfn "${targetName}" "$out/vendor/${basePath}"
+          '';
+      in
+      lib.concatStringsSep "\n" (lib.mapAttrsToList mkSymlink byBasePath)
+    else "";
   in
   pkgs.runCommand "${cellName}-cell" {
-    nativeBuildInputs = (adapter.cellBuildInputs or []) ++ nativeBuildInputs;
-    passthru = { inherit depPackages; };
+    nativeBuildInputs = cellBuildInputs;
+    passthru = { inherit depPackages; } // passthru;
   } ''
     mkdir -p $out/vendor
-
-    # Pre-merge hook
-    ${preMergeCmds}
 
     # Copy each dep package into vendor/
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList (key: pkg:
       let
-        # Normalize key for directory name
-        dirName = lib.replaceStrings ["@"] ["/"] key;
+        dirPath = keyToPath key;
       in ''
-        mkdir -p "$out/vendor/${dirName}"
-        cp -r ${pkg}/* "$out/vendor/${dirName}/"
-        chmod -R u+w "$out/vendor/${dirName}"
+        mkdir -p "$out/vendor/${dirPath}"
+        cp -r ${pkg}/* "$out/vendor/${dirPath}/"
+        chmod -R u+w "$out/vendor/${dirPath}"
       ''
     ) depPackages)}
 
-    # Language-specific merge operations
-    ${(adapter.mergeCommands or (_: "")) mergeContext}
+    # Create symlinks (if enabled)
+    ${symlinkCommands}
 
-    # Post-merge hook
-    ${postMergeCmds}
-    ${postMerge}
+    # Run language-specific merge commands
+    ${mergeCommands}
+
+    # Generate root rules.star (if provided)
+    ${if rootBuckContent != null then ''
+      cat > $out/rules.star << 'ROOTRULES'
+      ${rootBuckContent}
+      ROOTRULES
+    '' else ""}
 
     # Generate cell .buckconfig
     cat > $out/.buckconfig << 'BUCKCONFIG'
@@ -187,6 +129,22 @@ rec {
         name = rules.star
     BUCKCONFIG
   '';
+
+  # Build generic builder for adapters
+  genericBuilder = {
+    inherit genericMkDepsCell;
+  };
+
+  # Create adapters with access to generic builder
+  adapters = mkAdapters genericBuilder;
+
+in
+rec {
+  # Export sub-modules
+  inherit phases hooks fetchers fixups adapters;
+
+  # Export generic cell builder for direct use
+  mkDepsCell = genericMkDepsCell;
 
   # ==========================================================================
   # Language-Specific Builders (Public API)

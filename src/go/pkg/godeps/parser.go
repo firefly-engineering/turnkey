@@ -84,3 +84,86 @@ func MergeHashes(deps []Dependency, hashes map[string]string) {
 		}
 	}
 }
+
+// ParseReplaces extracts replace directives from go.mod content.
+// It takes raw bytes for testability (no file I/O).
+func ParseReplaces(data []byte) ([]Replace, error) {
+	f, err := modfile.Parse("go.mod", data, nil)
+	if err != nil {
+		return nil, fmt.Errorf("parsing go.mod: %w", err)
+	}
+
+	var replaces []Replace
+	for _, rep := range f.Replace {
+		replaces = append(replaces, Replace{
+			Old:        rep.Old.Path,
+			OldVersion: rep.Old.Version,
+			NewPath:    rep.New.Path,
+			NewVersion: rep.New.Version,
+		})
+	}
+
+	return replaces, nil
+}
+
+// FilterLocalReplaces returns only the replace directives that point to local paths.
+func FilterLocalReplaces(replaces []Replace) []Replace {
+	var local []Replace
+	for _, r := range replaces {
+		if r.IsLocal() {
+			local = append(local, r)
+		}
+	}
+	return local
+}
+
+// FilterExternalReplaces returns only the replace directives that point to external modules (forks).
+func FilterExternalReplaces(replaces []Replace) []Replace {
+	var external []Replace
+	for _, r := range replaces {
+		if r.IsExternal() {
+			external = append(external, r)
+		}
+	}
+	return external
+}
+
+// ApplyExternalReplaces applies external replace directives to dependencies.
+// For each dependency that matches a replace directive, it sets FetchPath to the
+// replacement module path. The ImportPath remains unchanged so that the dependency
+// is stored under the original path in the vendor directory.
+func ApplyExternalReplaces(deps []Dependency, replaces []Replace) {
+	// Build a map of external replaces for quick lookup
+	// Key is "module@version" or just "module" for version-less replaces
+	replaceMap := make(map[string]Replace)
+	for _, r := range replaces {
+		if r.IsExternal() {
+			if r.OldVersion != "" {
+				replaceMap[r.Old+"@"+r.OldVersion] = r
+			} else {
+				replaceMap[r.Old] = r
+			}
+		}
+	}
+
+	for i, dep := range deps {
+		// First check for version-specific replace
+		if r, ok := replaceMap[dep.ImportPath+"@"+dep.Version]; ok {
+			deps[i].FetchPath = r.NewPath
+			// If replace specifies a different version, update it
+			if r.NewVersion != "" && r.NewVersion != dep.Version {
+				deps[i].Version = r.NewVersion
+			}
+			continue
+		}
+
+		// Then check for module-wide replace (no version constraint)
+		if r, ok := replaceMap[dep.ImportPath]; ok {
+			deps[i].FetchPath = r.NewPath
+			// If replace specifies a version, use it
+			if r.NewVersion != "" {
+				deps[i].Version = r.NewVersion
+			}
+		}
+	}
+}

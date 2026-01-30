@@ -1,18 +1,22 @@
-schema_version = 1
+schema_version = 2
 
-[deps."github.com/google/uuid"]
+[deps."github.com/google/uuid@v1.6.0"]
+import_path = "github.com/google/uuid"
 version = "v1.6.0"
 hash = ""
 
-[deps."github.com/pelletier/go-toml/v2"]
+[deps."github.com/pelletier/go-toml/v2@v2.2.4"]
+import_path = "github.com/pelletier/go-toml/v2"
 version = "v2.2.4"
 hash = ""
 
-[deps."golang.org/x/mod"]
+[deps."golang.org/x/mod@v0.31.0"]
+import_path = "golang.org/x/mod"
 version = "v0.31.0"
 hash = ""
 
-[deps."golang.org/x/sync"]
+[deps."golang.org/x/sync@v0.18.0"]
+import_path = "golang.org/x/sync"
 version = "v0.18.0"
 hash = ""
 indirect = true

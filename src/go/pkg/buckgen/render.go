@@ -152,7 +152,9 @@ func RenderCell(vendorDir string, cfg *Config) ([]string, error) {
 		if rel == "." {
 			return nil
 		}
-		importPath := filepath.ToSlash(rel)
+		// Strip @version suffixes from path components
+		// e.g., "golang.org/x/mod@v0.31.0/module" -> "golang.org/x/mod/module"
+		importPath := stripVersionsFromPath(filepath.ToSlash(rel))
 
 		// Try to parse as a Go package
 		pkg, err := goparse.ScanPackage(path, importPath, cfg.PlatformsToGoparse())
@@ -193,7 +195,42 @@ func isStdLib(importPath string) bool {
 	return !strings.Contains(parts[0], ".")
 }
 
+// stripVersionsFromPath removes @version suffixes from path components.
+// e.g., "golang.org/x/mod@v0.31.0/module" -> "golang.org/x/mod/module"
+func stripVersionsFromPath(path string) string {
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		if idx := strings.Index(part, "@"); idx != -1 {
+			parts[i] = part[:idx]
+		}
+	}
+	return strings.Join(parts, "/")
+}
+
 func importToTarget(importPath string, cfg *Config) string {
+	// Check if this import path has a local replacement
+	if cfg.LocalReplaces != nil {
+		if target, ok := cfg.LocalReplaces[importPath]; ok {
+			return target
+		}
+		// Also check for prefix matches (e.g., github.com/foo/bar/pkg matches github.com/foo/bar)
+		for replacePrefix, target := range cfg.LocalReplaces {
+			if strings.HasPrefix(importPath, replacePrefix+"/") {
+				// Append the subpath to the target
+				// e.g., "//src/mylib:mylib" + "/subpkg" -> "//src/mylib/subpkg:subpkg"
+				subpath := strings.TrimPrefix(importPath, replacePrefix)
+				subpkgName := filepath.Base(importPath)
+				// Extract the cell/path part from target (e.g., "//src/mylib" from "//src/mylib:mylib")
+				colonIdx := strings.LastIndex(target, ":")
+				if colonIdx != -1 {
+					basePath := target[:colonIdx]
+					return fmt.Sprintf("%s%s:%s", basePath, subpath, subpkgName)
+				}
+				return fmt.Sprintf("%s%s:%s", target, subpath, subpkgName)
+			}
+		}
+	}
+
 	// Use directory name (last path component) as target name.
 	// This matches the target name generation in RenderPackage.
 	parts := strings.Split(importPath, "/")

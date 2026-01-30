@@ -1043,6 +1043,7 @@ dependencies = [
  "anyhow",
  "clap",
  "serde",
+ "serde-saphyr",
  "serde_json",
  "toml",
  "ureq",

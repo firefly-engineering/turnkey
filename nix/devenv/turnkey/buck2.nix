@@ -916,6 +916,26 @@ in
           Requires Python 3.11+.
         '';
       };
+
+      foundryConfigCheck = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Add a pre-commit hook that verifies Foundry configuration consistency.
+
+          Checks that:
+          - solc_version matches the toolchain-provided solc version
+          - Dependencies in per-project foundry.toml match root foundry.toml
+
+          This ensures native `forge` commands work correctly with the toolchain
+          and keeps dependency declarations synchronized.
+
+          Note: This hook requires the check-foundry-config script from turnkey.
+          Only enable this if you have copied the script to src/cmd/check-foundry-config/.
+
+          Requires Python 3.11+ with tomllib support.
+        '';
+      };
     };
 
     quiet = lib.mkOption {
@@ -1223,6 +1243,18 @@ in
         pass_filenames = false;
         entry = ''
           ${pkgs.python3}/bin/python src/cmd/check-js-test-config/__main__.py
+        '';
+      };
+
+      # Foundry configuration consistency check
+      foundry-config-check = lib.mkIf (cfg.solidity.enable && cfg.tk.foundryConfigCheck) {
+        enable = true;
+        name = "foundry-config-check";
+        description = "Check Foundry config consistency (solc version, dependencies)";
+        files = "foundry\\.toml$";
+        pass_filenames = false;
+        entry = ''
+          ${pkgs.python3}/bin/python src/cmd/check-foundry-config/__main__.py
         '';
       };
 

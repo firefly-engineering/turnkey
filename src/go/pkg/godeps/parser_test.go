@@ -414,3 +414,331 @@ func TestMergeHashes_EmptyHashes(t *testing.T) {
 		t.Errorf("expected empty hash, got %s", deps[0].GoSumHash)
 	}
 }
+
+// Replace directive tests
+
+func TestParseReplaces_LocalPath(t *testing.T) {
+	input := []byte(`module example.com/mymod
+
+go 1.21
+
+require github.com/foo/bar v1.0.0
+
+replace github.com/foo/bar => ../local/bar
+`)
+	replaces, err := ParseReplaces(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(replaces) != 1 {
+		t.Fatalf("expected 1 replace, got %d", len(replaces))
+	}
+	if replaces[0].Old != "github.com/foo/bar" {
+		t.Errorf("expected Old=github.com/foo/bar, got %s", replaces[0].Old)
+	}
+	if replaces[0].NewPath != "../local/bar" {
+		t.Errorf("expected NewPath=../local/bar, got %s", replaces[0].NewPath)
+	}
+	if !replaces[0].IsLocal() {
+		t.Error("expected IsLocal()=true for relative path")
+	}
+}
+
+func TestParseReplaces_LocalPathAbsolute(t *testing.T) {
+	input := []byte(`module example.com/mymod
+
+go 1.21
+
+replace github.com/foo/bar => /absolute/path/bar
+`)
+	replaces, err := ParseReplaces(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(replaces) != 1 {
+		t.Fatalf("expected 1 replace, got %d", len(replaces))
+	}
+	if !replaces[0].IsLocal() {
+		t.Error("expected IsLocal()=true for absolute path")
+	}
+}
+
+func TestParseReplaces_RemoteReplace(t *testing.T) {
+	input := []byte(`module example.com/mymod
+
+go 1.21
+
+replace github.com/original/pkg => github.com/fork/pkg v1.2.3
+`)
+	replaces, err := ParseReplaces(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(replaces) != 1 {
+		t.Fatalf("expected 1 replace, got %d", len(replaces))
+	}
+	if replaces[0].Old != "github.com/original/pkg" {
+		t.Errorf("expected Old=github.com/original/pkg, got %s", replaces[0].Old)
+	}
+	if replaces[0].NewPath != "github.com/fork/pkg" {
+		t.Errorf("expected NewPath=github.com/fork/pkg, got %s", replaces[0].NewPath)
+	}
+	if replaces[0].NewVersion != "v1.2.3" {
+		t.Errorf("expected NewVersion=v1.2.3, got %s", replaces[0].NewVersion)
+	}
+	if replaces[0].IsLocal() {
+		t.Error("expected IsLocal()=false for remote replace")
+	}
+}
+
+func TestParseReplaces_VersionSpecific(t *testing.T) {
+	input := []byte(`module example.com/mymod
+
+go 1.21
+
+replace github.com/foo/bar v1.0.0 => ../local/bar
+`)
+	replaces, err := ParseReplaces(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(replaces) != 1 {
+		t.Fatalf("expected 1 replace, got %d", len(replaces))
+	}
+	if replaces[0].OldVersion != "v1.0.0" {
+		t.Errorf("expected OldVersion=v1.0.0, got %s", replaces[0].OldVersion)
+	}
+}
+
+func TestParseReplaces_MultipleReplaces(t *testing.T) {
+	input := []byte(`module example.com/mymod
+
+go 1.21
+
+replace (
+	github.com/foo/bar => ../local/bar
+	github.com/baz/qux => ./qux
+	github.com/remote/pkg => github.com/fork/pkg v1.0.0
+)
+`)
+	replaces, err := ParseReplaces(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(replaces) != 3 {
+		t.Fatalf("expected 3 replaces, got %d", len(replaces))
+	}
+}
+
+func TestParseReplaces_NoReplaces(t *testing.T) {
+	input := []byte(`module example.com/mymod
+
+go 1.21
+
+require github.com/foo/bar v1.0.0
+`)
+	replaces, err := ParseReplaces(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(replaces) != 0 {
+		t.Errorf("expected 0 replaces, got %d", len(replaces))
+	}
+}
+
+func TestFilterLocalReplaces(t *testing.T) {
+	replaces := []Replace{
+		{Old: "github.com/foo/bar", NewPath: "../local/bar"},
+		{Old: "github.com/baz/qux", NewPath: "github.com/fork/qux", NewVersion: "v1.0.0"},
+		{Old: "github.com/another/pkg", NewPath: "./pkg"},
+	}
+
+	local := FilterLocalReplaces(replaces)
+	if len(local) != 2 {
+		t.Fatalf("expected 2 local replaces, got %d", len(local))
+	}
+	if local[0].Old != "github.com/foo/bar" {
+		t.Errorf("expected first local replace to be foo/bar, got %s", local[0].Old)
+	}
+	if local[1].Old != "github.com/another/pkg" {
+		t.Errorf("expected second local replace to be another/pkg, got %s", local[1].Old)
+	}
+}
+
+func TestFilterExternalReplaces(t *testing.T) {
+	replaces := []Replace{
+		{Old: "github.com/foo/bar", NewPath: "../local/bar"},
+		{Old: "github.com/baz/qux", NewPath: "github.com/fork/qux", NewVersion: "v1.0.0"},
+		{Old: "github.com/another/pkg", NewPath: "./pkg"},
+		{Old: "github.com/remote/dep", NewPath: "github.com/myfork/dep", NewVersion: "v2.0.0"},
+	}
+
+	external := FilterExternalReplaces(replaces)
+	if len(external) != 2 {
+		t.Fatalf("expected 2 external replaces, got %d", len(external))
+	}
+	if external[0].Old != "github.com/baz/qux" {
+		t.Errorf("expected first external replace to be baz/qux, got %s", external[0].Old)
+	}
+	if external[1].Old != "github.com/remote/dep" {
+		t.Errorf("expected second external replace to be remote/dep, got %s", external[1].Old)
+	}
+}
+
+func TestReplace_IsExternal(t *testing.T) {
+	tests := []struct {
+		name     string
+		replace  Replace
+		expected bool
+	}{
+		{
+			name:     "relative path",
+			replace:  Replace{Old: "pkg", NewPath: "../local"},
+			expected: false,
+		},
+		{
+			name:     "absolute path",
+			replace:  Replace{Old: "pkg", NewPath: "/absolute/path"},
+			expected: false,
+		},
+		{
+			name:     "current dir path",
+			replace:  Replace{Old: "pkg", NewPath: "./local"},
+			expected: false,
+		},
+		{
+			name:     "external module",
+			replace:  Replace{Old: "pkg", NewPath: "github.com/fork/pkg", NewVersion: "v1.0.0"},
+			expected: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.replace.IsExternal() != tc.expected {
+				t.Errorf("IsExternal() = %v, want %v", tc.replace.IsExternal(), tc.expected)
+			}
+		})
+	}
+}
+
+func TestApplyExternalReplaces_Basic(t *testing.T) {
+	deps := []Dependency{
+		{ImportPath: "github.com/original/pkg", Version: "v1.0.0"},
+		{ImportPath: "github.com/normal/dep", Version: "v2.0.0"},
+	}
+
+	replaces := []Replace{
+		{Old: "github.com/original/pkg", NewPath: "github.com/fork/pkg", NewVersion: "v1.0.0"},
+		{Old: "github.com/local/thing", NewPath: "../local"}, // local, should be ignored
+	}
+
+	ApplyExternalReplaces(deps, replaces)
+
+	// original/pkg should have FetchPath set
+	if deps[0].FetchPath != "github.com/fork/pkg" {
+		t.Errorf("expected FetchPath=github.com/fork/pkg, got %s", deps[0].FetchPath)
+	}
+
+	// normal/dep should have no FetchPath
+	if deps[1].FetchPath != "" {
+		t.Errorf("expected empty FetchPath for non-replaced dep, got %s", deps[1].FetchPath)
+	}
+}
+
+func TestApplyExternalReplaces_VersionSpecific(t *testing.T) {
+	deps := []Dependency{
+		{ImportPath: "github.com/pkg", Version: "v1.0.0"},
+		{ImportPath: "github.com/pkg", Version: "v2.0.0"},
+	}
+
+	replaces := []Replace{
+		// Only replace v1.0.0
+		{Old: "github.com/pkg", OldVersion: "v1.0.0", NewPath: "github.com/fork/pkg", NewVersion: "v1.0.0"},
+	}
+
+	ApplyExternalReplaces(deps, replaces)
+
+	// v1.0.0 should be replaced
+	if deps[0].FetchPath != "github.com/fork/pkg" {
+		t.Errorf("expected FetchPath for v1.0.0, got %s", deps[0].FetchPath)
+	}
+
+	// v2.0.0 should NOT be replaced (version-specific replace)
+	if deps[1].FetchPath != "" {
+		t.Errorf("expected no FetchPath for v2.0.0, got %s", deps[1].FetchPath)
+	}
+}
+
+func TestApplyExternalReplaces_VersionUpdate(t *testing.T) {
+	deps := []Dependency{
+		{ImportPath: "github.com/original/pkg", Version: "v1.0.0"},
+	}
+
+	replaces := []Replace{
+		// Replace with different version
+		{Old: "github.com/original/pkg", NewPath: "github.com/fork/pkg", NewVersion: "v2.0.0"},
+	}
+
+	ApplyExternalReplaces(deps, replaces)
+
+	if deps[0].FetchPath != "github.com/fork/pkg" {
+		t.Errorf("expected FetchPath=github.com/fork/pkg, got %s", deps[0].FetchPath)
+	}
+	if deps[0].Version != "v2.0.0" {
+		t.Errorf("expected Version=v2.0.0, got %s", deps[0].Version)
+	}
+}
+
+func TestApplyExternalReplaces_ModuleWideOverVersionSpecific(t *testing.T) {
+	deps := []Dependency{
+		{ImportPath: "github.com/pkg", Version: "v1.5.0"},
+	}
+
+	replaces := []Replace{
+		// Version-specific replace for v1.0.0
+		{Old: "github.com/pkg", OldVersion: "v1.0.0", NewPath: "github.com/fork1/pkg", NewVersion: "v1.0.0"},
+		// Module-wide replace (no version)
+		{Old: "github.com/pkg", NewPath: "github.com/fork2/pkg", NewVersion: "v2.0.0"},
+	}
+
+	ApplyExternalReplaces(deps, replaces)
+
+	// v1.5.0 should use module-wide replace (fork2), not version-specific (fork1)
+	if deps[0].FetchPath != "github.com/fork2/pkg" {
+		t.Errorf("expected FetchPath=github.com/fork2/pkg (module-wide), got %s", deps[0].FetchPath)
+	}
+}
+
+func TestDependency_EffectiveFetchPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		dep      Dependency
+		expected string
+	}{
+		{
+			name:     "no FetchPath",
+			dep:      Dependency{ImportPath: "github.com/foo/bar"},
+			expected: "github.com/foo/bar",
+		},
+		{
+			name:     "with FetchPath",
+			dep:      Dependency{ImportPath: "github.com/original/pkg", FetchPath: "github.com/fork/pkg"},
+			expected: "github.com/fork/pkg",
+		},
+		{
+			name:     "empty FetchPath",
+			dep:      Dependency{ImportPath: "github.com/foo/bar", FetchPath: ""},
+			expected: "github.com/foo/bar",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tc.dep.EffectiveFetchPath()
+			if result != tc.expected {
+				t.Errorf("EffectiveFetchPath() = %q, want %q", result, tc.expected)
+			}
+		})
+	}
+}

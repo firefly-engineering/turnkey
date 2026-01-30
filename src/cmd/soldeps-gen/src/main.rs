@@ -11,6 +11,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
+use std::process::Command;
 
 /// Generate solidity-deps.toml from foundry.toml and package.json
 #[derive(Parser, Debug)]
@@ -33,9 +34,9 @@ struct Args {
     #[arg(short = 'o', long)]
     output: Option<PathBuf>,
 
-    /// Fetch git commit hashes for dependencies (slower but more complete)
+    /// Prefetch git commit hashes and resolve tags to commits
     #[arg(long, default_value = "false")]
-    fetch_git_info: bool,
+    prefetch: bool,
 }
 
 /// Represents a package in the output TOML
@@ -89,6 +90,25 @@ struct PackageJson {
     dev_dependencies: BTreeMap<String, String>,
 }
 
+/// pnpm-lock.yaml structure (simplified for v9)
+#[derive(Debug, Deserialize)]
+struct PnpmLockfile {
+    #[serde(default)]
+    packages: BTreeMap<String, PnpmPackage>,
+}
+
+/// Package entry in pnpm-lock.yaml
+#[derive(Debug, Deserialize)]
+struct PnpmPackage {
+    resolution: Option<PnpmResolution>,
+}
+
+/// Resolution info containing integrity hash
+#[derive(Debug, Deserialize)]
+struct PnpmResolution {
+    integrity: Option<String>,
+}
+
 /// Output TOML structure
 #[derive(Debug, Serialize)]
 struct OutputToml {
@@ -122,8 +142,8 @@ fn parse_foundry_dep(name: &str, spec: &str) -> OutputPackage {
         repo
     };
 
-    // Generate remapping
-    let remapping = format!("{}=/", name);
+    // Generate remapping - point to lib/<name>/src/ for Foundry-style deps
+    let remapping = format!("{}/=lib/{}/src/", name, name);
 
     OutputPackage {
         name: name.to_string(),
@@ -150,13 +170,16 @@ fn is_solidity_package(name: &str) -> bool {
         "ds-test",
     ];
 
-    solidity_prefixes.iter().any(|p| name.starts_with(p) || name == *p)
+    solidity_prefixes
+        .iter()
+        .any(|p| name.starts_with(p) || name == *p)
 }
 
 /// Generate NPM tarball URL for a package
 fn npm_tarball_url(name: &str, version: &str) -> String {
     // Remove semver prefix (^, ~, etc.)
-    let clean_version = version.trim_start_matches(|c| c == '^' || c == '~' || c == '=' || c == 'v');
+    let clean_version =
+        version.trim_start_matches(|c| c == '^' || c == '~' || c == '=' || c == 'v');
 
     if name.starts_with('@') {
         let encoded_name = name.replace('/', "%2f");
@@ -174,10 +197,92 @@ fn npm_tarball_url(name: &str, version: &str) -> String {
     }
 }
 
+/// Parse pnpm-lock.yaml to extract integrity hashes
+/// Returns a map of "package@version" -> integrity hash
+fn parse_pnpm_lock(path: &PathBuf) -> Result<BTreeMap<String, String>> {
+    let content = fs::read_to_string(path)
+        .with_context(|| format!("Failed to read {}", path.display()))?;
+
+    let lockfile: PnpmLockfile = serde_saphyr::from_str(&content)
+        .with_context(|| format!("Failed to parse {}", path.display()))?;
+
+    let mut integrity_map = BTreeMap::new();
+
+    // pnpm-lock v9 structure: packages: { "@pkg/name@version": { resolution: { integrity: "sha..." } } }
+    for (key, pkg) in &lockfile.packages {
+        if let Some(resolution) = &pkg.resolution {
+            if let Some(integrity) = &resolution.integrity {
+                integrity_map.insert(key.clone(), integrity.clone());
+            }
+        }
+    }
+
+    Ok(integrity_map)
+}
+
+/// Resolve a git tag/ref to a commit hash using git ls-remote
+fn resolve_git_ref(repo_url: &str, git_ref: &str) -> Result<String> {
+    eprintln!("  resolving {}@{}...", repo_url, git_ref);
+
+    let output = Command::new("git")
+        .args(["ls-remote", repo_url, git_ref])
+        .output()
+        .context("Failed to run git ls-remote")?;
+
+    if !output.status.success() {
+        // Try with refs/tags/ prefix
+        let tag_ref = format!("refs/tags/{}", git_ref);
+        let output = Command::new("git")
+            .args(["ls-remote", repo_url, &tag_ref])
+            .output()
+            .context("Failed to run git ls-remote")?;
+
+        if !output.status.success() {
+            anyhow::bail!(
+                "git ls-remote failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if let Some(line) = stdout.lines().next() {
+            if let Some(commit) = line.split_whitespace().next() {
+                return Ok(commit.to_string());
+            }
+        }
+        anyhow::bail!("Could not resolve {} in {}", git_ref, repo_url);
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    if let Some(line) = stdout.lines().next() {
+        if let Some(commit) = line.split_whitespace().next() {
+            return Ok(commit.to_string());
+        }
+    }
+
+    anyhow::bail!("Could not resolve {} in {}", git_ref, repo_url);
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
 
     let mut output_packages: Vec<OutputPackage> = Vec::new();
+
+    // Parse pnpm-lock.yaml for integrity hashes if provided
+    let integrity_map = if let Some(pnpm_lock_path) = &args.pnpm_lock {
+        if pnpm_lock_path.exists() {
+            eprintln!("Parsing pnpm-lock.yaml for integrity hashes...");
+            parse_pnpm_lock(pnpm_lock_path)?
+        } else {
+            eprintln!(
+                "Note: {} not found, npm packages won't have integrity hashes",
+                pnpm_lock_path.display()
+            );
+            BTreeMap::new()
+        }
+    } else {
+        BTreeMap::new()
+    };
 
     // Parse foundry.toml if it exists
     if args.foundry.exists() {
@@ -193,11 +298,30 @@ fn main() -> Result<()> {
         );
 
         for (name, spec) in &foundry_config.dependencies {
-            let pkg = parse_foundry_dep(name, spec);
+            let mut pkg = parse_foundry_dep(name, spec);
+
+            // If prefetch is enabled, resolve git refs to commit hashes
+            if args.prefetch {
+                if let (Some(repo), Some(git_ref)) = (&pkg.repo, &pkg.rev) {
+                    match resolve_git_ref(repo, git_ref) {
+                        Ok(commit) => {
+                            eprintln!("  {} -> {}", git_ref, &commit[..12]);
+                            pkg.rev = Some(commit);
+                        }
+                        Err(e) => {
+                            eprintln!("  warning: failed to resolve {}: {}", git_ref, e);
+                        }
+                    }
+                }
+            }
+
             output_packages.push(pkg);
         }
     } else {
-        eprintln!("Note: {} not found, skipping Foundry deps", args.foundry.display());
+        eprintln!(
+            "Note: {} not found, skipping Foundry deps",
+            args.foundry.display()
+        );
     }
 
     // Parse package.json if provided
@@ -222,28 +346,57 @@ fn main() -> Result<()> {
             );
 
             for (name, version) in all_deps {
-                let clean_version = version.trim_start_matches(|c| c == '^' || c == '~' || c == '=');
+                let clean_version =
+                    version.trim_start_matches(|c| c == '^' || c == '~' || c == '=');
+
+                // Look up integrity hash from pnpm-lock.yaml
+                // The lock file uses resolved versions, not specifier versions
+                // Key format: "@scope/pkg@version" or "pkg@version"
+                // First try exact match, then search for any version of this package
+                let lock_key = format!("{}@{}", name, clean_version);
+                let (resolved_version, integrity) = if let Some(hash) = integrity_map.get(&lock_key) {
+                    (clean_version.to_string(), Some(hash.clone()))
+                } else {
+                    // Search for any version of this package in the lock file
+                    let prefix = format!("{}@", name);
+                    let found = integrity_map
+                        .iter()
+                        .find(|(k, _)| k.starts_with(&prefix));
+
+                    if let Some((key, hash)) = found {
+                        // Extract version from key (e.g., "@openzeppelin/contracts@5.4.0" -> "5.4.0")
+                        let ver = key.strip_prefix(&prefix).unwrap_or(clean_version);
+                        (ver.to_string(), Some(hash.clone()))
+                    } else {
+                        (clean_version.to_string(), None)
+                    }
+                };
+
+                if integrity.is_some() {
+                    eprintln!("  {} -> found integrity hash (resolved to {})", name, resolved_version);
+                } else {
+                    eprintln!("  {} -> no integrity hash found in lock file", name);
+                }
 
                 // Generate remapping for npm package
-                let remapping = if name.starts_with('@') {
-                    format!("{}/=node_modules/{}/", name, name)
-                } else {
-                    format!("{}/=node_modules/{}/", name, name)
-                };
+                let remapping = format!("{}/=node_modules/{}/", name, name);
 
                 output_packages.push(OutputPackage {
                     name: name.clone(),
-                    version: clean_version.to_string(),
+                    version: resolved_version.clone(),
                     source: "npm".to_string(),
-                    url: Some(npm_tarball_url(name, version)),
-                    integrity: None, // Would need pnpm-lock.yaml to get this
+                    url: Some(npm_tarball_url(name, &resolved_version)),
+                    integrity,
                     repo: None,
                     rev: None,
                     remapping: Some(remapping),
                 });
             }
         } else {
-            eprintln!("Note: {} not found, skipping npm deps", package_json_path.display());
+            eprintln!(
+                "Note: {} not found, skipping npm deps",
+                package_json_path.display()
+            );
         }
     }
 
@@ -285,7 +438,10 @@ mod tests {
         let pkg = parse_foundry_dep("solady", "https://github.com/vectorized/solady");
         assert_eq!(pkg.name, "solady");
         assert_eq!(pkg.source, "git");
-        assert_eq!(pkg.repo, Some("https://github.com/vectorized/solady".to_string()));
+        assert_eq!(
+            pkg.repo,
+            Some("https://github.com/vectorized/solady".to_string())
+        );
         assert_eq!(pkg.rev, None);
     }
 
@@ -293,14 +449,20 @@ mod tests {
     fn test_parse_foundry_dep_with_version() {
         let pkg = parse_foundry_dep("forge-std", "https://github.com/foundry-rs/forge-std@v1.8.0");
         assert_eq!(pkg.name, "forge-std");
-        assert_eq!(pkg.repo, Some("https://github.com/foundry-rs/forge-std".to_string()));
+        assert_eq!(
+            pkg.repo,
+            Some("https://github.com/foundry-rs/forge-std".to_string())
+        );
         assert_eq!(pkg.rev, Some("v1.8.0".to_string()));
     }
 
     #[test]
     fn test_parse_foundry_dep_shorthand() {
         let pkg = parse_foundry_dep("openzeppelin", "openzeppelin/openzeppelin-contracts@v5.0.0");
-        assert_eq!(pkg.repo, Some("https://github.com/openzeppelin/openzeppelin-contracts".to_string()));
+        assert_eq!(
+            pkg.repo,
+            Some("https://github.com/openzeppelin/openzeppelin-contracts".to_string())
+        );
         assert_eq!(pkg.rev, Some("v5.0.0".to_string()));
     }
 

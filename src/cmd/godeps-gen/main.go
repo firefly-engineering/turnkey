@@ -23,6 +23,7 @@ func main() {
 	goSumPath := flag.String("go-sum", "go.sum", "path to go.sum file")
 	outputPath := flag.String("o", "", "output file path (default: stdout)")
 	prefetch := flag.Bool("prefetch", false, "fetch Nix hashes using nix-prefetch-github (requires nix)")
+	noCache := flag.Bool("no-cache", false, "disable prefetch caching (always fetch from network)")
 	includeIndirect := flag.Bool("indirect", true, "include indirect (transitive) dependencies")
 	flag.Parse()
 
@@ -33,11 +34,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Parse go.mod
+	// Parse go.mod dependencies
 	opts := godeps.ParseOptions{IncludeIndirect: *includeIndirect}
 	deps, err := godeps.ParseGoMod(goModData, opts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error parsing go.mod: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Parse replace directives
+	replaces, err := godeps.ParseReplaces(goModData)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error parsing replace directives: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -57,10 +65,29 @@ func main() {
 	// Merge hashes into dependencies
 	godeps.MergeHashes(deps, hashes)
 
+	// Apply external replace directives to dependencies
+	// This sets FetchPath for deps that are replaced by external forks
+	godeps.ApplyExternalReplaces(deps, replaces)
+
 	// Prefetch Nix hashes if requested
 	if *prefetch {
 		fmt.Fprintf(os.Stderr, "Prefetching %d dependencies...\n", len(deps))
-		prefetcher := godeps.DefaultPrefetcher(os.Stderr)
+
+		var prefetcher godeps.Prefetcher
+		if *noCache {
+			prefetcher = godeps.DefaultPrefetcher(os.Stderr)
+		} else {
+			var cache interface{ Close() error }
+			prefetcher, cache = godeps.CachedDefaultPrefetcher(os.Stderr)
+			if cache != nil {
+				defer func() {
+					if err := cache.Close(); err != nil {
+						fmt.Fprintf(os.Stderr, "warning: failed to save cache: %v\n", err)
+					}
+				}()
+			}
+		}
+
 		godeps.PrefetchAll(deps, prefetcher, func(dep godeps.Dependency, err error) {
 			fmt.Fprintf(os.Stderr, "warning: failed to prefetch %s: %v\n", dep.ImportPath, err)
 		})
@@ -78,9 +105,9 @@ func main() {
 		output = f
 	}
 
-	// Output TOML
+	// Output TOML (with local replace directives)
 	outputOpts := godeps.DefaultOutputOptions()
-	if err := godeps.WriteTOML(output, deps, outputOpts); err != nil {
+	if err := godeps.WriteTOMLWithReplaces(output, deps, replaces, outputOpts); err != nil {
 		fmt.Fprintf(os.Stderr, "error writing output: %v\n", err)
 		os.Exit(1)
 	}

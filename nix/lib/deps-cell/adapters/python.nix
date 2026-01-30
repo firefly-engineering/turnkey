@@ -7,11 +7,12 @@
 # Python dependencies are fetched from PyPI.
 # rules.star files are generated per-dependency (simple python_library rules).
 
-{ pkgs, lib }:
+{ pkgs, lib, genericBuilder }:
 
 let
   fetchers = import ../fetchers.nix { inherit pkgs lib; };
   fixups = import ../fixups { inherit pkgs lib; };
+  inherit (genericBuilder) genericMkDepsCell;
 in
 rec {
   # Build inputs for per-dependency builds
@@ -107,46 +108,13 @@ rec {
       }
     ) deps;
   in
-  pkgs.runCommand "pydeps-cell" {
-    nativeBuildInputs = cellBuildInputs;
-    passthru = { inherit depPackages; };
-  } ''
-    mkdir -p $out/vendor
+  genericMkDepsCell {
+    cellName = "pydeps";
+    inherit depPackages;
+    # Python uses simple name-only paths, no versioning or symlinks
+    keyToPath = name: name;
+    createSymlinks = false;
+    cellBuildInputs = cellBuildInputs;
+  };
 
-    # Copy each dep package into vendor/
-    ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: pkg: ''
-      mkdir -p "$out/vendor/${name}"
-      cp -r ${pkg}/* "$out/vendor/${name}/"
-      chmod -R u+w "$out/vendor/${name}"
-    '') depPackages)}
-
-    # Generate cell .buckconfig
-    cat > $out/.buckconfig << 'CELLCONFIG'
-    [cells]
-        pydeps = .
-        prelude = prelude
-
-    [buildfile]
-        name = rules.star
-    CELLCONFIG
-  '';
-
-  # ==========================================================================
-  # Internal Helpers
-  # ==========================================================================
-
-  # Internal mkDepPackage for generic builder compatibility
-  mkDepPackage = { key, depSpec, config, allDeps }:
-    mkPythonDepPackage {
-      name = key;
-      version = depSpec.version;
-      sha256 = depSpec.hash;
-      url = depSpec.url;
-      fixup = (config.userFixups or {}).${key} or null;
-    };
-
-  # Merge commands for generic builder
-  mergeCommands = ctx: ''
-    # Python merge commands are handled directly in mkPythonDepsCell
-  '';
 }

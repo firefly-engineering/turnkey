@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"testing"
+
+	"github.com/firefly-engineering/turnkey/src/go/pkg/prefetchcache"
 )
 
 // MockPrefetcher is a test double for Prefetcher
@@ -467,5 +469,113 @@ func TestDefaultPrefetcher(t *testing.T) {
 	// Should now support any path via GoProxy fallback
 	if !p.Supports("example.com/pkg") {
 		t.Error("should support example.com/* via GoProxy fallback")
+	}
+}
+
+func TestCachedPrefetcher(t *testing.T) {
+	// Create a mock inner prefetcher
+	inner := &MockPrefetcher{
+		SupportedPaths: []string{"*"},
+		Hashes: map[string]string{
+			"github.com/foo/bar v1.0.0": "sha256-foo=",
+			"github.com/baz/qux v1.0.0": "sha256-baz=",
+		},
+	}
+
+	// Create cache in temp directory
+	dir := t.TempDir()
+	cache, err := prefetchcache.WithDir(dir)
+	if err != nil {
+		t.Fatalf("failed to create cache: %v", err)
+	}
+
+	var logBuf bytes.Buffer
+	cached := &CachedPrefetcher{
+		Inner:  inner,
+		Cache:  cache,
+		Logger: &logBuf,
+	}
+
+	// First prefetch - should be a cache miss
+	hash, err := cached.Prefetch("github.com/foo/bar", "v1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hash != "sha256-foo=" {
+		t.Errorf("expected sha256-foo=, got %s", hash)
+	}
+	if len(inner.Calls) != 1 {
+		t.Errorf("expected 1 inner call, got %d", len(inner.Calls))
+	}
+
+	// Second prefetch of same dep - should be a cache hit
+	logBuf.Reset()
+	hash, err = cached.Prefetch("github.com/foo/bar", "v1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hash != "sha256-foo=" {
+		t.Errorf("expected sha256-foo=, got %s", hash)
+	}
+	// Inner should NOT have been called again
+	if len(inner.Calls) != 1 {
+		t.Errorf("expected still 1 inner call (cache hit), got %d", len(inner.Calls))
+	}
+	if !bytes.Contains(logBuf.Bytes(), []byte("cache hit")) {
+		t.Error("expected cache hit message in log")
+	}
+
+	// Different dep - should be a cache miss
+	hash, err = cached.Prefetch("github.com/baz/qux", "v1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hash != "sha256-baz=" {
+		t.Errorf("expected sha256-baz=, got %s", hash)
+	}
+	if len(inner.Calls) != 2 {
+		t.Errorf("expected 2 inner calls, got %d", len(inner.Calls))
+	}
+}
+
+func TestCachedPrefetcher_Persistence(t *testing.T) {
+	inner := &MockPrefetcher{
+		SupportedPaths: []string{"*"},
+		Hashes: map[string]string{
+			"github.com/test/pkg v1.0.0": "sha256-test=",
+		},
+	}
+
+	dir := t.TempDir()
+
+	// First session: prefetch and save
+	cache1, _ := prefetchcache.WithDir(dir)
+	cached1 := &CachedPrefetcher{Inner: inner, Cache: cache1}
+
+	_, err := cached1.Prefetch("github.com/test/pkg", "v1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(inner.Calls) != 1 {
+		t.Fatalf("expected 1 inner call, got %d", len(inner.Calls))
+	}
+
+	// Save cache
+	cache1.Save()
+
+	// Second session: load cache, should be a hit
+	cache2, _ := prefetchcache.WithDir(dir)
+	cached2 := &CachedPrefetcher{Inner: inner, Cache: cache2}
+
+	hash, err := cached2.Prefetch("github.com/test/pkg", "v1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hash != "sha256-test=" {
+		t.Errorf("expected sha256-test=, got %s", hash)
+	}
+	// Inner should NOT have been called again (cache was loaded from disk)
+	if len(inner.Calls) != 1 {
+		t.Errorf("expected still 1 inner call (loaded from disk), got %d", len(inner.Calls))
 	}
 }
