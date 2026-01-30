@@ -24,8 +24,12 @@ func TestWriteTOML_BasicOutput(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, `[deps."github.com/foo/bar"]`) {
-		t.Error("missing dependency section")
+	// Schema v2 uses versioned key format: [deps."import-path@version"]
+	if !strings.Contains(output, `[deps."github.com/foo/bar@v1.0.0"]`) {
+		t.Errorf("missing versioned dependency section, got:\n%s", output)
+	}
+	if !strings.Contains(output, `import_path = "github.com/foo/bar"`) {
+		t.Error("missing import_path field")
 	}
 	if !strings.Contains(output, `version = "v1.0.0"`) {
 		t.Error("missing version")
@@ -106,6 +110,12 @@ func TestWriteTOML_WithHeader(t *testing.T) {
 	}
 	if !strings.Contains(output, "To regenerate:") {
 		t.Error("missing regenerate hint")
+	}
+	if !strings.Contains(output, "schema_version = 2") {
+		t.Error("missing or incorrect schema version")
+	}
+	if !strings.Contains(output, "Key format: deps.") {
+		t.Error("missing key format comment")
 	}
 }
 
