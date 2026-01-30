@@ -488,6 +488,60 @@ in
               '';
             };
           };
+
+          # ==========================================================================
+          # Pre-commit hook configuration (tk options)
+          # ==========================================================================
+          tk = {
+            aliasBuck2 = mkOption {
+              type = types.bool;
+              default = true;
+              description = ''
+                Alias buck2 to tk in the devenv shell.
+              '';
+            };
+
+            syncOnShellEntry = mkOption {
+              type = types.bool;
+              default = true;
+              description = ''
+                Run `tk sync` automatically when entering the devenv shell.
+              '';
+            };
+
+            preCommitCheck = mkOption {
+              type = types.bool;
+              default = true;
+              description = ''
+                Add a pre-commit hook that runs `tk check` before commits.
+              '';
+            };
+
+            rustEditionCheck = mkOption {
+              type = types.bool;
+              default = false;
+              description = ''
+                Add a pre-commit hook that verifies Rust edition alignment.
+              '';
+            };
+
+            monorepoDepCheck = mkOption {
+              type = types.bool;
+              default = false;
+              description = ''
+                Add a pre-commit hook that verifies monorepo dependency rules.
+              '';
+            };
+
+            jsTestConfigCheck = mkOption {
+              type = types.bool;
+              default = false;
+              description = ''
+                Add a pre-commit hook that verifies Jest/Vitest/Biome configs
+                properly exclude buck-out directories.
+              '';
+            };
+          };
         };
       };
     }
@@ -769,6 +823,16 @@ in
                 else
                   null;
               foundryTomlFile = cfg.buck2.solidity.foundryTomlFile;
+            };
+
+            # Pre-commit hook configuration
+            tk = {
+              aliasBuck2 = cfg.buck2.tk.aliasBuck2;
+              syncOnShellEntry = cfg.buck2.tk.syncOnShellEntry;
+              preCommitCheck = cfg.buck2.tk.preCommitCheck;
+              rustEditionCheck = cfg.buck2.tk.rustEditionCheck;
+              monorepoDepCheck = cfg.buck2.tk.monorepoDepCheck;
+              jsTestConfigCheck = cfg.buck2.tk.jsTestConfigCheck;
             };
           };
         };
