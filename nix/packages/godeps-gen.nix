@@ -24,6 +24,7 @@ pkgs.buildGoModule {
       (root + "/go.sum")
       (root + "/src/cmd/godeps-gen")
       (root + "/src/go/pkg/godeps")
+      (root + "/src/go/pkg/prefetchcache")
     ];
   };
   subPackages = [ "src/cmd/godeps-gen" ];
