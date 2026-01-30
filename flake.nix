@@ -2,16 +2,16 @@
   description = "Turnkey toolchain management for Nix flakes";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-parts.url = "github:hercules-ci/flake-parts";
-    devenv.url = "github:cachix/devenv";
+    nixpkgs.url = "github:NixOS/nixpkgs/e4bae1bd10c9c57b2cf517953ab70060a828ee6f";
+    flake-parts.url = "github:hercules-ci/flake-parts/80daad04eddbbf5a4d883996a73f3f542fa437ac";
+    devenv.url = "github:cachix/devenv/9bfc4a64c3a798ed8fa6cee3a519a9eac5e73cb5";
 
     # Required by devenv for container support (even if unused)
     nix2container = {
-      url = "github:nlewo/nix2container";
+      url = "github:nlewo/nix2container/66f4b8a47e92aa744ec43acbb5e9185078983909";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    mk-shell-bin.url = "github:rrbutani/nix-mk-shell-bin";
+    mk-shell-bin.url = "github:rrbutani/nix-mk-shell-bin/ff5d8bd4d68a347be5042e2f16caee391cd75887";
 
     # Beads - distributed git-backed graph issue tracker for AI agents
     beads = {
@@ -52,15 +52,29 @@
 
       # Export turnkey library functions (mkRegistryOverlay, mkMetaPackage, resolveTool, etc.)
       # These require pkgs, so they're provided per-system
-      flake.lib = builtins.listToAttrs (map (system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
-          lib = pkgs.lib;
-        in {
-          name = system;
-          value = import ./nix/lib { inherit pkgs lib; };
-        }
-      ) [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ]);
+      flake.lib = builtins.listToAttrs (
+        map
+          (
+            system:
+            let
+              pkgs = nixpkgs.legacyPackages.${system};
+              lib = pkgs.lib;
+            in
+            {
+              name = system;
+              value = import ./nix/lib {
+                inherit pkgs lib;
+                currentTime = self.lastModified or 0;
+              };
+            }
+          )
+          [
+            "x86_64-linux"
+            "aarch64-linux"
+            "x86_64-darwin"
+            "aarch64-darwin"
+          ]
+      );
 
       # Flake templates for project initialization
       flake.templates = {
@@ -97,8 +111,10 @@
           packages.nix-prefetch-cached = import ./nix/packages/nix-prefetch-cached.nix { inherit pkgs lib; };
           packages.pydeps-gen = import ./nix/packages/pydeps-gen.nix { inherit pkgs lib; };
           packages.rustdeps-gen = import ./nix/packages/rustdeps-gen.nix { inherit pkgs lib; };
-          packages.gobuckify = import ./nix/packages/gobuckify.nix { inherit pkgs lib; };
-          packages.cargo-prune-workspace = import ./nix/packages/cargo-prune-workspace.nix { inherit pkgs lib; };
+          packages.buckgen = import ./nix/packages/buckgen.nix { inherit pkgs lib; };
+          packages.cargo-prune-workspace = import ./nix/packages/cargo-prune-workspace.nix {
+            inherit pkgs lib;
+          };
           packages.tk = import ./nix/packages/tk.nix { inherit pkgs lib; };
           packages.tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
           packages.e2e-runner = import ./nix/packages/e2e-runner.nix { inherit pkgs lib; };
@@ -119,8 +135,14 @@
             # Each entry needs versioned format: { versions = {...}; default = "..."; }
             registryExtensions =
               let
-                single = pkg: { versions = { "default" = pkg; }; default = "default"; };
-              in {
+                single = pkg: {
+                  versions = {
+                    "default" = pkg;
+                  };
+                  default = "default";
+                };
+              in
+              {
                 beads = single inputs.beads.packages.${system}.default;
                 beads_viewer = single inputs.beads_viewer.packages.${system}.default;
                 jj = single inputs.jj.packages.${system}.default;
@@ -161,6 +183,13 @@
               solidity = {
                 enable = true;
                 depsFile = ./solidity-deps.toml;
+              };
+
+              # Pre-commit checks
+              tk = {
+                jsTestConfigCheck = true;
+                rustEditionCheck = true;
+                monorepoDepCheck = true;
               };
             };
           };

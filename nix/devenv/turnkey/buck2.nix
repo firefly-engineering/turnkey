@@ -862,12 +862,15 @@ in
 
       rustEditionCheck = lib.mkOption {
         type = lib.types.bool;
-        default = true;
+        default = false;
         description = ''
           Add a pre-commit hook that verifies Rust edition alignment.
           Checks that:
           1. All workspace members use edition.workspace = true
           2. rules.star files have edition matching workspace.package.edition
+
+          Note: This hook requires the check-rust-edition script from turnkey.
+          Only enable this if you have copied the script to src/cmd/check-rust-edition/.
 
           Requires Python 3.11+ with tomllib support.
         '';
@@ -875,7 +878,7 @@ in
 
       monorepoDepCheck = lib.mkOption {
         type = lib.types.bool;
-        default = true;
+        default = false;
         description = ''
           Add a pre-commit hook that verifies monorepo dependency rules.
           Checks that all languages follow the pattern of declaring deps
@@ -885,7 +888,32 @@ in
           - Python: deps in root pyproject.toml
           - JavaScript: workspace: protocol for nested packages
 
+          Note: This hook requires the check-monorepo-deps script from turnkey.
+          Only enable this if you have copied the script to src/cmd/check-monorepo-deps/.
+
           Requires Python 3.11+ with tomllib support.
+        '';
+      };
+
+      jsTestConfigCheck = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Add a pre-commit hook that verifies Jest/Vitest/Biome configs properly
+          exclude buck-out directories.
+
+          Checks that:
+          - Jest: testPathIgnorePatterns includes '/buck-out/' or '/\\.'
+          - Vitest: exclude includes '**/buck-out/**' or '**/.*/**'
+          - Biome: files.includes contains '!**/buck-out/'
+
+          This prevents spurious failures from buck-out artifacts being
+          picked up by test discovery, linting, or formatting.
+
+          Note: This hook requires the check-js-test-config script from turnkey.
+          Only enable this if you have copied the script to src/cmd/check-js-test-config/.
+
+          Requires Python 3.11+.
         '';
       };
     };
@@ -1186,9 +1214,24 @@ in
         '';
       };
 
-      # Nix flake check
-      nix-flake-check = {
+      # JS/TS tool config check (buck-out exclusions)
+      js-test-config-check = lib.mkIf (cfg.javascript.enable && cfg.tk.jsTestConfigCheck) {
         enable = true;
+        name = "js-test-config-check";
+        description = "Check Jest/Vitest/Biome configs exclude buck-out directories";
+        files = "(jest\\.config\\.(js|ts|mjs|cjs)|vitest\\.config\\.(js|ts|mjs|mts)|biome\\.jsonc?|package\\.json)$";
+        pass_filenames = false;
+        entry = ''
+          ${pkgs.python3}/bin/python src/cmd/check-js-test-config/__main__.py
+        '';
+      };
+
+      # Nix flake check
+      # Note: Disabled by default because devenv's container outputs require
+      # nix2container input which may not be present in all projects.
+      # Enable in your flake if you want this check.
+      nix-flake-check = {
+        enable = false;
         name = "nix-flake-check";
         description = "Check Nix flake validity";
         files = "\\.nix$";
@@ -1216,6 +1259,8 @@ in
         name = "toml-syntax-check";
         description = "Check TOML syntax validity";
         files = "\\.toml$";
+        # Exclude devenv/turnkey state directories and lock files
+        excludes = [ "^\\.devenv/" "^\\.turnkey/" "^buck-out/" ];
         pass_filenames = true;
         entry = ''
           ${pkgs.python3}/bin/python -c '
@@ -1241,6 +1286,8 @@ if errors:
         name = "json-syntax-check";
         description = "Check JSON syntax validity";
         files = "\\.json$";
+        # Exclude devenv/turnkey state directories
+        excludes = [ "^\\.devenv/" "^\\.turnkey/" "^buck-out/" ];
         pass_filenames = true;
         entry = ''
           ${pkgs.python3}/bin/python -c '

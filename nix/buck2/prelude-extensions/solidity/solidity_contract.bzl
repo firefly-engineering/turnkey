@@ -5,13 +5,15 @@
 
 """Solidity contract rule implementation."""
 
-load(":providers.bzl", "SolidityContractInfo", "SolidityLibraryInfo")
+load(":providers.bzl", "SolidityContractInfo", "SolidityLibraryInfo", "SolidityToolchainInfo")
 
 def _solidity_contract_impl(ctx: AnalysisContext) -> list[Provider]:
     """Implementation of solidity_contract rule.
 
     Extracts specific contract artifacts from a compiled solidity_library.
     """
+    toolchain = ctx.attrs._solidity_toolchain[SolidityToolchainInfo]
+
     # Get the library dependency
     lib_dep = ctx.attrs.lib
     if SolidityLibraryInfo not in lib_dep:
@@ -32,12 +34,13 @@ def _solidity_contract_impl(ctx: AnalysisContext) -> list[Provider]:
     script_content = """#!/usr/bin/env bash
 set -euo pipefail
 
-ARTIFACTS_DIR="$1"
-CONTRACT_NAME="$2"
-ABI_OUT="$3"
-BIN_OUT="$4"
-BIN_RUNTIME_OUT="$5"
-METADATA_OUT="$6"
+JQ="$1"
+ARTIFACTS_DIR="$2"
+CONTRACT_NAME="$3"
+ABI_OUT="$4"
+BIN_OUT="$5"
+BIN_RUNTIME_OUT="$6"
+METADATA_OUT="$7"
 
 # Find contract files in artifacts directory
 # solc outputs files as: ContractName.abi, ContractName.bin, etc.
@@ -78,12 +81,12 @@ METADATA_FILE=$(find_contract_file "metadata.json")
 
 if [[ "$ABI_FILE" == "COMBINED" ]]; then
     # Extract from combined.json
-    if command -v jq &> /dev/null; then
+    if [[ -n "$JQ" && -x "$JQ" ]]; then
         # Use jq if available
-        jq -r ".contracts | to_entries[] | select(.key | endswith(\\":$CONTRACT_NAME\\")) | .value.abi" "$ARTIFACTS_DIR/combined.json" > "$ABI_OUT"
-        jq -r ".contracts | to_entries[] | select(.key | endswith(\\":$CONTRACT_NAME\\")) | .value.bin" "$ARTIFACTS_DIR/combined.json" > "$BIN_OUT"
-        jq -r ".contracts | to_entries[] | select(.key | endswith(\\":$CONTRACT_NAME\\")) | .value[\\"bin-runtime\\"]" "$ARTIFACTS_DIR/combined.json" > "$BIN_RUNTIME_OUT"
-        jq -r ".contracts | to_entries[] | select(.key | endswith(\\":$CONTRACT_NAME\\")) | .value.metadata" "$ARTIFACTS_DIR/combined.json" > "$METADATA_OUT"
+        "$JQ" -r ".contracts | to_entries[] | select(.key | endswith(\\":$CONTRACT_NAME\\")) | .value.abi" "$ARTIFACTS_DIR/combined.json" > "$ABI_OUT"
+        "$JQ" -r ".contracts | to_entries[] | select(.key | endswith(\\":$CONTRACT_NAME\\")) | .value.bin" "$ARTIFACTS_DIR/combined.json" > "$BIN_OUT"
+        "$JQ" -r ".contracts | to_entries[] | select(.key | endswith(\\":$CONTRACT_NAME\\")) | .value[\\"bin-runtime\\"]" "$ARTIFACTS_DIR/combined.json" > "$BIN_RUNTIME_OUT"
+        "$JQ" -r ".contracts | to_entries[] | select(.key | endswith(\\":$CONTRACT_NAME\\")) | .value.metadata" "$ARTIFACTS_DIR/combined.json" > "$METADATA_OUT"
     else
         # Fallback: use grep/sed (less reliable but works without jq)
         echo "Warning: jq not found, using fallback extraction" >&2
@@ -130,6 +133,7 @@ fi
 
     # Build extraction command
     extract_cmd = cmd_args(extract_script)
+    extract_cmd.add(toolchain.jq.args if toolchain.jq else "")
     extract_cmd.add(lib_info.output_dir)
     extract_cmd.add(contract_name)
     extract_cmd.add(abi_file.as_output())
@@ -138,7 +142,7 @@ fi
     extract_cmd.add(metadata_file.as_output())
 
     ctx.actions.run(
-        cmd_args(extract_cmd, hidden = [lib_info.output_dir]),
+        cmd_args(extract_cmd, hidden = [lib_info.output_dir] + ([toolchain.jq] if toolchain.jq else [])),
         category = "solidity_extract",
         identifier = ctx.label.name,
     )
@@ -165,6 +169,10 @@ solidity_contract = rule(
         "lib": attrs.dep(
             providers = [SolidityLibraryInfo],
             doc = "The solidity_library target containing the contract",
+        ),
+        "_solidity_toolchain": attrs.toolchain_dep(
+            default = "toolchains//:solc",
+            providers = [SolidityToolchainInfo],
         ),
     },
     doc = "Extracts a specific contract's artifacts (ABI, bytecode) from a compiled solidity_library.",

@@ -112,6 +112,53 @@ eval "$(tk completion zsh)"
 tk completion fish > ~/.config/fish/completions/tk.fish
 ```
 
+#### tk rules
+
+Manage `rules.star` files that define Buck2 build targets from source files. This command automatically detects imports from source files and updates the `deps` list in `rules.star`.
+
+```bash
+tk rules check              # Check if rules.star files need updates
+tk rules sync               # Update rules.star files with detected dependencies
+tk rules help               # Show help
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--all`, `-a` | Process all files (skip staleness detection) |
+| `--force`, `-f` | Same as `--all` |
+| `--verbose`, `-v` | Show detailed output including skipped files |
+| `--quiet`, `-q` | Suppress output |
+| `--dry-run`, `-n` | Show what would be changed without writing |
+
+**Staleness Detection:**
+
+By default, only files where source files are newer than `rules.star` are processed. Use `--all` or `--force` to check/sync all files.
+
+**Examples:**
+
+```bash
+tk rules check                    # Check stale rules.star files
+tk rules check --all              # Check all rules.star files
+tk rules sync                     # Update stale rules.star files
+tk rules sync --all               # Force update all files
+tk rules sync src/cmd/tk          # Sync specific directory
+tk rules sync --dry-run           # Preview changes without writing
+```
+
+**Preserving Manual Dependencies:**
+
+If you have manual dependencies that shouldn't be auto-detected, use preservation markers in your `rules.star`:
+
+```python
+# turnkey:preserve-start
+    "//some/manual:dep",
+# turnkey:preserve-end
+```
+
+Dependencies within these markers are preserved during sync.
+
 ### tk Flags
 
 Flags must come before the subcommand:

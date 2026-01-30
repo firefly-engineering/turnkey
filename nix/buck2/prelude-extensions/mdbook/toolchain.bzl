@@ -20,6 +20,7 @@ def _system_mdbook_toolchain_impl(ctx: AnalysisContext) -> list[Provider]:
 
     toolchain_info = MdbookToolchainInfo(
         mdbook = mdbook_run_info,
+        python_path = ctx.attrs.python_path,
         serve_output_dir = ctx.attrs.serve_output_dir,
     )
 
@@ -33,6 +34,9 @@ system_mdbook_toolchain = rule(
     attrs = {
         "mdbook_path": attrs.string(
             doc = "Path to the mdbook binary",
+        ),
+        "python_path": attrs.string(
+            doc = "Path to the python3 binary",
         ),
         "serve_output_dir": attrs.option(
             attrs.string(),

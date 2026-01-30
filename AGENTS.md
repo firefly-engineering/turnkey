@@ -82,10 +82,10 @@ direnv reload
 nix develop
 
 # Build all targets
-buck2 build //...
+tk build //...
 
 # Run all tests
-buck2 test //...
+tk test //...
 ```
 
 **When to run quality gates:**
@@ -97,7 +97,7 @@ buck2 test //...
 **If builds fail after Nix changes:**
 1. Try `direnv reload` to refresh the environment
 2. If still failing, use `nix develop` to force fresh evaluation
-3. Run `buck2 clean` to clear Buck2's file cache
+3. Run `tk clean` to clear Buck2's file cache
 4. Rebuild and retest
 
 ## Landing the Plane (Session Completion)

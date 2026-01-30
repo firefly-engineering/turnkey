@@ -9,6 +9,7 @@ buck2 = {}
 # These are automatically wrapped with tw for auto-sync when dependency files change
 go = {}
 golangci-lint = {}  # Go linter
+gopls = {}
 rust = {}
 cargo = {}
 clippy = {}         # Rust linter

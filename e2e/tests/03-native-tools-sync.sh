@@ -68,34 +68,11 @@ run_in_devshell_script << 'PHASE2'
   echo ""
   echo "Updating module path..."
   go mod edit -module example.com/native-sync-test
-
-  echo ""
-  echo "Adding new Go dependency with 'go get'..."
-  go get github.com/fatih/color@v1.16.0
-
-  echo ""
-  echo "Checking if go-deps.toml was updated..."
-  new_hash=$(sha256sum go-deps.toml | cut -d' ' -f1)
-  echo "New hash: $new_hash"
-
-  if [ "$initial_hash" = "$new_hash" ]; then
-    echo "ERROR: go-deps.toml was not updated after 'go get'"
-    exit 1
-  fi
-  echo "SUCCESS: go-deps.toml was updated (hashes differ)"
 PHASE2
 
-# Step 8: Verify the new dependency is in go-deps.toml
-step "Verifying new dependency in go-deps.toml"
-assert_file_contains "go-deps.toml" "github.com/fatih/color" || exit 1
-
-# Step 9: Stage updated files
-step "Staging updated deps"
-stage_for_flake
-commit_changes "Add fatih/color dependency"
-
-# Step 10: Update source to use new dependency
-step "Updating source to use new dependency"
+# Step 7b: Update source to use new dependency BEFORE running go get
+# This ensures go mod tidy won't remove the dependency (tw runs tidy after get)
+step "Updating source to use new dependency before go get"
 cat > main.go << 'EOF'
 package main
 
@@ -113,7 +90,37 @@ func main() {
 }
 EOF
 
-# Update rules.star to include the new dependency
+# Step 7c: Run go get and verify sync
+step "Running go get and verifying auto-sync"
+run_in_devshell_script << 'PHASE2B'
+  echo "Adding new Go dependency with 'go get'..."
+  go get github.com/fatih/color@v1.16.0
+
+  echo ""
+  echo "Checking if go-deps.toml was updated..."
+  initial_hash=$(cat /tmp/initial-hash.txt)
+  new_hash=$(sha256sum go-deps.toml | cut -d' ' -f1)
+  echo "Initial hash: $initial_hash"
+  echo "New hash: $new_hash"
+
+  if [ "$initial_hash" = "$new_hash" ]; then
+    echo "ERROR: go-deps.toml was not updated after 'go get'"
+    exit 1
+  fi
+  echo "SUCCESS: go-deps.toml was updated (hashes differ)"
+PHASE2B
+
+# Step 8: Verify the new dependency is in go-deps.toml
+step "Verifying new dependency in go-deps.toml"
+assert_file_contains "go-deps.toml" "github.com/fatih/color" || exit 1
+
+# Step 9: Stage updated files
+step "Staging updated deps"
+stage_for_flake
+commit_changes "Add fatih/color dependency"
+
+# Step 10: Update rules.star to include the new dependency
+# (main.go was already updated before go get)
 cat > rules.star << 'EOF'
 go_binary(
     name = "hello-go",

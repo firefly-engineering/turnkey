@@ -34,7 +34,10 @@
       }
     ];
     # Go needs python for bootstrap scripts and cxx for linking
-    implicitDependencies = [ "python" "cxx" ];
+    implicitDependencies = [
+      "python"
+      "cxx"
+    ];
   };
 
   rust = {
@@ -51,7 +54,10 @@
       }
     ];
     # Rust needs CXX for linking and python for build scripts
-    implicitDependencies = [ "cxx" "python" ];
+    implicitDependencies = [
+      "cxx"
+      "python"
+    ];
   };
 
   python = {
@@ -224,6 +230,7 @@
           forge_path = "${registry.foundry}/bin/forge";
           cast_path = "${registry.foundry}/bin/cast";
           anvil_path = "${registry.foundry}/bin/anvil";
+          jq_path = "${registry.jq}/bin/jq";
           soldeps_path = ".turnkey/soldeps";
         };
       }
@@ -252,6 +259,7 @@
         # Dynamic attrs resolved at build time from registry
         dynamicAttrs = registry: {
           mdbook_path = "${registry.mdbook}/bin/mdbook";
+          python_path = "${registry.python}/bin/python3";
           # Output served books to .turnkey/books/ to keep source tree clean
           serve_output_dir = ".turnkey/books";
         };

@@ -151,6 +151,22 @@ godeps-gen = {}
 tk = {}
 EOF
 
+step "Adding .gitignore"
+cat > .gitignore << 'EOF'
+# Turnkey managed files (symlinks to Nix store)
+.buckconfig
+.turnkey/
+
+# Buck2 build outputs
+buck-out/
+
+# direnv
+.direnv/
+
+# devenv
+.devenv/
+EOF
+
 step "Adding .envrc"
 cat > .envrc << 'EOF'
 use flake . --no-pure-eval

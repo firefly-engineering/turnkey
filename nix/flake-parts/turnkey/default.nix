@@ -92,7 +92,12 @@ in
 
           prelude = {
             strategy = mkOption {
-              type = types.enum [ "bundled" "git" "nix" "path" ];
+              type = types.enum [
+                "bundled"
+                "git"
+                "nix"
+                "path"
+              ];
               default = "nix";
               description = ''
                 How to provide the Buck2 prelude cell:
@@ -483,6 +488,60 @@ in
               '';
             };
           };
+
+          # ==========================================================================
+          # Pre-commit hook configuration (tk options)
+          # ==========================================================================
+          tk = {
+            aliasBuck2 = mkOption {
+              type = types.bool;
+              default = true;
+              description = ''
+                Alias buck2 to tk in the devenv shell.
+              '';
+            };
+
+            syncOnShellEntry = mkOption {
+              type = types.bool;
+              default = true;
+              description = ''
+                Run `tk sync` automatically when entering the devenv shell.
+              '';
+            };
+
+            preCommitCheck = mkOption {
+              type = types.bool;
+              default = true;
+              description = ''
+                Add a pre-commit hook that runs `tk check` before commits.
+              '';
+            };
+
+            rustEditionCheck = mkOption {
+              type = types.bool;
+              default = false;
+              description = ''
+                Add a pre-commit hook that verifies Rust edition alignment.
+              '';
+            };
+
+            monorepoDepCheck = mkOption {
+              type = types.bool;
+              default = false;
+              description = ''
+                Add a pre-commit hook that verifies monorepo dependency rules.
+              '';
+            };
+
+            jsTestConfigCheck = mkOption {
+              type = types.bool;
+              default = false;
+              description = ''
+                Add a pre-commit hook that verifies Jest/Vitest/Biome configs
+                properly exclude buck-out directories.
+              '';
+            };
+          };
         };
       };
     }
@@ -506,36 +565,56 @@ in
 
       # Helper for single-version entries
       single = pkg: {
-        versions = { "default" = pkg; };
+        versions = {
+          "default" = pkg;
+        };
         default = "default";
       };
 
+      # Normalize a registry entry to versioned format
+      # Handles both flat (buck2 = pkgs.buck2) and versioned ({ versions = ...; default = ...; }) formats
+      normalizeEntry =
+        entry:
+        if entry ? versions && entry ? default then
+          entry # Already versioned
+        else
+          single entry; # Flat package -> convert to versioned
+
+      # Normalize all entries in a registry to versioned format
+      normalizeRegistry = reg: builtins.mapAttrs (_name: normalizeEntry) reg;
+
       # Merge versioned registries (toolchain level merge, version level merge)
-      mergeRegistries = base: extensions:
+      mergeRegistries =
+        base: extensions:
         let
-          mergeToolchain = name: ext:
+          mergeToolchain =
+            name: ext:
             let
               existing = base.${name} or null;
             in
-              if existing == null then ext
-              else {
-                versions = (existing.versions or {}) // (ext.versions or {});
+            if existing == null then
+              ext
+            else
+              {
+                versions = (existing.versions or { }) // (ext.versions or { });
                 default = if ext ? default then ext.default else existing.default;
               };
         in
-          base // (builtins.mapAttrs mergeToolchain extensions);
+        base // (builtins.mapAttrs mergeToolchain extensions);
 
       # Registry merging:
       # 1. Start with default registry
       # 2. Merge registryExtensions on top (versions are additive, default overrides)
       # 3. If registry is explicitly set (non-empty), use that as complete override
-      baseRegistry =
+      # 4. Normalize all entries to versioned format (handles flat pkgs.foo entries)
+      baseRegistry = normalizeRegistry (
         if cfg.registry != { } then
           # Complete override - user specified full registry
           cfg.registry
         else
           # Default + extensions with proper merging
-          mergeRegistries defaultRegistry cfg.registryExtensions;
+          mergeRegistries defaultRegistry cfg.registryExtensions
+      );
 
       # Build the turnkey-prelude derivation (Nix-backed prelude cell)
       turnkeyPrelude = import ../../buck2/prelude.nix { inherit pkgs lib; };
@@ -549,17 +628,26 @@ in
       twWrappers = import ../../packages/tw-wrappers.nix { inherit pkgs lib tw; };
 
       # Tools that can be wrapped (must have entries in tw-wrappers.nix)
-      wrappableTools = [ "go" "cargo" "uv" ];
+      wrappableTools = [
+        "go"
+        "cargo"
+        "uv"
+      ];
 
       # Augment registry with wrappers when wrapNativeTools is enabled
       # This replaces the tool entry with a wrapped version (same versioned structure)
       registry =
         if cfg.wrapNativeTools then
-          baseRegistry // (lib.listToAttrs (
+          baseRegistry
+          // (lib.listToAttrs (
             lib.filter (x: x != null) (
-              map (tool:
+              map (
+                tool:
                 if baseRegistry ? ${tool} then
-                  { name = tool; value = single twWrappers."tw-${tool}"; }
+                  {
+                    name = tool;
+                    value = single twWrappers."tw-${tool}";
+                  }
                 else
                   null
               ) wrappableTools
@@ -568,8 +656,8 @@ in
         else
           baseRegistry;
 
-      # Build gobuckify for generating BUCK files
-      gobuckify = import ../../packages/gobuckify.nix { inherit pkgs lib; };
+      # Build buckgen for generating BUCK files
+      buckgen = import ../../packages/buckgen.nix { inherit pkgs lib; };
 
       # Build godeps cell from go.depsFile if specified and exists
       # The file may not exist on first run (before .envrc generates it)
@@ -578,7 +666,7 @@ in
         if cfg.buck2.go.enable then
           if cfg.buck2.go.depsFile != null && builtins.pathExists cfg.buck2.go.depsFile then
             import ../../buck2/go-deps-cell.nix {
-              inherit pkgs lib gobuckify;
+              inherit pkgs lib buckgen;
               depsFile = cfg.buck2.go.depsFile;
             }
           else
@@ -595,9 +683,10 @@ in
               inherit pkgs lib;
               depsFile = cfg.buck2.rust.depsFile;
               featuresFile =
-                if cfg.buck2.rust.featuresFile != null && builtins.pathExists cfg.buck2.rust.featuresFile
-                then cfg.buck2.rust.featuresFile
-                else null;
+                if cfg.buck2.rust.featuresFile != null && builtins.pathExists cfg.buck2.rust.featuresFile then
+                  cfg.buck2.rust.featuresFile
+                else
+                  null;
               rustcFlagsRegistry = cfg.buck2.rust.rustcFlagsRegistry;
               buildScriptFixups = cfg.buck2.rust.buildScriptFixups;
             }
@@ -684,9 +773,7 @@ in
               enable = cfg.buck2.go.enable;
               cell = godepsCell;
               depsFile =
-                if cfg.buck2.go.depsFile != null
-                then builtins.baseNameOf cfg.buck2.go.depsFile
-                else "go-deps.toml";
+                if cfg.buck2.go.depsFile != null then builtins.baseNameOf cfg.buck2.go.depsFile else "go-deps.toml";
               modFile = cfg.buck2.go.modFile;
               sumFile = cfg.buck2.go.sumFile;
               autoRegenerate = cfg.buck2.go.autoRegenerate;
@@ -698,9 +785,7 @@ in
               enable = cfg.buck2.rust.enable;
               cell = rustdepsCell;
               depsFile =
-                if cfg.buck2.rust.depsFile != null
-                then builtins.baseNameOf cfg.buck2.rust.depsFile
-                else null;
+                if cfg.buck2.rust.depsFile != null then builtins.baseNameOf cfg.buck2.rust.depsFile else null;
               cargoTomlFile = cfg.buck2.rust.cargoTomlFile;
               cargoLockFile = cfg.buck2.rust.cargoLockFile;
             };
@@ -710,9 +795,7 @@ in
               enable = cfg.buck2.python.enable;
               cell = pydepsCell;
               depsFile =
-                if cfg.buck2.python.depsFile != null
-                then builtins.baseNameOf cfg.buck2.python.depsFile
-                else null;
+                if cfg.buck2.python.depsFile != null then builtins.baseNameOf cfg.buck2.python.depsFile else null;
               pyprojectFile = cfg.buck2.python.pyprojectFile;
               lockFile = cfg.buck2.python.lockFile;
             };
@@ -722,9 +805,10 @@ in
               enable = cfg.buck2.javascript.enable;
               cell = jsdepsCell;
               depsFile =
-                if cfg.buck2.javascript.depsFile != null
-                then builtins.baseNameOf cfg.buck2.javascript.depsFile
-                else null;
+                if cfg.buck2.javascript.depsFile != null then
+                  builtins.baseNameOf cfg.buck2.javascript.depsFile
+                else
+                  null;
               lockFile = cfg.buck2.javascript.lockFile;
               includeDevDependencies = cfg.buck2.javascript.includeDevDependencies;
             };
@@ -734,10 +818,21 @@ in
               enable = cfg.buck2.solidity.enable;
               cell = soldepsCell;
               depsFile =
-                if cfg.buck2.solidity.depsFile != null
-                then builtins.baseNameOf cfg.buck2.solidity.depsFile
-                else null;
+                if cfg.buck2.solidity.depsFile != null then
+                  builtins.baseNameOf cfg.buck2.solidity.depsFile
+                else
+                  null;
               foundryTomlFile = cfg.buck2.solidity.foundryTomlFile;
+            };
+
+            # Pre-commit hook configuration
+            tk = {
+              aliasBuck2 = cfg.buck2.tk.aliasBuck2;
+              syncOnShellEntry = cfg.buck2.tk.syncOnShellEntry;
+              preCommitCheck = cfg.buck2.tk.preCommitCheck;
+              rustEditionCheck = cfg.buck2.tk.rustEditionCheck;
+              monorepoDepCheck = cfg.buck2.tk.monorepoDepCheck;
+              jsTestConfigCheck = cfg.buck2.tk.jsTestConfigCheck;
             };
           };
         };
