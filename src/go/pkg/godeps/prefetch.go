@@ -6,6 +6,8 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+
+	"github.com/firefly-engineering/turnkey/src/go/pkg/prefetchcache"
 )
 
 // Prefetcher fetches Nix-compatible hashes for Go module sources.
@@ -61,6 +63,63 @@ func (c ChainPrefetcher) Prefetch(importPath, version string) (string, error) {
 		return "", lastErr
 	}
 	return "", fmt.Errorf("no prefetcher supports %s", importPath)
+}
+
+// CachedPrefetcher wraps a Prefetcher with cache support.
+// It checks the cache before delegating to the underlying prefetcher,
+// and stores results in the cache after successful fetches.
+type CachedPrefetcher struct {
+	// Inner is the underlying prefetcher to delegate to on cache miss.
+	Inner Prefetcher
+	// Cache is the shared prefetch cache.
+	Cache *prefetchcache.Cache
+	// Logger receives cache hit/miss messages. If nil, no logging is done.
+	Logger io.Writer
+	// KeyFunc generates cache keys from import paths. If nil, uses importPath directly.
+	// This allows customizing the cache key format (e.g., adding a source prefix).
+	KeyFunc func(importPath, version string) string
+}
+
+// Supports returns true if the inner prefetcher supports the import path.
+func (c *CachedPrefetcher) Supports(importPath string) bool {
+	return c.Inner.Supports(importPath)
+}
+
+// Prefetch checks the cache first, then delegates to the inner prefetcher on miss.
+func (c *CachedPrefetcher) Prefetch(importPath, version string) (string, error) {
+	key := c.cacheKey(importPath, version)
+
+	// Check cache first
+	if entry, ok := c.Cache.Get(key); ok {
+		if c.Logger != nil {
+			_, _ = fmt.Fprintf(c.Logger, "cache hit: %s@%s\n", importPath, version)
+		}
+		return entry.Hash, nil
+	}
+
+	if c.Logger != nil {
+		_, _ = fmt.Fprintf(c.Logger, "cache miss: %s@%s\n", importPath, version)
+	}
+
+	// Delegate to inner prefetcher
+	hash, err := c.Inner.Prefetch(importPath, version)
+	if err != nil {
+		return "", err
+	}
+
+	// Store in cache
+	c.Cache.Set(key, hash)
+
+	return hash, nil
+}
+
+// cacheKey generates the cache key for an import path and version.
+func (c *CachedPrefetcher) cacheKey(importPath, version string) string {
+	if c.KeyFunc != nil {
+		return c.KeyFunc(importPath, version)
+	}
+	// Default: use import path directly as source, which works for github.com paths
+	return prefetchcache.MakeKey(importPath, "", version)
 }
 
 // GitHubPrefetcher fetches hashes for github.com modules using nix-prefetch-github.
@@ -338,18 +397,47 @@ func DefaultPrefetcher(logger io.Writer) Prefetcher {
 	}
 }
 
+// CachedDefaultPrefetcher returns a DefaultPrefetcher wrapped with cache support.
+// The cache is shared with other turnkey tools (rustdeps-gen, pydeps-gen).
+// If cache initialization fails, returns the uncached prefetcher with a warning.
+func CachedDefaultPrefetcher(logger io.Writer) (Prefetcher, *prefetchcache.Cache) {
+	inner := DefaultPrefetcher(logger)
+
+	cache, err := prefetchcache.New()
+	if err != nil {
+		if logger != nil {
+			_, _ = fmt.Fprintf(logger, "warning: cache unavailable: %v\n", err)
+		}
+		return inner, nil
+	}
+
+	return &CachedPrefetcher{
+		Inner:  inner,
+		Cache:  cache,
+		Logger: logger,
+		KeyFunc: func(importPath, version string) string {
+			// Use import path as source for cache key
+			// This matches how Go modules are identified
+			return prefetchcache.MakeKey(importPath, "", version)
+		},
+	}, cache
+}
+
 // PrefetchAll fetches Nix hashes for all dependencies using the given prefetcher.
 // Errors are reported via the errHandler callback; processing continues on error.
 func PrefetchAll(deps []Dependency, p Prefetcher, errHandler func(dep Dependency, err error)) {
 	for i := range deps {
-		if !p.Supports(deps[i].ImportPath) {
+		// Use EffectiveFetchPath for the actual fetch, but keep ImportPath for storage
+		fetchPath := deps[i].EffectiveFetchPath()
+
+		if !p.Supports(fetchPath) {
 			if errHandler != nil {
-				errHandler(deps[i], fmt.Errorf("no prefetcher supports %s", deps[i].ImportPath))
+				errHandler(deps[i], fmt.Errorf("no prefetcher supports %s", fetchPath))
 			}
 			continue
 		}
 
-		hash, err := p.Prefetch(deps[i].ImportPath, deps[i].Version)
+		hash, err := p.Prefetch(fetchPath, deps[i].Version)
 		if err != nil {
 			if errHandler != nil {
 				errHandler(deps[i], err)
