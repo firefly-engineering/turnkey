@@ -121,4 +121,17 @@ ${asmSourcesArray}
     ar rcs "$RING_OUT/lib''${RING_PREFIX%.}.a" "''${RING_OBJS[@]}"
     echo "Built ring native library: $RING_OUT/lib''${RING_PREFIX%.}.a"
   '';
+
+  # ==========================================================================
+  # Native Libraries
+  # ==========================================================================
+
+  nativeLibraries = {
+    # ring's native crypto library
+    ring = { patchVersion, ... }: {
+      lib_name = "ring_core_0_17_${patchVersion}__";
+      static_lib_path = "out_dir/libring_core_0_17_${patchVersion}__.a";
+      link_search_path = "out_dir";
+    };
+  };
 }

@@ -3,21 +3,24 @@
 # Fixups for Rust crates that require special handling during build.
 # Each fixup file handles a family of related crates.
 #
-# This module exports two types of fixups:
+# This module exports three types of fixups:
 #   - buildScriptFixups: Shell commands to generate build.rs outputs
 #   - rustcFlags: --cfg flags to pass to rustc
+#   - nativeLibraries: Info about pre-compiled native libraries
 #
 # Fixups are organized as:
 #   - serde.nix: serde, serde_core (build script), serde_json (rustc flags)
 #   - thiserror.nix: thiserror (build script)
 #   - ring.nix: ring crypto library (native code compilation)
 #   - rustix.nix: rustix platform flags (rustc flags)
-#   - tree-sitter.nix: tree-sitter WASM stdlib symbols (build script)
+#   - tree-sitter.nix: tree-sitter native C library
 #
 # Build script fixups are functions: context -> string (shell commands)
 # Context includes: { name, version, patchVersion, vendorPath, ... }
 #
 # Rustc flags are arrays: [ "--cfg" "flag" ... ]
+#
+# Native libraries are functions: context -> { lib_name, static_lib_path, link_search_path? }
 
 { pkgs, lib }:
 
@@ -57,6 +60,21 @@ rec {
     // (ringFixups.rustcFlags or {})
     // (rustixFixups.rustcFlags or {})
     // (treeSitterFixups.rustcFlags or {});
+
+  # ==========================================================================
+  # Native Libraries
+  # ==========================================================================
+  #
+  # Info about pre-compiled native libraries that need to be linked.
+  # Keyed by crate name or name@version.
+  # Each entry is a function: context -> { lib_name, static_lib_path, link_search_path? }
+
+  nativeLibraries =
+    (serdeFixups.nativeLibraries or {})
+    // (thiserrorFixups.nativeLibraries or {})
+    // (ringFixups.nativeLibraries or {})
+    // (rustixFixups.nativeLibraries or {})
+    // (treeSitterFixups.nativeLibraries or {});
 
   # ==========================================================================
   # Combined (for backward compatibility)

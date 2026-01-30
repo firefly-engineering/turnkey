@@ -6,7 +6,6 @@ from .generator import (
     extract_deps_from_section,
     get_dependencies,
     get_build_script_cfg_flags,
-    get_native_library_info,
     generate_buck_file,
     filter_features_for_availability,
 )
@@ -17,7 +16,6 @@ __all__ = [
     "extract_deps_from_section",
     "get_dependencies",
     "get_build_script_cfg_flags",
-    "get_native_library_info",
     "generate_buck_file",
     "filter_features_for_availability",
 ]

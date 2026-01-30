@@ -201,31 +201,6 @@ def get_build_script_cfg_flags(
     return []
 
 
-def get_native_library_info(crate_name: str, version: str) -> dict | None:
-    """Get info about native libraries for crates with pre-built native code.
-
-    Some crates (like ring) have native C/assembly code that we pre-compile
-    in Nix. This returns info needed to create a prebuilt_cxx_library rule
-    and configure the linker.
-
-    Returns dict with:
-        - lib_name: The library name (without lib prefix and .a suffix)
-        - static_lib_path: Path to the static library file
-        - link_search_path: Path for -L flag (relative to crate dir)
-    """
-    if crate_name == "ring":
-        # ring's native crypto library is pre-compiled and placed in out_dir/
-        # The library name follows ring's versioning: libring_core_0_17_<patch>.a
-        patch = version.split(".")[-1] if version else "0"
-        lib_name = f"ring_core_0_17_{patch}__"
-        return {
-            "lib_name": lib_name,
-            "static_lib_path": f"out_dir/lib{lib_name}.a",
-            "link_search_path": "out_dir",
-        }
-    return None
-
-
 def generate_buck_file(
     crate_name: str,
     edition: str,
