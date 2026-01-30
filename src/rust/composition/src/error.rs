@@ -7,7 +7,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum Error {
     /// The backend is already mounted
-    #[error("backend is already mounted at {0}")]
+    #[error("backend is already mounted at {}", .0.display())]
     AlreadyMounted(PathBuf),
 
     /// The backend is not mounted
@@ -15,7 +15,7 @@ pub enum Error {
     NotMounted,
 
     /// Mount point does not exist or is inaccessible
-    #[error("mount point not accessible: {path}")]
+    #[error("mount point not accessible: {}", path.display())]
     MountPointInaccessible {
         path: PathBuf,
         #[source]
@@ -23,7 +23,7 @@ pub enum Error {
     },
 
     /// Failed to create mount point directory
-    #[error("failed to create mount point: {path}")]
+    #[error("failed to create mount point: {}", path.display())]
     MountPointCreationFailed {
         path: PathBuf,
         #[source]
@@ -35,11 +35,11 @@ pub enum Error {
     CellNotFound(String),
 
     /// Cell source path does not exist
-    #[error("cell source path does not exist: {cell} -> {path}")]
+    #[error("cell source path does not exist: {cell} -> {}", path.display())]
     CellSourceNotFound { cell: String, path: PathBuf },
 
     /// Failed to create symlink
-    #[error("failed to create symlink: {target} -> {link}")]
+    #[error("failed to create symlink: {} -> {}", target.display(), link.display())]
     SymlinkFailed {
         target: PathBuf,
         link: PathBuf,
@@ -48,7 +48,7 @@ pub enum Error {
     },
 
     /// Failed to remove symlink
-    #[error("failed to remove symlink: {path}")]
+    #[error("failed to remove symlink: {}", path.display())]
     SymlinkRemoveFailed {
         path: PathBuf,
         #[source]
@@ -88,7 +88,7 @@ pub enum Error {
     Io(#[from] std::io::Error),
 
     /// Path is being updated, read blocked
-    #[error("path is being updated: {0}")]
+    #[error("path is being updated: {}", .0.display())]
     PathUpdating(PathBuf),
 
     /// Operation timed out
