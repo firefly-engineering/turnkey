@@ -152,7 +152,9 @@ func RenderCell(vendorDir string, cfg *Config) ([]string, error) {
 		if rel == "." {
 			return nil
 		}
-		importPath := filepath.ToSlash(rel)
+		// Strip @version suffixes from path components
+		// e.g., "golang.org/x/mod@v0.31.0/module" -> "golang.org/x/mod/module"
+		importPath := stripVersionsFromPath(filepath.ToSlash(rel))
 
 		// Try to parse as a Go package
 		pkg, err := goparse.ScanPackage(path, importPath, cfg.PlatformsToGoparse())
@@ -191,6 +193,18 @@ func isStdLib(importPath string) bool {
 	}
 	parts := strings.Split(importPath, "/")
 	return !strings.Contains(parts[0], ".")
+}
+
+// stripVersionsFromPath removes @version suffixes from path components.
+// e.g., "golang.org/x/mod@v0.31.0/module" -> "golang.org/x/mod/module"
+func stripVersionsFromPath(path string) string {
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		if idx := strings.Index(part, "@"); idx != -1 {
+			parts[i] = part[:idx]
+		}
+	}
+	return strings.Join(parts, "/")
 }
 
 func importToTarget(importPath string, cfg *Config) string {
