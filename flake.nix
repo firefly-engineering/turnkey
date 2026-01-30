@@ -184,6 +184,9 @@
                 enable = true;
                 depsFile = ./solidity-deps.toml;
               };
+
+              # Pre-commit checks
+              tk.jsTestConfigCheck = true;
             };
           };
         };
