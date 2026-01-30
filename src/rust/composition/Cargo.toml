@@ -1,0 +1,11 @@
+[package]
+name = "composition"
+version = "0.1.0"
+edition.workspace = true
+description = "Composition backend trait for FUSE and symlink-based repository views"
+
+[dependencies]
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
