@@ -186,7 +186,11 @@
               };
 
               # Pre-commit checks
-              tk.jsTestConfigCheck = true;
+              tk = {
+                jsTestConfigCheck = true;
+                rustEditionCheck = true;
+                monorepoDepCheck = true;
+              };
             };
           };
         };
