@@ -190,6 +190,7 @@
                 jsTestConfigCheck = true;
                 rustEditionCheck = true;
                 monorepoDepCheck = true;
+                foundryConfigCheck = true;
               };
             };
           };
