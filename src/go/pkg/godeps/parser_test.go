@@ -414,3 +414,153 @@ func TestMergeHashes_EmptyHashes(t *testing.T) {
 		t.Errorf("expected empty hash, got %s", deps[0].GoSumHash)
 	}
 }
+
+// Replace directive tests
+
+func TestParseReplaces_LocalPath(t *testing.T) {
+	input := []byte(`module example.com/mymod
+
+go 1.21
+
+require github.com/foo/bar v1.0.0
+
+replace github.com/foo/bar => ../local/bar
+`)
+	replaces, err := ParseReplaces(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(replaces) != 1 {
+		t.Fatalf("expected 1 replace, got %d", len(replaces))
+	}
+	if replaces[0].Old != "github.com/foo/bar" {
+		t.Errorf("expected Old=github.com/foo/bar, got %s", replaces[0].Old)
+	}
+	if replaces[0].NewPath != "../local/bar" {
+		t.Errorf("expected NewPath=../local/bar, got %s", replaces[0].NewPath)
+	}
+	if !replaces[0].IsLocal() {
+		t.Error("expected IsLocal()=true for relative path")
+	}
+}
+
+func TestParseReplaces_LocalPathAbsolute(t *testing.T) {
+	input := []byte(`module example.com/mymod
+
+go 1.21
+
+replace github.com/foo/bar => /absolute/path/bar
+`)
+	replaces, err := ParseReplaces(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(replaces) != 1 {
+		t.Fatalf("expected 1 replace, got %d", len(replaces))
+	}
+	if !replaces[0].IsLocal() {
+		t.Error("expected IsLocal()=true for absolute path")
+	}
+}
+
+func TestParseReplaces_RemoteReplace(t *testing.T) {
+	input := []byte(`module example.com/mymod
+
+go 1.21
+
+replace github.com/original/pkg => github.com/fork/pkg v1.2.3
+`)
+	replaces, err := ParseReplaces(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(replaces) != 1 {
+		t.Fatalf("expected 1 replace, got %d", len(replaces))
+	}
+	if replaces[0].Old != "github.com/original/pkg" {
+		t.Errorf("expected Old=github.com/original/pkg, got %s", replaces[0].Old)
+	}
+	if replaces[0].NewPath != "github.com/fork/pkg" {
+		t.Errorf("expected NewPath=github.com/fork/pkg, got %s", replaces[0].NewPath)
+	}
+	if replaces[0].NewVersion != "v1.2.3" {
+		t.Errorf("expected NewVersion=v1.2.3, got %s", replaces[0].NewVersion)
+	}
+	if replaces[0].IsLocal() {
+		t.Error("expected IsLocal()=false for remote replace")
+	}
+}
+
+func TestParseReplaces_VersionSpecific(t *testing.T) {
+	input := []byte(`module example.com/mymod
+
+go 1.21
+
+replace github.com/foo/bar v1.0.0 => ../local/bar
+`)
+	replaces, err := ParseReplaces(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(replaces) != 1 {
+		t.Fatalf("expected 1 replace, got %d", len(replaces))
+	}
+	if replaces[0].OldVersion != "v1.0.0" {
+		t.Errorf("expected OldVersion=v1.0.0, got %s", replaces[0].OldVersion)
+	}
+}
+
+func TestParseReplaces_MultipleReplaces(t *testing.T) {
+	input := []byte(`module example.com/mymod
+
+go 1.21
+
+replace (
+	github.com/foo/bar => ../local/bar
+	github.com/baz/qux => ./qux
+	github.com/remote/pkg => github.com/fork/pkg v1.0.0
+)
+`)
+	replaces, err := ParseReplaces(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(replaces) != 3 {
+		t.Fatalf("expected 3 replaces, got %d", len(replaces))
+	}
+}
+
+func TestParseReplaces_NoReplaces(t *testing.T) {
+	input := []byte(`module example.com/mymod
+
+go 1.21
+
+require github.com/foo/bar v1.0.0
+`)
+	replaces, err := ParseReplaces(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(replaces) != 0 {
+		t.Errorf("expected 0 replaces, got %d", len(replaces))
+	}
+}
+
+func TestFilterLocalReplaces(t *testing.T) {
+	replaces := []Replace{
+		{Old: "github.com/foo/bar", NewPath: "../local/bar"},
+		{Old: "github.com/baz/qux", NewPath: "github.com/fork/qux", NewVersion: "v1.0.0"},
+		{Old: "github.com/another/pkg", NewPath: "./pkg"},
+	}
+
+	local := FilterLocalReplaces(replaces)
+	if len(local) != 2 {
+		t.Fatalf("expected 2 local replaces, got %d", len(local))
+	}
+	if local[0].Old != "github.com/foo/bar" {
+		t.Errorf("expected first local replace to be foo/bar, got %s", local[0].Old)
+	}
+	if local[1].Old != "github.com/another/pkg" {
+		t.Errorf("expected second local replace to be another/pkg, got %s", local[1].Old)
+	}
+}

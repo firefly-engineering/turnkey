@@ -208,6 +208,29 @@ func stripVersionsFromPath(path string) string {
 }
 
 func importToTarget(importPath string, cfg *Config) string {
+	// Check if this import path has a local replacement
+	if cfg.LocalReplaces != nil {
+		if target, ok := cfg.LocalReplaces[importPath]; ok {
+			return target
+		}
+		// Also check for prefix matches (e.g., github.com/foo/bar/pkg matches github.com/foo/bar)
+		for replacePrefix, target := range cfg.LocalReplaces {
+			if strings.HasPrefix(importPath, replacePrefix+"/") {
+				// Append the subpath to the target
+				// e.g., "//src/mylib:mylib" + "/subpkg" -> "//src/mylib/subpkg:subpkg"
+				subpath := strings.TrimPrefix(importPath, replacePrefix)
+				subpkgName := filepath.Base(importPath)
+				// Extract the cell/path part from target (e.g., "//src/mylib" from "//src/mylib:mylib")
+				colonIdx := strings.LastIndex(target, ":")
+				if colonIdx != -1 {
+					basePath := target[:colonIdx]
+					return fmt.Sprintf("%s%s:%s", basePath, subpath, subpkgName)
+				}
+				return fmt.Sprintf("%s%s:%s", target, subpath, subpkgName)
+			}
+		}
+	}
+
 	// Use directory name (last path component) as target name.
 	// This matches the target name generation in RenderPackage.
 	parts := strings.Split(importPath, "/")

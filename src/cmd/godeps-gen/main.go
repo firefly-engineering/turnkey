@@ -33,11 +33,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Parse go.mod
+	// Parse go.mod dependencies
 	opts := godeps.ParseOptions{IncludeIndirect: *includeIndirect}
 	deps, err := godeps.ParseGoMod(goModData, opts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error parsing go.mod: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Parse replace directives
+	replaces, err := godeps.ParseReplaces(goModData)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error parsing replace directives: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -78,9 +85,9 @@ func main() {
 		output = f
 	}
 
-	// Output TOML
+	// Output TOML (with local replace directives)
 	outputOpts := godeps.DefaultOutputOptions()
-	if err := godeps.WriteTOML(output, deps, outputOpts); err != nil {
+	if err := godeps.WriteTOMLWithReplaces(output, deps, replaces, outputOpts); err != nil {
 		fmt.Fprintf(os.Stderr, "error writing output: %v\n", err)
 		os.Exit(1)
 	}

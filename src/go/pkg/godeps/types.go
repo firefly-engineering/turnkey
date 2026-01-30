@@ -2,6 +2,8 @@
 // dependency declarations for Nix/Buck2 integration.
 package godeps
 
+import "strings"
+
 // Dependency represents a Go module dependency with its metadata.
 type Dependency struct {
 	// ImportPath is the Go module import path (e.g., "github.com/google/uuid")
@@ -18,6 +20,26 @@ type Dependency struct {
 
 	// NixHash is the SRI hash for Nix fetchFromGitHub or similar
 	NixHash string
+}
+
+// Replace represents a go.mod replace directive.
+type Replace struct {
+	// Old is the module path being replaced (e.g., "github.com/foo/bar")
+	Old string
+
+	// OldVersion is the specific version being replaced (empty for all versions)
+	OldVersion string
+
+	// NewPath is the replacement path - either a local path or module path
+	NewPath string
+
+	// NewVersion is the replacement version (empty for local paths)
+	NewVersion string
+}
+
+// IsLocal returns true if this replace directive points to a local path.
+func (r Replace) IsLocal() bool {
+	return strings.HasPrefix(r.NewPath, ".") || strings.HasPrefix(r.NewPath, "/")
 }
 
 // ParseOptions configures the behavior of ParseGoMod.

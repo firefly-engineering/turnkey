@@ -84,3 +84,35 @@ func MergeHashes(deps []Dependency, hashes map[string]string) {
 		}
 	}
 }
+
+// ParseReplaces extracts replace directives from go.mod content.
+// It takes raw bytes for testability (no file I/O).
+func ParseReplaces(data []byte) ([]Replace, error) {
+	f, err := modfile.Parse("go.mod", data, nil)
+	if err != nil {
+		return nil, fmt.Errorf("parsing go.mod: %w", err)
+	}
+
+	var replaces []Replace
+	for _, rep := range f.Replace {
+		replaces = append(replaces, Replace{
+			Old:        rep.Old.Path,
+			OldVersion: rep.Old.Version,
+			NewPath:    rep.New.Path,
+			NewVersion: rep.New.Version,
+		})
+	}
+
+	return replaces, nil
+}
+
+// FilterLocalReplaces returns only the replace directives that point to local paths.
+func FilterLocalReplaces(replaces []Replace) []Replace {
+	var local []Replace
+	for _, r := range replaces {
+		if r.IsLocal() {
+			local = append(local, r)
+		}
+	}
+	return local
+}

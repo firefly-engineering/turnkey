@@ -28,12 +28,25 @@ func DefaultOutputOptions() OutputOptions {
 
 // WriteTOML writes dependencies in go-deps.toml format to the given writer.
 func WriteTOML(w io.Writer, deps []Dependency, opts OutputOptions) error {
+	return WriteTOMLWithReplaces(w, deps, nil, opts)
+}
+
+// WriteTOMLWithReplaces writes dependencies and local replace directives in go-deps.toml format.
+func WriteTOMLWithReplaces(w io.Writer, deps []Dependency, replaces []Replace, opts OutputOptions) error {
 	// Check if any deps are missing hashes
 	hasMissingHashes := false
 	for _, dep := range deps {
 		if dep.NixHash == "" {
 			hasMissingHashes = true
 			break
+		}
+	}
+
+	// Filter to only local replaces (external replaces are handled separately)
+	var localReplaces []Replace
+	for _, r := range replaces {
+		if r.IsLocal() {
+			localReplaces = append(localReplaces, r)
 		}
 	}
 
@@ -70,6 +83,17 @@ func WriteTOML(w io.Writer, deps []Dependency, opts OutputOptions) error {
 		}
 	}
 
+	// Write local replace directives
+	if len(localReplaces) > 0 {
+		_, _ = fmt.Fprintln(w, "# Local replace directives - these map import paths to local Buck2 targets")
+		_, _ = fmt.Fprintln(w)
+		for _, rep := range localReplaces {
+			if err := writeLocalReplace(w, rep); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -102,4 +126,23 @@ func formatHashComment(goSumHash string) string {
 		return fmt.Sprintf(" # go.sum %s - run nix-prefetch-github to get correct hash", goSumHash)
 	}
 	return ""
+}
+
+// writeLocalReplace writes a local replace directive entry in TOML format.
+func writeLocalReplace(w io.Writer, rep Replace) error {
+	// Key format: [replace."import-path"] or [replace."import-path@version"]
+	key := rep.Old
+	if rep.OldVersion != "" {
+		key = rep.Old + "@" + rep.OldVersion
+	}
+
+	_, _ = fmt.Fprintf(w, "[replace.\"%s\"]\n", key)
+	_, _ = fmt.Fprintf(w, "import_path = \"%s\"\n", rep.Old)
+	_, _ = fmt.Fprintf(w, "local_path = \"%s\"\n", rep.NewPath)
+	if rep.OldVersion != "" {
+		_, _ = fmt.Fprintf(w, "version = \"%s\"\n", rep.OldVersion)
+	}
+	_, _ = fmt.Fprintln(w)
+
+	return nil
 }

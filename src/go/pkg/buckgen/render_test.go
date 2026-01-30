@@ -121,3 +121,75 @@ func TestConfig(t *testing.T) {
 		t.Errorf("expected default buildfile_name rules.star, got %s", cfg.Buck.BuildfileName)
 	}
 }
+
+func TestRenderPackageWithLocalReplaces(t *testing.T) {
+	pkg := &goparse.GoPackage{
+		Name:       "testpkg",
+		ImportPath: "github.com/example/testpkg",
+		Imports: map[goparse.Platform][]string{
+			{OS: "linux", Arch: "amd64"}: {
+				"fmt",
+				"github.com/company/shared-lib",         // locally replaced
+				"github.com/company/shared-lib/subpkg", // subpkg of locally replaced
+				"github.com/external/dep",               // not replaced
+			},
+		},
+	}
+
+	cfg := DefaultConfig()
+	cfg.LocalReplaces = map[string]string{
+		"github.com/company/shared-lib": "//src/shared-lib:shared-lib",
+	}
+
+	var buf bytes.Buffer
+	err := RenderPackage(&buf, pkg, cfg)
+	if err != nil {
+		t.Fatalf("RenderPackage failed: %v", err)
+	}
+
+	output := buf.String()
+
+	// Local replace should use the configured target
+	if !strings.Contains(output, "\"//src/shared-lib:shared-lib\"") {
+		t.Errorf("output missing local replace target: %s", output)
+	}
+
+	// Subpkg of local replace should also be handled
+	if !strings.Contains(output, "\"//src/shared-lib/subpkg:subpkg\"") {
+		t.Errorf("output missing subpkg of local replace: %s", output)
+	}
+
+	// External dep should use the normal godeps prefix
+	if !strings.Contains(output, "\"godeps//github.com/external/dep:dep\"") {
+		t.Errorf("output missing external dep with godeps prefix: %s", output)
+	}
+}
+
+func TestImportToTargetWithLocalReplace(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.LocalReplaces = map[string]string{
+		"github.com/company/mylib": "//libs/mylib:mylib",
+	}
+
+	tests := []struct {
+		importPath string
+		expected   string
+	}{
+		// Direct match
+		{"github.com/company/mylib", "//libs/mylib:mylib"},
+		// Subpackage of replaced module
+		{"github.com/company/mylib/subpkg", "//libs/mylib/subpkg:subpkg"},
+		{"github.com/company/mylib/deep/nested", "//libs/mylib/deep/nested:nested"},
+		// Non-replaced import
+		{"github.com/external/pkg", "godeps//github.com/external/pkg:pkg"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.importPath, func(t *testing.T) {
+			result := importToTarget(tc.importPath, cfg)
+			if result != tc.expected {
+				t.Errorf("importToTarget(%q) = %q, want %q", tc.importPath, result, tc.expected)
+			}
+		})
+	}
+}
