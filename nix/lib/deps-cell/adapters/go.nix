@@ -123,20 +123,43 @@ rec {
     let
       depsToml = builtins.fromTOML (builtins.readFile depsFile);
       deps = depsToml.deps or { };
+      schemaVersion = depsToml.schema_version or 1;
 
       # Merge built-in fixups with user-provided
       allFixups = (fixups.builtinFixups.go or { }) // userFixups;
 
+      # Parse dependency info based on schema version
+      # v1: key is import path, version in depSpec.version
+      # v2: key is "import-path@version", import_path in depSpec.import_path
+      parseDep = key: depSpec:
+        if schemaVersion >= 2 then {
+          importPath = depSpec.import_path;
+          version = depSpec.version;
+          # Key includes version for v2, e.g., "github.com/foo/bar@v1.0.0"
+          versionedKey = key;
+        } else {
+          importPath = key;
+          version = depSpec.version;
+          # For v1, construct versioned key
+          versionedKey = "${key}@${depSpec.version}";
+        };
+
       # Build individual dep packages
       depPackages = lib.mapAttrs (
         key: depSpec:
+        let
+          parsed = parseDep key depSpec;
+        in
         mkGoDepPackage {
-          importPath = key;
-          version = depSpec.version;
+          importPath = parsed.importPath;
+          version = parsed.version;
           sha256 = depSpec.hash;
-          fixup = allFixups.${key} or null;
+          fixup = allFixups.${parsed.importPath} or allFixups.${key} or null;
         }
       ) deps;
+
+      # Parsed dependency info for use in merge phase
+      parsedDeps = lib.mapAttrs parseDep deps;
 
       # Go standard assembly headers content
       # These headers are normally at $GOROOT/pkg/include but Buck2's system_go_toolchain
@@ -190,13 +213,52 @@ rec {
       ''
         mkdir -p $out/vendor
 
-        # Copy each dep package into vendor/
+        # Copy each dep package into vendor/ with versioned paths
+        # For schema v2: create vendor/path@version/ directories
+        # For both: create symlinks from vendor/path -> vendor/path@version
         ${lib.concatStringsSep "\n" (
-          lib.mapAttrsToList (importPath: pkg: ''
-            mkdir -p "$out/vendor/${importPath}"
-            cp -r ${pkg}/* "$out/vendor/${importPath}/"
-            chmod -R u+w "$out/vendor/${importPath}"
-          '') depPackages
+          lib.mapAttrsToList (key: depSpec:
+            let
+              parsed = parsedDeps.${key};
+              pkg = depPackages.${key};
+              # Directory name includes version
+              versionedPath = "${parsed.importPath}@${parsed.version}";
+            in ''
+            # Create versioned directory
+            mkdir -p "$out/vendor/${versionedPath}"
+            cp -r ${pkg}/* "$out/vendor/${versionedPath}/"
+            chmod -R u+w "$out/vendor/${versionedPath}"
+          '') deps
+        )}
+
+        # Create unversioned symlinks for backwards compatibility
+        # These point to the versioned directories
+        ${lib.concatStringsSep "\n" (
+          let
+            # Group by import path to find all versions
+            byImportPath = lib.groupBy (key:
+              let parsed = parsedDeps.${key};
+              in parsed.importPath
+            ) (lib.attrNames deps);
+
+            # For each import path, create symlink to highest version
+            mkSymlink = importPath: keys:
+              let
+                versions = map (key: parsedDeps.${key}.version) keys;
+                # Sort versions (simple string sort works for semver with same prefix)
+                sortedVersions = lib.sort (a: b: a > b) versions;
+                highestVersion = lib.head sortedVersions;
+                versionedPath = "${importPath}@${highestVersion}";
+                # Get parent directory path
+                parentDir = lib.concatStringsSep "/" (lib.init (lib.splitString "/" importPath));
+              in ''
+              # Create parent directories for symlink
+              mkdir -p "$out/vendor/${parentDir}"
+              # Create relative symlink from unversioned to versioned path
+              ln -sfn "${lib.last (lib.splitString "/" importPath)}@${highestVersion}" "$out/vendor/${importPath}"
+            '';
+          in
+          lib.mapAttrsToList mkSymlink byImportPath
         )}
 
         # Generate assembly headers in packages that have .s files
