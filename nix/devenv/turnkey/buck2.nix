@@ -899,15 +899,16 @@ in
         type = lib.types.bool;
         default = false;
         description = ''
-          Add a pre-commit hook that verifies Jest/Vitest configs properly
+          Add a pre-commit hook that verifies Jest/Vitest/Biome configs properly
           exclude buck-out directories.
 
           Checks that:
           - Jest: testPathIgnorePatterns includes '/buck-out/' or '/\\.'
           - Vitest: exclude includes '**/buck-out/**' or '**/.*/**'
+          - Biome: files.includes contains '!**/buck-out/'
 
-          This prevents spurious test failures from buck-out artifacts being
-          picked up by test discovery.
+          This prevents spurious failures from buck-out artifacts being
+          picked up by test discovery, linting, or formatting.
 
           Note: This hook requires the check-js-test-config script from turnkey.
           Only enable this if you have copied the script to src/cmd/check-js-test-config/.
@@ -1213,12 +1214,12 @@ in
         '';
       };
 
-      # JS/TS test config check (buck-out exclusions)
+      # JS/TS tool config check (buck-out exclusions)
       js-test-config-check = lib.mkIf (cfg.javascript.enable && cfg.tk.jsTestConfigCheck) {
         enable = true;
         name = "js-test-config-check";
-        description = "Check Jest/Vitest configs exclude buck-out directories";
-        files = "(jest\\.config\\.(js|ts|mjs|cjs)|vitest\\.config\\.(js|ts|mjs|mts)|package\\.json)$";
+        description = "Check Jest/Vitest/Biome configs exclude buck-out directories";
+        files = "(jest\\.config\\.(js|ts|mjs|cjs)|vitest\\.config\\.(js|ts|mjs|mts)|biome\\.jsonc?|package\\.json)$";
         pass_filenames = false;
         entry = ''
           ${pkgs.python3}/bin/python src/cmd/check-js-test-config/__main__.py

@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Check that Jest/Vitest configs properly exclude buck-out directories.
+"""Check that JS/TS tooling configs properly exclude buck-out directories.
 
-This script verifies that JavaScript/TypeScript test configurations exclude
-buck-out directories to prevent spurious test failures from build artifacts
-being picked up by test discovery.
+This script verifies that JavaScript/TypeScript tool configurations exclude
+buck-out directories to prevent spurious failures from build artifacts
+being picked up by test discovery, linting, or formatting.
 
 Checks:
 1. Jest configs (jest.config.js, jest.config.ts, jest field in package.json)
    - testPathIgnorePatterns should include '/buck-out/' or '/\\.'
 2. Vitest configs (vitest.config.js, vitest.config.ts, vitest.config.mts)
    - exclude should include '**/buck-out/**' or '**/.*/**'
+3. Biome configs (biome.json, biome.jsonc)
+   - files.includes should contain '!**/buck-out/**' or '!**/buck-out/'
 """
 
 import json
@@ -149,6 +151,70 @@ def check_package_json_jest(package_json: Path, errors: list[str]) -> bool:
     return True
 
 
+def check_biome_config(config_path: Path, errors: list[str]) -> bool:
+    """Check a Biome config file for buck-out exclusions.
+
+    Returns True if the config was found and checked, False otherwise.
+    """
+    if not config_path.exists():
+        return False
+
+    try:
+        with open(config_path, "r") as f:
+            content = f.read()
+            # Handle jsonc (JSON with comments) by stripping single-line comments
+            # This is a simple approach - won't handle all edge cases but works for typical configs
+            lines = []
+            for line in content.split("\n"):
+                # Remove single-line comments (// style)
+                comment_idx = line.find("//")
+                if comment_idx >= 0:
+                    # Make sure it's not inside a string (simple heuristic)
+                    before = line[:comment_idx]
+                    if before.count('"') % 2 == 0:
+                        line = before
+                lines.append(line)
+            content = "\n".join(lines)
+            config = json.loads(content)
+    except (json.JSONDecodeError, OSError) as e:
+        errors.append(f"{config_path}: Failed to parse Biome config: {e}")
+        return True
+
+    # Check files.includes for exclusion patterns
+    files_config = config.get("files", {})
+    includes = files_config.get("includes", [])
+
+    # Also check "ignore" field (older biome versions)
+    ignore = files_config.get("ignore", [])
+
+    all_patterns = includes + ignore
+
+    if not all_patterns:
+        errors.append(
+            f"{config_path}: Biome config missing file exclusions. "
+            'Add "files": {{ "includes": ["**", "!**/buck-out/"] }} to exclude build artifacts.'
+        )
+        return True
+
+    # Check if buck-out exclusion is present
+    # Look for patterns like "!**/buck-out/**" or "!**/buck-out/"
+    has_buck_out = any("buck-out" in p and p.startswith("!") for p in all_patterns)
+
+    # Also check for dot-directory exclusions like "!**/.*/**"
+    has_dot_dirs = any(
+        (p.startswith("!") and (".*" in p or "/." in p))
+        for p in all_patterns
+    )
+
+    if not has_buck_out and not has_dot_dirs:
+        errors.append(
+            f"{config_path}: Biome files.includes should contain '!**/buck-out/' "
+            "to exclude build artifacts from linting/formatting."
+        )
+
+    return True
+
+
 def has_js_tests(root: Path) -> bool:
     """Check if the project has JavaScript/TypeScript test files."""
     test_patterns = [
@@ -188,12 +254,13 @@ def main() -> int:
     root = find_project_root()
     errors: list[str] = []
 
-    print(f"Checking JS/TS test config for buck-out exclusions in {root}...")
+    print(f"Checking JS/TS tool configs for buck-out exclusions in {root}...")
     print()
 
-    # Track whether we found any test framework config
+    # Track whether we found any tool config
     found_jest = False
     found_vitest = False
+    found_biome = False
 
     # Check Jest configs
     jest_configs = [
@@ -225,33 +292,47 @@ def main() -> int:
             found_vitest = True
             break
 
-    # If no test framework config found, check if tests exist
-    if not found_jest and not found_vitest:
+    # Check Biome configs
+    biome_configs = [
+        root / "biome.json",
+        root / "biome.jsonc",
+    ]
+
+    for config in biome_configs:
+        if check_biome_config(config, errors):
+            found_biome = True
+            break
+
+    # If no tool config found, check if JS/TS files exist
+    if not found_jest and not found_vitest and not found_biome:
         if has_js_tests(root):
-            print("Warning: Found JS/TS test files but no Jest or Vitest config.")
-            print("         If using a test framework, ensure it excludes buck-out directories.")
+            print("Warning: Found JS/TS test files but no Jest, Vitest, or Biome config.")
+            print("         If using these tools, ensure they exclude buck-out directories.")
             print()
             # This is just a warning, not an error
         else:
-            print("No Jest or Vitest configuration found (and no test files detected).")
+            print("No Jest, Vitest, or Biome configuration found (and no test files detected).")
             return 0
 
     # Report results
     if errors:
-        print(f"Found {len(errors)} test config issue(s):\n")
+        print(f"Found {len(errors)} config issue(s):\n")
         for error in errors:
             print(f"  - {error}")
         print()
-        print("Fix: Add exclusion patterns to prevent buck-out artifacts from test discovery:")
+        print("Fix: Add exclusion patterns to prevent buck-out artifacts from processing:")
         print()
         print("  Jest (jest.config.js or package.json):")
         print('    testPathIgnorePatterns: ["/buck-out/", "/\\\\."]')
         print()
         print("  Vitest (vitest.config.ts):")
         print('    test: { exclude: ["**/buck-out/**", "**/.*/**", "**/node_modules/**"] }')
+        print()
+        print("  Biome (biome.json):")
+        print('    "files": { "includes": ["**", "!**/buck-out/", "!**/node_modules/"] }')
         return 1
 
-    print("All test configs properly exclude buck-out directories.")
+    print("All JS/TS tool configs properly exclude buck-out directories.")
     return 0
 
 
