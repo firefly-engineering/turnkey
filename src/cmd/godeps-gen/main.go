@@ -64,6 +64,10 @@ func main() {
 	// Merge hashes into dependencies
 	godeps.MergeHashes(deps, hashes)
 
+	// Apply external replace directives to dependencies
+	// This sets FetchPath for deps that are replaced by external forks
+	godeps.ApplyExternalReplaces(deps, replaces)
+
 	// Prefetch Nix hashes if requested
 	if *prefetch {
 		fmt.Fprintf(os.Stderr, "Prefetching %d dependencies...\n", len(deps))

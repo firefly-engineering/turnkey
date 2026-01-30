@@ -91,11 +91,14 @@ rec {
       sha256, # SRI hash of the source
 
       # Optional
+      fetchPath ? null, # Path to fetch from (if different from importPath, e.g., for forks)
       subPackages ? [ ], # Specific packages within module (not used currently)
       fixup ? null, # Custom fixup commands
     }:
     let
-      fetchSpec = mkFetchSpec importPath version sha256;
+      # Use fetchPath if provided, otherwise importPath
+      effectiveFetchPath = if fetchPath != null then fetchPath else importPath;
+      fetchSpec = mkFetchSpec effectiveFetchPath version sha256;
       patchCommands = if fixup != null then fixup else "";
     in
     pkgs.runCommand "dep-go-${lib.replaceStrings [ "/" "." ] [ "-" "-" ] importPath}"
@@ -137,12 +140,15 @@ rec {
       # Parse dependency info based on schema version
       # v1: key is import path, version in depSpec.version
       # v2: key is "import-path@version", import_path in depSpec.import_path
+      #     optional fetch_path for external fork replaces
       parseDep = key: depSpec:
         if schemaVersion >= 2 then {
           importPath = depSpec.import_path;
+          fetchPath = depSpec.fetch_path or null;
           version = depSpec.version;
         } else {
           importPath = key;
+          fetchPath = null;
           version = depSpec.version;
         };
 
@@ -154,6 +160,7 @@ rec {
         in
         mkGoDepPackage {
           importPath = parsed.importPath;
+          fetchPath = parsed.fetchPath;
           version = parsed.version;
           sha256 = depSpec.hash;
           fixup = allFixups.${parsed.importPath} or allFixups.${key} or null;

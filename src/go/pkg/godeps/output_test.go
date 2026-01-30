@@ -218,3 +218,98 @@ func TestFormatHashComment(t *testing.T) {
 		})
 	}
 }
+
+func TestWriteTOML_WithFetchPath(t *testing.T) {
+	deps := []Dependency{
+		{
+			ImportPath: "github.com/original/pkg",
+			FetchPath:  "github.com/fork/pkg",
+			Version:    "v1.0.0",
+			NixHash:    "sha256-abc123=",
+		},
+	}
+
+	var buf bytes.Buffer
+	opts := OutputOptions{
+		IncludeHeader:         false,
+		IncludeHashWarning:    false,
+		IncludeRegenerateHint: false,
+	}
+
+	err := WriteTOML(&buf, deps, opts)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	// Key should use import_path
+	if !strings.Contains(output, `[deps."github.com/original/pkg@v1.0.0"]`) {
+		t.Errorf("missing versioned dependency section with import_path, got:\n%s", output)
+	}
+	// import_path should be present
+	if !strings.Contains(output, `import_path = "github.com/original/pkg"`) {
+		t.Error("missing import_path field")
+	}
+	// fetch_path should be present since it differs from import_path
+	if !strings.Contains(output, `fetch_path = "github.com/fork/pkg"`) {
+		t.Errorf("missing fetch_path field, got:\n%s", output)
+	}
+}
+
+func TestWriteTOML_NoFetchPathWhenSame(t *testing.T) {
+	deps := []Dependency{
+		{
+			ImportPath: "github.com/foo/bar",
+			FetchPath:  "github.com/foo/bar", // Same as ImportPath
+			Version:    "v1.0.0",
+			NixHash:    "sha256-abc=",
+		},
+	}
+
+	var buf bytes.Buffer
+	opts := OutputOptions{
+		IncludeHeader:         false,
+		IncludeHashWarning:    false,
+		IncludeRegenerateHint: false,
+	}
+
+	err := WriteTOML(&buf, deps, opts)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	// fetch_path should NOT be present when it equals import_path
+	if strings.Contains(output, "fetch_path") {
+		t.Errorf("unexpected fetch_path when same as import_path, got:\n%s", output)
+	}
+}
+
+func TestWriteTOML_NoFetchPathWhenEmpty(t *testing.T) {
+	deps := []Dependency{
+		{
+			ImportPath: "github.com/foo/bar",
+			FetchPath:  "", // Empty FetchPath
+			Version:    "v1.0.0",
+			NixHash:    "sha256-abc=",
+		},
+	}
+
+	var buf bytes.Buffer
+	opts := OutputOptions{
+		IncludeHeader:         false,
+		IncludeHashWarning:    false,
+		IncludeRegenerateHint: false,
+	}
+
+	err := WriteTOML(&buf, deps, opts)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	// fetch_path should NOT be present when empty
+	if strings.Contains(output, "fetch_path") {
+		t.Errorf("unexpected fetch_path when empty, got:\n%s", output)
+	}
+}

@@ -160,6 +160,88 @@ go_binary(
 )
 ```
 
-### External Fork Replacements
+## External Fork Replacements
 
-For replace directives that point to external forks (not local paths), see the separate documentation on external replacements. These require fetching and are handled differently.
+Turnkey supports `replace` directives that point to external forks (not local paths). This is useful when:
+
+- Using a forked version of a dependency with bug fixes
+- Using a maintained fork of an abandoned project
+- Testing changes before upstreaming
+
+### How It Works
+
+When godeps-gen encounters an external replace directive like:
+
+```go
+replace github.com/original/pkg => github.com/myfork/pkg v1.2.3
+```
+
+It will:
+1. Set the dependency's `import_path` to `github.com/original/pkg` (for correct imports)
+2. Set the `fetch_path` to `github.com/myfork/pkg` (where to actually fetch from)
+3. Use the replacement version
+
+### In go.mod
+
+```go
+module github.com/company/myapp
+
+require github.com/original/pkg v1.0.0
+
+replace github.com/original/pkg => github.com/myfork/pkg v1.2.3
+```
+
+### Generated go-deps.toml
+
+```toml
+[deps."github.com/original/pkg@v1.2.3"]
+import_path = "github.com/original/pkg"
+fetch_path = "github.com/myfork/pkg"
+version = "v1.2.3"
+hash = "sha256-..."
+```
+
+### How the Cell Builder Uses This
+
+The Nix cell builder:
+1. Fetches the source from `fetch_path` (the fork)
+2. Stores it in the vendor directory under `import_path` (the original path)
+3. Generates Buck2 rules using the original import path
+
+This means your code continues to import from the original path (`github.com/original/pkg`), but the actual source comes from your fork.
+
+### Version Handling
+
+External replaces can change the version:
+
+| go.mod replace | Result |
+|---------------|--------|
+| `=> github.com/fork v1.2.3` | Uses v1.2.3 from fork |
+| `=> github.com/fork` (no version) | Uses the required version from fork |
+
+Version-specific replaces are also supported:
+
+```go
+// Only replace v1.0.0, not other versions
+replace github.com/pkg v1.0.0 => github.com/fork/pkg v1.0.1
+```
+
+### Common Use Cases
+
+**Using a fork with a fix:**
+```go
+// Your fork has a critical bug fix not yet merged upstream
+replace github.com/upstream/logger => github.com/you/logger v1.0.1-patched
+```
+
+**Using a maintained fork:**
+```go
+// Original project abandoned, using community fork
+replace github.com/old/abandoned => github.com/community/maintained v2.0.0
+```
+
+**Testing before upstreaming:**
+```go
+// Test your changes before creating a PR
+replace github.com/original/pkg => github.com/you/pkg v0.0.0-20240101
+```

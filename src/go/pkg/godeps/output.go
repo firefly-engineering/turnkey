@@ -103,6 +103,12 @@ func writeDependency(w io.Writer, dep Dependency) error {
 	// Versioned key format (schema v2)
 	_, _ = fmt.Fprintf(w, "[deps.\"%s@%s\"]\n", dep.ImportPath, dep.Version)
 	_, _ = fmt.Fprintf(w, "import_path = \"%s\"\n", dep.ImportPath)
+
+	// Include fetch_path when it differs from import_path (external fork replace)
+	if dep.FetchPath != "" && dep.FetchPath != dep.ImportPath {
+		_, _ = fmt.Fprintf(w, "fetch_path = \"%s\"\n", dep.FetchPath)
+	}
+
 	_, _ = fmt.Fprintf(w, "version = \"%s\"\n", dep.Version)
 
 	if dep.NixHash != "" {
