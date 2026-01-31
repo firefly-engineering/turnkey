@@ -936,6 +936,35 @@ in
           Requires Python 3.11+ with tomllib support.
         '';
       };
+
+      sourceCoverageCheck = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Add a pre-commit hook that validates all source files are covered by
+          Buck2 targets in rules.star files.
+
+          This prevents accidentally adding source files that won't be built.
+          The hook parses rules.star files to extract source patterns (glob and
+          explicit file lists) and compares them against actual source files.
+
+          Configure the scope with tk.sourceScope (default: "src/").
+
+          Note: This hook requires the check-source-coverage script from turnkey.
+          Only enable this if you have copied the script to src/cmd/check-source-coverage/.
+
+          Requires Python 3.11+.
+        '';
+      };
+
+      sourceScope = lib.mkOption {
+        type = lib.types.str;
+        default = "src/";
+        description = ''
+          Directory scope for source coverage checking.
+          Only source files under this directory are validated.
+        '';
+      };
     };
 
     quiet = lib.mkOption {
@@ -1255,6 +1284,18 @@ in
         pass_filenames = false;
         entry = ''
           ${pkgs.python3}/bin/python src/cmd/check-foundry-config/__main__.py
+        '';
+      };
+
+      # Source coverage check - validate all source files covered by Buck2 targets
+      source-coverage-check = lib.mkIf cfg.tk.sourceCoverageCheck {
+        enable = true;
+        name = "source-coverage-check";
+        description = "Check all source files are covered by Buck2 targets";
+        files = "(\\.go|\\.rs|\\.py|\\.ts|\\.tsx|\\.js|\\.jsx|\\.sol|rules\\.star)$";
+        pass_filenames = false;
+        entry = ''
+          TURNKEY_SOURCE_SCOPE="${cfg.tk.sourceScope}" ${pkgs.python3}/bin/python src/cmd/check-source-coverage/__main__.py
         '';
       };
 
