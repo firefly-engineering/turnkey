@@ -91,19 +91,26 @@ turnkey.fuse = {
 **Resulting structure:**
 ```
 /firefly/turnkey/
-├── src/                    # Pass-through to repo source
-│   ├── go/
-│   ├── rust/
-│   └── ...
-├── external/               # Composed dependency view
-│   ├── godeps/             # Go dependencies
-│   │   └── vendor/
-│   ├── rustdeps/           # Rust dependencies
-│   │   └── vendor/
-│   └── ...
-├── .buckconfig             # Generated for this mount
-└── .buckroot
+├── root/                   # OVERLAY on repo root (run Buck2 from here)
+│   ├── .buckconfig         # Virtual - generated, shadows real if exists
+│   ├── .buckroot           # Virtual - marks Buck2 root
+│   ├── src/                # Pass-through from actual repo
+│   │   ├── go/
+│   │   ├── rust/
+│   │   └── ...
+│   ├── prelude/            # Pass-through from actual repo
+│   └── ...                 # All other repo files pass-through
+└── external/               # Pure virtual - dependency cells
+    ├── godeps/             # Go dependencies (from Nix store)
+    │   └── vendor/
+    ├── rustdeps/           # Rust dependencies (from Nix store)
+    │   └── vendor/
+    └── ...
 ```
+
+**Key insight:** Buck2 is run from `/firefly/turnkey/root/` where `.buckroot` exists.
+This means `//docs/user-manual` resolves correctly (relative to `.buckroot` location),
+making targets identical between FUSE and symlink approaches.
 
 ## Core Components
 
