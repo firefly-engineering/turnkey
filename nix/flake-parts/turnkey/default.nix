@@ -550,6 +550,24 @@ in
                 Checks that solc_version matches toolchain and dependencies match root.
               '';
             };
+
+            sourceCoverageCheck = mkOption {
+              type = types.bool;
+              default = false;
+              description = ''
+                Add a pre-commit hook that validates all source files are covered by
+                Buck2 targets in rules.star files.
+              '';
+            };
+
+            sourceScope = mkOption {
+              type = types.str;
+              default = ".";
+              description = ''
+                Directory scope for source coverage checking.
+                Default is "." (entire repository).
+              '';
+            };
           };
         };
       };
@@ -843,6 +861,8 @@ in
               monorepoDepCheck = cfg.buck2.tk.monorepoDepCheck;
               jsTestConfigCheck = cfg.buck2.tk.jsTestConfigCheck;
               foundryConfigCheck = cfg.buck2.tk.foundryConfigCheck;
+              sourceCoverageCheck = cfg.buck2.tk.sourceCoverageCheck;
+              sourceScope = cfg.buck2.tk.sourceScope;
             };
           };
         };
