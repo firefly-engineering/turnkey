@@ -107,6 +107,11 @@ in
       name = "tree_sitter_solidity";
     };
 
+    tree-sitter-starlark = mkGrammarFixup {
+      name = "tree_sitter_starlark";
+      hasScanner = true;
+    };
+
     # tree-sitter-typescript has two grammars: typescript and tsx
     tree-sitter-typescript = { vendorPath, ... }: ''
       echo "Building tree-sitter-typescript native libraries..."
@@ -159,6 +164,7 @@ in
     tree-sitter-rust = mkGrammarNativeLib "tree_sitter_rust";
     tree-sitter-python = mkGrammarNativeLib "tree_sitter_python";
     tree-sitter-solidity = mkGrammarNativeLib "tree_sitter_solidity";
+    tree-sitter-starlark = mkGrammarNativeLib "tree_sitter_starlark";
     tree-sitter-typescript = { ... }: {
       lib_name = "tree_sitter_typescript";
       static_lib_path = "out_dir/libtree_sitter_typescript.a";

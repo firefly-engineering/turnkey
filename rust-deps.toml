@@ -762,6 +762,11 @@ name = "tree-sitter-solidity"
 version = "1.2.13"
 hash = "sha256-cV2XuGLLsDSmp0uAmiA65DY9lT/PRLY9/C0aHra/I84="
 
+[deps."tree-sitter-starlark@1.3.0"]
+name = "tree-sitter-starlark"
+version = "1.3.0"
+hash = "sha256-kSgmSQxaLwl63k/WIOxSKSKdh9DFRPdv7YwXv/qYEhU="
+
 [deps."tree-sitter-typescript@0.23.2"]
 name = "tree-sitter-typescript"
 version = "0.23.2"

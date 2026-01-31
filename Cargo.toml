@@ -19,6 +19,7 @@ members = [
     "src/rust/composition",
     "src/rust/deps-extract",
     "src/rust/prefetch-cache",
+    "src/rust/starlark-parse",
 ]
 
 # Shared package metadata for all workspace members
@@ -60,6 +61,7 @@ tree-sitter-python = "0.23"
 tree-sitter-rust = "0.23"
 tree-sitter-typescript = "0.23"
 tree-sitter-solidity = "1.2.13"
+tree-sitter-starlark = "1.3"
 
 # Workspace member references (for path dependencies between crates)
 composition = { path = "src/rust/composition", features = ["fuse", "watcher"] }
