@@ -6,6 +6,7 @@ rust_library(
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
     deps = [
+        "rustdeps//vendor/log:log",
         "rustdeps//vendor/thiserror:thiserror",
     ],
     visibility = ["PUBLIC"],
@@ -16,6 +17,7 @@ rust_test(
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
     deps = [
+        "rustdeps//vendor/log:log",
         "rustdeps//vendor/tempfile:tempfile",
         "rustdeps//vendor/thiserror:thiserror",
     ],
