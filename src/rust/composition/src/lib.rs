@@ -52,6 +52,7 @@ use std::path::PathBuf;
 mod backend;
 mod config;
 mod error;
+pub mod state;
 mod status;
 pub mod symlink;
 
@@ -65,6 +66,7 @@ pub use backend::CompositionBackend;
 pub use symlink::SymlinkBackend;
 pub use config::{CellConfig, CompositionConfig, ConsistencyMode};
 pub use error::Error;
+pub use state::{ConsistencyStateMachine, StateObserver};
 pub use status::BackendStatus;
 
 /// Result type for composition operations

@@ -92,6 +92,10 @@ pub enum Error {
     PathUpdating(PathBuf),
 
     /// Operation timed out
-    #[error("operation timed out: {0}")]
-    Timeout(String),
+    #[error("operation timed out after {:?}", .0)]
+    Timeout(std::time::Duration),
+
+    /// Invalid state transition
+    #[error("invalid state transition: {0}")]
+    StateTransitionError(String),
 }

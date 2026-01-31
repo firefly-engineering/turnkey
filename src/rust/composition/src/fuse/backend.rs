@@ -330,7 +330,7 @@ impl CompositionBackend for FuseBackend {
 
             if let Some(timeout) = timeout {
                 if start.elapsed() >= timeout {
-                    return Err(Error::Timeout("wait_ready timed out".into()));
+                    return Err(Error::Timeout(timeout));
                 }
             }
 
