@@ -16,8 +16,22 @@ pub struct CompositionConfig {
     /// The source repository root
     ///
     /// This is the actual repository directory that contains the source
-    /// code. The `src/` directory in the composed view will point here.
+    /// code. The composed view will expose this under `source_dir_name`.
     pub repo_root: PathBuf,
+
+    /// The name of the directory that exposes the repository root
+    ///
+    /// Default: `"root"`. The repository root will be accessible at
+    /// `<mount_point>/<source_dir_name>/` in the composed view.
+    pub source_dir_name: String,
+
+    /// The prefix path for dependency cells
+    ///
+    /// Default: `"external"`. Cells will be mounted at
+    /// `<mount_point>/<cell_prefix>/<cell_name>/`.
+    ///
+    /// For Buck2, this means `godeps = external/godeps` in .buckconfig.
+    pub cell_prefix: String,
 
     /// Cell configurations
     ///
@@ -59,6 +73,8 @@ impl CompositionConfig {
         Self {
             mount_point: mount_point.into(),
             repo_root: repo_root.into(),
+            source_dir_name: "root".to_string(),
+            cell_prefix: "external".to_string(),
             cells: Vec::new(),
             layout: "buck2".to_string(),
             consistency_mode: ConsistencyMode::BlockUntilReady,
@@ -66,6 +82,18 @@ impl CompositionConfig {
             edits_dir: PathBuf::from(".turnkey/edits"),
             patches_dir: PathBuf::from(".turnkey/patches"),
         }
+    }
+
+    /// Set the source directory name
+    pub fn with_source_dir_name(mut self, name: impl Into<String>) -> Self {
+        self.source_dir_name = name.into();
+        self
+    }
+
+    /// Set the cell prefix path
+    pub fn with_cell_prefix(mut self, prefix: impl Into<String>) -> Self {
+        self.cell_prefix = prefix.into();
+        self
     }
 
     /// Add a cell configuration
@@ -231,10 +259,8 @@ mod tests {
         let config = CompositionConfig::new("/mount", "/repo");
         assert!(config.validate().is_ok());
 
-        let bad_config = CompositionConfig {
-            mount_point: PathBuf::new(),
-            ..CompositionConfig::new("/mount", "/repo")
-        };
+        let mut bad_config = CompositionConfig::new("/mount", "/repo");
+        bad_config.mount_point = PathBuf::new();
         assert!(bad_config.validate().is_err());
     }
 

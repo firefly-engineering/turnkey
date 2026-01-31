@@ -2,8 +2,8 @@
 //!
 //! This implements the low-level FUSE operations for the composition view.
 //! The filesystem presents a unified view with:
-//! - `/src/` - Pass-through to the repository source
-//! - `/external/<cell>/` - Read-only view of dependency cells from Nix store
+//! - `/<source_dir_name>/` - Pass-through to the repository root (default: "root")
+//! - `/<cell_prefix>/<cell>/` - Read-only view of dependency cells (default: ".turnkey")
 
 use fuser::{
     FileAttr, FileType, Filesystem, ReplyAttr, ReplyData, ReplyDirectory, ReplyEntry, ReplyOpen,
@@ -28,8 +28,8 @@ const TTL: Duration = Duration::from_secs(1);
 
 /// Reserved inode numbers
 const ROOT_INO: u64 = 1;
-const SRC_INO: u64 = 2;
-const EXTERNAL_INO: u64 = 3;
+const SOURCE_INO: u64 = 2;
+const CELL_PREFIX_INO: u64 = 3;
 const BUCKCONFIG_INO: u64 = 4;
 const BUCKROOT_INO: u64 = 5;
 const FIRST_DYNAMIC_INO: u64 = 1000;
@@ -44,13 +44,13 @@ enum VirtualFile {
 /// Represents the underlying path for an inode
 #[derive(Debug, Clone)]
 enum InodePath {
-    /// Virtual root directory
+    /// Virtual root directory of the mount
     Root,
-    /// src/ directory - pass-through to repo
-    Src,
-    /// external/ directory - contains cells
-    External,
-    /// A cell directory under external/
+    /// Source directory - pass-through to repo root
+    Source,
+    /// Cell prefix directory - contains cells (e.g., ".turnkey")
+    CellPrefix,
+    /// A cell directory under cell prefix
     Cell { name: String },
     /// A virtual file (generated content)
     Virtual { file: VirtualFile },
@@ -62,8 +62,8 @@ enum InodePath {
 pub struct CompositionFs {
     /// Configuration for this composition
     config: CompositionConfig,
-    /// Path to the repository source (for src/ pass-through)
-    src_path: PathBuf,
+    /// Path to the repository root (for source/ pass-through)
+    repo_root: PathBuf,
     /// Inode to path mapping
     inode_map: RwLock<HashMap<u64, InodePath>>,
     /// Path to inode mapping (for lookups)
@@ -79,12 +79,10 @@ pub struct CompositionFs {
 impl CompositionFs {
     /// Create a new composition filesystem
     pub fn new(config: CompositionConfig, repo_root: PathBuf) -> Self {
-        let src_path = repo_root.join("src");
-
         let mut inode_map = HashMap::new();
         inode_map.insert(ROOT_INO, InodePath::Root);
-        inode_map.insert(SRC_INO, InodePath::Src);
-        inode_map.insert(EXTERNAL_INO, InodePath::External);
+        inode_map.insert(SOURCE_INO, InodePath::Source);
+        inode_map.insert(CELL_PREFIX_INO, InodePath::CellPrefix);
         inode_map.insert(
             BUCKCONFIG_INO,
             InodePath::Virtual {
@@ -107,7 +105,7 @@ impl CompositionFs {
 
         Self {
             config,
-            src_path,
+            repo_root,
             inode_map: RwLock::new(inode_map),
             path_map: RwLock::new(HashMap::new()),
             next_inode: AtomicU64::new(next_ino),
@@ -146,8 +144,8 @@ impl CompositionFs {
     /// Resolve an inode to a real filesystem path (if applicable)
     fn resolve_real_path(&self, ino: u64) -> Option<PathBuf> {
         match self.get_inode_path(ino)? {
-            InodePath::Root | InodePath::External | InodePath::Virtual { .. } => None,
-            InodePath::Src => Some(self.src_path.clone()),
+            InodePath::Root | InodePath::CellPrefix | InodePath::Virtual { .. } => None,
+            InodePath::Source => Some(self.repo_root.clone()),
             InodePath::Cell { name } => self
                 .config
                 .cells
@@ -233,22 +231,29 @@ impl CompositionFs {
     /// Generate the content of .buckconfig
     fn generate_buckconfig(&self) -> String {
         let mut content = String::new();
+        let source_dir = &self.config.source_dir_name;
+        let cell_prefix = &self.config.cell_prefix;
 
         // Cell definitions
         content.push_str("[cells]\n");
-        content.push_str("    root = .\n");
-        content.push_str("    prelude = prelude\n");
+        // The root cell points to the source directory (e.g., "root")
+        content.push_str(&format!("    root = {}\n", source_dir));
+        // Prelude is under the source directory
+        content.push_str(&format!("    prelude = {}/prelude\n", source_dir));
 
-        // Add cells for each dependency
+        // Add cells for each dependency under cell_prefix (e.g., "external/godeps")
         for cell in &self.config.cells {
-            content.push_str(&format!("    {} = external/{}\n", cell.name, cell.name));
+            content.push_str(&format!(
+                "    {} = {}/{}\n",
+                cell.name, cell_prefix, cell.name
+            ));
         }
 
         content.push('\n');
 
         // Buildfile configuration
         content.push_str("[buildfile]\n");
-        content.push_str("    name = BUCK\n");
+        content.push_str("    name = rules.star\n");
 
         content
     }
@@ -288,43 +293,39 @@ impl Filesystem for CompositionFs {
 
         match self.get_inode_path(parent) {
             Some(InodePath::Root) => {
-                // Looking up in root directory
-                match name_str.as_ref() {
-                    "src" => {
-                        if let Some(path) = self.resolve_real_path(SRC_INO) {
-                            if let Ok(meta) = fs::metadata(&path) {
-                                reply.entry(&TTL, &self.metadata_to_attr(SRC_INO, &meta), 0);
-                                return;
-                            }
+                // Looking up in root directory - use configurable names
+                if name_str == self.config.source_dir_name {
+                    // Source directory (e.g., "root")
+                    if let Some(path) = self.resolve_real_path(SOURCE_INO) {
+                        if let Ok(meta) = fs::metadata(&path) {
+                            reply.entry(&TTL, &self.metadata_to_attr(SOURCE_INO, &meta), 0);
+                            return;
                         }
-                        // src/ doesn't exist on disk, return virtual
-                        reply.entry(&TTL, &self.virtual_dir_attr(SRC_INO), 0);
                     }
-                    "external" => {
-                        reply.entry(&TTL, &self.virtual_dir_attr(EXTERNAL_INO), 0);
-                    }
-                    ".buckconfig" => {
-                        let content = self.generate_buckconfig();
-                        reply.entry(
-                            &TTL,
-                            &self.virtual_file_attr(BUCKCONFIG_INO, content.len() as u64),
-                            0,
-                        );
-                    }
-                    ".buckroot" => {
-                        let content = self.generate_buckroot();
-                        reply.entry(
-                            &TTL,
-                            &self.virtual_file_attr(BUCKROOT_INO, content.len() as u64),
-                            0,
-                        );
-                    }
-                    _ => {
-                        reply.error(ENOENT);
-                    }
+                    // Fallback to virtual dir
+                    reply.entry(&TTL, &self.virtual_dir_attr(SOURCE_INO), 0);
+                } else if name_str == self.config.cell_prefix {
+                    // Cell prefix directory (e.g., "external")
+                    reply.entry(&TTL, &self.virtual_dir_attr(CELL_PREFIX_INO), 0);
+                } else if name_str == ".buckconfig" {
+                    let content = self.generate_buckconfig();
+                    reply.entry(
+                        &TTL,
+                        &self.virtual_file_attr(BUCKCONFIG_INO, content.len() as u64),
+                        0,
+                    );
+                } else if name_str == ".buckroot" {
+                    let content = self.generate_buckroot();
+                    reply.entry(
+                        &TTL,
+                        &self.virtual_file_attr(BUCKROOT_INO, content.len() as u64),
+                        0,
+                    );
+                } else {
+                    reply.error(ENOENT);
                 }
             }
-            Some(InodePath::External) => {
+            Some(InodePath::CellPrefix) => {
                 // Looking up a cell in external/
                 if let Some(ino) = self.find_cell_inode(&name_str) {
                     if let Some(path) = self.resolve_real_path(ino) {
@@ -340,7 +341,7 @@ impl Filesystem for CompositionFs {
                 // Virtual files don't have children
                 reply.error(ENOENT);
             }
-            Some(InodePath::Src) | Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
+            Some(InodePath::Source) | Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
                 // Looking up in a real directory
                 if let Some(parent_path) = self.resolve_real_path(parent) {
                     let child_path = parent_path.join(name);
@@ -362,14 +363,14 @@ impl Filesystem for CompositionFs {
         debug!("getattr(ino={})", ino);
 
         match self.get_inode_path(ino) {
-            Some(InodePath::Root) | Some(InodePath::External) => {
+            Some(InodePath::Root) | Some(InodePath::CellPrefix) => {
                 reply.attr(&TTL, &self.virtual_dir_attr(ino));
             }
             Some(InodePath::Virtual { file }) => {
                 let content = self.get_virtual_file_content(file);
                 reply.attr(&TTL, &self.virtual_file_attr(ino, content.len() as u64));
             }
-            Some(InodePath::Src) | Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
+            Some(InodePath::Source) | Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
                 if let Some(path) = self.resolve_real_path(ino) {
                     if let Ok(meta) = fs::symlink_metadata(&path) {
                         reply.attr(&TTL, &self.metadata_to_attr(ino, &meta));
@@ -457,13 +458,17 @@ impl Filesystem for CompositionFs {
 
         match self.get_inode_path(ino) {
             Some(InodePath::Root) => {
-                let entries: Vec<(u64, FileType, &str)> = vec![
-                    (ROOT_INO, FileType::Directory, "."),
-                    (ROOT_INO, FileType::Directory, ".."),
-                    (SRC_INO, FileType::Directory, "src"),
-                    (EXTERNAL_INO, FileType::Directory, "external"),
-                    (BUCKCONFIG_INO, FileType::RegularFile, ".buckconfig"),
-                    (BUCKROOT_INO, FileType::RegularFile, ".buckroot"),
+                // Use configurable directory names
+                let source_name = self.config.source_dir_name.clone();
+                let cell_prefix = self.config.cell_prefix.clone();
+
+                let entries: Vec<(u64, FileType, String)> = vec![
+                    (ROOT_INO, FileType::Directory, ".".into()),
+                    (ROOT_INO, FileType::Directory, "..".into()),
+                    (SOURCE_INO, FileType::Directory, source_name),
+                    (CELL_PREFIX_INO, FileType::Directory, cell_prefix),
+                    (BUCKCONFIG_INO, FileType::RegularFile, ".buckconfig".into()),
+                    (BUCKROOT_INO, FileType::RegularFile, ".buckroot".into()),
                 ];
 
                 for (i, (inode, kind, name)) in entries.iter().enumerate().skip(offset as usize) {
@@ -473,9 +478,9 @@ impl Filesystem for CompositionFs {
                 }
                 reply.ok();
             }
-            Some(InodePath::External) => {
+            Some(InodePath::CellPrefix) => {
                 let mut entries: Vec<(u64, FileType, String)> = vec![
-                    (EXTERNAL_INO, FileType::Directory, ".".into()),
+                    (CELL_PREFIX_INO, FileType::Directory, ".".into()),
                     (ROOT_INO, FileType::Directory, "..".into()),
                 ];
 
@@ -493,7 +498,7 @@ impl Filesystem for CompositionFs {
                 }
                 reply.ok();
             }
-            Some(InodePath::Src) | Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
+            Some(InodePath::Source) | Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
                 if let Some(path) = self.resolve_real_path(ino) {
                     if let Ok(read_dir) = fs::read_dir(&path) {
                         let mut entries: Vec<(u64, FileType, String)> = vec![
@@ -564,7 +569,8 @@ mod tests {
         let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo")
             .with_cell(CellConfig::new("godeps", "/nix/store/godeps"));
         let fs = CompositionFs::new(config, PathBuf::from("/home/user/repo"));
-        assert_eq!(fs.src_path, PathBuf::from("/home/user/repo/src"));
+        // repo_root is the actual repository root (not src subdirectory)
+        assert_eq!(fs.repo_root, PathBuf::from("/home/user/repo"));
     }
 
     #[test]
@@ -576,10 +582,10 @@ mod tests {
 
         // Check reserved inodes
         assert!(matches!(fs.get_inode_path(ROOT_INO), Some(InodePath::Root)));
-        assert!(matches!(fs.get_inode_path(SRC_INO), Some(InodePath::Src)));
+        assert!(matches!(fs.get_inode_path(SOURCE_INO), Some(InodePath::Source)));
         assert!(matches!(
-            fs.get_inode_path(EXTERNAL_INO),
-            Some(InodePath::External)
+            fs.get_inode_path(CELL_PREFIX_INO),
+            Some(InodePath::CellPrefix)
         ));
 
         // Check cells got allocated inodes
@@ -608,16 +614,17 @@ mod tests {
 
         let content = fs.generate_buckconfig();
 
-        // Check cell definitions
+        // Check cell definitions - root points to source_dir_name (default: "root")
         assert!(content.contains("[cells]"));
-        assert!(content.contains("root = ."));
-        assert!(content.contains("prelude = prelude"));
+        assert!(content.contains("root = root"));
+        assert!(content.contains("prelude = root/prelude"));
+        // Cells are under cell_prefix (default: "external")
         assert!(content.contains("godeps = external/godeps"));
         assert!(content.contains("rustdeps = external/rustdeps"));
 
         // Check buildfile configuration
         assert!(content.contains("[buildfile]"));
-        assert!(content.contains("name = BUCK"));
+        assert!(content.contains("name = rules.star"));
     }
 
     #[test]
