@@ -4,6 +4,7 @@
 //! `CompositionBackend` trait using a FUSE filesystem.
 
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -44,9 +45,6 @@ pub struct FuseBackend {
 
     /// Handle to the FUSE thread
     fuse_thread: Option<JoinHandle<()>>,
-
-    /// FUSE session (for unmounting)
-    session: Arc<Mutex<Option<Session<CompositionFs>>>>,
 }
 
 impl FuseBackend {
@@ -57,7 +55,6 @@ impl FuseBackend {
             status: Arc::new(Mutex::new(BackendStatus::Stopped)),
             should_stop: Arc::new(AtomicBool::new(false)),
             fuse_thread: None,
-            session: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -130,61 +127,55 @@ impl CompositionBackend for FuseBackend {
             };
         }
 
-        // Create the filesystem
-        let fs = CompositionFs::new(self.config.clone(), self.repo_root());
         let mount_point = self.config.mount_point.clone();
+        let config = self.config.clone();
+        let repo_root = self.repo_root();
 
-        // Mount options
-        let options = vec![
-            MountOption::FSName("turnkey".to_string()),
-            MountOption::AutoUnmount,
-            MountOption::AllowOther,
-            MountOption::RO, // Read-only for now
-        ];
-
-        // Create FUSE session
         info!("Mounting FUSE filesystem at {:?}", mount_point);
-        let session = Session::new(fs, &mount_point, &options)
-            .map_err(|e| Error::FuseMountFailed(e.to_string()))?;
 
-        // Store session for later unmounting
-        {
-            let mut session_lock = self.session.lock().unwrap();
-            *session_lock = Some(session);
-        }
-
-        // Start the FUSE thread
+        // Start the FUSE thread - create session and run it in the thread
         let status = Arc::clone(&self.status);
         let should_stop = Arc::clone(&self.should_stop);
-        let session = Arc::clone(&self.session);
 
         let handle = thread::spawn(move || {
+            // Create mount options - try minimal first (allow_other requires system config)
+            let options = vec![
+                MountOption::FSName("turnkey".to_string()),
+                MountOption::RO,
+            ];
+
+            // Create the filesystem and session in this thread
+            let fs = CompositionFs::new(config, repo_root);
+            let mut session = match Session::new(fs, &mount_point, &options) {
+                Ok(s) => s,
+                Err(e) => {
+                    error!("Failed to create FUSE session: {}", e);
+                    let mut s = status.lock().unwrap();
+                    *s = BackendStatus::Error {
+                        message: format!("FUSE mount failed: {}", e),
+                        recoverable: false,
+                    };
+                    return;
+                }
+            };
+
             // Update status to ready
             {
                 let mut s = status.lock().unwrap();
                 *s = BackendStatus::Ready;
             }
 
-            // Run the session
-            // Note: We need to run the session in a loop until should_stop is set
-            loop {
-                if should_stop.load(Ordering::SeqCst) {
-                    debug!("FUSE thread received stop signal");
-                    break;
-                }
+            debug!("Starting FUSE session event loop");
 
-                // Check if session is still valid
-                let session_guard = session.lock().unwrap();
-                if session_guard.is_none() {
-                    debug!("FUSE session is gone, stopping thread");
-                    break;
+            // Run the FUSE session - this blocks until unmounted
+            // The session will exit when fusermount -u is called or the mount is unmounted
+            if let Err(e) = session.run() {
+                if !should_stop.load(Ordering::SeqCst) {
+                    error!("FUSE session error: {}", e);
                 }
-                drop(session_guard);
-
-                // Sleep briefly to avoid busy-waiting
-                // In a real implementation, we'd use the session.run() method
-                thread::sleep(Duration::from_millis(100));
             }
+
+            debug!("FUSE session ended");
 
             // Update status to stopped
             {
@@ -194,6 +185,17 @@ impl CompositionBackend for FuseBackend {
         });
 
         self.fuse_thread = Some(handle);
+
+        // Wait briefly for the mount to be ready
+        thread::sleep(Duration::from_millis(100));
+
+        // Check if mount succeeded
+        let status = self.status();
+        if status.is_error() {
+            if let BackendStatus::Error { message, .. } = status {
+                return Err(Error::FuseMountFailed(message));
+            }
+        }
 
         Ok(())
     }
@@ -208,10 +210,52 @@ impl CompositionBackend for FuseBackend {
         // Signal the thread to stop
         self.should_stop.store(true, Ordering::SeqCst);
 
-        // Drop the session to unmount
-        {
-            let mut session = self.session.lock().unwrap();
-            *session = None;
+        // Use fusermount to unmount - this will cause session.run() to return
+        let mount_point = &self.config.mount_point;
+        let result = Command::new("fusermount3")
+            .arg("-u")
+            .arg(mount_point)
+            .output();
+
+        match result {
+            Ok(output) => {
+                if !output.status.success() {
+                    // Try fusermount (without 3) as fallback
+                    let result2 = Command::new("fusermount")
+                        .arg("-u")
+                        .arg(mount_point)
+                        .output();
+
+                    if let Ok(output2) = result2 {
+                        if !output2.status.success() {
+                            let stderr = String::from_utf8_lossy(&output2.stderr);
+                            return Err(Error::FuseUnmountFailed(stderr.to_string()));
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                // fusermount3 not found, try fusermount
+                let result2 = Command::new("fusermount")
+                    .arg("-u")
+                    .arg(mount_point)
+                    .output();
+
+                match result2 {
+                    Ok(output2) => {
+                        if !output2.status.success() {
+                            let stderr = String::from_utf8_lossy(&output2.stderr);
+                            return Err(Error::FuseUnmountFailed(stderr.to_string()));
+                        }
+                    }
+                    Err(_) => {
+                        return Err(Error::FuseUnmountFailed(format!(
+                            "fusermount not found: {}",
+                            e
+                        )));
+                    }
+                }
+            }
         }
 
         // Wait for the thread to finish

@@ -223,8 +223,9 @@ fn run_daemon(
                 let status = backend.status();
                 let mp = mount_point.clone();
                 let watching = watcher.is_some();
+                let running_clone = running.clone();
                 thread::spawn(move || {
-                    if let Err(e) = handle_client(stream, &status, &mp, watching) {
+                    if let Err(e) = handle_client(stream, &status, &mp, watching, &running_clone) {
                         error!("Error handling client: {}", e);
                     }
                 });
@@ -259,6 +260,7 @@ fn handle_client(
     status: &composition::BackendStatus,
     mount_point: &PathBuf,
     watching: bool,
+    running: &Arc<AtomicBool>,
 ) -> Result<()> {
     stream
         .set_read_timeout(Some(Duration::from_secs(5)))
@@ -298,13 +300,13 @@ fn handle_client(
         writeln!(stream, "{}", response_json)?;
         stream.flush()?;
 
-        // For Stop command, we should signal the main loop to stop
+        // For Stop command, signal the main loop to stop
         if matches!(
             serde_json::from_str::<IpcRequest>(&line),
             Ok(IpcRequest::Stop)
         ) {
-            // The main loop will exit due to signal handling
-            // For now, we just respond - proper shutdown needs process-wide coordination
+            info!("Stop command received, signaling shutdown");
+            running.store(false, Ordering::SeqCst);
         }
 
         break; // One request per connection

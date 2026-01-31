@@ -295,7 +295,7 @@ tk compose down
 - [x] Pass-through for src/ - `filesystem.rs` with inode management
 - [x] Read-only external/ from Nix store - cell lookup and file access
 - [x] Basic .buckconfig generation - virtual files in `filesystem.rs`
-- [ ] Linux testing
+- [x] Linux testing - daemon start/stop, file operations verified
 
 ### Phase 3: Consistency Layer
 - [x] Manifest watcher (inotify/fsevents) - `watcher.rs` with debouncing
