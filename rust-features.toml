@@ -24,3 +24,7 @@ ureq = { add = ["json"] }
 
 # syn needs printing feature for serde_derive (quote! macro to generate tokens)
 syn = { add = ["printing"] }
+
+# inotify default features include "stream" which requires tokio/futures-core
+# We use synchronous file watching via notify, so disable the async feature
+inotify = { remove = ["default", "stream"] }

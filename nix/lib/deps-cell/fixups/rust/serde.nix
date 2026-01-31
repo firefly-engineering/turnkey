@@ -54,6 +54,7 @@ SERDE_PRIVATE
   rustcFlags = {
     # serde_json uses fast 64-bit arithmetic on x86_64
     # Reference: https://github.com/serde-rs/json/blob/master/build.rs
-    serde_json = [ "--cfg" ''fast_arithmetic=\"64\"'' ];
+    # Use separate arguments to avoid Buck2 parsing issues with combined format
+    serde_json = [ "--cfg" ''fast_arithmetic="64"'' ];
   };
 }

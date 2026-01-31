@@ -32,6 +32,7 @@ let
   rustixFixups = import ./rustix.nix { inherit lib; };
   treeSitterFixups = import ./tree-sitter.nix { inherit lib; };
   nixCrateFixups = import ./nix-crate.nix { inherit lib; };
+  fuserFixups = import ./fuser.nix { inherit lib; };
 in
 rec {
   # ==========================================================================
@@ -61,7 +62,8 @@ rec {
     // (ringFixups.rustcFlags or {})
     // (rustixFixups.rustcFlags or {})
     // (treeSitterFixups.rustcFlags or {})
-    // (nixCrateFixups.rustcFlags or {});
+    // (nixCrateFixups.rustcFlags or {})
+    // (fuserFixups.rustcFlags or {});
 
   # ==========================================================================
   # Native Libraries

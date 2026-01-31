@@ -180,7 +180,7 @@ rec {
               '${builtins.toJSON allCrateNames}' \
               '${builtins.toJSON (lib.attrNames allBuildScriptFixups)}' \
               "$UNIFIED_FEATURES" \
-              '${builtins.toJSON rustcFlagsRegistry}' \
+              '${builtins.toJSON allRustcFlags}' \
               '${builtins.toJSON nativeLibraryInfo}' \
               > "$dir/rules.star" || echo "# rules.star generation failed" > "$dir/rules.star"
           fi

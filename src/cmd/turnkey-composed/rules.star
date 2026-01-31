@@ -6,7 +6,7 @@ rust_binary(
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
     deps = [
-        "//src/rust/composition:composition",
+        "//src/rust/composition:composition-full",
         "rustdeps//vendor/anyhow:anyhow",
         "rustdeps//vendor/clap:clap",
         "rustdeps//vendor/ctrlc:ctrlc",

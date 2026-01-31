@@ -310,7 +310,9 @@ def generate_buck_file(
     if rustc_flags:
         lines.append("    rustc_flags = [")
         for flag in rustc_flags:
-            lines.append(f'        "{flag}",')
+            # Escape backslashes and quotes for Starlark string literals
+            escaped_flag = flag.replace("\\", "\\\\").replace('"', '\\"')
+            lines.append(f'        "{escaped_flag}",')
         lines.append("    ],")
 
     # Add exported_linker_flags for native libraries (propagates to dependents)
