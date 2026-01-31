@@ -2,8 +2,13 @@
 //!
 //! This implements the low-level FUSE operations for the composition view.
 //! The filesystem presents a unified view with:
-//! - `/<source_dir_name>/` - Pass-through to the repository root (default: "root")
-//! - `/<cell_prefix>/<cell>/` - Read-only view of dependency cells (default: ".turnkey")
+//! - `/<source_dir_name>/` - Overlay on repository root with virtual .buckroot/.buckconfig
+//! - `/<cell_prefix>/<cell>/` - Read-only view of dependency cells (e.g., "external/godeps")
+//!
+//! The source directory is an OVERLAY: it shows all files from the repo root,
+//! plus virtual files (.buckroot, .buckconfig) that shadow any real files with
+//! the same names. This allows Buck2 targets like `//docs/user-manual` to work
+//! identically whether using the FUSE mount or the symlink approach.
 
 use fuser::{
     FileAttr, FileType, Filesystem, ReplyAttr, ReplyData, ReplyDirectory, ReplyEntry, ReplyOpen,
@@ -229,22 +234,28 @@ impl CompositionFs {
     }
 
     /// Generate the content of .buckconfig
+    ///
+    /// The .buckconfig lives inside the source directory (overlay on repo root).
+    /// Paths are relative to where .buckconfig lives:
+    /// - `root = .` (current directory, the repo root)
+    /// - `prelude = prelude` (relative to repo root)
+    /// - `<cell> = ../<cell_prefix>/<cell>` (sibling directory)
     fn generate_buckconfig(&self) -> String {
         let mut content = String::new();
-        let source_dir = &self.config.source_dir_name;
         let cell_prefix = &self.config.cell_prefix;
 
         // Cell definitions
         content.push_str("[cells]\n");
-        // The root cell points to the source directory (e.g., "root")
-        content.push_str(&format!("    root = {}\n", source_dir));
-        // Prelude is under the source directory
-        content.push_str(&format!("    prelude = {}/prelude\n", source_dir));
+        // The root cell is the current directory (where .buckconfig lives)
+        content.push_str("    root = .\n");
+        // Prelude is a subdirectory of the repo root
+        content.push_str("    prelude = prelude\n");
 
-        // Add cells for each dependency under cell_prefix (e.g., "external/godeps")
+        // Add cells for each dependency - they're in the sibling cell_prefix dir
+        // e.g., "../external/godeps"
         for cell in &self.config.cells {
             content.push_str(&format!(
-                "    {} = {}/{}\n",
+                "    {} = ../{}/{}\n",
                 cell.name, cell_prefix, cell.name
             ));
         }
@@ -293,34 +304,13 @@ impl Filesystem for CompositionFs {
 
         match self.get_inode_path(parent) {
             Some(InodePath::Root) => {
-                // Looking up in root directory - use configurable names
+                // Looking up in mount root - only source and cell prefix directories
                 if name_str == self.config.source_dir_name {
-                    // Source directory (e.g., "root")
-                    if let Some(path) = self.resolve_real_path(SOURCE_INO) {
-                        if let Ok(meta) = fs::metadata(&path) {
-                            reply.entry(&TTL, &self.metadata_to_attr(SOURCE_INO, &meta), 0);
-                            return;
-                        }
-                    }
-                    // Fallback to virtual dir
+                    // Source directory (e.g., "root") - this is the overlay on repo
                     reply.entry(&TTL, &self.virtual_dir_attr(SOURCE_INO), 0);
                 } else if name_str == self.config.cell_prefix {
                     // Cell prefix directory (e.g., "external")
                     reply.entry(&TTL, &self.virtual_dir_attr(CELL_PREFIX_INO), 0);
-                } else if name_str == ".buckconfig" {
-                    let content = self.generate_buckconfig();
-                    reply.entry(
-                        &TTL,
-                        &self.virtual_file_attr(BUCKCONFIG_INO, content.len() as u64),
-                        0,
-                    );
-                } else if name_str == ".buckroot" {
-                    let content = self.generate_buckroot();
-                    reply.entry(
-                        &TTL,
-                        &self.virtual_file_attr(BUCKROOT_INO, content.len() as u64),
-                        0,
-                    );
                 } else {
                     reply.error(ENOENT);
                 }
@@ -341,8 +331,40 @@ impl Filesystem for CompositionFs {
                 // Virtual files don't have children
                 reply.error(ENOENT);
             }
-            Some(InodePath::Source) | Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
-                // Looking up in a real directory
+            Some(InodePath::Source) => {
+                // Source is an overlay: check virtual files first, then real files
+                // Virtual files shadow any real files with the same name
+                if name_str == ".buckconfig" {
+                    let content = self.generate_buckconfig();
+                    reply.entry(
+                        &TTL,
+                        &self.virtual_file_attr(BUCKCONFIG_INO, content.len() as u64),
+                        0,
+                    );
+                    return;
+                }
+                if name_str == ".buckroot" {
+                    let content = self.generate_buckroot();
+                    reply.entry(
+                        &TTL,
+                        &self.virtual_file_attr(BUCKROOT_INO, content.len() as u64),
+                        0,
+                    );
+                    return;
+                }
+                // Fall through to real file lookup
+                if let Some(parent_path) = self.resolve_real_path(parent) {
+                    let child_path = parent_path.join(name);
+                    if let Ok(meta) = fs::symlink_metadata(&child_path) {
+                        let ino = self.get_or_alloc_inode(&child_path);
+                        reply.entry(&TTL, &self.metadata_to_attr(ino, &meta), 0);
+                        return;
+                    }
+                }
+                reply.error(ENOENT);
+            }
+            Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
+                // Looking up in a real directory (cells or nested real paths)
                 if let Some(parent_path) = self.resolve_real_path(parent) {
                     let child_path = parent_path.join(name);
                     if let Ok(meta) = fs::symlink_metadata(&child_path) {
@@ -458,7 +480,7 @@ impl Filesystem for CompositionFs {
 
         match self.get_inode_path(ino) {
             Some(InodePath::Root) => {
-                // Use configurable directory names
+                // Mount root only contains source (overlay) and cell prefix directories
                 let source_name = self.config.source_dir_name.clone();
                 let cell_prefix = self.config.cell_prefix.clone();
 
@@ -467,8 +489,6 @@ impl Filesystem for CompositionFs {
                     (ROOT_INO, FileType::Directory, "..".into()),
                     (SOURCE_INO, FileType::Directory, source_name),
                     (CELL_PREFIX_INO, FileType::Directory, cell_prefix),
-                    (BUCKCONFIG_INO, FileType::RegularFile, ".buckconfig".into()),
-                    (BUCKROOT_INO, FileType::RegularFile, ".buckroot".into()),
                 ];
 
                 for (i, (inode, kind, name)) in entries.iter().enumerate().skip(offset as usize) {
@@ -498,7 +518,87 @@ impl Filesystem for CompositionFs {
                 }
                 reply.ok();
             }
-            Some(InodePath::Source) | Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
+            Some(InodePath::Source) => {
+                // Source is an overlay: merge real entries with virtual files
+                if let Some(path) = self.resolve_real_path(ino) {
+                    if let Ok(read_dir) = fs::read_dir(&path) {
+                        let mut entries: Vec<(u64, FileType, String)> = vec![
+                            (ino, FileType::Directory, ".".into()),
+                            (ROOT_INO, FileType::Directory, "..".into()),
+                        ];
+
+                        // Track which virtual files we add (to avoid duplicates)
+                        let mut has_buckconfig = false;
+                        let mut has_buckroot = false;
+
+                        for entry in read_dir.flatten() {
+                            let child_path = entry.path();
+                            if let Some(name) = entry.file_name().to_str() {
+                                // Skip real files that are shadowed by virtual files
+                                if name == ".buckconfig" {
+                                    has_buckconfig = true;
+                                    // Add virtual version instead
+                                    entries.push((
+                                        BUCKCONFIG_INO,
+                                        FileType::RegularFile,
+                                        ".buckconfig".into(),
+                                    ));
+                                    continue;
+                                }
+                                if name == ".buckroot" {
+                                    has_buckroot = true;
+                                    // Add virtual version instead
+                                    entries.push((
+                                        BUCKROOT_INO,
+                                        FileType::RegularFile,
+                                        ".buckroot".into(),
+                                    ));
+                                    continue;
+                                }
+
+                                let child_ino = self.get_or_alloc_inode(&child_path);
+                                let kind = if child_path.is_dir() {
+                                    FileType::Directory
+                                } else if child_path.is_symlink() {
+                                    FileType::Symlink
+                                } else {
+                                    FileType::RegularFile
+                                };
+                                entries.push((child_ino, kind, name.to_string()));
+                            }
+                        }
+
+                        // Add virtual files if they don't exist in real fs
+                        if !has_buckconfig {
+                            entries.push((
+                                BUCKCONFIG_INO,
+                                FileType::RegularFile,
+                                ".buckconfig".into(),
+                            ));
+                        }
+                        if !has_buckroot {
+                            entries.push((
+                                BUCKROOT_INO,
+                                FileType::RegularFile,
+                                ".buckroot".into(),
+                            ));
+                        }
+
+                        for (i, (inode, kind, name)) in
+                            entries.iter().enumerate().skip(offset as usize)
+                        {
+                            if reply.add(*inode, (i + 1) as i64, *kind, name) {
+                                break;
+                            }
+                        }
+                        reply.ok();
+                        return;
+                    }
+                }
+                reply.error(ENOTDIR);
+            }
+            Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
+                // Real directories (cells or nested paths) - no overlay
                 if let Some(path) = self.resolve_real_path(ino) {
                     if let Ok(read_dir) = fs::read_dir(&path) {
                         let mut entries: Vec<(u64, FileType, String)> = vec![
@@ -614,13 +714,16 @@ mod tests {
 
         let content = fs.generate_buckconfig();
 
-        // Check cell definitions - root points to source_dir_name (default: "root")
+        // Check cell definitions
+        // .buckconfig lives in the source dir (overlay on repo root)
         assert!(content.contains("[cells]"));
-        assert!(content.contains("root = root"));
-        assert!(content.contains("prelude = root/prelude"));
-        // Cells are under cell_prefix (default: "external")
-        assert!(content.contains("godeps = external/godeps"));
-        assert!(content.contains("rustdeps = external/rustdeps"));
+        // root = . (current directory, where .buckconfig lives)
+        assert!(content.contains("root = ."));
+        // prelude is a subdirectory
+        assert!(content.contains("prelude = prelude"));
+        // Cells are in sibling directory: ../external/<cell>
+        assert!(content.contains("godeps = ../external/godeps"));
+        assert!(content.contains("rustdeps = ../external/rustdeps"));
 
         // Check buildfile configuration
         assert!(content.contains("[buildfile]"));
