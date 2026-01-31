@@ -287,7 +287,7 @@ tk compose down
 
 ### Phase 1: Core Infrastructure
 - [x] Composition trait/interface (Rust) - `src/rust/composition/`
-- [ ] Symlink backend (refactor existing code)
+- [x] Symlink backend (refactor existing code) - `src/rust/composition/src/symlink.rs`
 - [x] FUSE backend skeleton (Linux only) - `src/rust/composition/src/fuse/`
 - [x] Daemon lifecycle (start/stop) - `src/cmd/turnkey-composed/`
 

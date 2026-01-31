@@ -53,6 +53,7 @@ mod backend;
 mod config;
 mod error;
 mod status;
+pub mod symlink;
 
 #[cfg(feature = "fuse")]
 pub mod fuse;
@@ -61,6 +62,7 @@ pub mod fuse;
 pub mod watcher;
 
 pub use backend::CompositionBackend;
+pub use symlink::SymlinkBackend;
 pub use config::{CellConfig, CompositionConfig, ConsistencyMode};
 pub use error::Error;
 pub use status::BackendStatus;
