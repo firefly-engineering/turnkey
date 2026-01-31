@@ -52,6 +52,7 @@ use std::path::PathBuf;
 mod backend;
 mod config;
 mod error;
+pub mod policy;
 pub mod state;
 mod status;
 pub mod symlink;
@@ -66,6 +67,10 @@ pub use backend::CompositionBackend;
 pub use symlink::SymlinkBackend;
 pub use config::{CellConfig, CompositionConfig, ConsistencyMode};
 pub use error::Error;
+pub use policy::{
+    AccessPolicy, CIPolicy, DevelopmentPolicy, FileClass, LenientPolicy, OperationType,
+    PolicyDecision, StrictPolicy, SystemState,
+};
 pub use state::{ConsistencyStateMachine, StateObserver};
 pub use status::BackendStatus;
 
