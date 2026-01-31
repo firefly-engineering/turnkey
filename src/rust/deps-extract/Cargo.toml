@@ -5,7 +5,8 @@ edition.workspace = true
 description = "Extract dependencies from source files using tree-sitter"
 
 [features]
-default = ["python", "rust", "typescript", "solidity"]
+default = ["go", "python", "rust", "typescript", "solidity"]
+go = ["dep:tree-sitter-go"]
 python = ["dep:tree-sitter-python"]
 rust = ["dep:tree-sitter-rust"]
 typescript = ["dep:tree-sitter-typescript"]
@@ -20,6 +21,7 @@ tree-sitter.workspace = true
 walkdir.workspace = true
 
 # Optional language-specific tree-sitter grammars
+tree-sitter-go = { workspace = true, optional = true }
 tree-sitter-python = { workspace = true, optional = true }
 tree-sitter-rust = { workspace = true, optional = true }
 tree-sitter-typescript = { workspace = true, optional = true }

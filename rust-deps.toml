@@ -607,6 +607,11 @@ name = "tree-sitter"
 version = "0.25.10"
 hash = "sha256-XrejNZtdDpHMXwPznGMef5Slk4GMz0RMWluj7WsYqLw="
 
+[deps."tree-sitter-go@0.25.0"]
+name = "tree-sitter-go"
+version = "0.25.0"
+hash = "sha256-bcIrIM7FWX/NGZO4o7A+cpkFzD3jT3CdtwLM4hB6p4M="
+
 [deps."tree-sitter-language@0.1.6"]
 name = "tree-sitter-language"
 version = "0.1.6"
