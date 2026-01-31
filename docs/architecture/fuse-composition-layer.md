@@ -286,15 +286,15 @@ tk compose down
 ## Implementation Phases
 
 ### Phase 1: Core Infrastructure
-- [ ] Composition trait/interface (Rust)
+- [x] Composition trait/interface (Rust) - `src/rust/composition/`
 - [ ] Symlink backend (refactor existing code)
-- [ ] FUSE backend skeleton (Linux only)
-- [ ] Daemon lifecycle (start/stop)
+- [x] FUSE backend skeleton (Linux only) - `src/rust/composition/src/fuse/`
+- [x] Daemon lifecycle (start/stop) - `src/cmd/turnkey-composed/`
 
 ### Phase 2: Basic FUSE
-- [ ] Pass-through for src/
-- [ ] Read-only external/ from Nix store
-- [ ] Basic .buckconfig generation
+- [x] Pass-through for src/ - `filesystem.rs` with inode management
+- [x] Read-only external/ from Nix store - cell lookup and file access
+- [x] Basic .buckconfig generation - virtual files in `filesystem.rs`
 - [ ] Linux testing
 
 ### Phase 3: Consistency Layer

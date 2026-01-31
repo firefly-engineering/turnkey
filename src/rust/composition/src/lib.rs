@@ -54,6 +54,9 @@ mod config;
 mod error;
 mod status;
 
+#[cfg(feature = "fuse")]
+pub mod fuse;
+
 pub use backend::CompositionBackend;
 pub use config::{CellConfig, CompositionConfig, ConsistencyMode};
 pub use error::Error;
