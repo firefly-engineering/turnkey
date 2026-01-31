@@ -191,6 +191,8 @@
                 rustEditionCheck = true;
                 monorepoDepCheck = true;
                 foundryConfigCheck = true;
+                sourceCoverageCheck = true;
+                sourceScope = "src/";  # Only check source files under src/
               };
             };
           };

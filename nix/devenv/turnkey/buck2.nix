@@ -959,10 +959,11 @@ in
 
       sourceScope = lib.mkOption {
         type = lib.types.str;
-        default = "src/";
+        default = ".";
         description = ''
           Directory scope for source coverage checking.
           Only source files under this directory are validated.
+          Default is "." (entire repository).
         '';
       };
     };
