@@ -1296,7 +1296,7 @@ in
         files = "(\\.go|\\.rs|\\.py|\\.ts|\\.tsx|\\.js|\\.jsx|\\.sol|rules\\.star)$";
         pass_filenames = false;
         entry = ''
-          TURNKEY_SOURCE_SCOPE="${cfg.tk.sourceScope}" ${pkgs.python3}/bin/python src/cmd/check-source-coverage/__main__.py
+          sh -c 'TURNKEY_SOURCE_SCOPE="${cfg.tk.sourceScope}" ${pkgs.python3}/bin/python src/cmd/check-source-coverage/__main__.py'
         '';
       };
 
