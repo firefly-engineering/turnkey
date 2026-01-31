@@ -27,10 +27,10 @@ name = "android_system_properties"
 version = "0.1.5"
 hash = "sha256-AVSo7h3ytu8IwFL9zJpyFvh7lLSztIP0W29KL00v/2k="
 
-[deps."annotate-snippets@0.12.10"]
+[deps."annotate-snippets@0.12.11"]
 name = "annotate-snippets"
-version = "0.12.10"
-hash = "sha256-APJxWfg+sMb9XwvTL0ZGpFktpQLS8PyWMIxhlWlWwSk="
+version = "0.12.11"
+hash = "sha256-40cMN72DCogJAneqvXn+VPzRtF3vbC2/sXR+8oPJBn8="
 
 [deps."anstream@0.6.21"]
 name = "anstream"
@@ -107,10 +107,10 @@ name = "cargo-lock"
 version = "10.1.0"
 hash = "sha256-D5DpUgvKxJSVQwsLzpwX3AA/qIG5lcX7catc1O0oxX4="
 
-[deps."cc@1.2.53"]
+[deps."cc@1.2.55"]
 name = "cc"
-version = "1.2.53"
-hash = "sha256-/ptMF93Xo9vC7aRUJD/tfC/Zw16MZgPltKxa04zIJ08="
+version = "1.2.55"
+hash = "sha256-y3BLIviQHJabhrS+aat0eQ/oXYnEZG+zRB5vlO0/iw0="
 
 [deps."cfg-if@1.0.4"]
 name = "cfg-if"
@@ -127,20 +127,20 @@ name = "chrono"
 version = "0.4.43"
 hash = "sha256-I6AuyKCQ7ccwJ0HUNrrEeZIG7OO0YDqYDImsXzS4HSs="
 
-[deps."clap@4.5.54"]
+[deps."clap@4.5.56"]
 name = "clap"
-version = "4.5.54"
-hash = "sha256-iPegyZYrVDHfe64Mo39ALJ1/SKD4xN6ZXoKWAZp0Kw4="
+version = "4.5.56"
+hash = "sha256-5DjZFNR2MPVi+ufU5yPdX+HA9ISMaQ0OAOQZ9EGHBWs="
 
-[deps."clap_builder@4.5.54"]
+[deps."clap_builder@4.5.56"]
 name = "clap_builder"
-version = "4.5.54"
-hash = "sha256-bA92NOvfr/2dEcdaiBd1wtB6S4HseGvpa+JWY2UQH3w="
+version = "4.5.56"
+hash = "sha256-5T6miCmyt9958CVtKIYnphe/7jTaulJQZZp6dqH6Sqs="
 
-[deps."clap_derive@4.5.49"]
+[deps."clap_derive@4.5.55"]
 name = "clap_derive"
-version = "4.5.49"
-hash = "sha256-C9KTihL/bf5PoENwJ2kXU1yhyf7hgrR5qHBOvzxpVAM="
+version = "4.5.55"
+hash = "sha256-Qz4GxduO504NKvG6ACrJ8HDBB+QsgXyyrkbY5o+j9tY="
 
 [deps."clap_lex@0.7.7"]
 name = "clap_lex"
@@ -237,10 +237,10 @@ name = "fastrand"
 version = "2.3.0"
 hash = "sha256-gCuKgtYEq3hpQeNeVHw+cCFFFng2vpiyzI4jvVKGUg8="
 
-[deps."find-msvc-tools@0.1.8"]
+[deps."find-msvc-tools@0.1.9"]
 name = "find-msvc-tools"
-version = "0.1.8"
-hash = "sha256-e1UnPFh8jc1ogLLEycTj8uedfyROYSRHLO0LWg/NcsE="
+version = "0.1.9"
+hash = "sha256-CAXurpZL1ltJrnUbTwp7EX5MKxL4gNTYKOyYnG8YrrQ="
 
 [deps."flate2@1.1.8"]
 name = "flate2"
@@ -277,6 +277,11 @@ name = "getrandom"
 version = "0.3.4"
 hash = "sha256-cFgw4woE4NyheMo3kiTnmP5N2N598UbcEgknPPFIOHY="
 
+[deps."glob@0.3.3"]
+name = "glob"
+version = "0.3.3"
+hash = "sha256-Y8vm15P3U4ryxWPODuxRcjGIN8niH6z2RGe7r0aZIT0="
+
 [deps."hashbrown@0.16.1"]
 name = "hashbrown"
 version = "0.16.1"
@@ -287,10 +292,10 @@ name = "heck"
 version = "0.5.0"
 hash = "sha256-vVMnzH1Jabhj7DZIjmlhH1Jdvp9NLxoSyb5eEhFQafU="
 
-[deps."iana-time-zone@0.1.64"]
+[deps."iana-time-zone@0.1.65"]
 name = "iana-time-zone"
-version = "0.1.64"
-hash = "sha256-8gu3wqovPP7WB4qSW8Q72EblKCaRmMQY8idI6U5a5Io="
+version = "0.1.65"
+hash = "sha256-96ALKuOIdwUp1ToTazS2msNuc8QqX9vcz0BaEfF8bMQ="
 
 [deps."iana-time-zone-haiku@0.1.2"]
 name = "iana-time-zone-haiku"
@@ -517,15 +522,15 @@ name = "potential_utf"
 version = "0.1.4"
 hash = "sha256-un3YCqmuyU79UA2sg3wwyrnnOeihDOkCuFubat6BcjU="
 
-[deps."proc-macro2@1.0.105"]
+[deps."proc-macro2@1.0.106"]
 name = "proc-macro2"
-version = "1.0.105"
-hash = "sha256-8oAd3DXvyzoipak9N0gntxmsn2uocl906xkU7KTmjJk="
+version = "1.0.106"
+hash = "sha256-q07CrHFPnYwuSZwRZPC9E5xtdGtxTfbzEhWH5y75DXU="
 
-[deps."quote@1.0.43"]
+[deps."quote@1.0.44"]
 name = "quote"
-version = "1.0.43"
-hash = "sha256-fNJ4zKU6jvo15tih9QkrClVeHkOBqWzWAR/bfq1CIOU="
+version = "1.0.44"
+hash = "sha256-twbReqnmjLLv6FgdDl4dHAnWnEBgUTOtUKkR5m5xZxI="
 
 [deps."r-efi@5.3.0"]
 name = "r-efi"
@@ -1087,15 +1092,15 @@ name = "yoke-derive"
 version = "0.8.1"
 hash = "sha256-KK8weDkilTf/9vpzHODTADlfb30wPdMpx26mnZPSfSU="
 
-[deps."zerocopy@0.8.33"]
+[deps."zerocopy@0.8.37"]
 name = "zerocopy"
-version = "0.8.33"
-hash = "sha256-sKr9jvGS3hvbJcolJX8rdu2e/A7nC+9BwKdseCJfous="
+version = "0.8.37"
+hash = "sha256-xO4f8z368xpi8JXaOAON5fwCGiS6Jj+/MfHsJ55YnOU="
 
-[deps."zerocopy-derive@0.8.33"]
+[deps."zerocopy-derive@0.8.37"]
 name = "zerocopy-derive"
-version = "0.8.33"
-hash = "sha256-7NSp305GrBVniQnqtgJIcZapkQjKd+njK5Fg97nTiK8="
+version = "0.8.37"
+hash = "sha256-AUFK6xMYZtPpeu//QoJyIkiBQxe5EI0wTQfFDUGfLmk="
 
 [deps."zerofrom@0.1.6"]
 name = "zerofrom"
@@ -1127,8 +1132,8 @@ name = "zerovec-derive"
 version = "0.11.2"
 hash = "sha256-p5fY9PeXZvjJ7QFRZjmV7Tm2LhLBtdrU8RGPTnOZru4="
 
-[deps."zmij@1.0.16"]
+[deps."zmij@1.0.18"]
 name = "zmij"
-version = "1.0.16"
-hash = "sha256-bGFMMMZ/xA8IJ1/n5e4Dq1TY0yAcfZxUCecQv6ckiO4="
+version = "1.0.18"
+hash = "sha256-Fh6EiQt0ZIxRxW2h01SDmsZXtRJVmDA4CPVw5rS/mFc="
 
