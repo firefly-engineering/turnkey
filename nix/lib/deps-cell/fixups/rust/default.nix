@@ -42,16 +42,8 @@ let
   allFixups = map importFixup fixupFiles;
 
   # Merge a specific attribute from all fixups
-  # For ring.nix backward compatibility: if fixup has no buildScriptFixups attr,
-  # treat the whole fixup as buildScriptFixups (legacy format)
   mergeAttr = attrName: fixups:
-    lib.foldl' (acc: fixup:
-      acc // (
-        if attrName == "buildScriptFixups" && !(fixup ? buildScriptFixups) && !(fixup ? rustcFlags) && !(fixup ? nativeLibraries)
-        then fixup  # Legacy format: whole file is buildScriptFixups
-        else (fixup.${attrName} or {})
-      )
-    ) {} fixups;
+    lib.foldl' (acc: fixup: acc // (fixup.${attrName} or {})) {} fixups;
 
 in
 rec {

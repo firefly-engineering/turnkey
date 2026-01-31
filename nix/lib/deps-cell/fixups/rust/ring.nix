@@ -40,8 +40,13 @@ let
 
 in
 {
-  # Ring native crypto library compilation fixup
-  ring = { patchVersion, vendorPath, ... }: ''
+  # ==========================================================================
+  # Build Script Fixups
+  # ==========================================================================
+
+  buildScriptFixups = {
+    # Ring native crypto library compilation fixup
+    ring = { patchVersion, vendorPath, ... }: ''
     # Fixup: ring native crypto library compilation
     # Ring's build.rs compiles C and assembly files into libring_core_*.a
     # We replicate this in Nix for Buck2 to link against
@@ -121,6 +126,7 @@ ${asmSourcesArray}
     ar rcs "$RING_OUT/lib''${RING_PREFIX%.}.a" "''${RING_OBJS[@]}"
     echo "Built ring native library: $RING_OUT/lib''${RING_PREFIX%.}.a"
   '';
+  };
 
   # ==========================================================================
   # Native Libraries
