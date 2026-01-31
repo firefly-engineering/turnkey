@@ -58,12 +58,23 @@
 //! state_machine.wait_ready(Some(Duration::from_secs(30)))?;
 //! ```
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Condvar, RwLock};
 use std::time::{Duration, Instant};
 
 use crate::{BackendStatus, Error, Result};
+
+/// Represents a pending update to a cell's source path
+#[derive(Debug, Clone)]
+pub struct CellUpdate {
+    /// The cell name
+    pub cell_name: String,
+    /// The new source path (typically a Nix store path)
+    pub new_source_path: PathBuf,
+    /// The old source path (for reference)
+    pub old_source_path: Option<PathBuf>,
+}
 
 /// A thread-safe state machine for managing consistency during updates
 ///
@@ -93,6 +104,10 @@ struct StateMachineInner {
     build_message: Option<String>,
     /// Last error message (if any)
     last_error: Option<String>,
+    /// Pending cell updates to apply during transition
+    pending_updates: HashMap<String, CellUpdate>,
+    /// Whether pending updates have been consumed by the filesystem
+    updates_applied: bool,
 }
 
 impl Default for StateMachineInner {
@@ -104,6 +119,8 @@ impl Default for StateMachineInner {
             update_started: None,
             build_message: None,
             last_error: None,
+            pending_updates: HashMap::new(),
+            updates_applied: false,
         }
     }
 }
@@ -166,7 +183,7 @@ impl ConsistencyStateMachine {
 
     /// Transition to the Ready state
     ///
-    /// This is typically called after mount() completes.
+    /// This is typically called after mount() completes or after a transition completes.
     pub fn set_ready(&self) -> Result<()> {
         let mut inner = self.inner.write().unwrap();
 
@@ -179,6 +196,8 @@ impl ConsistencyStateMachine {
                 inner.update_started = None;
                 inner.build_message = None;
                 inner.last_error = None;
+                inner.pending_updates.clear();
+                inner.updates_applied = false;
                 drop(inner);
                 self.notify_state_change();
                 Ok(())
@@ -202,6 +221,8 @@ impl ConsistencyStateMachine {
         inner.affected_paths.clear();
         inner.update_started = None;
         inner.build_message = None;
+        inner.pending_updates.clear();
+        inner.updates_applied = false;
         drop(inner);
         self.notify_state_change();
         Ok(())
@@ -284,15 +305,27 @@ impl ConsistencyStateMachine {
         }
     }
 
-    /// Mark the build as complete, transitioning to Transitioning state
+    /// Mark the build as complete with new cell paths, transitioning to Transitioning state
     ///
-    /// This transitions from Building to Transitioning.
-    pub fn build_complete(&self) -> Result<()> {
+    /// This transitions from Building to Transitioning and stores the new cell paths
+    /// for atomic application by the filesystem.
+    ///
+    /// # Arguments
+    ///
+    /// * `updates` - The cell updates to apply during transition. Each update contains
+    ///   the cell name and its new source path.
+    pub fn build_complete_with_updates(&self, updates: Vec<CellUpdate>) -> Result<()> {
         let mut inner = self.inner.write().unwrap();
 
         // Valid transition: Building -> Transitioning
         match &inner.status {
             BackendStatus::Building { .. } => {
+                // Store the pending updates
+                inner.pending_updates = updates
+                    .into_iter()
+                    .map(|u| (u.cell_name.clone(), u))
+                    .collect();
+                inner.updates_applied = false;
                 inner.status = BackendStatus::Transitioning;
                 inner.build_message = None;
                 drop(inner);
@@ -306,9 +339,44 @@ impl ConsistencyStateMachine {
         }
     }
 
+    /// Mark the build as complete, transitioning to Transitioning state
+    ///
+    /// This transitions from Building to Transitioning without any cell updates.
+    /// Use `build_complete_with_updates` when you have new cell paths to apply.
+    pub fn build_complete(&self) -> Result<()> {
+        self.build_complete_with_updates(vec![])
+    }
+
+    /// Get the pending cell updates (if in Transitioning state)
+    ///
+    /// Returns the updates and marks them as consumed. This should be called
+    /// by the filesystem to retrieve and apply the new cell paths atomically.
+    pub fn take_pending_updates(&self) -> Option<HashMap<String, CellUpdate>> {
+        let mut inner = self.inner.write().unwrap();
+
+        if !matches!(inner.status, BackendStatus::Transitioning) {
+            return None;
+        }
+
+        if inner.updates_applied || inner.pending_updates.is_empty() {
+            return None;
+        }
+
+        inner.updates_applied = true;
+        Some(inner.pending_updates.clone())
+    }
+
+    /// Check if there are pending updates that haven't been applied yet
+    pub fn has_pending_updates(&self) -> bool {
+        let inner = self.inner.read().unwrap();
+        matches!(inner.status, BackendStatus::Transitioning)
+            && !inner.updates_applied
+            && !inner.pending_updates.is_empty()
+    }
+
     /// Complete the transition, returning to Ready state
     ///
-    /// This transitions from Transitioning to Ready.
+    /// This transitions from Transitioning to Ready and clears any pending updates.
     pub fn transition_complete(&self) -> Result<()> {
         self.set_ready()
     }
@@ -331,6 +399,8 @@ impl ConsistencyStateMachine {
                 inner.affected_paths.clear();
                 inner.update_started = None;
                 inner.build_message = None;
+                inner.pending_updates.clear();
+                inner.updates_applied = false;
                 drop(inner);
                 self.notify_state_change();
                 Ok(())
@@ -649,5 +719,100 @@ mod tests {
         } else {
             panic!("Expected Building status");
         }
+    }
+
+    #[test]
+    fn test_build_complete_with_updates() {
+        let sm = ConsistencyStateMachine::new();
+        sm.set_ready().unwrap();
+        sm.trigger_update(vec!["godeps".into()]).unwrap();
+        sm.start_build(vec![PathBuf::from("/external/godeps")])
+            .unwrap();
+
+        // Complete with updates
+        let updates = vec![CellUpdate {
+            cell_name: "godeps".into(),
+            new_source_path: PathBuf::from("/nix/store/new-godeps"),
+            old_source_path: Some(PathBuf::from("/nix/store/old-godeps")),
+        }];
+        sm.build_complete_with_updates(updates).unwrap();
+
+        // Should be in Transitioning state
+        assert!(matches!(sm.status(), BackendStatus::Transitioning));
+
+        // Should have pending updates
+        assert!(sm.has_pending_updates());
+    }
+
+    #[test]
+    fn test_take_pending_updates() {
+        let sm = ConsistencyStateMachine::new();
+        sm.set_ready().unwrap();
+        sm.trigger_update(vec!["godeps".into()]).unwrap();
+        sm.start_build(vec![PathBuf::from("/external/godeps")])
+            .unwrap();
+
+        // Complete with updates
+        let updates = vec![CellUpdate {
+            cell_name: "godeps".into(),
+            new_source_path: PathBuf::from("/nix/store/new-godeps"),
+            old_source_path: None,
+        }];
+        sm.build_complete_with_updates(updates).unwrap();
+
+        // Take the updates
+        let taken = sm.take_pending_updates();
+        assert!(taken.is_some());
+        let updates = taken.unwrap();
+        assert_eq!(updates.len(), 1);
+        assert!(updates.contains_key("godeps"));
+        assert_eq!(
+            updates["godeps"].new_source_path,
+            PathBuf::from("/nix/store/new-godeps")
+        );
+
+        // Should no longer have pending updates (consumed)
+        assert!(!sm.has_pending_updates());
+
+        // Taking again should return None
+        assert!(sm.take_pending_updates().is_none());
+    }
+
+    #[test]
+    fn test_transition_clears_updates() {
+        let sm = ConsistencyStateMachine::new();
+        sm.set_ready().unwrap();
+        sm.trigger_update(vec!["godeps".into()]).unwrap();
+        sm.start_build(vec![PathBuf::from("/external/godeps")])
+            .unwrap();
+
+        let updates = vec![CellUpdate {
+            cell_name: "godeps".into(),
+            new_source_path: PathBuf::from("/nix/store/new-godeps"),
+            old_source_path: None,
+        }];
+        sm.build_complete_with_updates(updates).unwrap();
+
+        // Complete the transition
+        sm.transition_complete().unwrap();
+
+        // Should be Ready and have no pending updates
+        assert!(matches!(sm.status(), BackendStatus::Ready));
+        assert!(!sm.has_pending_updates());
+    }
+
+    #[test]
+    fn test_no_pending_updates_in_wrong_state() {
+        let sm = ConsistencyStateMachine::new();
+        sm.set_ready().unwrap();
+
+        // Not in Transitioning state
+        assert!(!sm.has_pending_updates());
+        assert!(sm.take_pending_updates().is_none());
+
+        // Even after starting an update
+        sm.trigger_update(vec!["godeps".into()]).unwrap();
+        assert!(!sm.has_pending_updates());
+        assert!(sm.take_pending_updates().is_none());
     }
 }

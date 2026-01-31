@@ -71,7 +71,7 @@ pub use policy::{
     AccessPolicy, CIPolicy, DevelopmentPolicy, FileClass, LenientPolicy, OperationType,
     PolicyDecision, StrictPolicy, SystemState,
 };
-pub use state::{ConsistencyStateMachine, StateObserver};
+pub use state::{CellUpdate, ConsistencyStateMachine, StateObserver};
 pub use status::BackendStatus;
 
 /// Result type for composition operations

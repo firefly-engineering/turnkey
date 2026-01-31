@@ -97,6 +97,11 @@ pub struct CompositionFs {
     state_machine: Arc<ConsistencyStateMachine>,
     /// Access policy for file operations
     policy: BoxedPolicy,
+    /// Mutable cell source paths (can be updated atomically during transitions)
+    ///
+    /// This is separate from config.cells to allow atomic updates without
+    /// replacing the entire config. Maps cell name -> current source path.
+    cell_paths: RwLock<HashMap<String, PathBuf>>,
 }
 
 impl CompositionFs {
@@ -133,10 +138,12 @@ impl CompositionFs {
             },
         );
 
-        // Pre-allocate inodes for configured cells
+        // Pre-allocate inodes for configured cells and build cell_paths map
         let mut next_ino = FIRST_DYNAMIC_INO;
+        let mut cell_paths = HashMap::new();
         for cell in &config.cells {
             inode_map.insert(next_ino, InodePath::Cell { name: cell.name.clone() });
+            cell_paths.insert(cell.name.clone(), cell.source_path.clone());
             next_ino += 1;
         }
 
@@ -150,6 +157,7 @@ impl CompositionFs {
             gid: unsafe { libc::getgid() },
             state_machine,
             policy,
+            cell_paths: RwLock::new(cell_paths),
         }
     }
 
@@ -185,12 +193,11 @@ impl CompositionFs {
         match self.get_inode_path(ino)? {
             InodePath::Root | InodePath::CellPrefix | InodePath::Virtual { .. } => None,
             InodePath::Source => Some(self.repo_root.clone()),
-            InodePath::Cell { name } => self
-                .config
-                .cells
-                .iter()
-                .find(|c| c.name == name)
-                .map(|c| c.source_path.clone()),
+            InodePath::Cell { name } => {
+                // Use mutable cell_paths for atomic updates
+                let cell_paths = self.cell_paths.read().unwrap();
+                cell_paths.get(&name).cloned()
+            }
             InodePath::Real { path } => Some(path),
         }
     }
@@ -430,6 +437,103 @@ impl CompositionFs {
             cell: cell_name.to_string(),
         };
         self.check_policy(&class, op)
+    }
+
+    /// Apply pending cell updates from the state machine
+    ///
+    /// This method should be called during the Transitioning state to
+    /// atomically update cell source paths. It:
+    ///
+    /// 1. Takes the pending updates from the state machine
+    /// 2. Updates the cell_paths map atomically
+    /// 3. Invalidates cached inodes for affected cells
+    ///
+    /// Returns the number of cells updated, or None if there were no updates.
+    pub fn apply_pending_updates(&self) -> Option<usize> {
+        // Take pending updates from the state machine
+        let updates = self.state_machine.take_pending_updates()?;
+
+        if updates.is_empty() {
+            return Some(0);
+        }
+
+        // Collect cell names that need cache invalidation
+        let affected_cells: Vec<String> = updates.keys().cloned().collect();
+
+        // Update cell paths atomically
+        {
+            let mut cell_paths = self.cell_paths.write().unwrap();
+            for (cell_name, update) in &updates {
+                debug!(
+                    "Updating cell '{}' path: {:?} -> {:?}",
+                    cell_name, update.old_source_path, update.new_source_path
+                );
+                cell_paths.insert(cell_name.clone(), update.new_source_path.clone());
+            }
+        }
+
+        // Invalidate cached inodes for affected cells
+        self.invalidate_cell_caches(&affected_cells);
+
+        Some(updates.len())
+    }
+
+    /// Invalidate cached inodes for the specified cells
+    ///
+    /// This clears the path_map entries for any paths that were under
+    /// the old cell source paths, ensuring subsequent lookups will
+    /// use the new paths.
+    fn invalidate_cell_caches(&self, cell_names: &[String]) {
+        // Get the cell source paths before invalidation
+        let cell_paths = self.cell_paths.read().unwrap();
+        let cell_source_paths: Vec<PathBuf> = cell_names
+            .iter()
+            .filter_map(|name| cell_paths.get(name).cloned())
+            .collect();
+        drop(cell_paths);
+
+        // Remove cached path -> inode mappings for affected cells
+        let mut path_map = self.path_map.write().unwrap();
+        let mut inode_map = self.inode_map.write().unwrap();
+
+        // Collect inodes to remove
+        let inodes_to_remove: Vec<u64> = path_map
+            .iter()
+            .filter_map(|(path, &ino)| {
+                // Check if this path is under any of the affected cell source paths
+                for cell_path in &cell_source_paths {
+                    if path.starts_with(cell_path) {
+                        return Some(ino);
+                    }
+                }
+                None
+            })
+            .collect();
+
+        let removed_count = inodes_to_remove.len();
+
+        // Remove from path_map
+        path_map.retain(|path, _| {
+            !cell_source_paths.iter().any(|cp| path.starts_with(cp))
+        });
+
+        // Remove from inode_map (but keep the Cell entries, only remove Real entries)
+        for ino in inodes_to_remove {
+            if let Some(InodePath::Real { .. }) = inode_map.get(&ino) {
+                inode_map.remove(&ino);
+            }
+        }
+
+        debug!(
+            "Invalidated caches for {} cells, removed {} inode mappings",
+            cell_names.len(),
+            removed_count
+        );
+    }
+
+    /// Check if there are pending updates that need to be applied
+    pub fn has_pending_updates(&self) -> bool {
+        self.state_machine.has_pending_updates()
     }
 }
 
@@ -1050,5 +1154,77 @@ mod tests {
             fs.classify_inode(BUCKROOT_INO),
             Some(FileClass::VirtualGenerated)
         ));
+    }
+
+    #[test]
+    fn test_atomic_cell_path_update() {
+        use crate::state::CellUpdate;
+
+        let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo")
+            .with_cell(CellConfig::new("godeps", "/nix/store/old-godeps"));
+        let state_machine = Arc::new(ConsistencyStateMachine::new());
+        let fs = CompositionFs::new(
+            config,
+            PathBuf::from("/home/user/repo"),
+            Arc::clone(&state_machine),
+        );
+
+        // Initial path
+        {
+            let cell_paths = fs.cell_paths.read().unwrap();
+            assert_eq!(
+                cell_paths.get("godeps"),
+                Some(&PathBuf::from("/nix/store/old-godeps"))
+            );
+        }
+
+        // Go through update cycle with new path
+        state_machine.set_ready().unwrap();
+        state_machine.trigger_update(vec!["godeps".into()]).unwrap();
+        state_machine
+            .start_build(vec![PathBuf::from("/firefly/turnkey/external/godeps")])
+            .unwrap();
+
+        // Complete build with new path
+        let updates = vec![CellUpdate {
+            cell_name: "godeps".into(),
+            new_source_path: PathBuf::from("/nix/store/new-godeps"),
+            old_source_path: Some(PathBuf::from("/nix/store/old-godeps")),
+        }];
+        state_machine.build_complete_with_updates(updates).unwrap();
+
+        // Apply updates
+        let count = fs.apply_pending_updates();
+        assert_eq!(count, Some(1));
+
+        // Path should be updated
+        {
+            let cell_paths = fs.cell_paths.read().unwrap();
+            assert_eq!(
+                cell_paths.get("godeps"),
+                Some(&PathBuf::from("/nix/store/new-godeps"))
+            );
+        }
+
+        // No more pending updates
+        assert!(!fs.has_pending_updates());
+    }
+
+    #[test]
+    fn test_no_pending_updates_when_not_transitioning() {
+        let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo")
+            .with_cell(CellConfig::new("godeps", "/nix/store/godeps"));
+        let state_machine = Arc::new(ConsistencyStateMachine::new());
+        let fs = CompositionFs::new(
+            config,
+            PathBuf::from("/home/user/repo"),
+            Arc::clone(&state_machine),
+        );
+
+        state_machine.set_ready().unwrap();
+
+        // Not in transitioning state
+        assert!(!fs.has_pending_updates());
+        assert!(fs.apply_pending_updates().is_none());
     }
 }
