@@ -40,6 +40,8 @@ fuser = "0.16"
 itoa = "1.0"
 libc = "0.2"
 log = "0.4"
+notify = "8.0"
+notify-debouncer-mini = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
@@ -60,5 +62,5 @@ tree-sitter-typescript = "0.23"
 tree-sitter-solidity = "1.2.13"
 
 # Workspace member references (for path dependencies between crates)
-composition = { path = "src/rust/composition", features = ["fuse"] }
+composition = { path = "src/rust/composition", features = ["fuse", "watcher"] }
 prefetch-cache = { path = "src/rust/prefetch-cache" }

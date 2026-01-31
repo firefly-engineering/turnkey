@@ -298,7 +298,7 @@ tk compose down
 - [ ] Linux testing
 
 ### Phase 3: Consistency Layer
-- [ ] Manifest watcher (inotify/fsevents)
+- [x] Manifest watcher (inotify/fsevents) - `watcher.rs` with debouncing
 - [ ] State machine implementation
 - [ ] Blocking reads during update
 - [ ] Atomic view transitions

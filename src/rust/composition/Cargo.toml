@@ -7,6 +7,7 @@ description = "Composition backend trait for FUSE and symlink-based repository v
 [features]
 default = []
 fuse = ["dep:fuser", "dep:libc", "dep:log"]
+watcher = ["dep:notify", "dep:notify-debouncer-mini", "dep:log"]
 
 [dependencies]
 thiserror.workspace = true
@@ -15,6 +16,10 @@ thiserror.workspace = true
 fuser = { workspace = true, optional = true }
 libc = { workspace = true, optional = true }
 log = { workspace = true, optional = true }
+
+# Optional file watcher support
+notify = { workspace = true, optional = true }
+notify-debouncer-mini = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile.workspace = true

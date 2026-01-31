@@ -57,6 +57,9 @@ mod status;
 #[cfg(feature = "fuse")]
 pub mod fuse;
 
+#[cfg(feature = "watcher")]
+pub mod watcher;
+
 pub use backend::CompositionBackend;
 pub use config::{CellConfig, CompositionConfig, ConsistencyMode};
 pub use error::Error;

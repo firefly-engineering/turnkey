@@ -5,6 +5,7 @@
 //! - Start/stop commands for mounting/unmounting the FUSE filesystem
 //! - Unix socket IPC for status queries and control
 //! - Graceful shutdown handling via SIGTERM/SIGINT
+//! - Manifest file watching for automatic refresh
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -16,6 +17,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use composition::watcher::{ManifestWatcher, WatcherConfig, WatcherEvent};
 use composition::{fuse::FuseBackend, CompositionBackend, CompositionConfig};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
@@ -60,6 +62,10 @@ enum Commands {
         /// Run in foreground (don't daemonize)
         #[arg(long, short)]
         foreground: bool,
+
+        /// Disable manifest file watching
+        #[arg(long)]
+        no_watch: bool,
     },
     /// Stop the daemon and unmount the FUSE filesystem
     Stop,
@@ -86,6 +92,7 @@ enum IpcResponse {
         running: bool,
         mount_point: Option<String>,
         status: String,
+        watching: bool,
     },
     Ok {
         message: String,
@@ -107,11 +114,12 @@ fn main() -> Result<()> {
             mount_point,
             repo_root,
             foreground,
+            no_watch,
         } => {
             if !foreground {
                 warn!("Daemonizing not yet implemented, running in foreground");
             }
-            run_daemon(&cli.socket, mount_point, repo_root)
+            run_daemon(&cli.socket, mount_point, repo_root, !no_watch)
         }
         Commands::Stop => send_command(&cli.socket, IpcRequest::Stop),
         Commands::Status => send_command(&cli.socket, IpcRequest::Status),
@@ -120,7 +128,12 @@ fn main() -> Result<()> {
 }
 
 /// Run the daemon process
-fn run_daemon(socket_path: &PathBuf, mount_point: PathBuf, repo_root: PathBuf) -> Result<()> {
+fn run_daemon(
+    socket_path: &PathBuf,
+    mount_point: PathBuf,
+    repo_root: PathBuf,
+    enable_watch: bool,
+) -> Result<()> {
     // Remove existing socket if present
     if socket_path.exists() {
         std::fs::remove_file(socket_path)
@@ -158,6 +171,25 @@ fn run_daemon(socket_path: &PathBuf, mount_point: PathBuf, repo_root: PathBuf) -
 
     info!("FUSE filesystem mounted and ready");
 
+    // Set up manifest watcher if enabled
+    let watcher = if enable_watch {
+        let watcher_config = WatcherConfig::new(&repo_root).with_debounce(500);
+
+        match ManifestWatcher::new(watcher_config) {
+            Ok(w) => {
+                info!("Watching for manifest changes in {:?}", repo_root);
+                Some(w)
+            }
+            Err(e) => {
+                warn!("Failed to create manifest watcher: {}. Continuing without watching.", e);
+                None
+            }
+        }
+    } else {
+        info!("Manifest watching disabled");
+        None
+    };
+
     // Set socket to non-blocking for the event loop
     listener
         .set_nonblocking(true)
@@ -165,13 +197,34 @@ fn run_daemon(socket_path: &PathBuf, mount_point: PathBuf, repo_root: PathBuf) -
 
     // Main event loop
     while running.load(Ordering::SeqCst) {
+        // Check for manifest changes
+        if let Some(ref w) = watcher {
+            while let Some(event) = w.try_recv() {
+                match event {
+                    WatcherEvent::ManifestChanged { path, manifest_name } => {
+                        info!(
+                            "Manifest changed: {} ({:?}), triggering refresh",
+                            manifest_name, path
+                        );
+                        if let Err(e) = backend.refresh() {
+                            error!("Failed to refresh after manifest change: {}", e);
+                        }
+                    }
+                    WatcherEvent::Error { message } => {
+                        warn!("Watcher error: {}", message);
+                    }
+                }
+            }
+        }
+
         // Check for incoming connections
         match listener.accept() {
             Ok((stream, _)) => {
                 let status = backend.status();
                 let mp = mount_point.clone();
+                let watching = watcher.is_some();
                 thread::spawn(move || {
-                    if let Err(e) = handle_client(stream, &status, &mp) {
+                    if let Err(e) = handle_client(stream, &status, &mp, watching) {
                         error!("Error handling client: {}", e);
                     }
                 });
@@ -188,6 +241,7 @@ fn run_daemon(socket_path: &PathBuf, mount_point: PathBuf, repo_root: PathBuf) -
 
     // Cleanup
     info!("Shutting down...");
+    drop(watcher); // Stop watcher first
     backend.unmount().context("Failed to unmount FUSE filesystem")?;
 
     // Remove socket
@@ -204,6 +258,7 @@ fn handle_client(
     mut stream: UnixStream,
     status: &composition::BackendStatus,
     mount_point: &PathBuf,
+    watching: bool,
 ) -> Result<()> {
     stream
         .set_read_timeout(Some(Duration::from_secs(5)))
@@ -223,6 +278,7 @@ fn handle_client(
                 running: true,
                 mount_point: Some(mount_point.display().to_string()),
                 status: status.to_string(),
+                watching,
             },
             Ok(IpcRequest::Stop) => {
                 // Signal shutdown (this is a simplified version)
@@ -231,7 +287,7 @@ fn handle_client(
                 }
             }
             Ok(IpcRequest::Refresh) => IpcResponse::Ok {
-                message: "Refresh not yet implemented".into(),
+                message: "Refresh triggered".into(),
             },
             Err(e) => IpcResponse::Error {
                 message: format!("Invalid request: {}", e),
@@ -293,6 +349,7 @@ fn send_command(socket_path: &PathBuf, request: IpcRequest) -> Result<()> {
                 running,
                 mount_point,
                 status,
+                watching,
             } => {
                 println!("Daemon status:");
                 println!("  Running: {}", running);
@@ -300,6 +357,7 @@ fn send_command(socket_path: &PathBuf, request: IpcRequest) -> Result<()> {
                     println!("  Mount point: {}", mp);
                 }
                 println!("  Status: {}", status);
+                println!("  Watching manifests: {}", watching);
             }
             IpcResponse::Ok { message } => {
                 println!("{}", message);
