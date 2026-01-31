@@ -14,6 +14,7 @@ use fuser::{MountOption, Session};
 use log::{debug, error, info};
 
 use super::filesystem::CompositionFs;
+use crate::state::ConsistencyStateMachine;
 use crate::{
     BackendStatus, CellMapping, CompositionBackend, CompositionConfig, Error, Result,
 };
@@ -33,12 +34,17 @@ use crate::{
 /// # Thread Safety
 ///
 /// The FUSE session runs in a background thread. All methods are thread-safe.
+/// The state machine is shared between the backend and filesystem for
+/// coordinating consistency during updates.
 pub struct FuseBackend {
     /// Configuration for this backend
     config: CompositionConfig,
 
     /// Current status
     status: Arc<Mutex<BackendStatus>>,
+
+    /// State machine for consistency during updates
+    state_machine: Arc<ConsistencyStateMachine>,
 
     /// Flag to signal the FUSE thread to stop
     should_stop: Arc<AtomicBool>,
@@ -53,9 +59,18 @@ impl FuseBackend {
         Self {
             config,
             status: Arc::new(Mutex::new(BackendStatus::Stopped)),
+            state_machine: Arc::new(ConsistencyStateMachine::new()),
             should_stop: Arc::new(AtomicBool::new(false)),
             fuse_thread: None,
         }
+    }
+
+    /// Get a reference to the state machine
+    ///
+    /// This is useful for external code that needs to trigger updates
+    /// or check the current state.
+    pub fn state_machine(&self) -> &Arc<ConsistencyStateMachine> {
+        &self.state_machine
     }
 
     /// Get the repository root path
@@ -136,6 +151,7 @@ impl CompositionBackend for FuseBackend {
         // Start the FUSE thread - create session and run it in the thread
         let status = Arc::clone(&self.status);
         let should_stop = Arc::clone(&self.should_stop);
+        let state_machine = Arc::clone(&self.state_machine);
 
         let handle = thread::spawn(move || {
             // Create mount options - try minimal first (allow_other requires system config)
@@ -145,7 +161,7 @@ impl CompositionBackend for FuseBackend {
             ];
 
             // Create the filesystem and session in this thread
-            let fs = CompositionFs::new(config, repo_root);
+            let fs = CompositionFs::new(config, repo_root, state_machine);
             let mut session = match Session::new(fs, &mount_point, &options) {
                 Ok(s) => s,
                 Err(e) => {

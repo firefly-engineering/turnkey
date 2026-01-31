@@ -9,13 +9,22 @@
 //! plus virtual files (.buckroot, .buckconfig) that shadow any real files with
 //! the same names. This allows Buck2 targets like `//docs/user-manual` to work
 //! identically whether using the FUSE mount or the symlink approach.
+//!
+//! # Consistency During Updates
+//!
+//! When dependency cells are being rebuilt, the filesystem handles reads based
+//! on the configured `ConsistencyMode`:
+//!
+//! - `BlockUntilReady`: Block the read until the update completes (default)
+//! - `AllowStale`: Return potentially stale data with a warning
+//! - `FailIfUpdating`: Return EAGAIN so the caller can retry
 
 use fuser::{
     FileAttr, FileType, Filesystem, ReplyAttr, ReplyData, ReplyDirectory, ReplyEntry, ReplyOpen,
     Request,
 };
-use libc::{ENOENT, ENOTDIR};
-use log::debug;
+use libc::{EAGAIN, ENOENT, ENOTDIR};
+use log::{debug, warn};
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs::{self, File};
@@ -23,10 +32,11 @@ use std::io::Read;
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::CompositionConfig;
+use crate::state::ConsistencyStateMachine;
+use crate::{CompositionConfig, ConsistencyMode};
 
 /// Time-to-live for cached attributes
 const TTL: Duration = Duration::from_secs(1);
@@ -63,6 +73,9 @@ enum InodePath {
     Real { path: PathBuf },
 }
 
+/// Default timeout for blocking reads during updates
+const BLOCKING_TIMEOUT: Duration = Duration::from_secs(300); // 5 minutes
+
 /// The FUSE filesystem for composition views
 pub struct CompositionFs {
     /// Configuration for this composition
@@ -79,11 +92,17 @@ pub struct CompositionFs {
     uid: u32,
     /// Current group ID
     gid: u32,
+    /// State machine for consistency during updates
+    state_machine: Arc<ConsistencyStateMachine>,
 }
 
 impl CompositionFs {
     /// Create a new composition filesystem
-    pub fn new(config: CompositionConfig, repo_root: PathBuf) -> Self {
+    pub fn new(
+        config: CompositionConfig,
+        repo_root: PathBuf,
+        state_machine: Arc<ConsistencyStateMachine>,
+    ) -> Self {
         let mut inode_map = HashMap::new();
         inode_map.insert(ROOT_INO, InodePath::Root);
         inode_map.insert(SOURCE_INO, InodePath::Source);
@@ -116,6 +135,7 @@ impl CompositionFs {
             next_inode: AtomicU64::new(next_ino),
             uid: unsafe { libc::getuid() },
             gid: unsafe { libc::getgid() },
+            state_machine,
         }
     }
 
@@ -295,6 +315,103 @@ impl CompositionFs {
         }
         None
     }
+
+    /// Check consistency for a path and handle according to the configured mode
+    ///
+    /// This is called before accessing cell paths during updates. Based on the
+    /// configured `ConsistencyMode`, this method will:
+    ///
+    /// - `BlockUntilReady`: Block until the update completes (returns Ok)
+    /// - `AllowStale`: Log a warning and return Ok (caller proceeds with stale data)
+    /// - `FailIfUpdating`: Return Err(EAGAIN) to signal the caller should retry
+    ///
+    /// For paths that are not affected by the current update, this returns Ok immediately.
+    fn check_path_consistency(&self, path: &PathBuf) -> Result<(), i32> {
+        // Check if this path is affected by the current update
+        if !self.state_machine.is_path_affected(path) {
+            return Ok(());
+        }
+
+        // Path is being updated - handle based on consistency mode
+        match self.config.consistency_mode {
+            ConsistencyMode::BlockUntilReady => {
+                debug!(
+                    "Blocking read for {:?} until update completes",
+                    path
+                );
+                // Block until the update completes
+                if let Err(e) = self.state_machine.wait_ready(Some(BLOCKING_TIMEOUT)) {
+                    warn!("Timeout waiting for update to complete: {:?}", e);
+                    return Err(EAGAIN);
+                }
+                Ok(())
+            }
+            ConsistencyMode::AllowStale => {
+                warn!(
+                    "Returning potentially stale data for {:?} during update",
+                    path
+                );
+                Ok(())
+            }
+            ConsistencyMode::FailIfUpdating => {
+                debug!(
+                    "Failing read for {:?} with EAGAIN - path is being updated",
+                    path
+                );
+                Err(EAGAIN)
+            }
+        }
+    }
+
+    /// Check consistency for a cell by name
+    ///
+    /// Convenience wrapper that constructs the cell path from the cell name.
+    fn check_cell_consistency(&self, cell_name: &str) -> Result<(), i32> {
+        let cell_path = self
+            .config
+            .mount_point
+            .join(&self.config.cell_prefix)
+            .join(cell_name);
+        self.check_path_consistency(&cell_path)
+    }
+
+    /// Check if an inode represents a cell path that needs consistency checking
+    ///
+    /// Returns true for:
+    /// - InodePath::Cell - the cell root directory
+    /// - InodePath::Real where the path is under a cell's source_path
+    ///
+    /// Returns false for:
+    /// - InodePath::Root, CellPrefix, Source, Virtual - not cell content
+    /// - InodePath::Real where the path is under repo_root (source passthrough)
+    fn is_cell_path(&self, ino: u64) -> Option<String> {
+        match self.get_inode_path(ino)? {
+            InodePath::Cell { name } => Some(name),
+            InodePath::Real { path } => {
+                // Check if this path is under any cell's source_path
+                for cell in &self.config.cells {
+                    if path.starts_with(&cell.source_path) {
+                        return Some(cell.name.clone());
+                    }
+                }
+                // Path is under repo_root (source passthrough), no check needed
+                None
+            }
+            _ => None,
+        }
+    }
+
+    /// Check consistency for an inode if it represents a cell path
+    ///
+    /// Only checks consistency for cell content (not source passthrough).
+    /// Returns Ok(()) if no check is needed or if the check passes.
+    fn check_inode_consistency(&self, ino: u64) -> Result<(), i32> {
+        if let Some(cell_name) = self.is_cell_path(ino) {
+            self.check_cell_consistency(&cell_name)
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl Filesystem for CompositionFs {
@@ -318,6 +435,11 @@ impl Filesystem for CompositionFs {
             Some(InodePath::CellPrefix) => {
                 // Looking up a cell in external/
                 if let Some(ino) = self.find_cell_inode(&name_str) {
+                    // Check consistency before accessing cell content
+                    if let Err(errno) = self.check_cell_consistency(&name_str) {
+                        reply.error(errno);
+                        return;
+                    }
                     if let Some(path) = self.resolve_real_path(ino) {
                         if let Ok(meta) = fs::metadata(&path) {
                             reply.entry(&TTL, &self.metadata_to_attr(ino, &meta), 0);
@@ -365,6 +487,11 @@ impl Filesystem for CompositionFs {
             }
             Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
                 // Looking up in a real directory (cells or nested real paths)
+                // Check consistency for cell paths (not source passthrough)
+                if let Err(errno) = self.check_inode_consistency(parent) {
+                    reply.error(errno);
+                    return;
+                }
                 if let Some(parent_path) = self.resolve_real_path(parent) {
                     let child_path = parent_path.join(name);
                     if let Ok(meta) = fs::symlink_metadata(&child_path) {
@@ -392,7 +519,22 @@ impl Filesystem for CompositionFs {
                 let content = self.get_virtual_file_content(file);
                 reply.attr(&TTL, &self.virtual_file_attr(ino, content.len() as u64));
             }
-            Some(InodePath::Source) | Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
+            Some(InodePath::Source) => {
+                // Source passthrough - no consistency check needed
+                if let Some(path) = self.resolve_real_path(ino) {
+                    if let Ok(meta) = fs::symlink_metadata(&path) {
+                        reply.attr(&TTL, &self.metadata_to_attr(ino, &meta));
+                        return;
+                    }
+                }
+                reply.error(ENOENT);
+            }
+            Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
+                // Check consistency for cell paths (not source passthrough)
+                if let Err(errno) = self.check_inode_consistency(ino) {
+                    reply.error(errno);
+                    return;
+                }
                 if let Some(path) = self.resolve_real_path(ino) {
                     if let Ok(meta) = fs::symlink_metadata(&path) {
                         reply.attr(&TTL, &self.metadata_to_attr(ino, &meta));
@@ -443,6 +585,12 @@ impl Filesystem for CompositionFs {
                 let end = std::cmp::min(start + size as usize, bytes.len());
                 reply.data(&bytes[start..end]);
             }
+            return;
+        }
+
+        // Check consistency for cell paths before reading
+        if let Err(errno) = self.check_inode_consistency(ino) {
+            reply.error(errno);
             return;
         }
 
@@ -599,6 +747,11 @@ impl Filesystem for CompositionFs {
             }
             Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
                 // Real directories (cells or nested paths) - no overlay
+                // Check consistency for cell paths (not source passthrough)
+                if let Err(errno) = self.check_inode_consistency(ino) {
+                    reply.error(errno);
+                    return;
+                }
                 if let Some(path) = self.resolve_real_path(ino) {
                     if let Ok(read_dir) = fs::read_dir(&path) {
                         let mut entries: Vec<(u64, FileType, String)> = vec![
@@ -664,11 +817,17 @@ mod tests {
     use super::*;
     use crate::config::CellConfig;
 
+    /// Helper to create a test filesystem with default state machine
+    fn test_fs(config: CompositionConfig, repo_root: PathBuf) -> CompositionFs {
+        let state_machine = Arc::new(ConsistencyStateMachine::new());
+        CompositionFs::new(config, repo_root, state_machine)
+    }
+
     #[test]
     fn test_composition_fs_new() {
         let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo")
             .with_cell(CellConfig::new("godeps", "/nix/store/godeps"));
-        let fs = CompositionFs::new(config, PathBuf::from("/home/user/repo"));
+        let fs = test_fs(config, PathBuf::from("/home/user/repo"));
         // repo_root is the actual repository root (not src subdirectory)
         assert_eq!(fs.repo_root, PathBuf::from("/home/user/repo"));
     }
@@ -678,7 +837,7 @@ mod tests {
         let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo")
             .with_cell(CellConfig::new("godeps", "/nix/store/godeps"))
             .with_cell(CellConfig::new("rustdeps", "/nix/store/rustdeps"));
-        let fs = CompositionFs::new(config, PathBuf::from("/home/user/repo"));
+        let fs = test_fs(config, PathBuf::from("/home/user/repo"));
 
         // Check reserved inodes
         assert!(matches!(fs.get_inode_path(ROOT_INO), Some(InodePath::Root)));
@@ -697,7 +856,7 @@ mod tests {
     #[test]
     fn test_virtual_dir_attr() {
         let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo");
-        let fs = CompositionFs::new(config, PathBuf::from("/home/user/repo"));
+        let fs = test_fs(config, PathBuf::from("/home/user/repo"));
 
         let attr = fs.virtual_dir_attr(ROOT_INO);
         assert_eq!(attr.ino, ROOT_INO);
@@ -710,7 +869,7 @@ mod tests {
         let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo")
             .with_cell(CellConfig::new("godeps", "/nix/store/godeps"))
             .with_cell(CellConfig::new("rustdeps", "/nix/store/rustdeps"));
-        let fs = CompositionFs::new(config, PathBuf::from("/home/user/repo"));
+        let fs = test_fs(config, PathBuf::from("/home/user/repo"));
 
         let content = fs.generate_buckconfig();
 
@@ -733,7 +892,7 @@ mod tests {
     #[test]
     fn test_buckroot_generation() {
         let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo");
-        let fs = CompositionFs::new(config, PathBuf::from("/home/user/repo"));
+        let fs = test_fs(config, PathBuf::from("/home/user/repo"));
 
         let content = fs.generate_buckroot();
         assert!(!content.is_empty());
@@ -742,7 +901,7 @@ mod tests {
     #[test]
     fn test_virtual_file_inodes() {
         let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo");
-        let fs = CompositionFs::new(config, PathBuf::from("/home/user/repo"));
+        let fs = test_fs(config, PathBuf::from("/home/user/repo"));
 
         // Check virtual file inodes are allocated
         assert!(matches!(
@@ -762,7 +921,7 @@ mod tests {
     #[test]
     fn test_virtual_file_attr() {
         let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo");
-        let fs = CompositionFs::new(config, PathBuf::from("/home/user/repo"));
+        let fs = test_fs(config, PathBuf::from("/home/user/repo"));
 
         let content = fs.generate_buckconfig();
         let attr = fs.virtual_file_attr(BUCKCONFIG_INO, content.len() as u64);
@@ -771,5 +930,81 @@ mod tests {
         assert_eq!(attr.kind, FileType::RegularFile);
         assert_eq!(attr.size, content.len() as u64);
         assert_eq!(attr.perm, 0o644);
+    }
+
+    #[test]
+    fn test_consistency_check_not_affected() {
+        let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo")
+            .with_cell(CellConfig::new("godeps", "/nix/store/godeps"));
+        let state_machine = Arc::new(ConsistencyStateMachine::new());
+        state_machine.set_ready().unwrap();
+        let fs = CompositionFs::new(config, PathBuf::from("/home/user/repo"), state_machine);
+
+        // When not updating, path check should succeed immediately
+        let result = fs.check_path_consistency(&PathBuf::from("/firefly/turnkey/external/godeps"));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_consistency_check_allow_stale() {
+        let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo")
+            .with_cell(CellConfig::new("godeps", "/nix/store/godeps"))
+            .with_consistency_mode(ConsistencyMode::AllowStale);
+        let state_machine = Arc::new(ConsistencyStateMachine::new());
+
+        // Set up an update affecting godeps
+        state_machine.set_ready().unwrap();
+        state_machine.trigger_update(vec!["godeps".into()]).unwrap();
+        state_machine
+            .start_build(vec![PathBuf::from("/firefly/turnkey/external/godeps")])
+            .unwrap();
+
+        let fs = CompositionFs::new(config, PathBuf::from("/home/user/repo"), state_machine);
+
+        // With AllowStale mode, should succeed even during update
+        let result = fs.check_path_consistency(&PathBuf::from("/firefly/turnkey/external/godeps"));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_consistency_check_fail_if_updating() {
+        let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo")
+            .with_cell(CellConfig::new("godeps", "/nix/store/godeps"))
+            .with_consistency_mode(ConsistencyMode::FailIfUpdating);
+        let state_machine = Arc::new(ConsistencyStateMachine::new());
+
+        // Set up an update affecting godeps
+        state_machine.set_ready().unwrap();
+        state_machine.trigger_update(vec!["godeps".into()]).unwrap();
+        state_machine
+            .start_build(vec![PathBuf::from("/firefly/turnkey/external/godeps")])
+            .unwrap();
+
+        let fs = CompositionFs::new(config, PathBuf::from("/home/user/repo"), state_machine);
+
+        // With FailIfUpdating mode, should return EAGAIN
+        let result = fs.check_path_consistency(&PathBuf::from("/firefly/turnkey/external/godeps"));
+        assert_eq!(result, Err(EAGAIN));
+    }
+
+    #[test]
+    fn test_cell_consistency_check() {
+        let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo")
+            .with_cell(CellConfig::new("godeps", "/nix/store/godeps"))
+            .with_consistency_mode(ConsistencyMode::FailIfUpdating);
+        let state_machine = Arc::new(ConsistencyStateMachine::new());
+
+        // Set up an update affecting godeps
+        state_machine.set_ready().unwrap();
+        state_machine.trigger_update(vec!["godeps".into()]).unwrap();
+        state_machine
+            .start_build(vec![PathBuf::from("/firefly/turnkey/external/godeps")])
+            .unwrap();
+
+        let fs = CompositionFs::new(config, PathBuf::from("/home/user/repo"), state_machine);
+
+        // Cell check should also return EAGAIN
+        let result = fs.check_cell_consistency("godeps");
+        assert_eq!(result, Err(EAGAIN));
     }
 }
