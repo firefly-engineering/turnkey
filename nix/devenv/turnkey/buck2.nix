@@ -14,6 +14,10 @@ let
   cfg = config.turnkey.buck2;
   turnkeyCfg = config.turnkey;
 
+  # Pre-commit check tools (Rust implementations with tree-sitter parsing)
+  checkSourceCoverageRs = import ../../packages/check-source-coverage-rs.nix { inherit pkgs lib; };
+  checkRustEditionRs = import ../../packages/check-rust-edition-rs.nix { inherit pkgs lib; };
+
   # Load the toolchain mappings
   mappings = import ../../buck2/mappings.nix { inherit lib; };
 
@@ -101,9 +105,6 @@ let
       enableTypescript = cfg.javascript.enable;
       enableSolidity = cfg.solidity.enable;
     };
-    # Pre-commit check tools (Rust implementations with tree-sitter parsing)
-    checkSourceCoverageRs = import ../../packages/check-source-coverage-rs.nix { inherit pkgs lib; };
-    checkRustEditionRs = import ../../packages/check-rust-edition-rs.nix { inherit pkgs lib; };
   in
     lib.optional cfg.go.enable godepsGen
     ++ lib.optional cfg.rust.enable rustdepsGen
