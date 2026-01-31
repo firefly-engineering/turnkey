@@ -23,6 +23,8 @@
 //! ```
 
 mod backend;
+mod edit_overlay;
 mod filesystem;
 
 pub use backend::FuseBackend;
+pub use edit_overlay::{EditOverlay, EditedFileInfo};

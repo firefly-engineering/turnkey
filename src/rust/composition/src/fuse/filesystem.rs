@@ -3,7 +3,17 @@
 //! This implements the low-level FUSE operations for the composition view.
 //! The filesystem presents a unified view with:
 //! - `/<source_dir_name>/` - Overlay on repository root with virtual .buckroot/.buckconfig
-//! - `/<cell_prefix>/<cell>/` - Read-only view of dependency cells (e.g., "external/godeps")
+//! - `/<cell_prefix>/<cell>/` - View of dependency cells (e.g., "external/godeps")
+//!
+//! # Edit Layer (Copy-on-Write)
+//!
+//! When editing is enabled (`config.enable_editing`), writes to editable cells
+//! are captured in an overlay directory (`.turnkey/edits/`). This allows editing
+//! external dependencies without modifying the read-only Nix store:
+//!
+//! 1. First write to a file triggers copy-on-write from Nix store to overlay
+//! 2. Subsequent reads return the overlay copy
+//! 3. Edits can be reverted or converted to patches
 //!
 //! The source directory is an OVERLAY: it shows all files from the repo root,
 //! plus virtual files (.buckroot, .buckconfig) that shadow any real files with
@@ -21,9 +31,9 @@
 
 use fuser::{
     FileAttr, FileType, Filesystem, ReplyAttr, ReplyData, ReplyDirectory, ReplyEntry, ReplyOpen,
-    Request,
+    ReplyWrite, Request,
 };
-use libc::{EAGAIN, ENOENT, ENOTDIR};
+use libc::{EAGAIN, ENOENT, ENOTDIR, EROFS};
 use log::{debug, warn};
 use std::collections::HashMap;
 use std::ffi::OsStr;
@@ -35,6 +45,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use super::edit_overlay::EditOverlay;
 use crate::policy::{
     default_policy, BoxedPolicy, FileClass, OperationType, PolicyDecision,
     SystemState as PolicyState,
@@ -102,6 +113,10 @@ pub struct CompositionFs {
     /// This is separate from config.cells to allow atomic updates without
     /// replacing the entire config. Maps cell name -> current source path.
     cell_paths: RwLock<HashMap<String, PathBuf>>,
+    /// Edit overlay for copy-on-write editing of cell files
+    ///
+    /// Only present when `config.enable_editing` is true.
+    edit_overlay: Option<EditOverlay>,
 }
 
 impl CompositionFs {
@@ -141,11 +156,23 @@ impl CompositionFs {
         // Pre-allocate inodes for configured cells and build cell_paths map
         let mut next_ino = FIRST_DYNAMIC_INO;
         let mut cell_paths = HashMap::new();
+        let mut editable_cells = Vec::new();
         for cell in &config.cells {
             inode_map.insert(next_ino, InodePath::Cell { name: cell.name.clone() });
             cell_paths.insert(cell.name.clone(), cell.source_path.clone());
+            if cell.editable {
+                editable_cells.push(cell.name.clone());
+            }
             next_ino += 1;
         }
+
+        // Create edit overlay if editing is enabled
+        let edit_overlay = if config.enable_editing {
+            let edits_dir = repo_root.join(&config.edits_dir);
+            Some(EditOverlay::new(edits_dir, editable_cells))
+        } else {
+            None
+        };
 
         Self {
             config,
@@ -158,6 +185,7 @@ impl CompositionFs {
             state_machine,
             policy,
             cell_paths: RwLock::new(cell_paths),
+            edit_overlay,
         }
     }
 
@@ -439,6 +467,48 @@ impl CompositionFs {
         self.check_policy(&class, op)
     }
 
+    /// Get cell info for a path under a cell
+    ///
+    /// Returns (cell_name, relative_path_within_cell) if the path is under a cell.
+    fn get_cell_info(&self, path: &PathBuf) -> Option<(String, PathBuf)> {
+        let cell_paths = self.cell_paths.read().unwrap();
+        for (cell_name, cell_source) in cell_paths.iter() {
+            if let Ok(relative) = path.strip_prefix(cell_source) {
+                return Some((cell_name.clone(), relative.to_path_buf()));
+            }
+        }
+        None
+    }
+
+    /// Check if a file is in an editable cell and has been edited
+    ///
+    /// Returns the overlay path if the file should be read from the overlay.
+    fn get_edit_overlay_path(&self, path: &PathBuf) -> Option<PathBuf> {
+        let overlay = self.edit_overlay.as_ref()?;
+        let (cell_name, relative) = self.get_cell_info(path)?;
+        overlay.get_read_path(&cell_name, &relative)
+    }
+
+    /// Check if editing is allowed for a given inode
+    ///
+    /// Returns (cell_name, relative_path, original_path) if the inode is in an
+    /// editable cell, otherwise returns an error.
+    fn check_edit_allowed(&self, ino: u64) -> Result<(String, PathBuf, PathBuf), i32> {
+        // Must have editing enabled
+        let overlay = self.edit_overlay.as_ref().ok_or(EROFS)?;
+
+        // Must be a real path in a cell
+        let original_path = self.resolve_real_path(ino).ok_or(ENOENT)?;
+        let (cell_name, relative) = self.get_cell_info(&original_path).ok_or(EROFS)?;
+
+        // Cell must be editable
+        if !overlay.is_cell_editable(&cell_name) {
+            return Err(EROFS);
+        }
+
+        Ok((cell_name, relative, original_path))
+    }
+
     /// Apply pending cell updates from the state machine
     ///
     /// This method should be called during the Transitioning state to
@@ -717,9 +787,12 @@ impl Filesystem for CompositionFs {
             return;
         }
 
-        // Read from real path
+        // Get the real path
         if let Some(path) = self.resolve_real_path(ino) {
-            match File::open(&path) {
+            // Check if this file has been edited (overlay takes precedence)
+            let read_path = self.get_edit_overlay_path(&path).unwrap_or(path);
+
+            match File::open(&read_path) {
                 Ok(mut file) => {
                     use std::io::Seek;
                     if file.seek(std::io::SeekFrom::Start(offset as u64)).is_ok() {
@@ -737,6 +810,137 @@ impl Filesystem for CompositionFs {
             }
         }
         reply.error(ENOENT);
+    }
+
+    fn write(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        _fh: u64,
+        offset: i64,
+        data: &[u8],
+        _write_flags: u32,
+        _flags: i32,
+        _lock_owner: Option<u64>,
+        reply: ReplyWrite,
+    ) {
+        debug!("write(ino={}, offset={}, size={})", ino, offset, data.len());
+
+        // Check policy for cell paths before writing
+        if let Err(errno) = self.check_inode_policy(ino, OperationType::Write) {
+            reply.error(errno);
+            return;
+        }
+
+        // Check if this is in an editable cell
+        let (cell_name, relative, original_path) = match self.check_edit_allowed(ino) {
+            Ok(info) => info,
+            Err(errno) => {
+                debug!("write denied: errno={}", errno);
+                reply.error(errno);
+                return;
+            }
+        };
+
+        // Perform the write via edit overlay
+        let overlay = match &self.edit_overlay {
+            Some(o) => o,
+            None => {
+                reply.error(EROFS);
+                return;
+            }
+        };
+
+        match overlay.write(&cell_name, &relative, &original_path, offset, data) {
+            Ok(written) => {
+                debug!(
+                    "Wrote {} bytes to {}/{} via overlay",
+                    written,
+                    cell_name,
+                    relative.display()
+                );
+                reply.written(written);
+            }
+            Err(e) => {
+                warn!("Write failed for {}/{}: {}", cell_name, relative.display(), e);
+                reply.error(libc::EIO);
+            }
+        }
+    }
+
+    fn setattr(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        _mode: Option<u32>,
+        _uid: Option<u32>,
+        _gid: Option<u32>,
+        size: Option<u64>,
+        _atime: Option<fuser::TimeOrNow>,
+        _mtime: Option<fuser::TimeOrNow>,
+        _ctime: Option<SystemTime>,
+        _fh: Option<u64>,
+        _crtime: Option<SystemTime>,
+        _chgtime: Option<SystemTime>,
+        _bkuptime: Option<SystemTime>,
+        _flags: Option<u32>,
+        reply: ReplyAttr,
+    ) {
+        debug!("setattr(ino={}, size={:?})", ino, size);
+
+        // Handle truncate via size parameter
+        if let Some(new_size) = size {
+            // Check if this is in an editable cell
+            let (cell_name, relative, original_path) = match self.check_edit_allowed(ino) {
+                Ok(info) => info,
+                Err(errno) => {
+                    reply.error(errno);
+                    return;
+                }
+            };
+
+            let overlay = match &self.edit_overlay {
+                Some(o) => o,
+                None => {
+                    reply.error(EROFS);
+                    return;
+                }
+            };
+
+            // Truncate via overlay
+            if let Err(e) = overlay.truncate(&cell_name, &relative, &original_path, new_size) {
+                warn!(
+                    "Truncate failed for {}/{}: {}",
+                    cell_name,
+                    relative.display(),
+                    e
+                );
+                reply.error(libc::EIO);
+                return;
+            }
+        }
+
+        // Return updated attributes
+        match self.get_inode_path(ino) {
+            Some(InodePath::Virtual { file }) => {
+                let content = self.get_virtual_file_content(file);
+                reply.attr(&TTL, &self.virtual_file_attr(ino, content.len() as u64));
+            }
+            Some(_) => {
+                if let Some(path) = self.resolve_real_path(ino) {
+                    // Check overlay for edited files
+                    let attr_path = self.get_edit_overlay_path(&path).unwrap_or(path);
+                    if let Ok(meta) = fs::symlink_metadata(&attr_path) {
+                        reply.attr(&TTL, &self.metadata_to_attr(ino, &meta));
+                        return;
+                    }
+                }
+                reply.error(ENOENT);
+            }
+            None => {
+                reply.error(ENOENT);
+            }
+        }
     }
 
     fn readdir(
@@ -1226,5 +1430,106 @@ mod tests {
         // Not in transitioning state
         assert!(!fs.has_pending_updates());
         assert!(fs.apply_pending_updates().is_none());
+    }
+
+    #[test]
+    fn test_edit_overlay_disabled_by_default() {
+        let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo")
+            .with_cell(CellConfig::new("godeps", "/nix/store/godeps"));
+        let fs = test_fs(config, PathBuf::from("/home/user/repo"));
+
+        // Edit overlay should be None when not enabled
+        assert!(fs.edit_overlay.is_none());
+    }
+
+    #[test]
+    fn test_edit_overlay_enabled_with_config() {
+        let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo")
+            .with_cell(CellConfig::new("godeps", "/nix/store/godeps").with_editable(true))
+            .with_editing(true);
+        let fs = test_fs(config, PathBuf::from("/home/user/repo"));
+
+        // Edit overlay should be present when enabled
+        assert!(fs.edit_overlay.is_some());
+
+        // And the cell should be editable
+        let overlay = fs.edit_overlay.as_ref().unwrap();
+        assert!(overlay.is_cell_editable("godeps"));
+    }
+
+    #[test]
+    fn test_get_cell_info() {
+        let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo")
+            .with_cell(CellConfig::new("godeps", "/nix/store/abc-godeps"));
+        let fs = test_fs(config, PathBuf::from("/home/user/repo"));
+
+        // Path within a cell
+        let path = PathBuf::from("/nix/store/abc-godeps/vendor/github.com/foo/bar/lib.go");
+        let info = fs.get_cell_info(&path);
+        assert!(info.is_some());
+        let (cell_name, relative) = info.unwrap();
+        assert_eq!(cell_name, "godeps");
+        assert_eq!(relative, PathBuf::from("vendor/github.com/foo/bar/lib.go"));
+
+        // Path not in any cell
+        let other_path = PathBuf::from("/nix/store/other/file.txt");
+        assert!(fs.get_cell_info(&other_path).is_none());
+    }
+
+    #[test]
+    fn test_check_edit_allowed_rejects_non_editable() {
+        // Cell not marked as editable
+        let config = CompositionConfig::new("/firefly/turnkey", "/tmp/test-repo")
+            .with_cell(CellConfig::new("godeps", "/tmp/test-cell"))
+            .with_editing(true);
+
+        let state_machine = Arc::new(ConsistencyStateMachine::new());
+        let fs = CompositionFs::new(config, PathBuf::from("/tmp/test-repo"), state_machine);
+
+        // Allocate an inode for a path in the cell
+        let cell_path = PathBuf::from("/tmp/test-cell/vendor/foo/lib.go");
+        let ino = fs.get_or_alloc_inode(&cell_path);
+
+        // Should be rejected since cell is not editable
+        let result = fs.check_edit_allowed(ino);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), EROFS);
+    }
+
+    #[test]
+    fn test_check_edit_allowed_accepts_editable() {
+        use tempfile::TempDir;
+        use std::io::Write;
+
+        let temp = TempDir::new().unwrap();
+        let repo_root = temp.path().join("repo");
+        let cell_source = temp.path().join("nix/store/godeps");
+
+        // Create the cell directory and file
+        fs::create_dir_all(cell_source.join("vendor/foo")).unwrap();
+        let mut f = File::create(cell_source.join("vendor/foo/lib.go")).unwrap();
+        f.write_all(b"package foo\n").unwrap();
+
+        fs::create_dir_all(&repo_root).unwrap();
+
+        let config = CompositionConfig::new("/firefly/turnkey", &repo_root)
+            .with_cell(CellConfig::new("godeps", &cell_source).with_editable(true))
+            .with_editing(true);
+
+        let state_machine = Arc::new(ConsistencyStateMachine::new());
+        let fs = CompositionFs::new(config, repo_root, state_machine);
+
+        // Allocate an inode for a path in the cell
+        let cell_path = cell_source.join("vendor/foo/lib.go");
+        let ino = fs.get_or_alloc_inode(&cell_path);
+
+        // Should be accepted since cell is editable
+        let result = fs.check_edit_allowed(ino);
+        assert!(result.is_ok());
+
+        let (cell_name, relative, original) = result.unwrap();
+        assert_eq!(cell_name, "godeps");
+        assert_eq!(relative, PathBuf::from("vendor/foo/lib.go"));
+        assert_eq!(original, cell_path);
     }
 }
