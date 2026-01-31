@@ -151,30 +151,48 @@ A long-running Rust daemon that:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 2. Consistency Layer
+### 2. Consistency Layer (Pluggable Policy System)
 
-Guarantees filesystem consistency during updates:
+The consistency layer uses a **pluggable policy system** that classifies files and
+determines access behavior based on system state. See the
+[FUSE Access Policy](../developer-manual/src/architecture/fuse-policy.md) documentation
+for full details.
 
-**States:**
-1. `READY` - Filesystem is consistent, all reads allowed
-2. `UPDATING` - Manifest changed, blocking new reads to changed paths
-3. `BUILDING` - Nix derivation building, reads to affected paths block
-4. `TRANSITIONING` - Atomically switching to new derivation
+**File Classes:**
+- `SourcePassthrough` - Repository source files (always accessible)
+- `CellContent` - Dependency cell content (subject to policy)
+- `VirtualGenerated` - Generated files like `.buckconfig`
+- `VirtualDirectory` - Virtual directory structure
 
-**Behavior:**
-- Reads to unaffected paths always succeed immediately
-- Reads to affected paths during update either:
-  - Block until new version ready (default)
-  - Return stale data with warning (configurable)
-  - Fail with EAGAIN (for non-blocking access)
+**System States:**
+1. `Settled` - Filesystem is consistent, all reads allowed
+2. `Syncing` - Manifest changed, preparing for update
+3. `Building` - Nix derivation building
+4. `Transitioning` - Atomically switching to new derivation
+5. `Error` - System encountered an error
+
+**Built-in Policies:**
+
+| Policy | Behavior |
+|--------|----------|
+| `StrictPolicy` | Block all cell access during updates |
+| `LenientPolicy` | Allow stale reads, only block during transition |
+| `CIPolicy` | Fail fast with EAGAIN on any conflict |
+| `DevelopmentPolicy` | Balanced default (allow stale during sync, block during build) |
 
 ```rust
-enum AccessMode {
-    BlockUntilReady,      // Default: wait for consistency
-    AllowStale,           // Return old version during update
-    FailIfUpdating,       // Return EAGAIN if path is updating
-}
+// Example: Using CI policy for fail-fast behavior
+let fs = CompositionFs::with_policy(
+    config,
+    repo_root,
+    state_machine,
+    Box::new(CIPolicy::new()),
+);
 ```
+
+**Key design:** Source passthrough files are always accessible. Only dependency
+cell content is subject to policy decisions, ensuring builds can always read
+source code even during dependency updates.
 
 ### 3. Edit Layer (Copy-on-Write)
 
@@ -306,8 +324,9 @@ tk compose down
 
 ### Phase 3: Consistency Layer
 - [x] Manifest watcher (inotify/fsevents) - `watcher.rs` with debouncing
-- [ ] State machine implementation
-- [ ] Blocking reads during update
+- [x] State machine implementation - `state.rs` with thread-safe transitions
+- [x] Pluggable policy system - `policy.rs` with FileClass, SystemState, PolicyDecision
+- [x] Blocking reads during update - integrated into FUSE operations
 - [ ] Atomic view transitions
 
 ### Phase 4: macOS Support
