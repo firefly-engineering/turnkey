@@ -3,7 +3,7 @@ load("@prelude//:rules.bzl", "rust_binary")
 
 rust_binary(
     name = "soldeps-gen",
-    srcs = glob(["src/**/*.rs"]),
+    srcs = glob(["src/**/*.rs", "VERSION.txt"]),
     edition = "2024",
     deps = [
         "rustdeps//vendor/anyhow:anyhow",

@@ -3,7 +3,7 @@ load("@prelude//:rules.bzl", "rust_binary")
 
 rust_binary(
     name = "jsdeps-gen",
-    srcs = glob(["src/**/*.rs"]),
+    srcs = glob(["src/**/*.rs", "VERSION.txt"]),
     edition = "2024",
     deps = [
         "rustdeps//vendor/anyhow:anyhow",
@@ -14,8 +14,5 @@ rust_binary(
         "rustdeps//vendor/sha2:sha2",
         "rustdeps//vendor/toml:toml",
     ],
-    env = {
-        "CARGO_PKG_VERSION": "0.1.0",
-    },
     visibility = ["PUBLIC"],
 )
