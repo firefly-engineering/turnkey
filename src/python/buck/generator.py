@@ -7,6 +7,8 @@ from python.cargo.toml import (
     get_optional_deps,
     feature_enables_unavailable_dep,
 )
+from python.buildsystem.native_library import NativeLibrarySpec
+from python.buildsystem.buck2 import buck2_generator
 
 try:
     from cfg import is_linux_compatible_target
@@ -219,8 +221,19 @@ def generate_buck_file(
 
     # Determine which rules we need to load
     rules_to_load = ["rust_library"]
+
+    # Native library rules prefix content
+    native_lib_content = ""
+
+    # Generate native library rules using the abstraction
     if native_lib_info:
-        rules_to_load.extend(["prebuilt_cxx_library", "export_file"])
+        spec = NativeLibrarySpec.from_dict(native_lib_info)
+        generated = buck2_generator.generate(spec)
+
+        rules_to_load.extend(generated.rules_to_load)
+        native_lib_content = generated.rules_content
+        deps = deps + generated.extra_deps
+        rustc_flags = rustc_flags + generated.extra_rustc_flags
 
     # Format rules for load statement: "rule1", "rule2"
     rules_str = ", ".join(f'"{r}"' for r in rules_to_load)
@@ -231,35 +244,9 @@ def generate_buck_file(
         "",
     ]
 
-    # Generate prebuilt_cxx_library for native libraries
-    if native_lib_info:
-        lib_name = native_lib_info["lib_name"]
-        static_lib_path = native_lib_info["static_lib_path"]
-        link_search_path = native_lib_info.get("link_search_path", "out_dir")
-        # Use export_file to expose the library, then reference it in prebuilt_cxx_library
-        lines.extend(
-            [
-                "# Native crypto library pre-compiled in Nix",
-                "export_file(",
-                f'    name = "{lib_name}_file",',
-                f'    src = "{static_lib_path}",',
-                '    visibility = ["PUBLIC"],',
-                ")",
-                "",
-                "prebuilt_cxx_library(",
-                f'    name = "{lib_name}",',
-                f'    static_lib = ":{lib_name}_file",',
-                "    link_whole = True,",
-                '    preferred_linkage = "static",',
-                '    visibility = ["PUBLIC"],',
-                ")",
-                "",
-            ]
-        )
-        # Add the native library as a dependency
-        deps = deps + [f":{lib_name}"]
-        # Add -L flag so rustc can find the library during compilation
-        rustc_flags = rustc_flags + [f"-Lnative={link_search_path}"]
+    # Add native library rules if present
+    if native_lib_content:
+        lines.append(native_lib_content)
 
     lines.extend(
         [

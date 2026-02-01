@@ -8,6 +8,7 @@ python_library(
     ],
     base_module = "python.buck",
     deps = [
+        "//src/python/buildsystem:buildsystem",
         "//src/python/cargo:cargo",
         "//src/python/cfg:cfg",
     ],
