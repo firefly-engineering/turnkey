@@ -25,6 +25,8 @@
 mod backend;
 mod edit_overlay;
 mod filesystem;
+mod patch_generator;
 
 pub use backend::FuseBackend;
 pub use edit_overlay::{EditOverlay, EditedFileInfo};
+pub use patch_generator::{PatchGenerator, PatchInfo};
