@@ -72,6 +72,57 @@ Different build systems expect different directory structures. The layout system
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+**Implementation:** The `Layout` trait is defined in `src/rust/composition/src/layout.rs`:
+
+```rust
+pub trait Layout: Send + Sync {
+    /// Get the layout name (e.g., "buck2", "bazel")
+    fn name(&self) -> &'static str;
+
+    /// Map a dependency path to its location in the composed view
+    fn map_dep(&self, ctx: &LayoutContext, cell: &str, path: &Path) -> Option<PathBuf>;
+
+    /// Generate configuration files for this build system
+    fn generate_config(&self, ctx: &LayoutContext) -> Vec<ConfigFile>;
+
+    /// Get the list of cells this layout supports
+    fn supported_cells(&self, ctx: &LayoutContext) -> Vec<String>;
+}
+```
+
+The `LayoutContext` provides all information needed for layout operations:
+- `mount_point` - Where the composed view is mounted (e.g., `/firefly/turnkey`)
+- `repo_root` - The repository root path
+- `source_dir_name` - Name of the source overlay directory (e.g., "root")
+- `cell_prefix` - Prefix for cell directories (e.g., "external")
+- `cells` - List of `CellInfo` with name, source path, and editable flag
+
+**Current Layouts:**
+- `Buck2Layout` - Default layout generating `.buckconfig` and `.buckroot`
+
+**Creating Custom Layouts:**
+```rust
+use composition::layout::{Layout, LayoutContext, ConfigFile};
+
+struct MyLayout;
+
+impl Layout for MyLayout {
+    fn name(&self) -> &'static str { "my-build-system" }
+
+    fn map_dep(&self, ctx: &LayoutContext, cell: &str, path: &Path) -> Option<PathBuf> {
+        Some(ctx.cell_path(cell).join(path))
+    }
+
+    fn generate_config(&self, ctx: &LayoutContext) -> Vec<ConfigFile> {
+        vec![ConfigFile::new("my.config", "# config content")]
+    }
+
+    fn supported_cells(&self, ctx: &LayoutContext) -> Vec<String> {
+        ctx.cells.iter().map(|c| c.name.clone()).collect()
+    }
+}
+```
+
 ### 3. Fixed Mount Location
 
 The FUSE layer mounts at a **configurable fixed location**, enabling:
@@ -327,7 +378,7 @@ tk compose down
 - [x] State machine implementation - `state.rs` with thread-safe transitions
 - [x] Pluggable policy system - `policy.rs` with FileClass, SystemState, PolicyDecision
 - [x] Blocking reads during update - integrated into FUSE operations
-- [ ] Atomic view transitions
+- [x] Atomic view transitions - `CellUpdate` struct and `apply_pending_updates()` in `filesystem.rs`
 
 ### Phase 4: macOS Support
 - [ ] FUSE-T backend
@@ -335,14 +386,14 @@ tk compose down
 - [ ] Cross-platform testing
 
 ### Phase 5: Edit Layer
-- [ ] Copy-on-write overlay
-- [ ] Patch generation
+- [x] Copy-on-write overlay - `edit_overlay.rs` with `EditOverlay` struct
+- [x] Patch generation - `patch_generator.rs` with LCS-based unified diff
 - [ ] Nix fixup integration
-- [ ] Edit workflow CLI
+- [x] Edit workflow CLI - `src/cmd/tk/compose.go` with status/edit/patch/reset commands
 
 ### Phase 6: Layout Plugins
-- [ ] Layout trait definition
-- [ ] Buck2 layout (current)
+- [x] Layout trait definition - `layout.rs` with `Layout` trait
+- [x] Buck2 layout (current) - `Buck2Layout` implementation
 - [ ] Bazel layout prototype
 - [ ] Custom layout API
 

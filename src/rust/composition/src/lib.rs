@@ -52,6 +52,7 @@ use std::path::PathBuf;
 mod backend;
 mod config;
 mod error;
+pub mod layout;
 pub mod policy;
 pub mod state;
 mod status;
@@ -73,6 +74,10 @@ pub use policy::{
 };
 pub use state::{CellUpdate, ConsistencyStateMachine, StateObserver};
 pub use status::BackendStatus;
+pub use layout::{
+    BoxedLayout, Buck2Layout, CellInfo, ConfigFile, Layout, LayoutContext, default_layout,
+    layout_by_name,
+};
 
 /// Result type for composition operations
 pub type Result<T> = std::result::Result<T, Error>;
