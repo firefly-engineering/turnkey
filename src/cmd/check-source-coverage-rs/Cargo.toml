@@ -1,0 +1,12 @@
+[package]
+name = "check-source-coverage-rs"
+version = "0.1.0"
+edition.workspace = true
+description = "Check that all source files are covered by Buck2 targets"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+glob.workspace = true
+walkdir.workspace = true
+starlark-parse = { path = "../../rust/starlark-parse" }

@@ -3,29 +3,48 @@
 # Fixups for Rust crates that require special handling during build.
 # Each fixup file handles a family of related crates.
 #
-# This module exports two types of fixups:
+# This module exports three types of fixups:
 #   - buildScriptFixups: Shell commands to generate build.rs outputs
 #   - rustcFlags: --cfg flags to pass to rustc
+#   - nativeLibraries: Info about pre-compiled native libraries
 #
-# Fixups are organized as:
-#   - serde.nix: serde, serde_core (build script), serde_json (rustc flags)
-#   - thiserror.nix: thiserror (build script)
-#   - ring.nix: ring crypto library (native code compilation)
-#   - rustix.nix: rustix platform flags (rustc flags)
+# Fixup files are auto-discovered from this directory. To add a new fixup:
+#   1. Create a new .nix file (e.g., mycrate.nix)
+#   2. Export any of: buildScriptFixups, rustcFlags, nativeLibraries
+#   3. That's it - no need to modify this file!
 #
 # Build script fixups are functions: context -> string (shell commands)
 # Context includes: { name, version, patchVersion, vendorPath, ... }
 #
 # Rustc flags are arrays: [ "--cfg" "flag" ... ]
+#
+# Native libraries are functions: context -> { lib_name, static_lib_path, link_search_path? }
 
 { pkgs, lib }:
 
 let
-  # Import individual fixup files
-  serdeFixups = import ./serde.nix { inherit lib; };
-  thiserrorFixups = import ./thiserror.nix { inherit lib; };
-  ringFixups = import ./ring.nix { inherit lib; };
-  rustixFixups = import ./rustix.nix { inherit lib; };
+  # Auto-discover all fixup files in this directory
+  # Excludes: default.nix (this file), *-symbols.nix (helper files)
+  fixupDir = ./.;
+  allFiles = builtins.attrNames (builtins.readDir fixupDir);
+
+  isFixupFile = name:
+    lib.hasSuffix ".nix" name
+    && name != "default.nix"
+    && !lib.hasSuffix "-symbols.nix" name;
+
+  fixupFiles = builtins.filter isFixupFile allFiles;
+
+  # Import each fixup file
+  importFixup = filename:
+    import (fixupDir + "/${filename}") { inherit lib; };
+
+  allFixups = map importFixup fixupFiles;
+
+  # Merge a specific attribute from all fixups
+  mergeAttr = attrName: fixups:
+    lib.foldl' (acc: fixup: acc // (fixup.${attrName} or {})) {} fixups;
+
 in
 rec {
   # ==========================================================================
@@ -35,11 +54,7 @@ rec {
   # These generate files that build.rs would normally create.
   # Keyed by crate name or name@version.
 
-  buildScriptFixups =
-    (serdeFixups.buildScriptFixups or {})
-    // (thiserrorFixups.buildScriptFixups or {})
-    // (ringFixups.buildScriptFixups or ringFixups)
-    // (rustixFixups.buildScriptFixups or {});
+  buildScriptFixups = mergeAttr "buildScriptFixups" allFixups;
 
   # ==========================================================================
   # Rustc Flags
@@ -48,11 +63,17 @@ rec {
   # These are --cfg flags that build.rs would normally emit.
   # Keyed by crate name or name@version.
 
-  rustcFlags =
-    (serdeFixups.rustcFlags or {})
-    // (thiserrorFixups.rustcFlags or {})
-    // (ringFixups.rustcFlags or {})
-    // (rustixFixups.rustcFlags or {});
+  rustcFlags = mergeAttr "rustcFlags" allFixups;
+
+  # ==========================================================================
+  # Native Libraries
+  # ==========================================================================
+  #
+  # Info about pre-compiled native libraries that need to be linked.
+  # Keyed by crate name or name@version.
+  # Each entry is a function: context -> { lib_name, static_lib_path, link_search_path? }
+
+  nativeLibraries = mergeAttr "nativeLibraries" allFixups;
 
   # ==========================================================================
   # Combined (for backward compatibility)

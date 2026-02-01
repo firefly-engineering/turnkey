@@ -1,0 +1,10 @@
+[package]
+name = "starlark-parse"
+version = "0.1.0"
+edition.workspace = true
+description = "Parse Starlark/Buck2 build files using tree-sitter"
+
+[dependencies]
+anyhow.workspace = true
+tree-sitter.workspace = true
+tree-sitter-starlark.workspace = true

@@ -8,6 +8,8 @@
 - [Module System](./architecture/module-system.md)
 - [Registry Pattern](./architecture/registry.md)
 - [Buck2 Integration](./architecture/buck2.md)
+- [Build System Abstraction](./architecture/build-system-abstraction.md)
+- [FUSE Access Policy](./architecture/fuse-policy.md)
 
 # Nix Modules
 

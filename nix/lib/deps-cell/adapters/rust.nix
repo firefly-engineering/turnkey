@@ -85,7 +85,9 @@ rec {
     deps = depsToml.deps or {};
 
     # Merge built-in fixups with user-provided
-    allBuildScriptFixups = (fixups.builtinFixups.rust or {}) // buildScriptFixups;
+    allBuildScriptFixups = (fixups.builtinFixups.rust.buildScriptFixups or {}) // buildScriptFixups;
+    allRustcFlags = (fixups.builtinFixups.rust.rustcFlags or {}) // rustcFlagsRegistry;
+    allNativeLibraries = fixups.builtinFixups.rust.nativeLibraries or {};
 
     # Build individual dep packages
     depPackages = lib.mapAttrs (key: depSpec:
@@ -106,7 +108,7 @@ rec {
         else null;
 
         # Look up rustc flags
-        flags = rustcFlagsRegistry.${key} or rustcFlagsRegistry.${crateName} or [];
+        flags = allRustcFlags.${key} or allRustcFlags.${crateName} or [];
       in
       mkRustDepPackage {
         name = crateName;
@@ -140,6 +142,23 @@ rec {
     ) versionedNames);
     allCrateNames = versionedNames ++ unversionedNames;
 
+    # Build native library info map (evaluate functions with crate context)
+    nativeLibraryInfo = lib.filterAttrs (k: v: v != null) (lib.mapAttrs (key: depSpec:
+      let
+        parts = lib.splitString "@" key;
+        crateName = depSpec.name or (lib.head parts);
+        version = depSpec.version;
+        patchVersion = lib.last (lib.splitString "." version);
+        nativeLibFn = allNativeLibraries.${key} or allNativeLibraries.${crateName} or null;
+      in
+      if nativeLibFn != null then
+        if builtins.isFunction nativeLibFn then
+          nativeLibFn { inherit crateName version patchVersion key; }
+        else
+          nativeLibFn
+      else null
+    ) deps);
+
     # Merge commands: feature unification + BUCK generation
     mergeCommands = ''
       # Compute unified features (if tool provided)
@@ -161,7 +180,8 @@ rec {
               '${builtins.toJSON allCrateNames}' \
               '${builtins.toJSON (lib.attrNames allBuildScriptFixups)}' \
               "$UNIFIED_FEATURES" \
-              '${builtins.toJSON rustcFlagsRegistry}' \
+              '${builtins.toJSON allRustcFlags}' \
+              '${builtins.toJSON nativeLibraryInfo}' \
               > "$dir/rules.star" || echo "# rules.star generation failed" > "$dir/rules.star"
           fi
         done

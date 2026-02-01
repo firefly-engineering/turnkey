@@ -27,10 +27,10 @@ name = "android_system_properties"
 version = "0.1.5"
 hash = "sha256-AVSo7h3ytu8IwFL9zJpyFvh7lLSztIP0W29KL00v/2k="
 
-[deps."annotate-snippets@0.12.10"]
+[deps."annotate-snippets@0.12.11"]
 name = "annotate-snippets"
-version = "0.12.10"
-hash = "sha256-APJxWfg+sMb9XwvTL0ZGpFktpQLS8PyWMIxhlWlWwSk="
+version = "0.12.11"
+hash = "sha256-40cMN72DCogJAneqvXn+VPzRtF3vbC2/sXR+8oPJBn8="
 
 [deps."anstream@0.6.21"]
 name = "anstream"
@@ -77,6 +77,11 @@ name = "base64"
 version = "0.22.1"
 hash = "sha256-Rbg3/6Ixc0vx6y62Qcd/OxGYQ8G2w0UKBurtTZ02Z5c="
 
+[deps."bitflags@1.3.2"]
+name = "bitflags"
+version = "1.3.2"
+hash = "sha256-qmZajdNZ7yvKWZJGJJXBGl0hqbgUht3Jof3qe4e2DQQ="
+
 [deps."bitflags@2.10.0"]
 name = "bitflags"
 version = "2.10.0"
@@ -86,6 +91,11 @@ hash = "sha256-nNfYkzqnyqeQKO7BVPy8Gk8Zr7mY00+OLyT1zHLexZs="
 name = "block-buffer"
 version = "0.10.4"
 hash = "sha256-bwr2UJKHUL3gzEEU1xE1uhfZ0qK8nTXk/TTyKHLwSj4="
+
+[deps."block2@0.6.2"]
+name = "block2"
+version = "0.6.2"
+hash = "sha256-kkE2Czga4etUPz+QyejVUwto9SuX/2wrYZsMGp1VZCQ="
 
 [deps."bumpalo@3.19.1"]
 name = "bumpalo"
@@ -97,35 +107,40 @@ name = "cargo-lock"
 version = "10.1.0"
 hash = "sha256-D5DpUgvKxJSVQwsLzpwX3AA/qIG5lcX7catc1O0oxX4="
 
-[deps."cc@1.2.53"]
+[deps."cc@1.2.55"]
 name = "cc"
-version = "1.2.53"
-hash = "sha256-/ptMF93Xo9vC7aRUJD/tfC/Zw16MZgPltKxa04zIJ08="
+version = "1.2.55"
+hash = "sha256-y3BLIviQHJabhrS+aat0eQ/oXYnEZG+zRB5vlO0/iw0="
 
 [deps."cfg-if@1.0.4"]
 name = "cfg-if"
 version = "1.0.4"
 hash = "sha256-JOncw/XcmX/jgZbQr0KNQKBa2Kw8dZDnIvBokD95Zm8="
 
+[deps."cfg_aliases@0.2.1"]
+name = "cfg_aliases"
+version = "0.2.1"
+hash = "sha256-7LIhJI5jQ2tO+iHjuqZTQWP6llvCqaAVNJEREjwHnNQ="
+
 [deps."chrono@0.4.43"]
 name = "chrono"
 version = "0.4.43"
 hash = "sha256-I6AuyKCQ7ccwJ0HUNrrEeZIG7OO0YDqYDImsXzS4HSs="
 
-[deps."clap@4.5.54"]
+[deps."clap@4.5.56"]
 name = "clap"
-version = "4.5.54"
-hash = "sha256-iPegyZYrVDHfe64Mo39ALJ1/SKD4xN6ZXoKWAZp0Kw4="
+version = "4.5.56"
+hash = "sha256-5DjZFNR2MPVi+ufU5yPdX+HA9ISMaQ0OAOQZ9EGHBWs="
 
-[deps."clap_builder@4.5.54"]
+[deps."clap_builder@4.5.56"]
 name = "clap_builder"
-version = "4.5.54"
-hash = "sha256-bA92NOvfr/2dEcdaiBd1wtB6S4HseGvpa+JWY2UQH3w="
+version = "4.5.56"
+hash = "sha256-5T6miCmyt9958CVtKIYnphe/7jTaulJQZZp6dqH6Sqs="
 
-[deps."clap_derive@4.5.49"]
+[deps."clap_derive@4.5.55"]
 name = "clap_derive"
-version = "4.5.49"
-hash = "sha256-C9KTihL/bf5PoENwJ2kXU1yhyf7hgrR5qHBOvzxpVAM="
+version = "4.5.55"
+hash = "sha256-Qz4GxduO504NKvG6ACrJ8HDBB+QsgXyyrkbY5o+j9tY="
 
 [deps."clap_lex@0.7.7"]
 name = "clap_lex"
@@ -157,6 +172,11 @@ name = "crypto-common"
 version = "0.1.7"
 hash = "sha256-0EfhaDP7K1h1awhkqr2iOfLzXsAjWlA9tWPAOjpmtis="
 
+[deps."ctrlc@3.5.1"]
+name = "ctrlc"
+version = "3.5.1"
+hash = "sha256-1B7aYfw6N/tT0bIc7QC0E8hNeKnofhnjG+vBNSkWfcE="
+
 [deps."digest@0.10.7"]
 name = "digest"
 version = "0.10.7"
@@ -171,6 +191,11 @@ hash = "sha256-4nXV8nh/iuC/zLPfOPCh6ukon9jbAE6dNw5sufowwmc="
 name = "dirs-sys"
 version = "0.4.1"
 hash = "sha256-C2yjgByWivh50Mod4HfQnVwISEQgskZMnyZTbtUwDUg="
+
+[deps."dispatch2@0.3.0"]
+name = "dispatch2"
+version = "0.3.0"
+hash = "sha256-p7yyy5Ciz0k/gBGif/ZYu+h+Nhiyg4Oh+Gp4Yx9IvcU="
 
 [deps."displaydoc@0.2.5"]
 name = "displaydoc"
@@ -187,6 +212,16 @@ name = "encoding_rs_io"
 version = "0.1.7"
 hash = "sha256-WQ/DjQqiJ0riayIL96pL+bZ7mmN2Ky8SBzOAoR9fJXg="
 
+[deps."env_filter@0.1.4"]
+name = "env_filter"
+version = "0.1.4"
+hash = "sha256-POo4iUXbeVRSTUbXAWSQGHypqBBcOPTSoDwKyVG2n2U="
+
+[deps."env_logger@0.11.8"]
+name = "env_logger"
+version = "0.11.8"
+hash = "sha256-Rzb2XyHPNI5go0CWfqE14naGpDzehykXRr2zARfEMDo="
+
 [deps."equivalent@1.0.2"]
 name = "equivalent"
 version = "1.0.2"
@@ -202,10 +237,10 @@ name = "fastrand"
 version = "2.3.0"
 hash = "sha256-gCuKgtYEq3hpQeNeVHw+cCFFFng2vpiyzI4jvVKGUg8="
 
-[deps."find-msvc-tools@0.1.8"]
+[deps."find-msvc-tools@0.1.9"]
 name = "find-msvc-tools"
-version = "0.1.8"
-hash = "sha256-e1UnPFh8jc1ogLLEycTj8uedfyROYSRHLO0LWg/NcsE="
+version = "0.1.9"
+hash = "sha256-CAXurpZL1ltJrnUbTwp7EX5MKxL4gNTYKOyYnG8YrrQ="
 
 [deps."flate2@1.1.8"]
 name = "flate2"
@@ -216,6 +251,16 @@ hash = "sha256-uKeWsdp+m9DjEL42zoAO8taa8oMJ6ZTWHPr9YGa8i7w="
 name = "form_urlencoded"
 version = "1.2.2"
 hash = "sha256-W+74FXbvzNFqCUqMn+MCjip7I6Z6BHZ8e/FotnXHsY4="
+
+[deps."fsevent-sys@4.1.0"]
+name = "fsevent-sys"
+version = "4.1.0"
+hash = "sha256-PfLMG85SQoXBtucyODxK3LazK9hTC4GDf8SQy9fF3ZQ="
+
+[deps."fuser@0.16.0"]
+name = "fuser"
+version = "0.16.0"
+hash = "sha256-KI7U2G0aAKg2YoID3z96NZBmcLQwcqu31j7/o4C2Uo0="
 
 [deps."generic-array@0.14.7"]
 name = "generic-array"
@@ -232,6 +277,11 @@ name = "getrandom"
 version = "0.3.4"
 hash = "sha256-cFgw4woE4NyheMo3kiTnmP5N2N598UbcEgknPPFIOHY="
 
+[deps."glob@0.3.3"]
+name = "glob"
+version = "0.3.3"
+hash = "sha256-Y8vm15P3U4ryxWPODuxRcjGIN8niH6z2RGe7r0aZIT0="
+
 [deps."hashbrown@0.16.1"]
 name = "hashbrown"
 version = "0.16.1"
@@ -242,10 +292,10 @@ name = "heck"
 version = "0.5.0"
 hash = "sha256-vVMnzH1Jabhj7DZIjmlhH1Jdvp9NLxoSyb5eEhFQafU="
 
-[deps."iana-time-zone@0.1.64"]
+[deps."iana-time-zone@0.1.65"]
 name = "iana-time-zone"
-version = "0.1.64"
-hash = "sha256-8gu3wqovPP7WB4qSW8Q72EblKCaRmMQY8idI6U5a5Io="
+version = "0.1.65"
+hash = "sha256-96ALKuOIdwUp1ToTazS2msNuc8QqX9vcz0BaEfF8bMQ="
 
 [deps."iana-time-zone-haiku@0.1.2"]
 name = "iana-time-zone-haiku"
@@ -302,6 +352,16 @@ name = "indexmap"
 version = "2.13.0"
 hash = "sha256-0EO8FeBPA87lIU5lbuyySmohuszHj5dAvlJQUkLC49g="
 
+[deps."inotify@0.11.0"]
+name = "inotify"
+version = "0.11.0"
+hash = "sha256-a7TGGhM/Xq11+z0LbencbbUCJzPjiGjm4pFlAVx15+Q="
+
+[deps."inotify-sys@0.1.5"]
+name = "inotify-sys"
+version = "0.1.5"
+hash = "sha256-ewRTqCyq72elLOVnYXrsgXHMUJs2vWVBkiDC3s8pPvo="
+
 [deps."is_terminal_polyfill@1.70.2"]
 name = "is_terminal_polyfill"
 version = "1.70.2"
@@ -312,10 +372,30 @@ name = "itoa"
 version = "1.0.17"
 hash = "sha256-QPSdCDvRBK4/QdeAA3hk3qwVILhy8d1ADckxTBcf0S4="
 
+[deps."jiff@0.2.18"]
+name = "jiff"
+version = "0.2.18"
+hash = "sha256-MvqOaTCEyX0mNLajt/dxg+cZNOz4dEVLpHU5XkVktLs="
+
+[deps."jiff-static@0.2.18"]
+name = "jiff-static"
+version = "0.2.18"
+hash = "sha256-VELlZzRyKhuG4G3T8ahn3wEvWIFkSUhkQvUklMSpsEo="
+
 [deps."js-sys@0.3.85"]
 name = "js-sys"
 version = "0.3.85"
 hash = "sha256-bxZbzbA8k4tLYCZ0VqkuF1Ku5sfCOp/wcIoH5hJE5y4="
+
+[deps."kqueue@1.1.1"]
+name = "kqueue"
+version = "1.1.1"
+hash = "sha256-SkiQ9h9bMX0mSsJnTiDqv5FJdlUo2t5jsYaJ/IiHzTI="
+
+[deps."kqueue-sys@1.0.4"]
+name = "kqueue-sys"
+version = "1.0.4"
+hash = "sha256-yW8jyrmEtxjaEgJZHoDyVh7CEid5Eq9BhKkKFLIf1Xo="
 
 [deps."libc@0.2.180"]
 name = "libc"
@@ -352,15 +432,55 @@ name = "miniz_oxide"
 version = "0.8.9"
 hash = "sha256-5qDEpg82Ff7UyOP7Cjw98hIVqavGlO/+0Zf1PPvuKWg="
 
+[deps."mio@1.1.1"]
+name = "mio"
+version = "1.1.1"
+hash = "sha256-60gbal4SlMmbkNbQneSWVEDj7oenMeHW+vOFVrB6aSA="
+
+[deps."nix@0.29.0"]
+name = "nix"
+version = "0.29.0"
+hash = "sha256-/i4t+f0dhhCjoKnIju3sblhxx3Dkqa0VWnWz2SQLDbk="
+
+[deps."nix@0.30.1"]
+name = "nix"
+version = "0.30.1"
+hash = "sha256-SXf1KbSQfB7niGvZhjGumU0HuzhkPNwPEmTeUlYcFDQ="
+
 [deps."nohash-hasher@0.2.0"]
 name = "nohash-hasher"
 version = "0.2.0"
 hash = "sha256-0rjD4VqbSUiO2DBw4vDwHb1OV2Rw7GlajgnIWHD7eaM="
 
+[deps."notify@8.2.0"]
+name = "notify"
+version = "8.2.0"
+hash = "sha256-VMcE8VmAdaEBDOYMsdOp3ppT0zq9lC3tpt2JjYR3pRE="
+
+[deps."notify-debouncer-mini@0.6.0"]
+name = "notify-debouncer-mini"
+version = "0.6.0"
+hash = "sha256-1AFqJrueAYxkADJln8Xanze/fVzHzo3uJbksNHg6qTg="
+
+[deps."notify-types@2.1.0"]
+name = "notify-types"
+version = "2.1.0"
+hash = "sha256-hOcfRhRIb4X1WLPzp2SXqCqpS74eTgfSqX5511iaiis="
+
 [deps."num-traits@0.2.19"]
 name = "num-traits"
 version = "0.2.19"
 hash = "sha256-5L0mKAem8o1xs1FxPfdG39Eiogz5oKWWzEuYz1nJFUk="
+
+[deps."objc2@0.6.3"]
+name = "objc2"
+version = "0.6.3"
+hash = "sha256-cxoJ3NYqV24eaWDLjVCbfX1VSuAd9YHbSBUn+5gZ5sY="
+
+[deps."objc2-encode@4.1.0"]
+name = "objc2-encode"
+version = "4.1.0"
+hash = "sha256-gNh56AcLA6MFMFTFqUJf4h+vQRCzoM56cLL8+K2Bskk="
 
 [deps."once_cell@1.21.3"]
 name = "once_cell"
@@ -377,25 +497,40 @@ name = "option-ext"
 version = "0.2.0"
 hash = "sha256-GCw0nQe98Gkrrpp7wKHuHAalakT5pn2rnEfjknlHDW4="
 
+[deps."page_size@0.6.0"]
+name = "page_size"
+version = "0.6.0"
+hash = "sha256-iPgYbpgnZ9gOVWODIUvoWkLRr2IMavCjKr6SgOkWJM0="
+
 [deps."percent-encoding@2.3.2"]
 name = "percent-encoding"
 version = "2.3.2"
 hash = "sha256-ZnFfa0N7wX+lUIIVdhW01XiDZRJuwapkhV0s0TRLyMo="
+
+[deps."portable-atomic@1.13.0"]
+name = "portable-atomic"
+version = "1.13.0"
+hash = "sha256-jxBqCk6Y/TBhsUbHGxGr3YU2tVgYZ6uXfyWWQff9oe8="
+
+[deps."portable-atomic-util@0.2.4"]
+name = "portable-atomic-util"
+version = "0.2.4"
+hash = "sha256-cIZIMDAVTY2/fJEQ6zDYAmxHqV1cBwLOSCaZAQckvvE="
 
 [deps."potential_utf@0.1.4"]
 name = "potential_utf"
 version = "0.1.4"
 hash = "sha256-un3YCqmuyU79UA2sg3wwyrnnOeihDOkCuFubat6BcjU="
 
-[deps."proc-macro2@1.0.105"]
+[deps."proc-macro2@1.0.106"]
 name = "proc-macro2"
-version = "1.0.105"
-hash = "sha256-8oAd3DXvyzoipak9N0gntxmsn2uocl906xkU7KTmjJk="
+version = "1.0.106"
+hash = "sha256-q07CrHFPnYwuSZwRZPC9E5xtdGtxTfbzEhWH5y75DXU="
 
-[deps."quote@1.0.43"]
+[deps."quote@1.0.44"]
 name = "quote"
-version = "1.0.43"
-hash = "sha256-fNJ4zKU6jvo15tih9QkrClVeHkOBqWzWAR/bfq1CIOU="
+version = "1.0.44"
+hash = "sha256-twbReqnmjLLv6FgdDl4dHAnWnEBgUTOtUKkR5m5xZxI="
 
 [deps."r-efi@5.3.0"]
 name = "r-efi"
@@ -607,6 +742,11 @@ name = "tree-sitter"
 version = "0.25.10"
 hash = "sha256-XrejNZtdDpHMXwPznGMef5Slk4GMz0RMWluj7WsYqLw="
 
+[deps."tree-sitter-go@0.25.0"]
+name = "tree-sitter-go"
+version = "0.25.0"
+hash = "sha256-bcIrIM7FWX/NGZO4o7A+cpkFzD3jT3CdtwLM4hB6p4M="
+
 [deps."tree-sitter-language@0.1.6"]
 name = "tree-sitter-language"
 version = "0.1.6"
@@ -626,6 +766,11 @@ hash = "sha256-npxxU3ycDU1vtL7VEad/yw4BhtADj22JlDs1iFwZHnc="
 name = "tree-sitter-solidity"
 version = "1.2.13"
 hash = "sha256-cV2XuGLLsDSmp0uAmiA65DY9lT/PRLY9/C0aHra/I84="
+
+[deps."tree-sitter-starlark@1.3.0"]
+name = "tree-sitter-starlark"
+version = "1.3.0"
+hash = "sha256-kSgmSQxaLwl63k/WIOxSKSKdh9DFRPdv7YwXv/qYEhU="
 
 [deps."tree-sitter-typescript@0.23.2"]
 name = "tree-sitter-typescript"
@@ -722,10 +867,25 @@ name = "webpki-roots"
 version = "1.0.5"
 hash = "sha256-FK6mTRJxRmQwcNvIFV1X66DC9tfkDL5Q2j59nae96uI="
 
+[deps."winapi@0.3.9"]
+name = "winapi"
+version = "0.3.9"
+hash = "sha256-VmNwJmtPZGDHsMoqYUGPMQ49bO8NAoXR5hcty/N4o+Q="
+
+[deps."winapi-i686-pc-windows-gnu@0.4.0"]
+name = "winapi-i686-pc-windows-gnu"
+version = "0.4.0"
+hash = "sha256-N396W/yUl6kq/bJGYY5VjIRChMqPyH5lVY9kFGScMBY="
+
 [deps."winapi-util@0.1.11"]
 name = "winapi-util"
 version = "0.1.11"
 hash = "sha256-28/CiT9fwalxeRUMD5rkTtqwbJs8r10gSS6qCLQa/hU="
+
+[deps."winapi-x86_64-pc-windows-gnu@0.4.0"]
+name = "winapi-x86_64-pc-windows-gnu"
+version = "0.4.0"
+hash = "sha256-ctGdKJNOStxgKGxt6soRgjxcMfCdxIHKDs+jpWmlPlg="
 
 [deps."windows-core@0.62.2"]
 name = "windows-core"
@@ -767,6 +927,11 @@ name = "windows-sys"
 version = "0.52.0"
 hash = "sha256-UdAo4m9d+AacpFM0tPdpC3UrBAlxx9NkdM3qDOooKFQ="
 
+[deps."windows-sys@0.60.2"]
+name = "windows-sys"
+version = "0.60.2"
+hash = "sha256-BSYS9G80vBSC+ReoSJJp1TWnl9f/S4OQNTTOH3WInGk="
+
 [deps."windows-sys@0.61.2"]
 name = "windows-sys"
 version = "0.61.2"
@@ -782,6 +947,11 @@ name = "windows-targets"
 version = "0.52.6"
 hash = "sha256-0cO1oBGL0x77NamwGT9u62L89mX//f+YQeDLtrRkqtE="
 
+[deps."windows-targets@0.53.5"]
+name = "windows-targets"
+version = "0.53.5"
+hash = "sha256-/bOkeVuWCBC6/MFyX72w63PyKoOhphVQ2uyEj42YWU0="
+
 [deps."windows_aarch64_gnullvm@0.48.5"]
 name = "windows_aarch64_gnullvm"
 version = "0.48.5"
@@ -791,6 +961,11 @@ hash = "sha256-rxoq6UL/Dc9tDlqZdPVmlTuQA4YUJ5A0dY2LZvAUILY="
 name = "windows_aarch64_gnullvm"
 version = "0.52.6"
 hash = "sha256-U5CL4gnIWGlRtggZhhXRzS40NzEUYRQugmiu32ro6rw="
+
+[deps."windows_aarch64_gnullvm@0.53.1"]
+name = "windows_aarch64_gnullvm"
+version = "0.53.1"
+hash = "sha256-hR6OM9ra0rf8DcE9s7oBeyeOWGnZdrGKdCZ6jB60TKk="
 
 [deps."windows_aarch64_msvc@0.48.5"]
 name = "windows_aarch64_msvc"
@@ -802,6 +977,11 @@ name = "windows_aarch64_msvc"
 version = "0.52.6"
 hash = "sha256-C4c5tCJRpiFpipE138lqNt6B32smjvZH9WNwFpfVNZE="
 
+[deps."windows_aarch64_msvc@0.53.1"]
+name = "windows_aarch64_msvc"
+version = "0.53.1"
+hash = "sha256-fDrxBNwhfCI/Js/6Mu/Wo9AUwyXKVKdhFK5Z5Wu2oZ0="
+
 [deps."windows_i686_gnu@0.48.5"]
 name = "windows_i686_gnu"
 version = "0.48.5"
@@ -812,10 +992,20 @@ name = "windows_i686_gnu"
 version = "0.52.6"
 hash = "sha256-TxPbns69dvHunK7Ak1Av+vQjRhWt4hV6SeSwCqU6oDk="
 
+[deps."windows_i686_gnu@0.53.1"]
+name = "windows_i686_gnu"
+version = "0.53.1"
+hash = "sha256-QuwtSf+PXrX1nLrL/pgnJiVcxAnT+KCpcoDATJjAEPM="
+
 [deps."windows_i686_gnullvm@0.52.6"]
 name = "windows_i686_gnullvm"
 version = "0.52.6"
 hash = "sha256-qeQSlrCLYIly3BDyvNv0jVKaTn1N2hWya5+2KCXY6Y4="
+
+[deps."windows_i686_gnullvm@0.53.1"]
+name = "windows_i686_gnullvm"
+version = "0.53.1"
+hash = "sha256-T0rlANAabzt5hKsfpI/FWtTvWb8Mf00XSL1KPa9LrA4="
 
 [deps."windows_i686_msvc@0.48.5"]
 name = "windows_i686_msvc"
@@ -827,6 +1017,11 @@ name = "windows_i686_msvc"
 version = "0.52.6"
 hash = "sha256-5g7V6KjQwGQ+HhK+jy2LJunIv1bhrdk35Yz3Dgdgbdc="
 
+[deps."windows_i686_msvc@0.53.1"]
+name = "windows_i686_msvc"
+version = "0.53.1"
+hash = "sha256-oQvvvWXY5GprCTpwZaie8MfHAy1wRd+RNkaKNvvY8qA="
+
 [deps."windows_x86_64_gnu@0.48.5"]
 name = "windows_x86_64_gnu"
 version = "0.48.5"
@@ -836,6 +1031,11 @@ hash = "sha256-XF1vPalAglZ4gDsHOt84tElL8WmRsCf6RDZx2euzZuk="
 name = "windows_x86_64_gnu"
 version = "0.52.6"
 hash = "sha256-4hA/iWUkC8pUztPl6eFE6jMJQ1UbiBzlrh1oXEioUbk="
+
+[deps."windows_x86_64_gnu@0.53.1"]
+name = "windows_x86_64_gnu"
+version = "0.53.1"
+hash = "sha256-k8OPg9RDK/MzLXpTrve1YJtfQc1+jXm0limQsifp4qg="
 
 [deps."windows_x86_64_gnullvm@0.48.5"]
 name = "windows_x86_64_gnullvm"
@@ -847,6 +1047,11 @@ name = "windows_x86_64_gnullvm"
 version = "0.52.6"
 hash = "sha256-fao+6XyOd06n8+RMc5JY9w+Z/1YkABczMCn2r7E0toQ="
 
+[deps."windows_x86_64_gnullvm@0.53.1"]
+name = "windows_x86_64_gnullvm"
+version = "0.53.1"
+hash = "sha256-StuQLsLBd7JfEyJiCclu7BPYkH1COWMD+3J/HkwEbSc="
+
 [deps."windows_x86_64_msvc@0.48.5"]
 name = "windows_x86_64_msvc"
 version = "0.48.5"
@@ -856,6 +1061,11 @@ hash = "sha256-/huck29cQG7sfd2luM5Xm/fcLWDgC5v8kozJ8OcHQvM="
 name = "windows_x86_64_msvc"
 version = "0.52.6"
 hash = "sha256-vPkomt4vlq4k4TvQVc07Y7xpoTZqJlGCS7JBNqivX4k="
+
+[deps."windows_x86_64_msvc@0.53.1"]
+name = "windows_x86_64_msvc"
+version = "0.53.1"
+hash = "sha256-FNow0xAL/XJlIsVvSgFaWURDd2///5IZVUKuKmE9F8M="
 
 [deps."winnow@0.7.14"]
 name = "winnow"
@@ -882,15 +1092,15 @@ name = "yoke-derive"
 version = "0.8.1"
 hash = "sha256-KK8weDkilTf/9vpzHODTADlfb30wPdMpx26mnZPSfSU="
 
-[deps."zerocopy@0.8.33"]
+[deps."zerocopy@0.8.37"]
 name = "zerocopy"
-version = "0.8.33"
-hash = "sha256-sKr9jvGS3hvbJcolJX8rdu2e/A7nC+9BwKdseCJfous="
+version = "0.8.37"
+hash = "sha256-xO4f8z368xpi8JXaOAON5fwCGiS6Jj+/MfHsJ55YnOU="
 
-[deps."zerocopy-derive@0.8.33"]
+[deps."zerocopy-derive@0.8.37"]
 name = "zerocopy-derive"
-version = "0.8.33"
-hash = "sha256-7NSp305GrBVniQnqtgJIcZapkQjKd+njK5Fg97nTiK8="
+version = "0.8.37"
+hash = "sha256-AUFK6xMYZtPpeu//QoJyIkiBQxe5EI0wTQfFDUGfLmk="
 
 [deps."zerofrom@0.1.6"]
 name = "zerofrom"
@@ -922,8 +1132,8 @@ name = "zerovec-derive"
 version = "0.11.2"
 hash = "sha256-p5fY9PeXZvjJ7QFRZjmV7Tm2LhLBtdrU8RGPTnOZru4="
 
-[deps."zmij@1.0.16"]
+[deps."zmij@1.0.18"]
 name = "zmij"
-version = "1.0.16"
-hash = "sha256-bGFMMMZ/xA8IJ1/n5e4Dq1TY0yAcfZxUCecQv6ckiO4="
+version = "1.0.18"
+hash = "sha256-Fh6EiQt0ZIxRxW2h01SDmsZXtRJVmDA4CPVw5rS/mFc="
 

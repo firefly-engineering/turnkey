@@ -18,7 +18,6 @@ try:
     from buck import (
         get_dependencies,
         get_build_script_cfg_flags,
-        get_native_library_info,
         generate_buck_file,
         filter_features_for_availability,
     )
@@ -35,7 +34,6 @@ except ImportError:
     from python.buck import (
         get_dependencies,
         get_build_script_cfg_flags,
-        get_native_library_info,
         generate_buck_file,
         filter_features_for_availability,
     )
@@ -45,7 +43,8 @@ def main():
     if len(sys.argv) < 3:
         print(
             "Usage: gen-rust-buck <crate_dir> <available_crates_json> "
-            "[fixup_crates_json] [unified_features_json] [rustc_flags_registry_json]",
+            "[fixup_crates_json] [unified_features_json] [rustc_flags_registry_json] "
+            "[native_libraries_json]",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -55,6 +54,7 @@ def main():
     fixup_crates = set(json.loads(sys.argv[3])) if len(sys.argv) > 3 else set()
     unified_features = json.loads(sys.argv[4]) if len(sys.argv) > 4 else {}
     rustc_flags_registry = json.loads(sys.argv[5]) if len(sys.argv) > 5 else {}
+    native_libraries_registry = json.loads(sys.argv[6]) if len(sys.argv) > 6 else {}
 
     # Get crate name from directory (format: name@version or just name)
     dir_name = crate_dir.name
@@ -74,7 +74,9 @@ def main():
     rustc_flags = get_build_script_cfg_flags(crate_name, version, rustc_flags_registry)
 
     # Get native library info for crates with pre-built native code
-    native_lib_info = get_native_library_info(crate_name, version)
+    # First check versioned key (name@version), then unversioned
+    versioned_key = f"{crate_name}@{version}"
+    native_lib_info = native_libraries_registry.get(versioned_key) or native_libraries_registry.get(crate_name)
 
     # Use unified features if available, otherwise fall back to default features
     if crate_name in unified_features:

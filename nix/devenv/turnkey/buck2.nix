@@ -14,6 +14,10 @@ let
   cfg = config.turnkey.buck2;
   turnkeyCfg = config.turnkey;
 
+  # Pre-commit check tools (Rust implementations with tree-sitter parsing)
+  checkSourceCoverageRs = import ../../packages/check-source-coverage-rs.nix { inherit pkgs lib; };
+  checkRustEditionRs = import ../../packages/check-rust-edition-rs.nix { inherit pkgs lib; };
+
   # Load the toolchain mappings
   mappings = import ../../buck2/mappings.nix { inherit lib; };
 
@@ -869,10 +873,7 @@ in
           1. All workspace members use edition.workspace = true
           2. rules.star files have edition matching workspace.package.edition
 
-          Note: This hook requires the check-rust-edition script from turnkey.
-          Only enable this if you have copied the script to src/cmd/check-rust-edition/.
-
-          Requires Python 3.11+ with tomllib support.
+          Uses tree-sitter for proper Starlark AST parsing.
         '';
       };
 
@@ -934,6 +935,33 @@ in
           Only enable this if you have copied the script to src/cmd/check-foundry-config/.
 
           Requires Python 3.11+ with tomllib support.
+        '';
+      };
+
+      sourceCoverageCheck = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Add a pre-commit hook that validates all source files are covered by
+          Buck2 targets in rules.star files.
+
+          This prevents accidentally adding source files that won't be built.
+          The hook parses rules.star files to extract source patterns (glob and
+          explicit file lists) and compares them against actual source files.
+
+          Configure the scope with tk.sourceScope (default: ".").
+
+          Uses tree-sitter for proper Starlark AST parsing.
+        '';
+      };
+
+      sourceScope = lib.mkOption {
+        type = lib.types.str;
+        default = ".";
+        description = ''
+          Directory scope for source coverage checking.
+          Only source files under this directory are validated.
+          Default is "." (entire repository).
         '';
       };
     };
@@ -1210,7 +1238,7 @@ in
         '';
       };
 
-      # Rust edition alignment check
+      # Rust edition alignment check (uses tree-sitter for proper Starlark parsing)
       rust-edition-check = lib.mkIf (cfg.rust.enable && cfg.tk.rustEditionCheck) {
         enable = true;
         name = "rust-edition-check";
@@ -1218,7 +1246,7 @@ in
         files = "(Cargo\\.toml|rules\\.star)$";
         pass_filenames = false;
         entry = ''
-          ${pkgs.python3}/bin/python src/cmd/check-rust-edition/__main__.py
+          ${checkRustEditionRs}/bin/check-rust-edition-rs
         '';
       };
 
@@ -1255,6 +1283,19 @@ in
         pass_filenames = false;
         entry = ''
           ${pkgs.python3}/bin/python src/cmd/check-foundry-config/__main__.py
+        '';
+      };
+
+      # Source coverage check - validate all source files covered by Buck2 targets
+      # Uses tree-sitter for proper Starlark parsing
+      source-coverage-check = lib.mkIf cfg.tk.sourceCoverageCheck {
+        enable = true;
+        name = "source-coverage-check";
+        description = "Check all source files are covered by Buck2 targets";
+        files = "(\\.go|\\.rs|\\.py|\\.ts|\\.tsx|\\.js|\\.jsx|\\.sol|rules\\.star)$";
+        pass_filenames = false;
+        entry = ''
+          ${checkSourceCoverageRs}/bin/check-source-coverage-rs --scope "${cfg.tk.sourceScope}"
         '';
       };
 

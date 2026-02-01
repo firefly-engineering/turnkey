@@ -4,6 +4,25 @@
 //! package.json/pnpm-lock.yaml for npm Solidity packages (like @openzeppelin/contracts).
 //! It generates a unified TOML file for use with turnkey's solidity-deps-cell.nix.
 
+/// Package version from VERSION.txt (works with both Cargo and Buck2)
+const VERSION: &str = {
+    // include_str! is relative to the source file location
+    // From src/main.rs, VERSION.txt is at ../VERSION.txt
+    const V: &str = include_str!("../VERSION.txt");
+    // Trim trailing newline at compile time by taking a slice
+    // VERSION.txt contains "0.1.0\n", we want "0.1.0"
+    const fn trim_newline(s: &str) -> &str {
+        let bytes = s.as_bytes();
+        let mut end = bytes.len();
+        while end > 0 && (bytes[end - 1] == b'\n' || bytes[end - 1] == b'\r') {
+            end -= 1;
+        }
+        // SAFETY: We're trimming ASCII whitespace, so UTF-8 validity is preserved
+        unsafe { std::str::from_utf8_unchecked(bytes.split_at(end).0) }
+    }
+    trim_newline(V)
+};
+
 use anyhow::{Context, Result};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
@@ -408,7 +427,7 @@ fn main() -> Result<()> {
     // Create output TOML
     let output = OutputToml {
         meta: OutputMeta {
-            generator: format!("soldeps-gen {}", env!("CARGO_PKG_VERSION")),
+            generator: format!("soldeps-gen {}", VERSION),
         },
         packages: output_packages,
     };

@@ -462,11 +462,32 @@ When implementing tests, consider:
 4. **Cross-platform tests** - Verify all 4 supported systems work
 
 ### Manual Testing
-Currently, testing involves:
-1. Making changes to the Nix code
-2. Rebuilding the dev shell
-3. Verifying expected toolchains are available
-4. Testing with real projects that import the module
+
+**Use `direnv exec . <command>` for all testing**. This is the standard pattern that:
+- Loads the full devenv environment
+- Automatically creates/updates cell symlinks
+- Works consistently for all tools (tk, cargo, go, etc.)
+
+```bash
+# Build and test with Buck2
+direnv exec . tk build //src/rust/starlark-parse:starlark-parse
+direnv exec . tk test //src/rust/starlark-parse:starlark-parse-test
+
+# Run a binary
+direnv exec . tk run //src/cmd/check-source-coverage-rs:check-source-coverage-rs
+
+# Use native tools
+direnv exec . cargo check
+direnv exec . go test ./...
+```
+
+**After modifying Nix files** (fixups, cell builders, etc.):
+```bash
+rm -rf .turnkey/rustdeps  # Remove stale cell
+nix develop --impure -c bash -c 'tk build //...'  # Force rebuild
+```
+
+See `docs/testing-devenv.md` for complete documentation on this testing pattern.
 
 ## Documentation Standards
 
@@ -623,6 +644,7 @@ When adding functionality, ensure it works across all platforms.
 
 - **Dependency Management**: See `docs/dependency-management.md` for core principles on how dependencies flow from language-native declarations through Nix to Buck2 cells. **Read this before working on any dependency-related code.**
 - **Native Tool Wrappers**: See `docs/native-tool-wrappers.md` for how `go`, `cargo`, `uv` are transparently wrapped with auto-sync.
+- **Testing in Devenv**: See `docs/testing-devenv.md` for the standard `direnv exec . <command>` pattern used for all testing.
 - **Buck2 Cell Resolution**: See `docs/buck2_cell_resolution.md` for deep dive
 - **flake-parts**: https://flake.parts/
 - **devenv**: https://devenv.sh/

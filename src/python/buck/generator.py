@@ -7,6 +7,8 @@ from python.cargo.toml import (
     get_optional_deps,
     feature_enables_unavailable_dep,
 )
+from python.buildsystem.native_library import NativeLibrarySpec
+from python.buildsystem.buck2 import buck2_generator
 
 try:
     from cfg import is_linux_compatible_target
@@ -201,31 +203,6 @@ def get_build_script_cfg_flags(
     return []
 
 
-def get_native_library_info(crate_name: str, version: str) -> dict | None:
-    """Get info about native libraries for crates with pre-built native code.
-
-    Some crates (like ring) have native C/assembly code that we pre-compile
-    in Nix. This returns info needed to create a prebuilt_cxx_library rule
-    and configure the linker.
-
-    Returns dict with:
-        - lib_name: The library name (without lib prefix and .a suffix)
-        - static_lib_path: Path to the static library file
-        - link_search_path: Path for -L flag (relative to crate dir)
-    """
-    if crate_name == "ring":
-        # ring's native crypto library is pre-compiled and placed in out_dir/
-        # The library name follows ring's versioning: libring_core_0_17_<patch>.a
-        patch = version.split(".")[-1] if version else "0"
-        lib_name = f"ring_core_0_17_{patch}__"
-        return {
-            "lib_name": lib_name,
-            "static_lib_path": f"out_dir/lib{lib_name}.a",
-            "link_search_path": "out_dir",
-        }
-    return None
-
-
 def generate_buck_file(
     crate_name: str,
     edition: str,
@@ -244,8 +221,19 @@ def generate_buck_file(
 
     # Determine which rules we need to load
     rules_to_load = ["rust_library"]
+
+    # Native library rules prefix content
+    native_lib_content = ""
+
+    # Generate native library rules using the abstraction
     if native_lib_info:
-        rules_to_load.extend(["prebuilt_cxx_library", "export_file"])
+        spec = NativeLibrarySpec.from_dict(native_lib_info)
+        generated = buck2_generator.generate(spec)
+
+        rules_to_load.extend(generated.rules_to_load)
+        native_lib_content = generated.rules_content
+        deps = deps + generated.extra_deps
+        rustc_flags = rustc_flags + generated.extra_rustc_flags
 
     # Format rules for load statement: "rule1", "rule2"
     rules_str = ", ".join(f'"{r}"' for r in rules_to_load)
@@ -256,35 +244,9 @@ def generate_buck_file(
         "",
     ]
 
-    # Generate prebuilt_cxx_library for native libraries
-    if native_lib_info:
-        lib_name = native_lib_info["lib_name"]
-        static_lib_path = native_lib_info["static_lib_path"]
-        link_search_path = native_lib_info.get("link_search_path", "out_dir")
-        # Use export_file to expose the library, then reference it in prebuilt_cxx_library
-        lines.extend(
-            [
-                "# Native crypto library pre-compiled in Nix",
-                "export_file(",
-                f'    name = "{lib_name}_file",',
-                f'    src = "{static_lib_path}",',
-                '    visibility = ["PUBLIC"],',
-                ")",
-                "",
-                "prebuilt_cxx_library(",
-                f'    name = "{lib_name}",',
-                f'    static_lib = ":{lib_name}_file",',
-                "    link_whole = True,",
-                '    preferred_linkage = "static",',
-                '    visibility = ["PUBLIC"],',
-                ")",
-                "",
-            ]
-        )
-        # Add the native library as a dependency
-        deps = deps + [f":{lib_name}"]
-        # Add -L flag so rustc can find the library during compilation
-        rustc_flags = rustc_flags + [f"-Lnative={link_search_path}"]
+    # Add native library rules if present
+    if native_lib_content:
+        lines.append(native_lib_content)
 
     lines.extend(
         [
@@ -335,7 +297,9 @@ def generate_buck_file(
     if rustc_flags:
         lines.append("    rustc_flags = [")
         for flag in rustc_flags:
-            lines.append(f'        "{flag}",')
+            # Escape backslashes and quotes for Starlark string literals
+            escaped_flag = flag.replace("\\", "\\\\").replace('"', '\\"')
+            lines.append(f'        "{escaped_flag}",')
         lines.append("    ],")
 
     # Add exported_linker_flags for native libraries (propagates to dependents)

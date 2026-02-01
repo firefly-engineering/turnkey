@@ -1,0 +1,25 @@
+[package]
+name = "composition"
+version = "0.1.0"
+edition.workspace = true
+description = "Composition backend trait for FUSE and symlink-based repository views"
+
+[features]
+default = []
+fuse = ["dep:fuser", "dep:libc"]
+watcher = ["dep:notify", "dep:notify-debouncer-mini"]
+
+[dependencies]
+log.workspace = true
+thiserror.workspace = true
+
+# Optional FUSE support (Linux only)
+fuser = { workspace = true, optional = true }
+libc = { workspace = true, optional = true }
+
+# Optional file watcher support
+notify = { workspace = true, optional = true }
+notify-debouncer-mini = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true
