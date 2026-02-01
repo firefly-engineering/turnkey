@@ -78,6 +78,9 @@ func main() {
 	case "rules":
 		exitCode := runRules(args[1:])
 		os.Exit(exitCode)
+	case "compose":
+		exitCode := runCompose(args[1:])
+		os.Exit(exitCode)
 	case "completion":
 		exitCode := runCompletion(args[1:])
 		os.Exit(exitCode)
@@ -673,6 +676,7 @@ tk-specific subcommands:
   sync         Run dependency sync manually
   check        Check if dependency files are stale
   rules        Manage rules.star files (check, sync)
+  compose      Edit external dependencies (edit, patch, reset, status)
   completion   Generate shell completion scripts (bash, zsh, fish)
 
 All other subcommands are delegated to buck2.
