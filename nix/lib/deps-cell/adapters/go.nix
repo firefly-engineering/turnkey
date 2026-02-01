@@ -125,6 +125,7 @@ rec {
       # Optional
       userFixups ? { }, # Additional fixups
       localReplaces ? { }, # Map import path -> Buck2 target for local replacements
+      userPatchesDir ? null, # Path to .turnkey/patches directory (from FUSE edit layer)
     }:
     let
       depsToml = builtins.fromTOML (builtins.readFile depsFile);
@@ -252,7 +253,7 @@ rec {
     in
     genericMkDepsCell {
       cellName = "godeps";
-      inherit depPackages keyToPath parseKeyForSymlink mergeCommands;
+      inherit depPackages keyToPath parseKeyForSymlink mergeCommands userPatchesDir;
       createSymlinks = true;
       cellBuildInputs = [ buckgen pkgs.findutils ];
     };

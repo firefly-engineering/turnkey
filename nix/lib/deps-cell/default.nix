@@ -45,6 +45,9 @@ let
     createSymlinks ? false,            # Create unversioned symlinks
     parseKeyForSymlink ? null,         # key -> { basePath, version } for symlink grouping
 
+    # User patches (from FUSE edit layer)
+    userPatchesDir ? null,             # Path to .turnkey/patches directory
+
     # Merge phase
     mergeCommands ? "",                # Shell commands after copy
     cellBuildInputs ? [],              # Build inputs for merge phase
@@ -90,7 +93,7 @@ let
     else "";
   in
   pkgs.runCommand "${cellName}-cell" {
-    nativeBuildInputs = cellBuildInputs;
+    nativeBuildInputs = cellBuildInputs ++ [ pkgs.patch ];
     passthru = { inherit depPackages; } // passthru;
   } ''
     mkdir -p $out/vendor
@@ -108,6 +111,26 @@ let
 
     # Create symlinks (if enabled)
     ${symlinkCommands}
+
+    # Apply user patches from FUSE edit layer
+    # Patches are in .turnkey/patches/<cellName>/*.patch format
+    # Patch files use a/vendor/... and b/vendor/... paths, so we use -p1
+    ${if userPatchesDir != null then ''
+      patchDir="${userPatchesDir}/${cellName}"
+      if [ -d "$patchDir" ]; then
+        echo "Applying user patches from $patchDir"
+        for patchFile in "$patchDir"/*.patch; do
+          if [ -f "$patchFile" ]; then
+            echo "  Applying: $(basename "$patchFile")"
+            # Use -p1 to strip the a/ or b/ prefix from patch paths
+            patch -d "$out" -p1 < "$patchFile" || {
+              echo "Warning: Failed to apply patch: $patchFile"
+              echo "Continuing anyway..."
+            }
+          fi
+        done
+      fi
+    '' else ""}
 
     # Run language-specific merge commands
     ${mergeCommands}

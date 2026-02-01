@@ -89,6 +89,7 @@ rec {
 
     # Optional
     userFixups ? {},    # Additional fixups
+    userPatchesDir ? null, # Path to .turnkey/patches directory (from FUSE edit layer)
   }:
   let
     depsToml = builtins.fromTOML (builtins.readFile depsFile);
@@ -110,7 +111,7 @@ rec {
   in
   genericMkDepsCell {
     cellName = "pydeps";
-    inherit depPackages;
+    inherit depPackages userPatchesDir;
     # Python uses simple name-only paths, no versioning or symlinks
     keyToPath = name: name;
     createSymlinks = false;

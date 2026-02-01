@@ -76,6 +76,9 @@ rec {
     buildScriptFixups ? {},     # Additional build script fixups
     rustcFlagsRegistry ? {},    # Additional rustc flags
 
+    # User patches (from FUSE edit layer)
+    userPatchesDir ? null,      # Path to .turnkey/patches directory
+
     # Tools (must be provided by caller)
     computeUnifiedFeatures ? null,  # Tool for feature unification
     genRustBuck ? null,             # Tool for BUCK generation
@@ -192,7 +195,7 @@ rec {
   in
   genericMkDepsCell {
     cellName = "rustdeps";
-    inherit depPackages keyToPath parseKeyForSymlink mergeCommands;
+    inherit depPackages keyToPath parseKeyForSymlink mergeCommands userPatchesDir;
     createSymlinks = true;
     cellBuildInputs = cellBuildInputs ++
       (if computeUnifiedFeatures != null then [ computeUnifiedFeatures ] else []) ++
