@@ -99,6 +99,7 @@ The `LayoutContext` provides all information needed for layout operations:
 
 **Current Layouts:**
 - `Buck2Layout` - Default layout generating `.buckconfig` and `.buckroot`
+- `BazelLayout` - Bazel layout generating `WORKSPACE` and `BUILD.bazel`
 
 **Creating Custom Layouts:**
 ```rust
@@ -394,7 +395,7 @@ tk compose down
 ### Phase 6: Layout Plugins
 - [x] Layout trait definition - `layout.rs` with `Layout` trait
 - [x] Buck2 layout (current) - `Buck2Layout` implementation
-- [ ] Bazel layout prototype
+- [x] Bazel layout prototype - `BazelLayout` with WORKSPACE generation
 - [ ] Custom layout API
 
 ### Phase 7: Production Hardening
