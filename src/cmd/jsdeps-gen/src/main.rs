@@ -229,7 +229,7 @@ fn main() -> Result<()> {
     // Create output TOML
     let output = OutputToml {
         meta: OutputMeta {
-            generator: format!("jsdeps-gen {}", option_env!("CARGO_PKG_VERSION").unwrap_or("dev")),
+            generator: format!("jsdeps-gen {}", env!("CARGO_PKG_VERSION")),
             lockfile_version: lockfile.lockfile_version,
         },
         packages: output_packages,

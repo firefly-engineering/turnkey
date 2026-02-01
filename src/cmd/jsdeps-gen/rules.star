@@ -1,12 +1,8 @@
 # jsdeps-gen - generate js-deps.toml from pnpm-lock.yaml
-load("@prelude//rust:rust.bzl", "rust_binary")
-
-# Version must match Cargo.toml
-VERSION = "0.1.0"
+load("@prelude//:rules.bzl", "rust_binary")
 
 rust_binary(
     name = "jsdeps-gen",
-    version = VERSION,
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
     deps = [
@@ -18,5 +14,8 @@ rust_binary(
         "rustdeps//vendor/sha2:sha2",
         "rustdeps//vendor/toml:toml",
     ],
+    env = {
+        "CARGO_PKG_VERSION": "0.1.0",
+    },
     visibility = ["PUBLIC"],
 )

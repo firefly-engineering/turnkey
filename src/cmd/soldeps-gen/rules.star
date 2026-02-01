@@ -1,12 +1,8 @@
 # soldeps-gen - generate solidity-deps.toml from foundry.toml
-load("@prelude//rust:rust.bzl", "rust_binary")
-
-# Version must match Cargo.toml
-VERSION = "0.1.0"
+load("@prelude//:rules.bzl", "rust_binary")
 
 rust_binary(
     name = "soldeps-gen",
-    version = VERSION,
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
     deps = [

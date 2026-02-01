@@ -408,7 +408,7 @@ fn main() -> Result<()> {
     // Create output TOML
     let output = OutputToml {
         meta: OutputMeta {
-            generator: format!("soldeps-gen {}", option_env!("CARGO_PKG_VERSION").unwrap_or("dev")),
+            generator: format!("soldeps-gen {}", option_env!("CARGO_PKG_VERSION").unwrap_or("0.1.0")),
         },
         packages: output_packages,
     };
