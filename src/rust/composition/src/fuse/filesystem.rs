@@ -47,6 +47,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use super::edit_overlay::EditOverlay;
 use crate::layout::{default_layout, layout_by_name, BoxedLayout, CellInfo, LayoutContext};
+use crate::performance::CacheConfig;
 use crate::policy::{
     default_policy, BoxedPolicy, FileClass, OperationType, PolicyDecision,
     SystemState as PolicyState,
@@ -54,8 +55,6 @@ use crate::policy::{
 use crate::state::ConsistencyStateMachine;
 use crate::{BackendStatus, CompositionConfig};
 
-/// Time-to-live for cached attributes
-const TTL: Duration = Duration::from_secs(1);
 
 /// Reserved inode numbers
 const ROOT_INO: u64 = 1;
@@ -126,6 +125,8 @@ pub struct CompositionFs {
     layout_context: LayoutContext,
     /// Cached config files from the layout
     cached_configs: RwLock<HashMap<String, String>>,
+    /// Cache configuration for performance tuning
+    cache_config: CacheConfig,
 }
 
 impl CompositionFs {
@@ -135,7 +136,7 @@ impl CompositionFs {
         repo_root: PathBuf,
         state_machine: Arc<ConsistencyStateMachine>,
     ) -> Self {
-        Self::with_policy(config, repo_root, state_machine, default_policy())
+        Self::with_options(config, repo_root, state_machine, default_policy(), CacheConfig::default())
     }
 
     /// Create a new composition filesystem with a custom policy
@@ -144,6 +145,17 @@ impl CompositionFs {
         repo_root: PathBuf,
         state_machine: Arc<ConsistencyStateMachine>,
         policy: BoxedPolicy,
+    ) -> Self {
+        Self::with_options(config, repo_root, state_machine, policy, CacheConfig::default())
+    }
+
+    /// Create a new composition filesystem with custom policy and cache configuration
+    pub fn with_options(
+        config: CompositionConfig,
+        repo_root: PathBuf,
+        state_machine: Arc<ConsistencyStateMachine>,
+        policy: BoxedPolicy,
+        cache_config: CacheConfig,
     ) -> Self {
         let mut inode_map = HashMap::new();
         inode_map.insert(ROOT_INO, InodePath::Root);
@@ -221,12 +233,43 @@ impl CompositionFs {
             layout,
             layout_context,
             cached_configs: RwLock::new(configs),
+            cache_config,
+        }
+    }
+
+    /// Get the attribute TTL based on cache configuration
+    #[inline]
+    fn attr_ttl(&self) -> Duration {
+        self.cache_config.attr_ttl()
+    }
+
+    /// Convert std::fs::FileType to fuser::FileType
+    ///
+    /// This avoids making separate is_dir()/is_symlink() calls which would
+    /// each trigger a syscall. Instead, we use the file_type() from the
+    /// directory entry which is often cached by the OS.
+    #[inline]
+    fn to_fuse_file_type(ft: std::fs::FileType) -> FileType {
+        if ft.is_dir() {
+            FileType::Directory
+        } else if ft.is_symlink() {
+            FileType::Symlink
+        } else {
+            FileType::RegularFile
         }
     }
 
     /// Get or allocate an inode for a real path
+    ///
+    /// This method is optimized to minimize lock contention:
+    /// 1. Try read-only lookup first (most common case - cache hit)
+    /// 2. If miss, acquire write lock and double-check before inserting
+    ///
+    /// The double-check pattern handles race conditions where another
+    /// thread may have inserted the same path while we were waiting
+    /// for the write lock.
     fn get_or_alloc_inode(&self, path: &PathBuf) -> u64 {
-        // Check if we already have an inode for this path
+        // Fast path: read-only lookup (most common case)
         {
             let path_map = self.path_map.read().unwrap();
             if let Some(&ino) = path_map.get(path) {
@@ -234,14 +277,20 @@ impl CompositionFs {
             }
         }
 
+        // Slow path: need to insert
+        // Acquire write locks for both maps
+        let mut path_map = self.path_map.write().unwrap();
+        let mut inode_map = self.inode_map.write().unwrap();
+
+        // Double-check: another thread may have inserted while we waited
+        if let Some(&ino) = path_map.get(path) {
+            return ino;
+        }
+
         // Allocate a new inode
         let ino = self.next_inode.fetch_add(1, Ordering::SeqCst);
-        {
-            let mut inode_map = self.inode_map.write().unwrap();
-            let mut path_map = self.path_map.write().unwrap();
-            inode_map.insert(ino, InodePath::Real { path: path.clone() });
-            path_map.insert(path.clone(), ino);
-        }
+        inode_map.insert(ino, InodePath::Real { path: path.clone() });
+        path_map.insert(path.clone(), ino);
         ino
     }
 
@@ -644,10 +693,10 @@ impl Filesystem for CompositionFs {
                 // Looking up in mount root - only source and cell prefix directories
                 if name_str == self.config.source_dir_name {
                     // Source directory (e.g., "root") - this is the overlay on repo
-                    reply.entry(&TTL, &self.virtual_dir_attr(SOURCE_INO), 0);
+                    reply.entry(&self.attr_ttl(), &self.virtual_dir_attr(SOURCE_INO), 0);
                 } else if name_str == self.config.cell_prefix {
                     // Cell prefix directory (e.g., "external")
-                    reply.entry(&TTL, &self.virtual_dir_attr(CELL_PREFIX_INO), 0);
+                    reply.entry(&self.attr_ttl(), &self.virtual_dir_attr(CELL_PREFIX_INO), 0);
                 } else {
                     reply.error(ENOENT);
                 }
@@ -662,7 +711,7 @@ impl Filesystem for CompositionFs {
                     }
                     if let Some(path) = self.resolve_real_path(ino) {
                         if let Ok(meta) = fs::metadata(&path) {
-                            reply.entry(&TTL, &self.metadata_to_attr(ino, &meta), 0);
+                            reply.entry(&self.attr_ttl(), &self.metadata_to_attr(ino, &meta), 0);
                             return;
                         }
                     }
@@ -679,7 +728,7 @@ impl Filesystem for CompositionFs {
                 if name_str == ".buckconfig" {
                     let content = self.get_virtual_file_content(VirtualFile::BuckConfig);
                     reply.entry(
-                        &TTL,
+                        &self.attr_ttl(),
                         &self.virtual_file_attr(BUCKCONFIG_INO, content.len() as u64),
                         0,
                     );
@@ -688,7 +737,7 @@ impl Filesystem for CompositionFs {
                 if name_str == ".buckroot" {
                     let content = self.get_virtual_file_content(VirtualFile::BuckRoot);
                     reply.entry(
-                        &TTL,
+                        &self.attr_ttl(),
                         &self.virtual_file_attr(BUCKROOT_INO, content.len() as u64),
                         0,
                     );
@@ -699,7 +748,7 @@ impl Filesystem for CompositionFs {
                     let child_path = parent_path.join(name);
                     if let Ok(meta) = fs::symlink_metadata(&child_path) {
                         let ino = self.get_or_alloc_inode(&child_path);
-                        reply.entry(&TTL, &self.metadata_to_attr(ino, &meta), 0);
+                        reply.entry(&self.attr_ttl(), &self.metadata_to_attr(ino, &meta), 0);
                         return;
                     }
                 }
@@ -716,7 +765,7 @@ impl Filesystem for CompositionFs {
                     let child_path = parent_path.join(name);
                     if let Ok(meta) = fs::symlink_metadata(&child_path) {
                         let ino = self.get_or_alloc_inode(&child_path);
-                        reply.entry(&TTL, &self.metadata_to_attr(ino, &meta), 0);
+                        reply.entry(&self.attr_ttl(), &self.metadata_to_attr(ino, &meta), 0);
                         return;
                     }
                 }
@@ -733,17 +782,17 @@ impl Filesystem for CompositionFs {
 
         match self.get_inode_path(ino) {
             Some(InodePath::Root) | Some(InodePath::CellPrefix) => {
-                reply.attr(&TTL, &self.virtual_dir_attr(ino));
+                reply.attr(&self.attr_ttl(), &self.virtual_dir_attr(ino));
             }
             Some(InodePath::Virtual { file }) => {
                 let content = self.get_virtual_file_content(file);
-                reply.attr(&TTL, &self.virtual_file_attr(ino, content.len() as u64));
+                reply.attr(&self.attr_ttl(), &self.virtual_file_attr(ino, content.len() as u64));
             }
             Some(InodePath::Source) => {
                 // Source passthrough - no consistency check needed
                 if let Some(path) = self.resolve_real_path(ino) {
                     if let Ok(meta) = fs::symlink_metadata(&path) {
-                        reply.attr(&TTL, &self.metadata_to_attr(ino, &meta));
+                        reply.attr(&self.attr_ttl(), &self.metadata_to_attr(ino, &meta));
                         return;
                     }
                 }
@@ -757,7 +806,7 @@ impl Filesystem for CompositionFs {
                 }
                 if let Some(path) = self.resolve_real_path(ino) {
                     if let Ok(meta) = fs::symlink_metadata(&path) {
-                        reply.attr(&TTL, &self.metadata_to_attr(ino, &meta));
+                        reply.attr(&self.attr_ttl(), &self.metadata_to_attr(ino, &meta));
                         return;
                     }
                 }
@@ -951,14 +1000,14 @@ impl Filesystem for CompositionFs {
         match self.get_inode_path(ino) {
             Some(InodePath::Virtual { file }) => {
                 let content = self.get_virtual_file_content(file);
-                reply.attr(&TTL, &self.virtual_file_attr(ino, content.len() as u64));
+                reply.attr(&self.attr_ttl(), &self.virtual_file_attr(ino, content.len() as u64));
             }
             Some(_) => {
                 if let Some(path) = self.resolve_real_path(ino) {
                     // Check overlay for edited files
                     let attr_path = self.get_edit_overlay_path(&path).unwrap_or(path);
                     if let Ok(meta) = fs::symlink_metadata(&attr_path) {
-                        reply.attr(&TTL, &self.metadata_to_attr(ino, &meta));
+                        reply.attr(&self.attr_ttl(), &self.metadata_to_attr(ino, &meta));
                         return;
                     }
                 }
@@ -1059,13 +1108,12 @@ impl Filesystem for CompositionFs {
                                 }
 
                                 let child_ino = self.get_or_alloc_inode(&child_path);
-                                let kind = if child_path.is_dir() {
-                                    FileType::Directory
-                                } else if child_path.is_symlink() {
-                                    FileType::Symlink
-                                } else {
-                                    FileType::RegularFile
-                                };
+                                // Use entry.file_type() instead of child_path.is_dir()/is_symlink()
+                                // to avoid extra syscalls. The file_type is often cached by the OS.
+                                let kind = entry
+                                    .file_type()
+                                    .map(Self::to_fuse_file_type)
+                                    .unwrap_or(FileType::RegularFile);
                                 entries.push((child_ino, kind, name.to_string()));
                             }
                         }
@@ -1116,13 +1164,12 @@ impl Filesystem for CompositionFs {
                         for entry in read_dir.flatten() {
                             let child_path = entry.path();
                             let child_ino = self.get_or_alloc_inode(&child_path);
-                            let kind = if child_path.is_dir() {
-                                FileType::Directory
-                            } else if child_path.is_symlink() {
-                                FileType::Symlink
-                            } else {
-                                FileType::RegularFile
-                            };
+                            // Use entry.file_type() instead of child_path.is_dir()/is_symlink()
+                            // to avoid extra syscalls. The file_type is often cached by the OS.
+                            let kind = entry
+                                .file_type()
+                                .map(Self::to_fuse_file_type)
+                                .unwrap_or(FileType::RegularFile);
                             if let Some(name) = entry.file_name().to_str() {
                                 entries.push((child_ino, kind, name.to_string()));
                             }

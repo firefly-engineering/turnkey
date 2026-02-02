@@ -53,6 +53,7 @@ mod backend;
 mod config;
 mod error;
 pub mod layout;
+pub mod performance;
 pub mod policy;
 pub mod recovery;
 pub mod selector;
@@ -91,6 +92,7 @@ pub use recovery::{
     RetryConfig,
 };
 pub use tracing::{DebugInfo, FuseTracer, Metrics, StateLogger, TracingConfig};
+pub use performance::{CacheConfig, CacheStats, DirEntry, DirEntryType, InodeCache, OptimizedReaddir};
 
 /// Result type for composition operations
 pub type Result<T> = std::result::Result<T, Error>;
