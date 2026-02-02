@@ -165,9 +165,13 @@ pub fn select_backend(requested: BackendType) -> BackendSelection {
             backend_type: BackendType::Symlink,
             reason: "FUSE requested but not compiled in, using symlinks".to_string(),
         },
-        BackendType::Symlink | BackendType::Auto => BackendSelection {
+        BackendType::Symlink => BackendSelection {
             backend_type: BackendType::Symlink,
-            reason: "Symlink backend (FUSE not compiled in)".to_string(),
+            reason: "Symlink backend explicitly requested".to_string(),
+        },
+        BackendType::Auto => BackendSelection {
+            backend_type: BackendType::Symlink,
+            reason: "Auto-selected symlinks (FUSE not compiled in)".to_string(),
         },
     }
 }
