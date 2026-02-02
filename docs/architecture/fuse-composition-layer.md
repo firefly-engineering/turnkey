@@ -317,13 +317,33 @@ Example: A patch to `vendor/serde@1.0.219/src/lib.rs` would be named:
 
 **Linux (fuser):**
 - Native FUSE via `/dev/fuse`
-- No external dependencies
+- Uses `fusermount3` or `fusermount` for unmount
+- No external dependencies (FUSE is typically available)
 - Best performance
 
 **macOS (FUSE-T):**
-- NFS-based, no kernel extension
-- Requires FUSE-T installation
-- Slightly higher latency
+- NFS-based, no kernel extension required
+- Works on Apple Silicon (M1/M2/M3)
+- Uses standard `umount` for unmount
+- Installation: `brew install macos-fuse-t/homebrew-cask/fuse-t`
+- Slightly higher latency due to NFS layer
+
+**Platform detection** (`platform.rs`):
+```rust
+// Check FUSE availability
+let availability = check_fuse_availability();
+match availability {
+    FuseAvailability::Available { implementation, version } => {
+        // FUSE is ready to use
+    }
+    FuseAvailability::NotInstalled { install_instructions } => {
+        // Show installation guidance
+    }
+    FuseAvailability::UnsupportedPlatform => {
+        // Fall back to symlinks
+    }
+}
+```
 
 **Fallback (symlinks):**
 - No daemon, just symlinks
@@ -405,8 +425,8 @@ tk compose down
 - [x] Atomic view transitions - `CellUpdate` struct and `apply_pending_updates()` in `filesystem.rs`
 
 ### Phase 4: macOS Support
-- [ ] FUSE-T backend
-- [ ] Platform detection
+- [x] FUSE-T backend - `platform.rs` with macOS-specific mount/unmount
+- [x] Platform detection - `Platform::detect()` and `check_fuse_availability()`
 - [ ] Cross-platform testing
 
 ### Phase 5: Edit Layer

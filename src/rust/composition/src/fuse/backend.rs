@@ -2,9 +2,13 @@
 //!
 //! This module provides the `FuseBackend` struct that implements the
 //! `CompositionBackend` trait using a FUSE filesystem.
+//!
+//! # Platform Support
+//!
+//! - **Linux**: Native FUSE support
+//! - **macOS**: FUSE-T support (NFS-based, no kernel extension)
 
 use std::path::PathBuf;
-use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -14,10 +18,9 @@ use fuser::{MountOption, Session};
 use log::{debug, error, info};
 
 use super::filesystem::CompositionFs;
+use super::platform::{self, Platform};
 use crate::state::ConsistencyStateMachine;
-use crate::{
-    BackendStatus, CellMapping, CompositionBackend, CompositionConfig, Error, Result,
-};
+use crate::{BackendStatus, CellMapping, CompositionBackend, CompositionConfig, Error, Result};
 
 /// FUSE-based composition backend for Linux
 ///
@@ -221,57 +224,19 @@ impl CompositionBackend for FuseBackend {
             return Err(Error::NotMounted);
         }
 
-        info!("Unmounting FUSE filesystem at {:?}", self.config.mount_point);
+        info!(
+            "Unmounting FUSE filesystem at {:?} (platform: {})",
+            self.config.mount_point,
+            Platform::detect().name()
+        );
 
         // Signal the thread to stop
         self.should_stop.store(true, Ordering::SeqCst);
 
-        // Use fusermount to unmount - this will cause session.run() to return
+        // Use platform-specific unmount command
         let mount_point = &self.config.mount_point;
-        let result = Command::new("fusermount3")
-            .arg("-u")
-            .arg(mount_point)
-            .output();
-
-        match result {
-            Ok(output) => {
-                if !output.status.success() {
-                    // Try fusermount (without 3) as fallback
-                    let result2 = Command::new("fusermount")
-                        .arg("-u")
-                        .arg(mount_point)
-                        .output();
-
-                    if let Ok(output2) = result2 {
-                        if !output2.status.success() {
-                            let stderr = String::from_utf8_lossy(&output2.stderr);
-                            return Err(Error::FuseUnmountFailed(stderr.to_string()));
-                        }
-                    }
-                }
-            }
-            Err(e) => {
-                // fusermount3 not found, try fusermount
-                let result2 = Command::new("fusermount")
-                    .arg("-u")
-                    .arg(mount_point)
-                    .output();
-
-                match result2 {
-                    Ok(output2) => {
-                        if !output2.status.success() {
-                            let stderr = String::from_utf8_lossy(&output2.stderr);
-                            return Err(Error::FuseUnmountFailed(stderr.to_string()));
-                        }
-                    }
-                    Err(_) => {
-                        return Err(Error::FuseUnmountFailed(format!(
-                            "fusermount not found: {}",
-                            e
-                        )));
-                    }
-                }
-            }
+        if let Err(e) = platform::unmount(mount_point) {
+            return Err(Error::FuseUnmountFailed(e));
         }
 
         // Wait for the thread to finish
