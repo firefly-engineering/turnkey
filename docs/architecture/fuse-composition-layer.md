@@ -36,9 +36,21 @@ The FUSE layer is an **optional enhancement** on top of the existing symlink-bas
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Selection criteria:**
-- FUSE: When `turnkey.fuse.enable = true` and FUSE is available
-- Symlinks: CI environments, containers without FUSE, explicit opt-out
+**Selection criteria** (automatic via `selector.rs`):
+- FUSE: When FUSE is available (Linux native, macOS FUSE-T) and not explicitly disabled
+- Symlinks: CI environments, containers without FUSE, explicit `--backend=symlink`
+
+**Backend selection API:**
+```rust
+use composition::{create_backend, BackendType, CompositionConfig};
+
+// Auto-select best backend based on platform and availability
+let backend = create_backend(BackendType::Auto, config)?;
+
+// Or explicitly request a specific backend
+let backend = create_backend(BackendType::Fuse, config)?;    // Requires FUSE
+let backend = create_backend(BackendType::Symlink, config)?; // Always available
+```
 
 ### 2. Pluggable Layout System
 

@@ -54,6 +54,7 @@ mod config;
 mod error;
 pub mod layout;
 pub mod policy;
+pub mod selector;
 pub mod state;
 mod status;
 pub mod symlink;
@@ -77,6 +78,10 @@ pub use status::BackendStatus;
 pub use layout::{
     BoxedLayout, Buck2Layout, CellInfo, ConfigFile, Layout, LayoutContext, default_layout,
     layout_by_name,
+};
+pub use selector::{
+    create_backend, fuse_install_instructions, is_fuse_available, select_backend,
+    BackendSelection, BackendType,
 };
 
 /// Result type for composition operations

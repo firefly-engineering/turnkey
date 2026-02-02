@@ -1,11 +1,12 @@
-//! turnkey-composed - FUSE composition daemon
+//! turnkey-composed - Composition daemon
 //!
-//! This daemon manages the FUSE mount lifecycle for the Turnkey composition layer.
+//! This daemon manages the composition backend lifecycle for the Turnkey composition layer.
 //! It provides:
-//! - Start/stop commands for mounting/unmounting the FUSE filesystem
+//! - Start/stop commands for mounting/unmounting the composition view
 //! - Unix socket IPC for status queries and control
 //! - Graceful shutdown handling via SIGTERM/SIGINT
 //! - Manifest file watching for automatic refresh
+//! - Automatic backend selection (FUSE or symlinks based on platform)
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -18,7 +19,7 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use composition::watcher::{ManifestWatcher, WatcherConfig, WatcherEvent};
-use composition::{fuse::FuseBackend, CompositionBackend, CompositionConfig};
+use composition::{create_backend, BackendType, CompositionConfig};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 
@@ -49,7 +50,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Start the daemon and mount the FUSE filesystem
+    /// Start the daemon and mount the composition view
     Start {
         /// Mount point for the composition view
         #[arg(long)]
@@ -59,6 +60,14 @@ enum Commands {
         #[arg(long)]
         repo_root: PathBuf,
 
+        /// Backend type: auto, fuse, or symlink
+        ///
+        /// - auto: Automatically select best available backend (default)
+        /// - fuse: Use FUSE filesystem (requires FUSE/FUSE-T installation)
+        /// - symlink: Use symlinks (always available, no daemon needed)
+        #[arg(long, default_value = "auto")]
+        backend: String,
+
         /// Run in foreground (don't daemonize)
         #[arg(long, short)]
         foreground: bool,
@@ -67,7 +76,7 @@ enum Commands {
         #[arg(long)]
         no_watch: bool,
     },
-    /// Stop the daemon and unmount the FUSE filesystem
+    /// Stop the daemon and unmount the composition view
     Stop,
     /// Query the daemon status
     Status,
@@ -113,13 +122,23 @@ fn main() -> Result<()> {
         Commands::Start {
             mount_point,
             repo_root,
+            backend,
             foreground,
             no_watch,
         } => {
+            // Parse backend type
+            let backend_type = BackendType::from_str(&backend).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Invalid backend type '{}'. Valid options: {}",
+                    backend,
+                    BackendType::valid_names().join(", ")
+                )
+            })?;
+
             if !foreground {
                 warn!("Daemonizing not yet implemented, running in foreground");
             }
-            run_daemon(&cli.socket, mount_point, repo_root, !no_watch)
+            run_daemon(&cli.socket, mount_point, repo_root, backend_type, !no_watch)
         }
         Commands::Stop => send_command(&cli.socket, IpcRequest::Stop),
         Commands::Status => send_command(&cli.socket, IpcRequest::Status),
@@ -132,6 +151,7 @@ fn run_daemon(
     socket_path: &PathBuf,
     mount_point: PathBuf,
     repo_root: PathBuf,
+    backend_type: BackendType,
     enable_watch: bool,
 ) -> Result<()> {
     // Remove existing socket if present
@@ -155,14 +175,16 @@ fn run_daemon(
     })
     .context("Failed to set signal handler")?;
 
-    // Create and mount the FUSE backend
+    // Create composition config
     let config = CompositionConfig::new(&mount_point, &repo_root);
     // TODO: Load cell configuration from file
 
-    let mut backend = FuseBackend::new(config);
+    // Create backend using automatic selection
+    let mut backend = create_backend(backend_type, config)
+        .context("Failed to create composition backend")?;
 
-    info!("Mounting FUSE filesystem at {:?}", mount_point);
-    backend.mount().context("Failed to mount FUSE filesystem")?;
+    info!("Mounting composition view at {:?}", mount_point);
+    backend.mount().context("Failed to mount composition view")?;
 
     // Wait for backend to be ready
     backend
