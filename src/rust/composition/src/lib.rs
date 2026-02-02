@@ -59,6 +59,7 @@ pub mod selector;
 pub mod state;
 mod status;
 pub mod symlink;
+pub mod tracing;
 
 #[cfg(feature = "fuse")]
 pub mod fuse;
@@ -89,6 +90,7 @@ pub use recovery::{
     is_transient_error, recovery_suggestion, retry_with_backoff, DaemonRecovery, RecoveryAction,
     RetryConfig,
 };
+pub use tracing::{DebugInfo, FuseTracer, Metrics, StateLogger, TracingConfig};
 
 /// Result type for composition operations
 pub type Result<T> = std::result::Result<T, Error>;
