@@ -77,8 +77,9 @@ pub use policy::{
 pub use state::{CellUpdate, ConsistencyStateMachine, StateObserver};
 pub use status::BackendStatus;
 pub use layout::{
-    BoxedLayout, Buck2Layout, CellInfo, ConfigFile, Layout, LayoutContext, default_layout,
-    layout_by_name,
+    available_layouts, default_layout, global_registry, layout_by_name, BazelLayout, BoxedLayout,
+    Buck2Layout, CellInfo, ConfigFile, Layout, LayoutContext, LayoutFactory, LayoutRegistry,
+    SimpleLayout,
 };
 pub use selector::{
     create_backend, fuse_install_instructions, is_fuse_available, select_backend,
