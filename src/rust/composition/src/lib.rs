@@ -54,6 +54,7 @@ mod config;
 mod error;
 pub mod layout;
 pub mod policy;
+pub mod recovery;
 pub mod selector;
 pub mod state;
 mod status;
@@ -82,6 +83,10 @@ pub use layout::{
 pub use selector::{
     create_backend, fuse_install_instructions, is_fuse_available, select_backend,
     BackendSelection, BackendType,
+};
+pub use recovery::{
+    is_transient_error, recovery_suggestion, retry_with_backoff, DaemonRecovery, RecoveryAction,
+    RetryConfig,
 };
 
 /// Result type for composition operations
