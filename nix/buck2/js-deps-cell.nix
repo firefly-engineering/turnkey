@@ -17,11 +17,11 @@
 #
 # This is a thin wrapper around the deps-cell library.
 
-{ pkgs, lib, depsFile }:
+{ pkgs, lib, depsFile, userPatchesDir ? null }:
 
 let
   depsCell = import ../lib/deps-cell { inherit pkgs lib; };
 in
 depsCell.mkJsDepsCell {
-  inherit depsFile;
+  inherit depsFile userPatchesDir;
 }

@@ -103,6 +103,7 @@ rec {
 
     # Optional
     userFixups ? {},    # Additional fixups
+    userPatchesDir ? null, # Path to .turnkey/patches directory (from FUSE edit layer)
   }:
   let
     depsToml = builtins.fromTOML (builtins.readFile depsFile);
@@ -140,7 +141,7 @@ rec {
   in
   genericMkDepsCell {
     cellName = "jsdeps";
-    inherit depPackages rootBuckContent;
+    inherit depPackages rootBuckContent userPatchesDir;
     # JavaScript uses simple name-only paths, no versioning or symlinks
     keyToPath = name: name;
     createSymlinks = false;

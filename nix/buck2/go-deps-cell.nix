@@ -15,11 +15,12 @@
   lib,
   depsFile,
   buckgen,
+  userPatchesDir ? null,
 }:
 
 let
   depsCell = import ../lib/deps-cell { inherit pkgs lib; };
 in
 depsCell.mkGoDepsCell {
-  inherit depsFile buckgen;
+  inherit depsFile buckgen userPatchesDir;
 }

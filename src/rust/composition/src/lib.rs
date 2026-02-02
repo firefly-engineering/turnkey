@@ -53,10 +53,14 @@ mod backend;
 mod config;
 mod error;
 pub mod layout;
+pub mod performance;
 pub mod policy;
+pub mod recovery;
+pub mod selector;
 pub mod state;
 mod status;
 pub mod symlink;
+pub mod tracing;
 
 #[cfg(feature = "fuse")]
 pub mod fuse;
@@ -75,9 +79,20 @@ pub use policy::{
 pub use state::{CellUpdate, ConsistencyStateMachine, StateObserver};
 pub use status::BackendStatus;
 pub use layout::{
-    BoxedLayout, Buck2Layout, CellInfo, ConfigFile, Layout, LayoutContext, default_layout,
-    layout_by_name,
+    available_layouts, default_layout, global_registry, layout_by_name, BazelLayout, BoxedLayout,
+    Buck2Layout, CellInfo, ConfigFile, Layout, LayoutContext, LayoutFactory, LayoutRegistry,
+    SimpleLayout,
 };
+pub use selector::{
+    create_backend, fuse_install_instructions, is_fuse_available, select_backend,
+    BackendSelection, BackendType,
+};
+pub use recovery::{
+    is_transient_error, recovery_suggestion, retry_with_backoff, DaemonRecovery, RecoveryAction,
+    RetryConfig,
+};
+pub use tracing::{DebugInfo, FuseTracer, Metrics, StateLogger, TracingConfig};
+pub use performance::{CacheConfig, CacheStats, DirEntry, DirEntryType, InodeCache, OptimizedReaddir};
 
 /// Result type for composition operations
 pub type Result<T> = std::result::Result<T, Error>;

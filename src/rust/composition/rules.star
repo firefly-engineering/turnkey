@@ -45,3 +45,14 @@ rust_test(
         "rustdeps//vendor/thiserror:thiserror",
     ],
 )
+
+# Integration tests
+rust_test(
+    name = "integration-tests",
+    srcs = glob(["tests/**/*.rs"]),
+    edition = "2024",
+    deps = [
+        ":composition",
+        "rustdeps//vendor/tempfile:tempfile",
+    ],
+)

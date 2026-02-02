@@ -22,7 +22,7 @@
 # Some crates have build scripts that generate files needed at compile time.
 # We handle these by pre-generating the output in Nix via the fixups registry.
 
-{ pkgs, lib, depsFile, featuresFile ? null, rustcFlagsRegistry ? {}, buildScriptFixups ? {} }:
+{ pkgs, lib, depsFile, featuresFile ? null, rustcFlagsRegistry ? {}, buildScriptFixups ? {}, userPatchesDir ? null }:
 
 let
   depsCell = import ../lib/deps-cell { inherit pkgs lib; };
@@ -37,7 +37,7 @@ let
   defaultBuildScriptFixups = rustFixups.buildScriptFixups;
 in
 depsCell.mkRustDepsCell {
-  inherit depsFile featuresFile;
+  inherit depsFile featuresFile userPatchesDir;
   inherit computeUnifiedFeatures genRustBuck;
 
   # Merge user-provided registries with defaults

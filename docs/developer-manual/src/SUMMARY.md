@@ -9,6 +9,7 @@
 - [Registry Pattern](./architecture/registry.md)
 - [Buck2 Integration](./architecture/buck2.md)
 - [Build System Abstraction](./architecture/build-system-abstraction.md)
+- [FUSE Composition Layer](./architecture/fuse-composition.md)
 - [FUSE Access Policy](./architecture/fuse-policy.md)
 
 # Nix Modules
@@ -22,6 +23,7 @@
 - [Adding Toolchains](./extending/toolchains.md)
 - [Prelude Extensions](./extending/prelude-extensions.md)
 - [Custom Rules](./extending/custom-rules.md)
+- [Custom Layouts](./extending/custom-layouts.md)
 - [Dependency Generators](./extending/dependency-generators.md)
 
 # Contributing

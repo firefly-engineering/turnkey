@@ -21,6 +21,7 @@
 - [The .turnkey Directory](./configuration/turnkey-directory.md)
 - [Shell Environment](./configuration/shell-environment.md)
 - [IDE Integration](./configuration/ide-integration.md)
+- [FUSE Composition](./configuration/fuse-composition.md)
 
 # Workflows
 

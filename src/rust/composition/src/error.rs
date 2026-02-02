@@ -99,3 +99,22 @@ pub enum Error {
     #[error("invalid state transition: {0}")]
     StateTransitionError(String),
 }
+
+impl Error {
+    /// Check if this error is transient (worth retrying)
+    ///
+    /// Transient errors include timeouts, temporary I/O issues, and
+    /// paths being updated. Non-transient errors include configuration
+    /// errors, permission issues, and missing files.
+    pub fn is_transient(&self) -> bool {
+        crate::recovery::is_transient_error(self)
+    }
+
+    /// Get a recovery suggestion for this error
+    ///
+    /// Returns a human-readable string with suggestions for how to
+    /// resolve the error, or `None` if no specific suggestion is available.
+    pub fn recovery_suggestion(&self) -> Option<String> {
+        crate::recovery::recovery_suggestion(self)
+    }
+}
