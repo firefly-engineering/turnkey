@@ -16,6 +16,7 @@ let
       ../../src/python/cfg
       ../../src/python/cargo
       ../../src/python/buck
+      ../../src/python/buildsystem
       ../../src/cmd/gen-rust-buck
     ];
   };
