@@ -471,9 +471,155 @@ tk compose down
 | CI support | Yes | Yes (fallback) |
 | Build system | Buck2 only | Pluggable |
 
+## Build System Change Notification
+
+A critical challenge for the FUSE backend is **notifying Buck2 when cell content
+changes**. This section documents the problem, the constraints imposed by the
+Linux kernel, and the available strategies.
+
+### The problem
+
+When the VFS daemon switches a cell from one Nix store path to another (e.g.
+after `nix flake update`), the mount path stays stable but the content behind it
+changes. Buck2 needs to know which files changed so its DICE engine can
+invalidate the right cache entries. Without notification, Buck2 serves stale
+data from its in-memory cache indefinitely.
+
+### Why inotify doesn't work automatically
+
+inotify fires events only in response to **explicit VFS operations** (write,
+rename, unlink). When the FUSE daemon silently starts serving different content
+for the same path, no VFS write occurs — the kernel has no way to know the
+content changed, and no inotify event is generated.
+
+The `fuser` crate's `Notifier` API reflects this kernel limitation:
+
+| Method | Kernel cache effect | inotify effect |
+|--------|-------------------|----------------|
+| `inval_inode()` | Drops page cache | **None** |
+| `inval_entry()` | Drops dentry cache | **None** |
+| `delete()` | Drops dentry, unhashes | **IN_DELETE only** |
+| `store()` | Updates cached data | **None** |
+
+A `FUSE_FSNOTIFY` kernel patch that would enable full inotify from FUSE daemons
+has been [RFC'd since 2021](https://patchwork.kernel.org/project/linux-fsdevel/cover/20211025204634.2517-1-iangelak@redhat.com/)
+but is **not merged** as of Linux 6.18.
+
+**References:**
+- [libfuse wiki: Fsnotify and FUSE](https://github.com/libfuse/libfuse/wiki/Fsnotify-and-FUSE)
+- [LWN: Inotify support in FUSE and virtiofs](https://lwn.net/Articles/874000/)
+- [gocryptfs #215](https://github.com/rfjakob/gocryptfs/issues/215) — confirms the limitation
+
+### What the VFS can guarantee today
+
+Even without inotify, the daemon **can** ensure stale content is never served on
+read. After switching a cell's backing store path:
+
+1. Call `Notifier::inval_entry()` on every directory entry under the cell.
+2. Call `Notifier::inval_inode()` on every file inode whose content changed.
+
+This forces the kernel to re-fetch content from the daemon on the next access.
+The result: any process that reads a file after the transition gets fresh data.
+The problem is purely that **no watcher is told to re-read**.
+
+### DICE early cutoff — why surgical notification matters
+
+Buck2's DICE engine implements **early cutoff**: when a recomputed value equals
+its previous value, reverse dependencies are not invalidated. This means that if
+we can tell Buck2 "these files may have changed, please re-read them," DICE will
+automatically limit the blast radius:
+
+- Files whose content is identical across store paths → no downstream rebuild
+- Files that actually changed → only affected targets rebuild
+
+This makes surgical notification far superior to `buck2 kill`, which restarts the
+daemon process even though DICE would have skipped most recomputation anyway.
+
+### Notification strategies
+
+#### Strategy 1: Stamp file + daemon kill (current, symlink backend)
+
+The `cellfresh` package (`src/go/pkg/cellfresh/`) detects when `.turnkey/*`
+symlinks change target and runs `buck2 kill`. This works for the symlink backend
+and as a fallback for the FUSE backend:
+
+1. VFS daemon writes updated targets to `.turnkey/.cell-targets` on the **real**
+   filesystem (not the FUSE mount) after each transition.
+2. `tk` reads the stamp file before delegating to Buck2 and kills the daemon if
+   targets changed.
+
+**Trade-off:** Kills the entire daemon. DICE early cutoff still limits rebuild
+scope, but the daemon restart itself costs a few hundred milliseconds and loses
+in-memory state.
+
+#### Strategy 2: Sideband journal API (recommended, EdenFS pattern)
+
+The VFS daemon maintains an internal journal of cell transitions with
+per-file granularity. A custom Buck2 file watcher queries this journal
+instead of relying on inotify.
+
+This is the pattern Meta uses with EdenFS. Watchman has a special "eden" watcher
+that queries EdenFS via a Thrift API rather than using inotify:
+
+```thrift
+// EdenFS Thrift API (for reference — our equivalent would be simpler)
+FileDelta getFilesChangedSince(mountPoint, fromPosition)
+JournalPosition getCurrentJournalPosition(mountPoint)
+```
+
+**For Turnkey, the equivalent would be:**
+
+1. The VFS daemon exposes a Unix socket or file-based journal at
+   `/run/turnkey-composed/<project>.sock` (already planned in the IPC
+   interface).
+2. On each cell transition, the daemon computes a file-level diff between
+   old and new store paths and appends entries to the journal.
+3. A custom Buck2 file watcher (or a Watchman plugin) queries the journal
+   for changes since its last known position.
+4. Changed files are fed into DICE as leaf invalidations.
+5. DICE's early cutoff handles the rest — unchanged files cause no rebuilds.
+
+**Trade-off:** Requires implementing a custom Buck2 file watcher, but gives
+optimal incremental builds with zero daemon restarts.
+
+#### Strategy 3: Custom Watchman watcher
+
+If Watchman is already in use, implement a custom watcher SCM that queries
+the VFS daemon's journal (identical to Strategy 2, but integrated through
+Watchman's watcher plugin system rather than a custom Buck2 watcher).
+
+### Recommended approach
+
+**Short term:** Strategy 1 (stamp file + `buck2 kill`) works today and is
+already implemented via `cellfresh`. The FUSE daemon should write
+`.turnkey/.cell-targets` after each transition so `cellfresh` works
+identically across both backends.
+
+**Medium term:** Strategy 2 (sideband journal). The VFS daemon already has the
+state machine, IPC socket, and per-cell transition tracking needed. The
+remaining work is:
+1. Computing file-level diffs during transitions (compare old vs new store paths)
+2. Exposing a journal query API on the IPC socket
+3. Writing a custom Buck2 file watcher that queries the journal
+
+The file-level diff is cheap: Nix store paths are immutable, so a simple
+recursive directory comparison with content hashing identifies exactly which
+files changed. The VFS daemon can do this during the `Transitioning` state
+(when reads are blocked anyway).
+
+### Key insight
+
+The FUSE backend eliminates the **cell path resolution** problem entirely:
+mount paths are stable, so Buck2's cell resolver never goes stale. The only
+remaining problem is **change notification** — telling Buck2 which files to
+re-read. This is a strictly smaller problem than what the symlink backend
+faces, and it has a clean solution via the sideband journal pattern.
+
 ## Open Questions
 
 1. **Daemon startup**: Integrate with shell entry or separate command?
 2. **Multiple projects**: One daemon per project or shared?
 3. **Root permissions**: Can we avoid needing elevated permissions?
 4. **Container support**: How to handle Docker/Podman environments?
+5. **Journal format**: What wire format for the sideband change journal? (Protobuf, JSON lines, custom binary?)
+6. **Buck2 file watcher**: Implement as a Watchman plugin or a native Buck2 watcher? (Buck2 supports pluggable watchers via `[buck2] file_watcher` in `.buckconfig`)
