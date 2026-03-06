@@ -8,6 +8,7 @@ go_binary(
     srcs = glob(["*.go"]),
     deps = [
         # turnkey:auto-start
+        "//src/go/pkg/cellfresh:cellfresh",
         "//src/go/pkg/localconfig:localconfig",
         "//src/go/pkg/rulessync:rulessync",
         "//src/go/pkg/syncconfig:syncconfig",

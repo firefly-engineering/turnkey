@@ -22,6 +22,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/cellfresh"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/localconfig"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncer"
@@ -103,6 +104,11 @@ func main() {
 		if exitCode := runRulesAutoSync(); exitCode != 0 {
 			os.Exit(exitCode)
 		}
+	}
+
+	// Check if cell symlinks changed (kills daemon if so)
+	if needsSync && !noSync {
+		checkCellFreshness()
 	}
 
 	// Delegate to buck2
@@ -260,6 +266,20 @@ func runCheck() int {
 		fmt.Fprintln(os.Stderr, "tk: all files up-to-date")
 	}
 	return 0
+}
+
+// checkCellFreshness detects when cell symlinks change and kills the
+// Buck2 daemon so it picks up new Nix store paths.
+func checkCellFreshness() {
+	root, err := findProjectRoot()
+	if err != nil {
+		return // best-effort
+	}
+	if err := cellfresh.Check(root, verbose, quiet, os.Stderr); err != nil {
+		if verbose {
+			fmt.Fprintf(os.Stderr, "tk: cell freshness check failed: %v\n", err)
+		}
+	}
 }
 
 // runCompletion generates shell completion scripts.
