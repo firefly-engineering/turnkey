@@ -10,8 +10,8 @@ let
   cfg = config.turnkey;
   buck2Cfg = cfg.buck2;
 
-  # Import turnkey lib for resolution helpers
-  turnkeyLib = import ../../lib { inherit lib pkgs; };
+  # Teller lib for registry resolution (injected via flake-parts module)
+  turnkeyLib = cfg.tellerLib;
 
   # Detect which languages are enabled from toolchain.toml
   toolchainNames =

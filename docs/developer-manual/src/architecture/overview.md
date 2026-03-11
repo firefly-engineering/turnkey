@@ -48,9 +48,9 @@ rust = {}
 ### Registry
 
 - Maps toolchain names to Nix packages
-- Simple attribute set: `{ go = pkgs.go; rust = pkgs.rustc; }`
-- Extensible by users
-- Located at `nix/registry/default.nix`
+- Versioned format: `{ go = { versions = { ... }; default = "..."; }; }`
+- Extensible by users via `registryExtensions` or custom overlays
+- Default registry provided by [teller](https://github.com/firefly-engineering/teller)
 
 ### Buck2 Cells
 

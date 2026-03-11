@@ -70,8 +70,8 @@ let
     ) finalToolchains
   );
 
-  # Import turnkey lib for resolution helpers
-  turnkeyLib = import ../../lib { inherit lib pkgs; };
+  # Teller lib for registry resolution (injected via flake-parts module)
+  turnkeyLib = turnkeyCfg.tellerLib;
 
   # Resolve runtime dependencies to actual packages from versioned registry
   runtimePackages = builtins.filter (p: p != null) (

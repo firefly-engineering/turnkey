@@ -70,12 +70,6 @@ This document provides comprehensive guidance for AI assistants working on the T
 - Resolves toolchain names to actual packages via registry
 - Adds resolved packages to the development shell
 
-### `/home/user/turnkey/nix/registry/default.nix`
-**Toolchain registry**
-- Simple mapping: toolchain name → Nix package
-- Currently supports: `buck2`, `nix`
-- Designed to be extensible (add new toolchains here)
-
 ### `/home/user/turnkey/toolchain.toml`
 **Example toolchain declaration**
 ```toml
@@ -133,7 +127,7 @@ flake-parts module (nix/flake-parts/turnkey/default.nix)
     ↓ configures
 devenv module (nix/devenv/turnkey/default.nix)
     ↓ uses
-registry (nix/registry/default.nix)
+teller registry (external flake: github:firefly-engineering/teller)
     ↓ maps to
 nixpkgs packages
 ```
@@ -151,20 +145,13 @@ nixpkgs packages
 
 ### The Registry Pattern
 
-The registry is intentionally simple:
-```nix
-{
-  buck2 = pkgs.buck2;
-  nix = pkgs.nix;
-  # Add more toolchains here
-}
-```
+The default registry lives in [teller](https://github.com/firefly-engineering/teller), a standalone flake providing versioned toolchain registry library functions and a default set of standard nixpkgs toolchains. Turnkey-specific tools (tk, tw, jrsonnet) are added via `registryExtensions` in turnkey's `flake.nix`.
 
 **Design principles**:
-- Simple attribute set, nothing fancy
+- Versioned format with `versions` and `default` attributes
 - Easy to understand and extend
 - Lazy evaluation for performance
-- Can be overridden by consumers
+- Can be overridden by consumers via `registryExtensions` or custom overlays
 
 ## Nix Code Conventions
 
@@ -520,31 +507,26 @@ Currently needed:
 
 ### Adding a New Toolchain
 
-1. **Update the registry** (`nix/registry/default.nix`):
+For standard nixpkgs toolchains, add to [teller](https://github.com/firefly-engineering/teller)'s `registry/default.nix`.
+
+For project-specific tools, add to `registryExtensions` in `flake.nix`:
 ```nix
-{
-  buck2 = pkgs.buck2;
-  nix = pkgs.nix;
-  cargo = pkgs.cargo;  # Add new toolchain
-}
+registryExtensions = let
+  single = pkg: { versions = { "default" = pkg; }; default = "default"; };
+in {
+  cargo = single pkgs.cargo;
+};
 ```
 
-2. **Test locally** - Add to `toolchain.toml`:
-```toml
-[toolchains]
-buck2 = {}
-nix = {}
-cargo = {}
-```
-
-3. **Verify** - Rebuild dev shell and check `cargo` is available
+Then add to `toolchain.toml` and rebuild the dev shell to verify.
 
 ### Modifying Module Behavior
 
 1. **Identify the right module**:
    - User-facing API changes → `nix/flake-parts/turnkey/default.nix`
    - Shell behavior changes → `nix/devenv/turnkey/default.nix`
-   - Toolchain mappings → `nix/registry/default.nix`
+   - Default toolchain mappings → [teller](https://github.com/firefly-engineering/teller) repo
+   - Turnkey-specific tools → `registryExtensions` in `flake.nix`
 
 2. **Follow module system patterns**:
    - Add options in `options` section

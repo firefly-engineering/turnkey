@@ -71,6 +71,18 @@ in
           '';
         };
 
+        tellerLib = mkOption {
+          type = types.anything;
+          description = "Teller library instance (teller.lib). Required.";
+        };
+
+        tellerRegistry = mkOption {
+          type = types.lazyAttrsOf types.anything;
+          default = { };
+          internal = true;
+          description = "Default registry from teller. Set via teller's overlay or import.";
+        };
+
         wrapNativeTools = mkOption {
           type = types.bool;
           default = true;
@@ -598,11 +610,11 @@ in
     let
       cfg = config.turnkey.toolchains;
 
-      # Import turnkey lib
-      turnkeyLib = import ../../lib { inherit pkgs lib; };
+      # Teller library (required)
+      turnkeyLib = cfg.tellerLib;
 
-      # Load default versioned registry
-      defaultRegistry = import ../../registry { inherit pkgs lib; };
+      # Default registry from teller
+      defaultRegistry = cfg.tellerRegistry;
 
       # Helper for single-version entries
       single = pkg: {
@@ -804,6 +816,7 @@ in
         turnkey = {
           registry = lib.mkDefault registry;
           declarationFile = declarationFile;
+          tellerLib = lib.mkDefault turnkeyLib;
 
           # Pass through Buck2 configuration with new language-specific namespaces
           buck2 = {

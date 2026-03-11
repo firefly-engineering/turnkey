@@ -40,6 +40,6 @@ jsonnet = {}  # Jsonnet to JSON compiler
 nix = {}
 pytest = {}  # Python test runner
 beads = {}
-beads_viewer = {}
+beads-viewer = {}
 jj = {}
 tk = {}  # Turnkey CLI wrapper for buck2 with auto-sync

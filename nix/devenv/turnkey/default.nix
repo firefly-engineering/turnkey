@@ -6,8 +6,8 @@ let
   # Generate the direnv library script
   direnvLib = import ./direnv-lib.nix { inherit lib pkgs config; };
 
-  # Import turnkey lib for resolution helpers
-  turnkeyLib = import ../../lib { inherit lib pkgs; };
+  # Teller lib for registry resolution (injected via flake-parts module)
+  turnkeyLib = cfg.tellerLib;
 in
 {
   # Import the Buck2 generation sub-module
@@ -32,6 +32,12 @@ in
         Versioned registry mapping toolchain names to version sets.
         Each entry has the structure: { versions = { "<ver>" = <pkg>; }; default = "<ver>"; }
       '';
+    };
+
+    tellerLib = lib.mkOption {
+      type = lib.types.anything;
+      internal = true;
+      description = "Teller library (injected by flake-parts module).";
     };
   };
 

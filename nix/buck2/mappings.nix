@@ -163,7 +163,7 @@
     reason = "Issue tracking tool";
   };
 
-  beads_viewer = {
+  beads-viewer = {
     skip = true;
     reason = "Issue visualization tool";
   };

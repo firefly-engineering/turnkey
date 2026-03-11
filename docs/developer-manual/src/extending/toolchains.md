@@ -10,27 +10,29 @@ This guide covers adding new toolchains to Turnkey.
 
 ## 1. Add to Registry
 
-Edit `nix/registry/default.nix`:
+For standard toolchains (available in nixpkgs), contribute to [teller](https://github.com/firefly-engineering/teller)'s `registry/default.nix`.
+
+For project-specific tools, use `registryExtensions` in your `flake.nix`:
 
 ```nix
-let
-  single = pkg: { versions = { "default" = pkg; }; default = "default"; };
-in {
-  # Existing entries...
+turnkey.toolchains = {
+  registryExtensions = let
+    single = pkg: { versions = { "default" = pkg; }; default = "default"; };
+  in {
+    # Single version (most common)
+    zig = single pkgs.zig;
 
-  # Single version (most common)
-  zig = single pkgs.zig;
-
-  # Multiple versions
-  nodejs = {
-    versions = {
-      "18" = pkgs.nodejs_18;
-      "20" = pkgs.nodejs_20;
-      "22" = pkgs.nodejs_22;
+    # Multiple versions
+    nodejs = {
+      versions = {
+        "18" = pkgs.nodejs_18;
+        "20" = pkgs.nodejs_20;
+        "22" = pkgs.nodejs_22;
+      };
+      default = "20";
     };
-    default = "20";
   };
-}
+};
 ```
 
 ### Versioned Format

@@ -13,22 +13,17 @@
     };
     mk-shell-bin.url = "github:rrbutani/nix-mk-shell-bin/ff5d8bd4d68a347be5042e2f16caee391cd75887";
 
-    # Beads - distributed git-backed graph issue tracker for AI agents
-    beads = {
-      url = "github:steveyegge/beads/v0.47.1";
+    # Teller - versioned toolchain registry library
+    teller = {
+      url = "github:firefly-engineering/teller";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Beads Viewer - visualization tool for beads graphs
-    beads_viewer = {
-      url = "github:Dicklesworthstone/beads_viewer/v0.13.0";
+    # Toolbox - package registry (provides beads, beads_viewer, jj, go, rust, etc.)
+    toolbox = {
+      url = "github:firefly-engineering/toolbox";
       inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    # Jujutsu - Git-compatible VCS
-    jj = {
-      url = "github:jj-vcs/jj/v0.37.0";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.teller.follows = "teller";
     };
   };
 
@@ -49,32 +44,6 @@
       flake.devenvModules = {
         turnkey = ./nix/devenv/turnkey;
       };
-
-      # Export turnkey library functions (mkRegistryOverlay, mkMetaPackage, resolveTool, etc.)
-      # These require pkgs, so they're provided per-system
-      flake.lib = builtins.listToAttrs (
-        map
-          (
-            system:
-            let
-              pkgs = nixpkgs.legacyPackages.${system};
-              lib = pkgs.lib;
-            in
-            {
-              name = system;
-              value = import ./nix/lib {
-                inherit pkgs lib;
-                currentTime = self.lastModified or 0;
-              };
-            }
-          )
-          [
-            "x86_64-linux"
-            "aarch64-linux"
-            "x86_64-darwin"
-            "aarch64-darwin"
-          ]
-      );
 
       # Flake templates for project initialization
       flake.templates = {
@@ -127,12 +96,23 @@
           # Each file creates a corresponding shell
           turnkey.toolchains = {
             enable = true;
+            tellerLib = inputs.teller.lib;
+            # Compose registries via overlays, as designed
+            tellerRegistry =
+              let
+                overlaidPkgs = import inputs.nixpkgs {
+                  inherit system;
+                  overlays = [
+                    inputs.teller.overlays.default   # Base: standard nixpkgs toolchains
+                    inputs.toolbox.overlays.default   # Adds beads, jj, etc. (versions merge)
+                  ];
+                };
+              in
+              overlaidPkgs.turnkeyRegistry;
             declarationFiles = {
               default = ./toolchain.toml; # Creates devShells.default with buck2 + nix + beads + go
             };
-            # Extend the default registry with packages from flake inputs
-            # (standard toolchains like buck2, nix, go, tk, etc. come from default registry)
-            # Each entry needs versioned format: { versions = {...}; default = "..."; }
+            # Extend toolbox registry with turnkey-specific tools
             registryExtensions =
               let
                 single = pkg: {
@@ -143,9 +123,9 @@
                 };
               in
               {
-                beads = single inputs.beads.packages.${system}.default;
-                beads_viewer = single inputs.beads_viewer.packages.${system}.default;
-                jj = single inputs.jj.packages.${system}.default;
+                tk = single (import ./nix/packages/tk.nix { inherit pkgs lib; });
+                tw = single (import ./nix/packages/tw.nix { inherit pkgs lib; });
+                jsonnet = single (import ./nix/packages/jrsonnet.nix { inherit pkgs lib; });
               };
             # Enable Buck2 toolchain generation
             buck2 = {

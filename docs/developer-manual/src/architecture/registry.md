@@ -1,10 +1,10 @@
 # Registry Pattern
 
-The registry maps toolchain names to versioned Nix packages.
+The registry maps toolchain names to versioned Nix packages. The core registry library and default registry live in [teller](https://github.com/firefly-engineering/teller), a standalone Nix flake that turnkey depends on.
 
 ## Structure
 
-Located at `nix/registry/default.nix`:
+The default registry is provided by teller (`registry/default.nix` in the teller repo):
 
 ```nix
 { pkgs, lib ? pkgs.lib }:
@@ -59,7 +59,7 @@ go = {
 
 ## Library Functions
 
-Turnkey provides helpers in `turnkey.lib.<system>`:
+Teller provides helpers in `teller.lib` (system-independent):
 
 ### resolveTool
 
@@ -67,8 +67,8 @@ Resolves a toolchain from the registry:
 
 ```nix
 # Usage
-go = turnkey.lib.x86_64-linux.resolveTool registry "go" {};           # Use default
-go122 = turnkey.lib.x86_64-linux.resolveTool registry "go" { version = "1.22"; };
+go = teller.lib.resolveTool registry "go" {};           # Use default
+go122 = teller.lib.resolveTool registry "go" { version = "1.22"; };
 ```
 
 ### resolveToolchains
@@ -77,7 +77,7 @@ Resolves all toolchains from a parsed toolchain.toml:
 
 ```nix
 declaration = builtins.fromTOML (builtins.readFile ./toolchain.toml);
-packages = turnkey.lib.x86_64-linux.resolveToolchains registry declaration;
+packages = teller.lib.resolveToolchains registry declaration;
 ```
 
 ### mkRegistryOverlay
@@ -85,7 +85,7 @@ packages = turnkey.lib.x86_64-linux.resolveToolchains registry declaration;
 Creates overlays with two-level merging for registry composition:
 
 ```nix
-overlays.default = turnkey.lib.x86_64-linux.mkRegistryOverlay (final: prev: {
+overlays.default = teller.lib.mkRegistryOverlay (final: prev: {
   go = {
     versions = { "1.24" = final.go_1_24; };
     default = "1.24";
@@ -102,7 +102,8 @@ Bundles multiple tools into a single derivation:
 ```nix
 rust = {
   versions = {
-    "1.80" = turnkey.lib.x86_64-linux.mkMetaPackage {
+    "1.80" = teller.lib.mkMetaPackage {
+      inherit pkgs;
       name = "rust-1.80";
       components = {
         rustc = final.rustc;
@@ -118,10 +119,11 @@ rust = {
 
 ## How It's Used
 
-In the devenv module:
+The flake-parts module injects `tellerLib` into the devenv module:
 
 ```nix
-turnkeyLib = import ../../lib { inherit lib pkgs; };
+# In the devenv module:
+turnkeyLib = cfg.tellerLib;
 
 # Parse toolchain.toml and resolve all toolchains
 declaration = builtins.fromTOML (builtins.readFile cfg.declarationFile);
@@ -156,10 +158,10 @@ For reusable registries, create a flake that exports an overlay:
 ```nix
 # my-registry/flake.nix
 {
-  inputs.turnkey.url = "github:firefly-engineering/turnkey";
+  inputs.teller.url = "github:firefly-engineering/teller";
 
-  outputs = { turnkey, ... }: {
-    overlays.default = turnkey.lib.x86_64-linux.mkRegistryOverlay (final: prev: {
+  outputs = { teller, ... }: {
+    overlays.default = teller.lib.mkRegistryOverlay (final: prev: {
       zig = {
         versions = {
           "0.11" = final.zig_0_11;
@@ -189,11 +191,9 @@ Dependency generators (`godeps-gen`, `rustdeps-gen`, etc.) are **not** in the re
 
 ## Adding to Default Registry
 
-To add a new toolchain to the default registry:
+To add a new standard toolchain, contribute to [teller](https://github.com/firefly-engineering/teller)'s `registry/default.nix`.
 
-1. Edit `nix/registry/default.nix`
-2. Add the package mapping using the `single` helper (or multi-version format)
-3. Test with `nix develop`
+To add a turnkey-specific tool, add it to `registryExtensions` in turnkey's `flake.nix`.
 
 ```nix
 # Single version (most common)
