@@ -324,22 +324,39 @@ for each toolchain in toolchain.toml:
 3. Resolves version (explicit or default)
 4. Returns the derivation
 
-Turnkey provides `lib.resolveTool` for this:
+Turnkey provides `lib.resolveTool` and `lib.resolveToolchains` for this.
+
+**Note:** Library functions require `pkgs` and are exported per-system:
+`turnkey.lib.${system}.resolveTool`, not `turnkey.lib.resolveTool`.
 
 ```nix
-# turnkey.lib.resolveTool
+# Resolve a single tool — turnkey.lib.${system}.resolveTool
 resolveTool = registry: name: spec:
   let
-    entry = registry.${name}
-      or (throw "Unknown toolchain: ${name}");
+    entry = registry.${name} or (throw "Unknown toolchain: ${name}");
     version = spec.version or entry.default;
-    pkg = entry.versions.${version}
-      or (throw "Unknown version '${version}' for ${name}. Available: ${toString (builtins.attrNames entry.versions)}");
-  in pkg;
+    availableVersions = builtins.attrNames entry.versions;
+    versionEntry = entry.versions.${version}
+      or (throw ''
+        Version '${version}' of toolchain '${name}' is not available.
+
+        Available versions for '${name}':
+          ${builtins.concatStringsSep "\n    " (
+            map (v: if v == entry.default then "- ${v} (default)" else "- ${v}") availableVersions
+          )}
+      '');
+  in warnIfNeeded name version versionEntry;
+
+# Resolve all toolchains from a toolchain.toml declaration — returns a list of packages
+resolveToolchains = registry: declaration: ...;
 
 # Usage:
-go = turnkey.lib.resolveTool pkgs.turnkeyRegistry "go" { version = "1.22"; };
+go = turnkey.lib.${system}.resolveTool pkgs.turnkeyRegistry "go" { version = "1.22"; };
+packages = turnkey.lib.${system}.resolveToolchains pkgs.turnkeyRegistry toolchainDeclaration;
 ```
+
+Both functions support extended version entries with deprecation/EOL metadata
+(see Open Questions §2 below) and emit warnings via `lib.warn`.
 
 ### Backward Compatibility
 
@@ -348,18 +365,18 @@ The current flat registry format:
 { go = pkgs.go; python = pkgs.python3; }
 ```
 
-Can be auto-wrapped to the versioned format via a compatibility layer:
+Is auto-wrapped to versioned format internally by the flake-parts module via `normalizeRegistry`. This function detects whether an entry already has `versions`/`default` attributes and converts flat entries (plain derivations) to versioned format:
 
 ```nix
-# Turnkey can wrap legacy registries
-wrapLegacyRegistry = legacy:
-  builtins.mapAttrs (name: pkg: {
-    versions = { "default" = pkg; };
-    default = "default";
-  }) legacy;
+# Internal to nix/flake-parts/turnkey/default.nix — not exported as a library function
+normalizeEntry = entry:
+  if entry ? versions && entry ? default then entry  # Already versioned
+  else { versions = { "default" = entry; }; default = "default"; };  # Flat → versioned
+
+normalizeRegistry = reg: builtins.mapAttrs (_name: normalizeEntry) reg;
 ```
 
-This allows gradual migration from flat registries to versioned ones.
+This allows consumers to pass either flat or versioned registries — the module handles both transparently.
 
 ---
 
@@ -686,26 +703,39 @@ See appendix for a complete example registry flake implementation.
 
 ### Turnkey's Library Functions
 
-Turnkey provides these helpers in `turnkey.lib`:
+Turnkey provides these helpers in `turnkey.lib.${system}` (per-system, since they require `pkgs`).
+
+See implementation: `nix/lib/default.nix`
 
 ```nix
+# nix/lib/default.nix
+{ lib, pkgs, currentTime ? null }:
+let
+  # Deprecation/EOL support (internal helpers)
+  suppressWarnings = builtins.getEnv "TURNKEY_NO_DEPRECATION_WARNINGS" != "";
+  extractPackage = versionEntry:
+    if versionEntry ? package then versionEntry.package else versionEntry;
+  checkDeprecation = name: version: versionEntry: /* ... warns for deprecated/EOL entries ... */;
+  warnIfNeeded = name: version: versionEntry:
+    let pkg = extractPackage versionEntry;
+        warning = checkDeprecation name version versionEntry;
+    in if warning == null then pkg else lib.warn warning pkg;
+in
 {
   # Create a registry overlay with two-level merging
   # packagesFn receives both final and prev for full overlay power
   mkRegistryOverlay = packagesFn: final: prev:
     let
-      prevRegistry = prev.turnkeyRegistry or {};
+      prevRegistry = prev.turnkeyRegistry or { };
       newPackages = packagesFn final prev;
 
       mergeToolchain = name: new:
-        let
-          existing = prevRegistry.${name} or null;
-        in
-          if existing == null then new
-          else {
-            versions = (existing.versions or {}) // (new.versions or {});
-            default = if new ? default then new.default else existing.default;
-          };
+        let existing = prevRegistry.${name} or null;
+        in if existing == null then new
+           else {
+             versions = (existing.versions or { }) // (new.versions or { });
+             default = if new ? default then new.default else existing.default;
+           };
     in {
       turnkeyRegistry = prevRegistry // (builtins.mapAttrs mergeToolchain newPackages);
     };
@@ -716,37 +746,55 @@ Turnkey provides these helpers in `turnkey.lib`:
     pkgs.symlinkJoin {
       inherit name;
       paths = builtins.attrValues components;
-      passthru = {
-        inherit components;
-      } // components;
+      passthru = { inherit components; } // components;
     };
 
-  # Resolve a toolchain from registry
+  # Resolve a single toolchain from registry
+  # Supports extended version entries with deprecation/EOL metadata
   resolveTool = registry: name: spec:
     let
-      entry = registry.${name}
-        or (throw "Unknown toolchain: ${name}");
+      entry = registry.${name} or (throw "Unknown toolchain: ${name}");
       version = spec.version or entry.default;
       availableVersions = builtins.attrNames entry.versions;
-      pkg = entry.versions.${version}
+      versionEntry = entry.versions.${version}
         or (throw ''
           Version '${version}' of toolchain '${name}' is not available.
 
           Available versions for '${name}':
-            ${builtins.concatStringsSep "\n  " (map (v:
-              if v == entry.default then "- ${v} (default)" else "- ${v}"
-            ) availableVersions)}
+            ${builtins.concatStringsSep "\n    " (
+              map (v: if v == entry.default then "- ${v} (default)" else "- ${v}") availableVersions
+            )}
         '');
-    in pkg;
+    in warnIfNeeded name version versionEntry;
 
-  # Wrap a legacy flat registry to versioned format
-  wrapLegacyRegistry = legacy:
-    builtins.mapAttrs (name: pkg: {
-      versions = { "default" = pkg; };
-      default = "default";
-    }) legacy;
+  # Resolve all toolchains from a toolchain.toml declaration
+  # Returns a list of packages
+  resolveToolchains = registry: declaration:
+    let
+      toolchains = declaration.toolchains or { };
+      resolveOne = name: spec:
+        let
+          entry = registry.${name} or (throw "Unknown toolchain '${name}' in toolchain.toml");
+          version = spec.version or entry.default;
+          availableVersions = builtins.attrNames entry.versions;
+          versionEntry = entry.versions.${version}
+            or (throw ''
+              Version '${version}' of toolchain '${name}' is not available.
+
+              Available versions for '${name}':
+                ${builtins.concatStringsSep "\n    " (
+                  map (v: if v == entry.default then "- ${v} (default)" else "- ${v}") availableVersions
+                )}
+
+              Requested in: toolchain.toml
+            '');
+        in warnIfNeeded name version versionEntry;
+    in lib.mapAttrsToList resolveOne toolchains;
 }
 ```
+
+**Note:** Legacy registry wrapping is handled internally by the flake-parts module
+(`normalizeRegistry` in `nix/flake-parts/turnkey/default.nix`), not exported as a library function.
 
 ### Usage Example
 
@@ -762,19 +810,27 @@ Turnkey provides these helpers in `turnkey.lib`:
 
   outputs = { nixpkgs, turnkey, turnkey-registry, rust-overlay, ... }:
     let
+      system = "x86_64-linux";
       pkgs = import nixpkgs {
-        system = "x86_64-linux";
+        inherit system;
         overlays = [
           rust-overlay.overlays.default      # Add rust-bin first
           turnkey-registry.overlays.default  # Registry can use rust-bin
         ];
       };
 
+      # Library functions are per-system (they require pkgs)
+      tkLib = turnkey.lib.${system};
+
       # Resolve Go 1.22
-      go = turnkey.lib.resolveTool pkgs.turnkeyRegistry "go" { version = "1.22"; };
+      go = tkLib.resolveTool pkgs.turnkeyRegistry "go" { version = "1.22"; };
 
       # Resolve Rust (uses default from registry)
-      rust = turnkey.lib.resolveTool pkgs.turnkeyRegistry "rust" {};
+      rust = tkLib.resolveTool pkgs.turnkeyRegistry "rust" {};
+
+      # Resolve all toolchains from toolchain.toml at once
+      allTools = tkLib.resolveToolchains pkgs.turnkeyRegistry
+        (builtins.fromTOML (builtins.readFile ./toolchain.toml));
     in {
       # ...
     };
