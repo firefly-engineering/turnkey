@@ -68,7 +68,7 @@ edition = "2024"
             member.mkdir(parents=True)
 
             result = find_workspace_root(member)
-            self.assertEqual(result, tmpdir)
+            self.assertEqual(result, tmpdir.resolve())
 
     def test_returns_none_when_no_workspace(self):
         """Returns None when no workspace found."""
