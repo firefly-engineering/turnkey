@@ -68,7 +68,7 @@ def main():
     version = cargo.get("package", {}).get("version", "0.0.0")
     edition = get_edition(cargo, crate_dir=crate_dir)
     crate_root = get_lib_path(cargo, crate_dir)
-    deps, named_deps = get_dependencies(cargo, available_crates)
+    platform_deps, platform_named_deps = get_dependencies(cargo, available_crates)
     proc_macro = is_proc_macro(cargo)
     env = get_cargo_env(cargo, crate_name)
     rustc_flags = get_build_script_cfg_flags(crate_name, version, rustc_flags_registry)
@@ -95,8 +95,8 @@ def main():
         crate_name,
         edition,
         crate_root,
-        deps,
-        named_deps,
+        platform_deps,
+        platform_named_deps,
         proc_macro,
         features,
         env,
