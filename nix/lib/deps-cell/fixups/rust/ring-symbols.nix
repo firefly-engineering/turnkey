@@ -185,7 +185,68 @@
     "OPENSSL_ia32cap_P"
   ];
 
-  # C source files to compile for x86_64-linux
+  # C source files common to all architectures
+  cSourcesCommon = [
+    "crypto/curve25519/curve25519.c"
+    "crypto/fipsmodule/aes/aes_nohw.c"
+    "crypto/fipsmodule/bn/montgomery.c"
+    "crypto/fipsmodule/bn/montgomery_inv.c"
+    "crypto/fipsmodule/ec/ecp_nistz.c"
+    "crypto/fipsmodule/ec/gfp_p256.c"
+    "crypto/fipsmodule/ec/gfp_p384.c"
+    "crypto/fipsmodule/ec/p256.c"
+    "crypto/limbs/limbs.c"
+    "crypto/mem.c"
+    "crypto/poly1305/poly1305.c"
+  ];
+
+  # C source files for x86_64 (includes AARCH64 shared sources)
+  cSourcesX86_64 = [
+    "crypto/crypto.c"
+    "crypto/cpu_intel.c"
+    "crypto/curve25519/curve25519_64_adx.c"
+    "crypto/fipsmodule/ec/p256-nistz.c"
+  ];
+
+  # C source files for aarch64
+  cSourcesAarch64 = [
+    "crypto/fipsmodule/ec/p256-nistz.c"
+  ];
+
+  # Assembly files for x86_64-linux (ELF format)
+  asmSourcesX86_64Linux = [
+    "pregenerated/chacha-x86_64-elf.S"
+    "pregenerated/aesni-gcm-x86_64-elf.S"
+    "pregenerated/aesni-x86_64-elf.S"
+    "pregenerated/ghash-x86_64-elf.S"
+    "pregenerated/vpaes-x86_64-elf.S"
+    "pregenerated/x86_64-mont-elf.S"
+    "pregenerated/x86_64-mont5-elf.S"
+    "pregenerated/p256-x86_64-asm-elf.S"
+    "pregenerated/sha256-x86_64-elf.S"
+    "pregenerated/sha512-x86_64-elf.S"
+    "pregenerated/chacha20_poly1305_x86_64-elf.S"
+    "pregenerated/aes-gcm-avx2-x86_64-elf.S"
+    "third_party/fiat/asm/fiat_curve25519_adx_mul.S"
+    "third_party/fiat/asm/fiat_curve25519_adx_square.S"
+  ];
+
+  # Assembly files for aarch64-apple-darwin (ios64 Mach-O format)
+  asmSourcesAarch64Apple = [
+    "pregenerated/chacha-armv8-ios64.S"
+    "pregenerated/chacha20_poly1305_armv8-ios64.S"
+    "pregenerated/aesv8-armx-ios64.S"
+    "pregenerated/aesv8-gcm-armv8-ios64.S"
+    "pregenerated/ghash-neon-armv8-ios64.S"
+    "pregenerated/ghashv8-armx-ios64.S"
+    "pregenerated/vpaes-armv8-ios64.S"
+    "pregenerated/armv8-mont-ios64.S"
+    "pregenerated/p256-armv8-asm-ios64.S"
+    "pregenerated/sha256-armv8-ios64.S"
+    "pregenerated/sha512-armv8-ios64.S"
+  ];
+
+  # Legacy aliases (backward compat)
   cSources = [
     "crypto/curve25519/curve25519.c"
     "crypto/fipsmodule/aes/aes_nohw.c"
@@ -204,7 +265,6 @@
     "crypto/curve25519/curve25519_64_adx.c"
   ];
 
-  # Assembly files for x86_64-linux (ELF format)
   asmSources = [
     "pregenerated/chacha-x86_64-elf.S"
     "pregenerated/aesni-gcm-x86_64-elf.S"

@@ -22,35 +22,64 @@ let
     "#define ${r.old} ${r.new}"
   ) symbols.symbolRenames;
 
+  # Generate #define lines for symbol renames with underscore (Apple/Mach-O)
+  renameDefinesApple = lib.concatMapStringsSep "\n" (r:
+    "#define _${r.old} _${r.new}"
+  ) symbols.symbolRenames;
+
   # Generate #define lines for symbol prefixes
   # Uses \${RING_PREFIX} which becomes ${RING_PREFIX} in shell (escaped in double-quoted string)
   prefixDefines = lib.concatMapStringsSep "\n" (sym:
     "#define ${sym} \${RING_PREFIX}${sym}"
   ) symbols.symbolsToPrefix;
 
-  # Generate C source array for shell
-  cSourcesArray = lib.concatMapStringsSep "\n" (src:
+  # Generate #define lines for symbol prefixes with underscore (Apple/Mach-O)
+  # On Apple platforms, Mach-O symbols have a leading underscore
+  prefixDefinesApple = lib.concatMapStringsSep "\n" (sym:
+    "#define _${sym} _\${RING_PREFIX}${sym}"
+  ) symbols.symbolsToPrefix;
+
+  # Helper to generate shell array from a Nix list
+  mkSourcesArray = srcs: lib.concatMapStringsSep "\n" (src:
     "        ${src}"
-  ) symbols.cSources;
+  ) srcs;
 
-  # Generate ASM source array for shell
-  asmSourcesArray = lib.concatMapStringsSep "\n" (src:
-    "        ${src}"
-  ) symbols.asmSources;
+  # Detect target platform from Nix system
+  # Returns { cSources, asmSources } for the current platform
+  platformSources = system:
+    let
+      isAarch64 = lib.hasPrefix "aarch64" system;
+      isDarwin = lib.hasSuffix "darwin" system;
+      isLinux = lib.hasSuffix "linux" system;
+    in
+    if isAarch64 && isDarwin then {
+      cSources = symbols.cSourcesCommon ++ symbols.cSourcesAarch64;
+      asmSources = symbols.asmSourcesAarch64Apple;
+    }
+    else if isAarch64 && isLinux then {
+      # aarch64-linux uses linux64 format assembly
+      cSources = symbols.cSourcesCommon ++ symbols.cSourcesAarch64;
+      asmSources = map (s: builtins.replaceStrings ["-ios64.S"] ["-linux64.S"] s) symbols.asmSourcesAarch64Apple;
+    }
+    else {
+      # Default: x86_64-linux
+      cSources = symbols.cSourcesCommon ++ symbols.cSourcesX86_64;
+      asmSources = symbols.asmSourcesX86_64Linux;
+    };
 
-in
-{
-  # ==========================================================================
-  # Build Script Fixups
-  # ==========================================================================
-
-  buildScriptFixups = {
-    # Ring native crypto library compilation fixup
-    ring = { patchVersion, vendorPath, ... }: ''
+  # Build the fixup for the current system
+  mkRingFixup =
+    let
+      system = builtins.currentSystem;
+      platSrcs = platformSources system;
+      cSourcesArray = mkSourcesArray platSrcs.cSources;
+      asmSourcesArray = mkSourcesArray platSrcs.asmSources;
+    in
+    { patchVersion, vendorPath, ... }: ''
     # Fixup: ring native crypto library compilation
     # Ring's build.rs compiles C and assembly files into libring_core_*.a
     # We replicate this in Nix for Buck2 to link against
-    echo "Building ring native crypto library..."
+    echo "Building ring native crypto library (${system})..."
     RING_SRC="$out/${vendorPath}"
     RING_OUT="$out/${vendorPath}/out_dir"
     mkdir -p "$RING_OUT"
@@ -75,16 +104,27 @@ ${prefixDefines}
 #endif
 RING_PREFIX_HEADER
 
-    # Generate assembly prefix header (same symbols, for .S files)
+    # Generate assembly prefix header
+    # On Apple (Mach-O), assembly symbols have a leading underscore, so we need
+    # both _symbol and symbol defines. ring's build.rs uses #if defined(__APPLE__)
+    # to conditionally include the underscore variants.
     cat > "$RING_OUT/ring_core_generated/prefix_symbols_asm.h" << RING_ASM_PREFIX_HEADER
 #ifndef ring_core_generated_PREFIX_SYMBOLS_ASM_H
 #define ring_core_generated_PREFIX_SYMBOLS_ASM_H
 
-// Symbol renames (from SYMBOLS_TO_RENAME in build.rs)
+#if defined(__APPLE__)
+// Apple/Mach-O: underscore-prefixed symbol renames
+${renameDefinesApple}
+
+// Apple/Mach-O: underscore-prefixed symbols
+${prefixDefinesApple}
+#else
+// ELF: symbol renames (from SYMBOLS_TO_RENAME in build.rs)
 ${renameDefines}
 
-// All symbols from SYMBOLS_TO_PREFIX in build.rs
+// ELF: all symbols from SYMBOLS_TO_PREFIX in build.rs
 ${prefixDefines}
+#endif
 
 #endif
 RING_ASM_PREFIX_HEADER
@@ -93,7 +133,7 @@ RING_ASM_PREFIX_HEADER
     # Include paths: ring's include dir AND out_dir (for generated headers)
     RING_CFLAGS="-fvisibility=hidden -std=c1x -pedantic -Wall -I$RING_SRC/include -I$RING_OUT"
 
-    # C source files to compile (x86_64-linux)
+    # C source files to compile (platform-specific)
     RING_C_SRCS=(
 ${cSourcesArray}
     )
@@ -108,7 +148,7 @@ ${cSourcesArray}
       fi
     done
 
-    # Assembly files from pregenerated/ directory (x86_64 ELF format)
+    # Assembly files (platform-specific)
     RING_ASM_SRCS=(
 ${asmSourcesArray}
     )
@@ -126,6 +166,17 @@ ${asmSourcesArray}
     ar rcs "$RING_OUT/lib''${RING_PREFIX%.}.a" "''${RING_OBJS[@]}"
     echo "Built ring native library: $RING_OUT/lib''${RING_PREFIX%.}.a"
   '';
+
+in
+{
+  # ==========================================================================
+  # Build Script Fixups
+  # ==========================================================================
+
+  # The fixup is a function that takes system as an argument.
+  # The deps-cell adapter passes system to fixup functions that accept it.
+  buildScriptFixups = {
+    ring = mkRingFixup;
   };
 
   # ==========================================================================

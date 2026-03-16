@@ -12,8 +12,6 @@
 #   - bsd: any(freebsd, dragonfly, netbsd, openbsd, apple_targets)
 #   - apple_targets: any(ios, macos, watchos, tvos, visionos)
 #   - etc.
-#
-# For Linux targets, we need: linux, linux_android (but not bsd, apple_targets)
 
 { lib }:
 
@@ -23,11 +21,16 @@
   # ==========================================================================
 
   rustcFlags = {
-    # nix crate platform detection flags for Linux x86_64
-    # These are the cfg_aliases that build.rs would set
-    nix = [
-      "--cfg" "linux"
-      "--cfg" "linux_android"
-    ];
+    # Platform-specific flags: dict with linux/macos keys
+    nix = {
+      linux = [
+        "--cfg" "linux"
+        "--cfg" "linux_android"
+      ];
+      macos = [
+        "--cfg" "apple_targets"
+        "--cfg" "bsd"
+      ];
+    };
   };
 }
