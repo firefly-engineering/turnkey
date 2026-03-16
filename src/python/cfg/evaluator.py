@@ -28,6 +28,17 @@ class TargetSpec:
             family="unix",
         )
 
+    @classmethod
+    def macos_aarch64(cls) -> "TargetSpec":
+        """Create a spec for aarch64-apple-darwin."""
+        return cls(
+            arch="aarch64",
+            vendor="apple",
+            os="macos",
+            env=None,
+            family="unix",
+        )
+
 
 def evaluate_cfg(predicate: CfgPredicate, target: TargetSpec) -> bool:
     """Evaluate a cfg predicate against a target specification."""

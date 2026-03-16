@@ -11,7 +11,7 @@ import unittest
 
 from python.cfg.parser import CfgParser, CfgKey, CfgKeyValue, CfgAll, CfgAny, CfgNot
 from python.cfg.evaluator import TargetSpec, evaluate_cfg
-from python.cfg.target import is_linux_compatible_target
+from python.cfg.target import is_linux_compatible_target, classify_target_platforms
 
 
 class TestCfgParser(unittest.TestCase):
@@ -110,6 +110,48 @@ class TestCfgEvaluation(unittest.TestCase):
         self.assertFalse(evaluate_cfg(parser.parse(), self.target))
 
 
+class TestCfgEvaluationMacOS(unittest.TestCase):
+    """Test cases for evaluating cfg() expressions against macOS aarch64."""
+
+    def setUp(self):
+        self.target = TargetSpec.macos_aarch64()
+
+    def test_unix_is_true(self):
+        """Unix shorthand should be true on macOS."""
+        parser = CfgParser("cfg(unix)")
+        self.assertTrue(evaluate_cfg(parser.parse(), self.target))
+
+    def test_windows_is_false(self):
+        """Windows shorthand should be false on macOS."""
+        parser = CfgParser("cfg(windows)")
+        self.assertFalse(evaluate_cfg(parser.parse(), self.target))
+
+    def test_target_os_macos(self):
+        """target_os = macos should be true."""
+        parser = CfgParser('cfg(target_os = "macos")')
+        self.assertTrue(evaluate_cfg(parser.parse(), self.target))
+
+    def test_target_os_linux(self):
+        """target_os = linux should be false on macOS."""
+        parser = CfgParser('cfg(target_os = "linux")')
+        self.assertFalse(evaluate_cfg(parser.parse(), self.target))
+
+    def test_target_vendor_apple(self):
+        """target_vendor = apple should be true on macOS."""
+        parser = CfgParser('cfg(target_vendor = "apple")')
+        self.assertTrue(evaluate_cfg(parser.parse(), self.target))
+
+    def test_target_arch_aarch64(self):
+        """target_arch = aarch64 should be true on macOS aarch64."""
+        parser = CfgParser('cfg(target_arch = "aarch64")')
+        self.assertTrue(evaluate_cfg(parser.parse(), self.target))
+
+    def test_not_windows(self):
+        """not(windows) should be true on macOS."""
+        parser = CfgParser("cfg(not(windows))")
+        self.assertTrue(evaluate_cfg(parser.parse(), self.target))
+
+
 class TestGetrandomCfg(unittest.TestCase):
     """Test the specific cfg expression from getrandom that was causing issues."""
 
@@ -177,7 +219,7 @@ class TestGetrandomCfg(unittest.TestCase):
 
 
 class TestLinuxCompatibleTarget(unittest.TestCase):
-    """Test the is_linux_compatible_target function."""
+    """Test the is_linux_compatible_target function (backward compatibility)."""
 
     def test_simple_linux_cfg(self):
         self.assertTrue(is_linux_compatible_target('cfg(target_os = "linux")'))
@@ -201,6 +243,76 @@ class TestLinuxCompatibleTarget(unittest.TestCase):
     def test_not_unix(self):
         """not(unix) should be false on Linux."""
         self.assertFalse(is_linux_compatible_target("cfg(not(unix))"))
+
+
+class TestClassifyTargetPlatforms(unittest.TestCase):
+    """Test classify_target_platforms for multi-platform classification."""
+
+    def test_linux_only(self):
+        """Linux-specific cfg matches only linux."""
+        result = classify_target_platforms('cfg(target_os = "linux")')
+        self.assertEqual(result, {"config//os:linux"})
+
+    def test_macos_only(self):
+        """macOS-specific cfg matches only macos."""
+        result = classify_target_platforms('cfg(target_os = "macos")')
+        self.assertEqual(result, {"config//os:macos"})
+
+    def test_apple_vendor(self):
+        """Apple vendor matches macOS."""
+        result = classify_target_platforms('cfg(target_vendor = "apple")')
+        self.assertEqual(result, {"config//os:macos"})
+
+    def test_unix_matches_both(self):
+        """Unix matches both Linux and macOS."""
+        result = classify_target_platforms("cfg(unix)")
+        self.assertEqual(result, {"config//os:linux", "config//os:macos"})
+
+    def test_not_windows_matches_both(self):
+        """not(windows) matches both Linux and macOS."""
+        result = classify_target_platforms("cfg(not(windows))")
+        self.assertEqual(result, {"config//os:linux", "config//os:macos"})
+
+    def test_windows_matches_neither(self):
+        """Windows matches neither Linux nor macOS."""
+        result = classify_target_platforms('cfg(target_os = "windows")')
+        self.assertEqual(result, set())
+
+    def test_any_linux_android(self):
+        """any(linux, android) matches only linux."""
+        result = classify_target_platforms(
+            'cfg(any(target_os = "linux", target_os = "android"))'
+        )
+        self.assertEqual(result, {"config//os:linux"})
+
+    def test_any_linux_macos(self):
+        """any(linux, macos) matches both."""
+        result = classify_target_platforms(
+            'cfg(any(target_os = "linux", target_os = "macos"))'
+        )
+        self.assertEqual(result, {"config//os:linux", "config//os:macos"})
+
+    def test_complex_apple_cfg(self):
+        """Complex Apple-specific cfg."""
+        result = classify_target_platforms(
+            'cfg(all(target_vendor = "apple", any(target_os = "ios", target_os = "macos")))'
+        )
+        self.assertEqual(result, {"config//os:macos"})
+
+    def test_target_triple_fallback_linux(self):
+        """Direct target triple with linux matches linux."""
+        result = classify_target_platforms("x86_64-unknown-linux-gnu")
+        self.assertEqual(result, {"config//os:linux"})
+
+    def test_target_triple_fallback_darwin(self):
+        """Direct target triple with darwin matches macos."""
+        result = classify_target_platforms("aarch64-apple-darwin")
+        self.assertEqual(result, {"config//os:macos"})
+
+    def test_target_triple_fallback_windows(self):
+        """Direct target triple with windows matches nothing."""
+        result = classify_target_platforms("x86_64-pc-windows-msvc")
+        self.assertEqual(result, set())
 
 
 if __name__ == "__main__":
