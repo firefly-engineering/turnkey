@@ -272,7 +272,7 @@
   # Data Templating Toolchains
   # ==========================================================================
 
-  jsonnet = {
+  jrsonnet = {
     skip = false;
     targets = [
       {
@@ -281,7 +281,7 @@
         load = "@prelude//jsonnet:toolchain.bzl";
         visibility = [ "PUBLIC" ];
         dynamicAttrs = registry: {
-          jsonnet_path = "${registry.jsonnet}/bin/jsonnet";
+          jsonnet_path = "${registry.jrsonnet}/bin/jrsonnet";
         };
       }
     ];
