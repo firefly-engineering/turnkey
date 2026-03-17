@@ -112,7 +112,8 @@
             declarationFiles = {
               default = ./toolchain.toml; # Creates devShells.default with buck2 + nix + beads + go
             };
-            # Extend toolbox registry with turnkey-specific tools
+            # Extend registry with turnkey-specific tools
+            # (tk is already a built-in extension provided by the turnkey module)
             registryExtensions =
               let
                 single = pkg: {
@@ -123,7 +124,6 @@
                 };
               in
               {
-                tk = single (import ./nix/packages/tk.nix { inherit pkgs lib; });
                 tw = single (import ./nix/packages/tw.nix { inherit pkgs lib; });
                 jsonnet = single (import ./nix/packages/jrsonnet.nix { inherit pkgs lib; });
               };

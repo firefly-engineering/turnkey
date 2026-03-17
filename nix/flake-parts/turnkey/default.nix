@@ -655,18 +655,25 @@ in
         in
         base // (builtins.mapAttrs mergeToolchain extensions);
 
+      # Built-in turnkey tools that all consumers get automatically
+      tk = import ../../packages/tk.nix { inherit pkgs lib; };
+      builtinExtensions = {
+        tk = single tk;
+      };
+
       # Registry merging:
-      # 1. Start with default registry
-      # 2. Merge registryExtensions on top (versions are additive, default overrides)
-      # 3. If registry is explicitly set (non-empty), use that as complete override
-      # 4. Normalize all entries to versioned format (handles flat pkgs.foo entries)
+      # 1. Start with default registry (from teller)
+      # 2. Merge built-in turnkey tools (tk)
+      # 3. Merge user registryExtensions on top (versions are additive, default overrides)
+      # 4. If registry is explicitly set (non-empty), use that as complete override
+      # 5. Normalize all entries to versioned format (handles flat pkgs.foo entries)
       baseRegistry = normalizeRegistry (
         if cfg.registry != { } then
           # Complete override - user specified full registry
           cfg.registry
         else
-          # Default + extensions with proper merging
-          mergeRegistries defaultRegistry cfg.registryExtensions
+          # Default + builtins + user extensions with proper merging
+          mergeRegistries (mergeRegistries defaultRegistry builtinExtensions) cfg.registryExtensions
       );
 
       # Build the turnkey-prelude derivation (Nix-backed prelude cell)
