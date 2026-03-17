@@ -277,12 +277,11 @@ rec {
         inherit sha256;
       }
     else if host == "golang.org" && lib.length parts >= 3 && lib.elemAt parts 1 == "x" then
-      # golang.org/x/* -> github.com/golang/*
-      fetchers.mkGitHubSpec {
-        owner = "golang";
-        repo = lib.elemAt parts 2;
-        rev = version;
-        inherit sha256;
+      # golang.org/x/* -> use Go proxy (more reliable than GitHub for
+      # pseudo-versions and sub-path modules like golang.org/x/example/hello)
+      fetchers.mkGoProxySpec {
+        modulePath = importPath;
+        inherit version sha256;
       }
     else if lib.hasPrefix "go.uber.org/" importPath then
       # go.uber.org/* -> github.com/uber-go/*
