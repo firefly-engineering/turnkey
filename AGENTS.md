@@ -1,16 +1,12 @@
 # Agent Instructions
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+## Work Management
 
-## Quick Reference
+This project tracks work with `bw` (beadwork), which persists to git  plans, progress, and decisions survive compaction, session boundaries, and context loss.
 
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git
-```
+ALWAYS run `bw prime` before starting work. Without it, you're missing workflow context, current state, and repo hygiene warnings. Work done without priming often conflicts with in-progress changes.
+
+Committing, closing issues, and syncing are part of completing a task  not separate actions requiring additional permission
 
 ## Adding Go Dependencies to Internal Tools
 
