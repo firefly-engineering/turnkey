@@ -150,10 +150,20 @@ let
             # Dynamic attrs resolved from registry (e.g., absolute paths to compilers)
             dynamicAttrs =
               if t ? dynamicAttrs then t.dynamicAttrs resolvedRegistry else { };
-            # Inject mdbook preprocessor paths from config
+            # Inject mdbook preprocessor paths from config and/or mdbook-toolchain
             preprocessorAttrs =
-              if t.name == "mdbook" && cfg.mdbook.preprocessors != [] then
-                { preprocessor_paths = map (p: "${p}/bin") cfg.mdbook.preprocessors; }
+              if t.name == "mdbook" then
+                let
+                  # Explicit preprocessors from config
+                  configPaths = map (p: "${p}/bin") cfg.mdbook.preprocessors;
+                  # Auto-detect mdbook-toolchain in registry (has preprocessors in same bin/)
+                  toolchainPath =
+                    if resolvedRegistry ? "mdbook-toolchain"
+                    then [ "${resolvedRegistry.mdbook-toolchain}/bin" ]
+                    else [];
+                  allPaths = lib.unique (configPaths ++ toolchainPath);
+                in
+                if allPaths != [] then { preprocessor_paths = allPaths; } else {}
               else {};
             # Merge: dynamic attrs override static attrs, preprocessors on top
             attrs = staticAttrs // dynamicAttrs // preprocessorAttrs;

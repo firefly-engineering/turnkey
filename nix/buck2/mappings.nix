@@ -268,6 +268,27 @@
     implicitDependencies = [ ];
   };
 
+  # mdbook-toolchain is a meta-package bundling mdbook + preprocessors.
+  # It generates the same Buck2 toolchain as "mdbook" but resolves paths
+  # from the meta-package (which has all binaries in one bin/).
+  mdbook-toolchain = {
+    skip = false;
+    targets = [
+      {
+        name = "mdbook";
+        rule = "system_mdbook_toolchain";
+        load = "@prelude//mdbook:toolchain.bzl";
+        visibility = [ "PUBLIC" ];
+        dynamicAttrs = registry: {
+          mdbook_path = "${registry.mdbook-toolchain}/bin/mdbook";
+          python_path = "${registry.python}/bin/python3";
+          serve_output_dir = ".turnkey/books";
+        };
+      }
+    ];
+    implicitDependencies = [ ];
+  };
+
   # ==========================================================================
   # Data Templating Toolchains
   # ==========================================================================
