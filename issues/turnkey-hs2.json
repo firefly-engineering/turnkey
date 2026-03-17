@@ -1,0 +1,17 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-kxs"
+  ],
+  "closed_at": "2026-01-09T17:28:21.673112531+01:00",
+  "created": "2026-01-09T17:21:20.823200617+01:00",
+  "description": "Go library for detecting when generated files are stale relative to source files.\n\nFeatures:\n- Compare timestamps: source file vs generated file\n- Compare hashes: for content-based detection  \n- API: IsStale(sources []string, target string) bool\n- Support glob patterns for sources\n\nUsed by tk wrapper to determine what needs regeneration.",
+  "id": "turnkey-hs2",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Staleness detection library",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

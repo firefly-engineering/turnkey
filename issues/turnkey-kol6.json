@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-66b"
+  ],
+  "closed_at": "2026-01-16T10:31:04.466236698+01:00",
+  "close_reason": "Implemented tw wrapper with generic config-driven approach",
+  "created": "2026-01-13T22:06:18.786911962+01:00",
+  "description": "Create wrapper scripts for native language tools that auto-sync deps:\n\n1. `go` wrapper - detects `go get`, `go mod tidy`, etc. and:\n   - Runs the real go command\n   - Regenerates go-deps.toml if go.mod/go.sum changed\n   - Triggers godeps cell refresh (direnv reload or similar)\n\n2. `cargo` wrapper - detects `cargo add`, `cargo update`, etc. and:\n   - Runs the real cargo command\n   - Regenerates rust-deps.toml if Cargo.lock changed\n   - Triggers rustdeps cell refresh\n\n3. `uv` wrapper - detects `uv add`, `uv sync`, etc. and:\n   - Runs the real uv command\n   - Regenerates python-deps.toml if pyproject.toml changed\n   - Triggers pydeps cell refresh\n\nThis provides seamless DX where deps cells stay in sync automatically without waiting for `tk build`.",
+  "id": "turnkey-kol6",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Native tool wrappers for auto-sync (go, cargo, uv)",
+  "type": "feature",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-ew72"
+  ],
+  "blocks": [
+    "turnkey-24rf"
+  ],
+  "closed_at": "2026-01-19T21:15:31.240198375+01:00",
+  "close_reason": "Added Solidity toolchain to mappings.nix with solc and foundry tool paths",
+  "created": "2026-01-19T21:06:07.792816305+01:00",
+  "description": "Modify nix/buck2/mappings.nix to add solidity toolchain entry:\n\nsolidity = {\n  skip = false;\n  targets = [{\n    name = \"solidity\";\n    rule = \"system_solidity_toolchain\";\n    load = \"@prelude//solidity:toolchain.bzl\";\n    visibility = [\"PUBLIC\"];\n    dynamicAttrs = registry: {\n      solc_path = \"${registry.solc}/bin/solc\";\n      forge_path = \"${registry.foundry}/bin/forge\";\n    };\n  }];\n};\n\nPart of Solidity support (turnkey-ri2t).",
+  "id": "turnkey-kdjx",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add Solidity to mappings.nix",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

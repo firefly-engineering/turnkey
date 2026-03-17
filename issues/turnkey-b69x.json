@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-40cj",
+    "turnkey-zk3j"
+  ],
+  "closed_at": "2026-01-19T16:18:46.713140444+01:00",
+  "close_reason": "Added transformIsolationDir to tk that prefixes user-specified isolation dirs with .turnkey-. Includes tests and updated help text.",
+  "created": "2026-01-19T16:09:55.138892928+01:00",
+  "description": "Modify the tk wrapper to translate user-specified isolation directories to .turnkey-prefixed names.\n\nExamples:\n- tk build //foo → buck2 --isolation-dir=.turnkey build //foo (default)\n- tk --isolation-dir=foo build //foo → buck2 --isolation-dir=.turnkey-foo build //foo\n- tk --isolation-dir=.custom build //foo → buck2 --isolation-dir=.custom build //foo (already dotted, pass through)\n\nThis preserves the ability to have multiple isolation directories while ensuring all of them are hidden from native tools (Go, Cargo, etc.).\n\nImplementation:\n- Parse --isolation-dir flag in tk before passing to buck2\n- If not specified: use .turnkey\n- If specified without leading dot: prefix with .turnkey-\n- If specified with leading dot: pass through as-is\n- Update tk help text to document this behavior",
+  "id": "turnkey-b69x",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "tk: Translate --isolation-dir to .turnkey-prefixed dirs",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-16T12:31:23.788934162+01:00",
+  "close_reason": "Implemented reproducibility test for Go and Rust. Python support tracked in turnkey-hsg7.",
+  "created": "2026-01-16T12:20:14.268973594+01:00",
+  "description": "Implement the missing 07-reproducibility.sh E2E test. This test should verify that builds are reproducible across different environments or runs - a key property for Nix-based toolchains.\n\nRegistered in e2e/harness/runner.sh but not yet implemented.",
+  "id": "turnkey-tdb3",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "E2E: Implement reproducibility test",
+  "type": "task",
+  "updated_at": "2026-01-16T12:31:23.788934162+01:00"
+}

@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-f2y7",
+    "turnkey-r13s"
+  ],
+  "blocks": [
+    "turnkey-48ju"
+  ],
+  "closed_at": "2026-01-19T17:34:39.117323581+01:00",
+  "close_reason": "Created user manual with mdbook structure",
+  "created": "2026-01-19T17:09:20.274971634+01:00",
+  "description": "Create docs/user-manual/ with mdbook structure:\n- book.toml configuration\n- src/SUMMARY.md with chapter structure\n- Initial chapters covering getting started, configuration, workflows",
+  "id": "turnkey-qhvt",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create user manual book structure",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

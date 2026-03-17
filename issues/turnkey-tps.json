@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-8nh",
+    "turnkey-emc",
+    "turnkey-ish"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-13T12:01:57.99597166+01:00",
+  "close_reason": "Multi-language E2E test complete - Go and Rust working together",
+  "created": "2026-01-10T17:36:32.501637168+01:00",
+  "description": "Test scenario: Project with Go, Python, and Rust code\n\n1. Create project with all three languages\n2. Add cross-language dependencies (e.g., Python calling Rust via PyO3, Go calling C)\n3. Verify all deps files generated correctly\n4. Run 'tk build //...' - all targets build\n5. Run 'tk test //...' - all tests pass\n6. Modify deps in one language, verify others unaffected\n\nValidates: multi-language support, isolation between toolchains",
+  "id": "turnkey-tps",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "E2E: Multi-language monorepo",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

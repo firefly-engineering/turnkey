@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-bbm"
+  ],
+  "blocks": [],
+  "created": "2026-01-08T22:16:22.791869738+01:00",
+  "description": "godeps-gen needs to support `replace` directives in go.mod, particularly for local paths within a monorepo.\n\n**Use case:**\n```go\n// go.mod\nmodule github.com/company/myproject\n\nrequire github.com/company/shared-lib v1.0.0\n\nreplace github.com/company/shared-lib =\u003e ../shared-lib\n```\n\nThis pattern is common for:\n- Local forks of external dependencies\n- Monorepo internal packages\n- Development overrides\n\n**Implementation considerations:**\n\n1. **Parse replace directives** using modfile.File.Replace\n   ```go\n   for _, rep := range f.Replace {\n       // rep.Old.Path, rep.Old.Version\n       // rep.New.Path, rep.New.Version (or local path)\n   }\n   ```\n\n2. **Handle local paths differently:**\n   - Don't fetch from GitHub (no hash needed)\n   - Generate Buck2 target that references the local path\n   - May need cell alias or path mapping\n\n3. **TOML output format:**\n   ```toml\n   [deps.\"github.com/company/shared-lib\"]\n   version = \"v1.0.0\"\n   replace = \"../shared-lib\"  # Local path, no fetch needed\n   ```\n\n4. **go-deps-cell.nix changes:**\n   - Detect `replace` field\n   - Skip fetchFromGitHub for local replacements\n   - Generate appropriate Buck2 cell reference\n\n**Depends on:** turnkey-bbm (modfile parser) - replace directives are easily accessible via modfile.Parse()",
+  "id": "turnkey-wvb",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "Support go.mod replace directives for local monorepo paths",
+  "type": "feature",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

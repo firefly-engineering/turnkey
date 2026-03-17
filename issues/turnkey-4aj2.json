@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-xcpo"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-20T20:13:12.573443501+01:00",
+  "close_reason": "Completed in docs commit 042e01d - updated toolchain-toml.md with version pinning examples",
+  "created": "2026-01-20T14:45:12.066376581+01:00",
+  "description": "The user manual currently shows toolchain declarations like:\n\n```toml\n[toolchains]\ngo = {}\nrust = {}\n```\n\nWhile these are fully reproducible (via the underlying Nix layer), they're not particularly interesting from a specification perspective. The documentation should showcase the versioned toolchain syntax:\n\n```toml\n[toolchains]\ngo.version = \"1.25.3\"\nrust.version = \"1.82.0\"\npython.version = \"3.12\"\n```\n\nThis makes the documentation more compelling and demonstrates the value proposition of explicit version control.\n\n**Files to update:**\n- docs/user-manual/src/getting-started/project-setup.md\n- docs/user-manual/src/configuration/toolchain-toml.md\n- docs/user-manual/src/vision/core-principles.md (Level 2 example)\n- Any other files showing toolchain.toml examples\n\n**Depends on:** turnkey-xcpo (Implement versioned toolchain registry) - the version syntax needs to actually work before we document it.",
+  "id": "turnkey-4aj2",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Update user manual to show versioned toolchain examples",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

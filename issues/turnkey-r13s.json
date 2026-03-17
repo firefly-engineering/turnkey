@@ -1,0 +1,22 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-48ju",
+    "turnkey-50uq",
+    "turnkey-5qnh",
+    "turnkey-f2y7",
+    "turnkey-qhvt"
+  ],
+  "closed_at": "2026-01-19T18:29:42.083156772+01:00",
+  "close_reason": "All sub-tasks complete: mdbook toolchain added, user and developer manuals created, existing docs migrated.",
+  "created": "2026-01-19T17:09:08.860949805+01:00",
+  "description": "Reorganize docs/ into multiple mdbook books (user manual, developer manual, etc.) with buck2 build/run support",
+  "id": "turnkey-r13s",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Documentation books with mdbook",
+  "type": "epic",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

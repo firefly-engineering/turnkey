@@ -1,0 +1,21 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [
+    "turnkey-yu7"
+  ],
+  "blocks": [
+    "turnkey-dp4d",
+    "turnkey-ksi6"
+  ],
+  "closed_at": "2026-01-22T10:50:06.433953563+01:00",
+  "close_reason": "Implemented goparse, buckgen libraries and CLI; integrated into Nix; removed gobuckify and patches",
+  "created": "2026-01-22T10:29:07.953618135+01:00",
+  "description": "Create src/go/pkg/goparse/ library that parses Go source files without requiring importable code.\n\n## Goals\nParse .go files directly using go/parser and go/build/constraint to extract:\n- Package declarations\n- Import statements\n- Build constraints (//go:build, file naming conventions)\n- //go:embed directives\n- Cgo detection (import \"C\")\n\n## Structure\n```\nsrc/go/pkg/goparse/\n├── parser.go       # Parse single .go file → GoFile struct\n├── constraints.go  # Build constraint evaluation using go/build/constraint\n├── scanner.go      # Walk directory, filter files by platform\n└── package.go      # Aggregate files → GoPackage struct\n```\n\n## Key Types\n```go\ntype GoFile struct {\n    Path        string\n    Package     string\n    Imports     []string\n    EmbedDirs   []string\n    Constraint  *constraint.Expr\n    HasCgo      bool\n}\n\ntype GoPackage struct {\n    Dir       string\n    Name      string\n    Files     map[Platform][]string\n    Imports   map[Platform][]string\n    EmbedDirs []string\n    HasCgo    bool\n}\n```\n\n## Reference\n- Existing code: src/go/pkg/staleness/imports.go:159-201, src/go/pkg/rules/detector_go.go:47-104\n- go/build/constraint stdlib for parsing //go:build directives",
+  "id": "turnkey-2e0a",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "goparse: Go file parser library",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

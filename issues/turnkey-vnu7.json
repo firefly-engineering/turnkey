@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-17T08:53:29.277644664+01:00",
+  "close_reason": "Added nix2container and mk-shell-bin inputs required by devenv. Flake check now passes with --impure.",
+  "created": "2026-01-16T16:35:58.474233892+01:00",
+  "description": "When running 'nix flake check --no-build', there's an error about containers:\n\nerror: To use 'containers', Add the following to flake.nix:\n\nThis error appears when checking packages.x86_64-linux.ci-container-processes. The CI shell likely has container configuration that needs proper setup or should be disabled when containers aren't available.\n\nRoot cause: The ci.toml shell config may be enabling devenv containers without the required flake configuration.",
+  "id": "turnkey-vnu7",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Fix container error in nix flake check",
+  "type": "bug",
+  "updated_at": "2026-01-17T08:53:29.277644664+01:00"
+}

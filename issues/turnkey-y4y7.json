@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-lu8g"
+  ],
+  "blocks": [
+    "turnkey-qatp"
+  ],
+  "closed_at": "2026-01-19T21:20:08.580899079+01:00",
+  "close_reason": "Created soldeps-gen tool with foundry.toml and package.json parsing",
+  "created": "2026-01-19T21:05:17.957494677+01:00",
+  "description": "Create cmd/soldeps-gen/ Rust tool that:\n- Parses foundry.toml for git-based dependencies (lib/ folder)\n- Parses package.json/pnpm-lock.yaml for npm Solidity packages\n- Prefetches Nix hashes for both sources\n- Outputs solidity-deps.toml with unified format\n\nReference: cmd/jsdeps-gen/ for npm parsing pattern.\n\nPart of Solidity support (turnkey-ri2t).",
+  "id": "turnkey-y4y7",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create soldeps-gen tool",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

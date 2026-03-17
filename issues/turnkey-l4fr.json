@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-h4zd"
+  ],
+  "closed_at": "2026-01-19T16:46:39.129719272+01:00",
+  "close_reason": "Completed rules.star rename",
+  "created": "2026-01-19T16:34:27.705759583+01:00",
+  "description": "Update all deps-cell adapters to output rules.star instead of BUCK.\n\nFiles to update:\n- nix/lib/deps-cell/adapters/go.nix (gobuckify.json config + cell buckconfig)\n- nix/lib/deps-cell/adapters/rust.nix (heredocs + cell buckconfig)\n- nix/lib/deps-cell/adapters/python.nix (heredocs + cell buckconfig)\n- nix/lib/deps-cell/adapters/javascript.nix (heredocs + cell buckconfig)\n\nChanges per file:\n1. Change 'cat \u003e $out/BUCK' to 'cat \u003e $out/rules.star'\n2. Change heredoc delimiter from BUCK to RULES (cosmetic)\n3. Update [buildfile] name in cell .buckconfig sections\n4. For go.nix: add buildfile_name to gobuckify.json config",
+  "id": "turnkey-l4fr",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Update Nix deps-cell adapters to generate rules.star",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

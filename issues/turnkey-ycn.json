@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T12:19:17.972032044+01:00",
+  "close_reason": "Added BUCK file",
+  "created": "2026-01-12T12:16:41.149855219+01:00",
+  "description": "Add Buck2 build target for the cargo-prune-workspace Go tool.",
+  "id": "turnkey-ycn",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Add BUCK file for cmd/cargo-prune-workspace",
+  "type": "task",
+  "updated_at": "2026-01-12T12:19:17.972032044+01:00"
+}

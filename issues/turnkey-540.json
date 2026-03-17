@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-538",
+    "turnkey-bbm"
+  ],
+  "blocks": [
+    "turnkey-pzv"
+  ],
+  "closed_at": "2026-01-09T13:05:14.094673669+01:00",
+  "close_reason": "Transitive deps already working - godeps-gen includes indirect deps by default (-indirect=true). Verified golang.org/x/mod in godeps cell.",
+  "created": "2026-01-08T19:13:42.692130244+01:00",
+  "description": "Extend Go deps cell to handle transitive dependencies.\n\n**Simpler solution identified:**\nGo's module system already computes the full transitive dependency graph. Indirect deps are marked with `// indirect` in go.mod and their hashes are in go.sum.\n\nCurrent godeps-gen skips indirect deps:\n```go\nif strings.Contains(line, \"// indirect\") {\n    continue\n}\n```\n\nSimply removing this skip will capture all transitive dependencies automatically.\n\n**Remaining work:**\n1. Use modfile parser (turnkey-bbm) which exposes `Require[].Indirect` flag cleanly\n2. Remove the indirect skip in godeps-gen\n3. Test with a package that has transitive deps (e.g., spf13/cobra)\n\n**Note:** Inter-package dependency relationships for Buck2's `deps` field is a separate concern handled by BUCK file generation (turnkey-9ws).\n\nDepends on: turnkey-bbm (modfile parser provides clean indirect flag access)",
+  "id": "turnkey-540",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Go external deps: transitive dependency graphs",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

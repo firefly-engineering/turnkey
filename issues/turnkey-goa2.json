@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-01-19T23:18:44.657461437+01:00",
+  "description": "Currently there are multiple foundry.toml files:\n- Top-level foundry.toml\n- Per-example foundry.toml files (e.g., src/examples/solidity-hello-deps/foundry.toml)\n\nThe desired approach is to have only a single top-level foundry.toml, similar to how Go, Rust, and Python dependencies are managed at the workspace root.\n\nThis would:\n- Simplify dependency management\n- Ensure consistent Solidity toolchain configuration across examples\n- Align with the monorepo dependency management pattern used for other languages\n\nNeeds investigation:\n- How to reference sources from subdirectories with a single foundry.toml\n- Whether solc remappings can be configured to work across the whole repo\n- Impact on soldeps-gen and the soldeps cell generation",
+  "id": "turnkey-goa2",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "Consolidate foundry.toml to top-level only",
+  "type": "task",
+  "updated_at": "2026-01-19T23:18:44.657461437+01:00"
+}

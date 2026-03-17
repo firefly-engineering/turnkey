@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-17T08:30:19.124399345+01:00",
+  "close_reason": "Completed - all internal crates updated to 2024 edition in both Cargo.toml and BUCK files",
+  "created": "2026-01-17T08:28:46.134204815+01:00",
+  "description": "Ensure all internal Rust crates (cmd/*, rust/*, examples/*) use the 2024 edition consistently in both Cargo.toml (via workspace.package inheritance) and BUCK files. Verify no crate is still using 2021 or has mismatched editions.",
+  "id": "turnkey-mioi",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Realign internal Rust crates to 2024 edition",
+  "type": "task",
+  "updated_at": "2026-01-17T08:30:19.124399345+01:00"
+}

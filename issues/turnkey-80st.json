@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-17T08:33:04.539740978+01:00",
+  "close_reason": "Implemented pre-commit hook for Cargo.toml/BUCK edition alignment",
+  "created": "2026-01-17T08:28:47.56926422+01:00",
+  "description": "Create a pre-commit check that verifies internal Rust crates have consistent edition settings between Cargo.toml and BUCK files. Should fail if: 1) A crate's Cargo.toml edition differs from its BUCK file edition, 2) A workspace member doesn't use edition.workspace = true, 3) The workspace.package edition differs from BUCK files.",
+  "id": "turnkey-80st",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add pre-commit check for Cargo.toml/BUCK edition alignment",
+  "type": "task",
+  "updated_at": "2026-01-17T08:33:04.539740978+01:00"
+}

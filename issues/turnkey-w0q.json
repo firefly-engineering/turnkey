@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T09:03:59.318587813+01:00",
+  "close_reason": "Completed: library refactor, unit tests (77.9% coverage), multi-source prefetchers, Nix package with wrapped deps, .envrc auto-generation",
+  "created": "2026-01-08T22:36:48.328504228+01:00",
+  "description": "Epic tracking the comprehensive testing and refactoring of godeps-gen.\n\n**Goals:**\n1. Proper library structure enabling unit testing\n2. Comprehensive test coverage for parsing\n3. Multi-source prefetcher system (GitHub, golang.org, Go proxy)\n4. Nix package with all required dependencies\n5. Integration tests with real modules\n\n**Blocked tasks (implementation order):**\n1. turnkey-hqn: Refactor into library + CLI structure\n2. turnkey-0ej: Unit tests for parsing\n3. turnkey-9as: Multi-source prefetcher system\n4. turnkey-2kx: Integration tests\n5. turnkey-f63: Nix package with prefetcher deps\n\n**Success criteria:**\n- `go test ./...` passes with \u003e80% coverage on parsing\n- godeps-gen handles all common Go module hosts\n- Nix package works out-of-the-box with --prefetch\n- Clear error messages for unsupported hosts",
+  "id": "turnkey-w0q",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "godeps-gen testing and refactoring",
+  "type": "epic",
+  "updated_at": "2026-01-09T09:03:59.318587813+01:00"
+}

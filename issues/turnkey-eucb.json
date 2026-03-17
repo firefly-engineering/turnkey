@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-17T08:41:37.912411854+01:00",
+  "close_reason": "Disabled by renaming to ci.yaml.disabled",
+  "created": "2026-01-17T08:40:41.98736474+01:00",
+  "description": "The current GitHub Actions workflows need to be disabled or removed. They may be outdated or not aligned with the current project setup.",
+  "id": "turnkey-eucb",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Disable current GitHub workflows",
+  "type": "task",
+  "updated_at": "2026-01-17T08:41:37.912411854+01:00"
+}

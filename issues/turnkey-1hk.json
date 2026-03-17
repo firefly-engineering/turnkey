@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-13T10:45:39.027127372+01:00",
+  "close_reason": "Refactored buck2 config to use language-specific namespaces: buck2.go.*, buck2.rust.*, buck2.python.* with per-language enable flags",
+  "created": "2026-01-13T10:33:37.378196855+01:00",
+  "description": "## Problem\n\nCurrent Buck2 configuration uses flat option names with language prefixes:\n\n```nix\nbuck2.goDepsFile\nbuck2.goModFile\nbuck2.goSumFile\nbuck2.rustDepsFile\nbuck2.rustFeaturesFile\nbuck2.cargoTomlFile\nbuck2.cargoLockFile\nbuck2.pythonDepsFile\nbuck2.pyprojectFile\nbuck2.pylockFile\nbuck2.rustcFlagsRegistry\nbuck2.buildScriptFixups\n```\n\nThis becomes unwieldy as we add more languages and options.\n\n## Proposed Solution\n\nRefactor to language-specific namespaces with per-language enable flags:\n\n```nix\nbuck2.go = {\n  enable = true;  # Enable Go toolchain support\n  depsFile = ./go-deps.toml;\n  modFile = \"go.mod\";\n  sumFile = \"go.sum\";\n};\n\nbuck2.rust = {\n  enable = true;  # Enable Rust toolchain support\n  depsFile = ./rust-deps.toml;\n  featuresFile = ./rust-features.toml;\n  cargoTomlFile = \"Cargo.toml\";\n  cargoLockFile = \"Cargo.lock\";\n  rustcFlagsRegistry = { ... };\n  buildScriptFixups = { ... };\n};\n\nbuck2.python = {\n  enable = true;  # Enable Python toolchain support\n  depsFile = ./python-deps.toml;\n  pyprojectFile = \"pyproject.toml\";\n  lockFile = \"pylock.toml\";\n};\n```\n\nThe `enable` flag per language:\n- Controls whether the language cell is generated\n- Controls whether sync rules are added for that language\n- Allows selective enablement (e.g., Rust-only project)\n- Defaults could be auto-detected from file presence\n\n## Benefits\n\n- Clearer organization by language\n- Per-language enable/disable without removing all config\n- Easier to add new language-specific options\n- Better discoverability (tab completion shows all go.* options)\n- Consistent naming within each namespace (depsFile vs goDepsFile/rustDepsFile/pythonDepsFile)\n\n## Files to Update\n\n1. `nix/flake-parts/turnkey/default.nix` - option definitions\n2. `nix/devenv/turnkey/buck2.nix` - option consumers\n3. `flake.nix` (turnkey repo) - update example usage\n4. Documentation\n\n## Migration\n\nConsider keeping old flat names as deprecated aliases for backwards compatibility, or do a clean break since this is pre-1.0.",
+  "id": "turnkey-1hk",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Refactor Buck2 config to use language-specific namespaces",
+  "type": "task",
+  "updated_at": "2026-01-13T10:45:39.027127372+01:00"
+}

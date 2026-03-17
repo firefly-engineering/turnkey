@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-muu"
+  ],
+  "blocks": [
+    "turnkey-399"
+  ],
+  "closed_at": "2026-01-08T14:25:20.533855+01:00",
+  "close_reason": "Added go to toolchain.toml, enabled buck2.enable in flake.nix, updated flake-parts module with buck2 options",
+  "created": "2026-01-08T14:17:01.642884+01:00",
+  "description": "Enable turnkey.buck2 in flake.nix with go toolchain. Demonstrate the feature working.",
+  "id": "turnkey-knb",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "Add self-usage example in flake.nix",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

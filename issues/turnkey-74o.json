@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-08T13:43:11.410105+01:00",
+  "close_reason": "Separated module outputs: flakeModules.turnkey for flake-parts module, devenvModules.turnkey for devenv module. Updated CLAUDE.md documentation.",
+  "created": "2026-01-08T13:40:19.305976+01:00",
+  "description": "currently the turnkey devenv module is exposed as part of the flake.flakeModules output. This is confusing as flakeModules are for flake-parts modules, which this module is not. Instead, let's output it in a different flake.devenvModules output",
+  "id": "turnkey-74o",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "fix devenv module output",
+  "type": "bug",
+  "updated_at": "2026-01-08T13:43:11.410105+01:00"
+}

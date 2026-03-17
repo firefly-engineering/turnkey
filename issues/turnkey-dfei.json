@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-d17b"
+  ],
+  "blocks": [
+    "turnkey-0ub4"
+  ],
+  "closed_at": "2026-01-16T19:05:16.27713581+01:00",
+  "close_reason": "Added run_in_devshell_script helper to setup.sh",
+  "created": "2026-01-16T19:03:38.052664883+01:00",
+  "description": "Add a new helper function to e2e/harness/lib/setup.sh that runs multiple commands in a single devshell session.\n\nCurrent pattern (slow - 6 devshell invocations):\n  run_in_devshell \"cmd1\"\n  run_in_devshell \"cmd2\"\n  run_in_devshell \"cmd3\"\n\nNew pattern (fast - 1 devshell invocation):\n  run_in_devshell_script \u003c\u003c'EOF'\n    cmd1\n    cmd2\n    cmd3\n  EOF\n\nThe helper should:\n- Accept commands via heredoc or string argument\n- Run all commands in a single nix develop session\n- Properly handle errors (fail on first error)\n- Support capturing output for assertions\n\nExpected savings: ~13-15s per avoided devshell call",
+  "id": "turnkey-dfei",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add run_in_devshell_script helper for batched commands",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

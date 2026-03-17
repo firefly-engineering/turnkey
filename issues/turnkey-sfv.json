@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-10T12:36:33.534793131+01:00",
+  "close_reason": "CLI implemented with --pyproject, --requirements, -o, --no-prefetch, --include-dev flags",
+  "created": "2026-01-10T12:11:48.883720358+01:00",
+  "description": "Define CLI interface following godeps-gen/rustdeps-gen patterns:\n- Input flags: --pyproject, --requirements (mutually exclusive or combinable?)\n- Output flag: -o for explicit file output\n- --no-prefetch flag for testing without network\n- --include-dev flag to include dev dependencies\n- Consider how to handle extras (e.g., package[extra])\n- Consider version constraints vs pinned versions",
+  "id": "turnkey-sfv",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Design pydeps-gen CLI interface and flags",
+  "type": "task",
+  "updated_at": "2026-01-10T12:36:33.534793131+01:00"
+}

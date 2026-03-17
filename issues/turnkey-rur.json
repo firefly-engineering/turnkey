@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T12:19:23.287406989+01:00",
+  "close_reason": "BUCK file already exists",
+  "created": "2026-01-12T12:16:43.661489186+01:00",
+  "description": "Add Buck2 build target for the tk Go tool.",
+  "id": "turnkey-rur",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Add BUCK file for cmd/tk",
+  "type": "task",
+  "updated_at": "2026-01-12T12:19:23.287406989+01:00"
+}

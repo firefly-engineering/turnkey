@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-8i7"
+  ],
+  "blocks": [
+    "turnkey-pzv"
+  ],
+  "closed_at": "2026-01-08T21:40:39.089362853+01:00",
+  "close_reason": "Root go.mod created. All Go code shares single module. Both go build and buck2 build work.",
+  "created": "2026-01-08T20:52:26.329674387+01:00",
+  "description": "Standardize on a single go.mod/go.sum at the repository root for consistency.\n\nRationale:\n- Single source of truth for all Go dependencies\n- Guarantees version consistency across all targets\n- Simplifies Buck2 integration (one godeps cell)\n- Aligns with Go workspace patterns\n\nImplications:\n- All Go code shares the same dependency versions\n- examples/hello-deps would use root go.mod, not its own\n- Need to document this as a project convention\n- May need to support Go workspaces (go.work) for multi-module repos\n\nMigration:\n1. Move examples/hello-deps/go.mod content to root go.mod\n2. Update examples/hello-deps to be a package, not a module\n3. Update documentation\n\nAlternative: Support Go workspaces (go.work) for repos that need multiple modules.",
+  "id": "turnkey-nnn",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Standardize on monorepo Go module layout",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-8a6",
+    "turnkey-8yr",
+    "turnkey-vii"
+  ],
+  "closed_at": "2026-01-10T12:36:33.441717814+01:00",
+  "close_reason": "Chose Rust for consistency with rustdeps-gen",
+  "created": "2026-01-10T12:11:55.404331443+01:00",
+  "description": "Decide between:\n1. Python - natural for parsing pyproject.toml, has packaging/pip libraries\n2. Rust - consistent with rustdeps-gen, good TOML support, fast\n3. Go - consistent with godeps-gen\n\nConsiderations:\n- Python has 'packaging' library for version parsing\n- Python has 'tomllib' (stdlib 3.11+) for TOML\n- Rust has good TOML crates\n- Need to wrap with nix tools regardless of language",
+  "id": "turnkey-clb",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Choose implementation language for pydeps-gen",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

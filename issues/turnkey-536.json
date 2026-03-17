@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-545",
+    "turnkey-5cm"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-09T23:31:40.489689133+01:00",
+  "close_reason": "Phase 5 Sync \u0026 Maintenance complete. tk CLI provides sync, check, shell integration, and pre-commit validation.",
+  "created": "2026-01-08T14:16:34.666807+01:00",
+  "description": "Keep BUCK files synchronized with native project changes. Watch mode, CI checks, diff tool.",
+  "id": "turnkey-536",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Phase 5: Sync \u0026 Maintenance",
+  "type": "feature",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

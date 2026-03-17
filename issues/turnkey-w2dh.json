@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-7qna",
+    "turnkey-kx9o"
+  ],
+  "blocks": [
+    "turnkey-588m"
+  ],
+  "closed_at": "2026-01-16T16:36:40.941397932+01:00",
+  "created": "2026-01-16T16:26:05.964598763+01:00",
+  "description": "Update flake-parts and devenv modules to use nix-backed prelude:\n\n1. Update nix/flake-parts/turnkey/default.nix:\n   - Import and build turnkey-prelude derivation\n   - Change prelude.strategy default from 'bundled' to 'nix'\n   - Auto-set prelude.path to turnkey-prelude\n\n2. Update nix/devenv/turnkey/buck2.nix:\n   - Consume prelude derivation from flake-parts config\n\n3. Update flake.nix:\n   - Export turnkey-prelude as a package\n\n4. Keep 'bundled' as opt-in fallback for compatibility",
+  "id": "turnkey-w2dh",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Integrate nix prelude into turnkey module",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

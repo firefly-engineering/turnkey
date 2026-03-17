@@ -1,0 +1,34 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-ish"
+  ],
+  "blocks": [
+    "turnkey-1us",
+    "turnkey-2l8",
+    "turnkey-2t5",
+    "turnkey-31s",
+    "turnkey-3rp",
+    "turnkey-4ny",
+    "turnkey-66b",
+    "turnkey-7ks",
+    "turnkey-dw7",
+    "turnkey-egm",
+    "turnkey-m5t",
+    "turnkey-njc",
+    "turnkey-nvs",
+    "turnkey-s52",
+    "turnkey-tps"
+  ],
+  "closed_at": "2026-01-13T11:33:05.191521263+01:00",
+  "close_reason": "E2E harness complete with assertions.sh, setup.sh, runner.sh, and GitHub Actions CI workflow",
+  "created": "2026-01-10T17:37:11.598074187+01:00",
+  "description": "Build the infrastructure for running e2e tests:\n\n1. NixOS container/VM provisioning (nixos-generators or similar)\n2. Test runner script that executes scenarios\n3. Assertion helpers for verifying outcomes\n4. Logging and artifact collection\n5. Integration with CI (GitHub Actions)\n6. Parallel test execution for speed\n\nConsider: Nix flake checks, nixosTests, or custom shell scripts",
+  "id": "turnkey-emc",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "E2E: Test harness infrastructure",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

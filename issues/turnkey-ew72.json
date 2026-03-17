@@ -1,0 +1,22 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-c8ti",
+    "turnkey-lu8g"
+  ],
+  "blocks": [
+    "turnkey-eleg",
+    "turnkey-kdjx"
+  ],
+  "closed_at": "2026-01-19T21:12:37.626928622+01:00",
+  "close_reason": "Created toolchain.bzl with system_solidity_toolchain rule supporting multi-version solc",
+  "created": "2026-01-19T21:05:49.68363717+01:00",
+  "description": "Create nix/buck2/prelude-extensions/solidity/toolchain.bzl with system_solidity_toolchain rule.\n\nShould accept:\n- solc_path (or multiple solc paths for version support)\n- forge_path\n- default_version\n\nReference: nix/buck2/prelude-extensions/typescript/toolchain.bzl\n\nPart of Solidity support (turnkey-ri2t).",
+  "id": "turnkey-ew72",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create Solidity toolchain.bzl",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

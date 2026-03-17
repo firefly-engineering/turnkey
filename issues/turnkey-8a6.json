@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-clb"
+  ],
+  "blocks": [
+    "turnkey-gtj"
+  ],
+  "closed_at": "2026-01-10T12:36:33.702626806+01:00",
+  "close_reason": "Implemented in cmd/pydeps-gen/src/main.rs",
+  "created": "2026-01-10T12:12:08.344007962+01:00",
+  "description": "Parse requirements.txt format:\n- Handle pinned versions (package==1.2.3)\n- Handle version ranges (package\u003e=1.0,\u003c2.0)\n- Skip comments (#) and blank lines\n- Handle -r includes for other requirement files\n- Handle -e for editable installs (skip these)\n- Handle environment markers (;python_version\u003e='3.8')\n- Handle extras (package[extra]==1.0)\n\nNote: Pinned requirements.txt is preferred as it's deterministic.",
+  "id": "turnkey-8a6",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Implement requirements.txt parsing",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

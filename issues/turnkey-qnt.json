@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-3as"
+  ],
+  "closed_at": "2026-01-11T22:57:32.173184366+01:00",
+  "close_reason": "Implemented CheckPythonSrcList, CheckPythonImports, and CheckPythonPackage functions in go/pkg/staleness/python.go with full test coverage",
+  "created": "2026-01-09T23:35:18.300678162+01:00",
+  "description": "Detect when Python BUCK files are stale due to source changes. Track .py files and import statements.",
+  "id": "turnkey-qnt",
+  "labels": [],
+  "priority": 4,
+  "status": "closed",
+  "title": "Python source file staleness detection",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

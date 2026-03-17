@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-20T14:55:55.274498946+01:00",
+  "close_reason": "Simplified .envrc docs to use turnkey direnv library",
+  "created": "2026-01-20T14:42:37.093658448+01:00",
+  "description": "The .envrc snippet in docs/user-manual/src/getting-started/project-setup.md is overly complicated with manual symlink management.\n\n**Current (complex):**\n```bash\nuse flake . --no-pure-eval\n\n# 20+ lines of manual symlink sync logic...\nif [ -n \"$TURNKEY_BUCK2_CONFIG\" ]; then\n  # ...\nfi\nfor var in $(env | grep '^TURNKEY_CELL_' | cut -d= -f1); do\n  # ...\ndone\n```\n\n**Should be (simple):**\n```bash\nuse flake . --no-pure-eval\n\nsource \"$TURNKEY_DIRENV_LIB\"\nuse_turnkey\n```\n\nThe turnkey direnv library ($TURNKEY_DIRENV_LIB) already handles all the symlink management, watch_file declarations, and optional regeneration. The documentation should use this simpler approach.\n\nSee the actual .envrc in this repository for the correct pattern.",
+  "id": "turnkey-i38s",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Simplify .envrc documentation in project-setup.md",
+  "type": "task",
+  "updated_at": "2026-01-20T14:55:55.274498946+01:00"
+}

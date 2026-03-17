@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T13:21:11.51547491+01:00",
+  "close_reason": "Created examples/python-hello/ with python_binary",
+  "created": "2026-01-09T13:11:43.487912954+01:00",
+  "description": "Create examples/python/hello/ with a simple Python script.\n\nFiles needed:\n- examples/python/hello/__init__.py\n- examples/python/hello/__main__.py - simple hello world\n- examples/python/hello/BUCK - python_binary target\n\nShould work with:\n- `python -m examples.python.hello` or direct execution\n- `buck2 run //examples/python/hello:hello`",
+  "id": "turnkey-urm",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Python: simple hello world example",
+  "type": "task",
+  "updated_at": "2026-01-09T13:21:11.51547491+01:00"
+}

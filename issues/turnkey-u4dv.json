@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-di93",
+    "turnkey-h4zd"
+  ],
+  "closed_at": "2026-01-19T16:46:39.091945769+01:00",
+  "close_reason": "Completed rules.star rename",
+  "created": "2026-01-19T16:34:19.863581277+01:00",
+  "description": "Change [buildfile] name from BUCK to rules.star in the generated buckconfig.\n\nLocation: nix/devenv/turnkey/buck2.nix (buckconfigContent)\n\nChange:\n[buildfile]\n    name = BUCK\nto:\n[buildfile]\n    name = rules.star",
+  "id": "turnkey-u4dv",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Update buckconfig to use rules.star as buildfile name",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

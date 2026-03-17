@@ -1,0 +1,23 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-hs2"
+  ],
+  "blocks": [
+    "turnkey-4oa",
+    "turnkey-qvc",
+    "turnkey-tva",
+    "turnkey-xnz"
+  ],
+  "closed_at": "2026-01-09T17:45:38.548689986+01:00",
+  "close_reason": "Implemented tk CLI core wrapper with command categorization, sync-first vs pass-through command lists, --no-sync and --verbose flags, and buck2 delegation via syscall.Exec",
+  "created": "2026-01-09T17:22:07.080065595+01:00",
+  "description": "Implement the `tk` command - a transparent wrapper around buck2 that auto-syncs.\n\nCore behavior:\n1. Parse subcommand from args\n2. Check if subcommand is in syncFirstCommands list\n3. If yes: run sync, then delegate to buck2\n4. If no (passThroughCommands): delegate directly to buck2\n5. Unknown commands: default to sync-first (safe)\n\nTwo explicit lists for easy configuration:\n```go\nvar syncFirstCommands = []string{\n    \"build\", \"run\", \"test\", \"query\", \n    \"cquery\", \"uquery\", \"targets\", \"audit\", \"bxl\",\n}\n\nvar passThroughCommands = []string{\n    \"clean\", \"kill\", \"killall\", \"status\",\n    \"log\", \"rage\", \"help\", \"docs\", \"init\",\n}\n```\n\nFlags:\n- `--no-sync`: Skip sync for power users\n- `--verbose`: Show what's being synced",
+  "id": "turnkey-kxs",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "tk CLI: Core wrapper implementation",
+  "type": "feature",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

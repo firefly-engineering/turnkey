@@ -1,0 +1,21 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [
+    "turnkey-2e0a",
+    "turnkey-yu7"
+  ],
+  "blocks": [
+    "turnkey-ksi6"
+  ],
+  "closed_at": "2026-01-22T10:50:06.456954019+01:00",
+  "close_reason": "Implemented goparse, buckgen libraries and CLI; integrated into Nix; removed gobuckify and patches",
+  "created": "2026-01-22T10:29:14.12837634+01:00",
+  "description": "Create src/go/pkg/buckgen/ library that generates rules.star files from parsed Go packages.\n\n## Goals\n- Generate go_library rules with proper deps\n- Handle platform-specific select() for OS/arch constraints\n- Support configurable constraint prefixes (config//os:, config//cpu:)\n- Generate embed file references\n\n## Structure\n```\nsrc/go/pkg/buckgen/\n├── render.go       # Template rendering for rules.star\n├── normalize.go    # Deduplicate common deps across platforms\n└── config.go       # Configuration (compatible with gobuckify.json)\n```\n\n## Output Format\nGenerate rules.star files like:\n```python\ngo_library(\n    name = \"pkgname\",\n    srcs = glob([\"*.go\"]),\n    deps = [\n        \"godeps//vendor/some/pkg:pkg\",\n    ] + select({\n        \"config//os:linux\": [\"godeps//vendor/linux/only:only\"],\n        \"DEFAULT\": [],\n    }),\n)\n```\n\n## Reference\n- Port template logic from gobuckify's render.go\n- Keep JSON config format compatible for easy migration",
+  "id": "turnkey-dp4d",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "buckgen: BUCK file generation library",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-16T13:20:40.786497832+01:00",
+  "close_reason": "Added Python to multi-language fixture with full E2E test coverage",
+  "created": "2026-01-16T12:26:33.935054888+01:00",
+  "description": "Add Python support to the multi-language E2E fixture for reproducibility testing.\n\n**Currently missing:**\n\n1. **pydeps-gen not in default registry** (nix/registry/default.nix)\n   - godeps-gen is registered, pydeps-gen is not\n   - Package exists at nix/packages/pydeps-gen.nix\n\n2. **No Python source files in multi-language fixture** (e2e/fixtures/multi-language/)\n   - Need: hello.py (simple Python script)\n   - Need: pyproject.toml (dependency declaration)\n   - Need: uv.lock (lockfile for reproducible deps)\n\n3. **No Python BUCK target** in fixture\n   - Need: python_binary target in BUCK file\n   - Should have at least one external dependency (e.g., 'six')\n\n4. **Multi-language test doesn't configure Python** (e2e/tests/04-multi-language.sh)\n   - flake.nix needs python.enable = true\n   - needs pydeps-gen in registry\n   - needs python-deps.toml generation step\n\n**Reference:** examples/python-hello-deps/ shows working Python + pydeps pattern",
+  "id": "turnkey-hsg7",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Add Python to multi-language fixture",
+  "type": "task",
+  "updated_at": "2026-01-16T13:20:40.786497832+01:00"
+}

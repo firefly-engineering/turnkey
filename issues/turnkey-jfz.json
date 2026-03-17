@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T13:24:04.21574529+01:00",
+  "close_reason": "Created examples/typescript-hello/ using genrule approach. Full TypeScript support would require custom rules or worker-based integration.",
+  "created": "2026-01-09T13:12:00.309760705+01:00",
+  "description": "Create examples/typescript/hello/ with a simple TypeScript file.\n\nFiles needed:\n- examples/typescript/hello/main.ts - simple hello world\n- examples/typescript/hello/BUCK - appropriate target\n- examples/typescript/hello/tsconfig.json (if needed)\n\nShould work with:\n- `npx ts-node examples/typescript/hello/main.ts`\n- `buck2 run //examples/typescript/hello:hello`\n\nResearch needed:\n- What Buck2 rules to use (js_bundle, ts_library, etc.)\n- How TypeScript compilation integrates with Buck2",
+  "id": "turnkey-jfz",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "TypeScript: simple hello world example",
+  "type": "task",
+  "updated_at": "2026-01-09T13:24:04.21574529+01:00"
+}

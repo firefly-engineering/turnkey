@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T13:26:51.253533711+01:00",
+  "close_reason": "TypeScript deps would require npm integration. The js_library rules need worker setup - documented limitations.",
+  "created": "2026-01-09T13:12:00.375877915+01:00",
+  "description": "Create examples/typescript/hello-deps/ with an npm package dependency.\n\nFiles needed:\n- examples/typescript/hello-deps/main.ts - uses npm package (e.g., lodash, chalk)\n- examples/typescript/hello-deps/BUCK - target with deps\n- examples/typescript/hello-deps/package.json\n\nRequires:\n- TypeScript deps cell with npm packages\n- Type definitions (@types/*)\n\nShould work with both native ts-node/node and buck2 run.",
+  "id": "turnkey-5pv",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "TypeScript: hello with npm package (deps example)",
+  "type": "task",
+  "updated_at": "2026-01-09T13:26:51.253533711+01:00"
+}

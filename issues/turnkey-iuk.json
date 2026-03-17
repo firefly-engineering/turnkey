@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T08:33:49.799721293+01:00",
+  "close_reason": "Research complete, documented in docs/buck2_prelude_customization.md",
+  "created": "2026-01-09T09:33:44.764081272+01:00",
+  "description": "Investigate options for customizing the Buck2 prelude for turnkey's needs.\n\n## Context\n\nCurrently using `prelude.strategy = \"bundled\"` which uses Buck2's built-in prelude.\nAs turnkey evolves, we may need prelude modifications.\n\n## Options to Research\n\n1. **Custom bundled Buck2**: Build our own buck2 with a patched prelude\n   - Pros: Same deployment model as bundled, single binary\n   - Cons: Must maintain a buck2 fork/patch, rebuild on updates\n\n2. **Prelude as cell**: Maintain prelude in a separate cell (like toolchains)\n   - Pros: More flexible, easier to iterate, visible in repo\n   - Cons: Different from standard buck2 usage, may complicate consumer onboarding\n\n3. **Hybrid**: Use bundled with overlays/extensions\n   - May not be possible depending on Buck2 architecture\n\n## Questions to Answer\n\n- What prelude changes might we need? (Go rules, Nix integration, etc.)\n- How does Buck2's prelude loading work? Can we overlay?\n- What's the maintenance burden of each approach?\n- How do other Buck2 users handle prelude customization?\n\n## Related\n\n- gobuckify is from the Buck2 prelude - shows we're already touching prelude code\n- Go rules may need enhancement (see turnkey-jrh)",
+  "id": "turnkey-iuk",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Research Buck2 prelude customization options",
+  "type": "task",
+  "updated_at": "2026-01-12T08:33:49.799721293+01:00"
+}

@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T22:19:27.9336703+01:00",
+  "close_reason": "Fixed by adding os_constraint_prefix and arch_constraint_prefix config options to gobuckify. Select() statements now generate valid Buck2 constraint targets like config//os:macos and config//cpu:arm64.",
+  "created": "2026-01-09T22:13:26.824220392+01:00",
+  "description": "gobuckify generates BUCK files with invalid select() syntax for platform-specific dependencies.\n\nExample from godeps cell:\n```starlark\ndeps = [\n] + select({\n    \"DEFAULT\": [],\n    \"macos\": select({\n        \"DEFAULT\": [],\n        \"arm64\": [\n            \"godeps//vendor/github.com/pelletier/go-toml/v2/internal/characters:characters\",\n            ...\n        ],\n    }),\n}),\n```\n\nThe keys `\"macos\"` and `\"arm64\"` are not valid Buck2 constraint targets. They should be proper constraint value targets like:\n- `prelude//platforms:macos` or `config//os:macos`\n- `prelude//platforms:arm64` or `config//cpu:arm64`\n\nBuck2 error:\n```\nInvalid target pattern `arm64` is not allowed\nExpected pattern to contain `:`, trailing `/...` or literal `...`.\n```\n\nThis affects any Go package with platform-specific build tags (e.g., `//go:build darwin \u0026\u0026 arm64`).\n\nAffected file: `nix/packages/gobuckify.nix` (patches) or upstream gobuckify code.",
+  "id": "turnkey-8fq",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "gobuckify generates invalid select() syntax for platform deps",
+  "type": "bug",
+  "updated_at": "2026-01-09T22:19:27.9336703+01:00"
+}

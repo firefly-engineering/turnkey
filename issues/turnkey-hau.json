@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T12:23:37.978833539+01:00",
+  "close_reason": "Renamed pre-commit.hooks to git-hooks.hooks in buck2.nix",
+  "created": "2026-01-09T09:36:47.679893778+01:00",
+  "description": "The devenv option 'pre-commit' has been renamed to 'git-hooks'.\n\nWarning seen:\n```\nevaluation warning: The option 'pre-commit' defined in \n'/nix/store/.../nix/devenv/turnkey/buck2.nix' has been renamed to 'git-hooks'.\n```\n\nNeed to update nix/devenv/turnkey/buck2.nix to use the new option name.",
+  "id": "turnkey-hau",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Fix pre-commit -\u003e git-hooks deprecation warning",
+  "type": "bug",
+  "updated_at": "2026-01-09T12:23:37.978833539+01:00"
+}

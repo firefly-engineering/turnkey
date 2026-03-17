@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-588m",
+    "turnkey-ce6"
+  ],
+  "blocks": [
+    "turnkey-x1pn"
+  ],
+  "closed_at": "2026-01-16T18:19:45.05469695+01:00",
+  "close_reason": "Created typescript rules in nix/buck2/prelude-extensions/typescript/",
+  "created": "2026-01-16T16:26:31.061095707+01:00",
+  "description": "Add TypeScript build rules to nix/buck2/prelude-extensions/typescript/:\n\nRules needed:\n- typescript_library: Compile TS to JS, produce type declarations\n- typescript_binary: Runnable TS application (uses node)\n- typescript_test: Run TS tests (jest or similar)\n- TypeScript toolchain definition\n\nShould integrate with prelude's existing patterns for providers and toolchains.",
+  "id": "turnkey-u903",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Create TypeScript rules in prelude-extensions",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-fgk",
+    "turnkey-tz0"
+  ],
+  "closed_at": "2026-01-10T17:54:22.996347286+01:00",
+  "close_reason": "Design complete: docs/design-use-turnkey.md covers API, flags (--skip-regen, --only-go, etc.), env vars (TURNKEY_SKIP_GO), and Nix generation approach",
+  "created": "2026-01-10T17:27:47.347155851+01:00",
+  "description": "Design the API for a use_turnkey direnv function that encapsulates: (1) hash-based dependency regeneration for Go/Python/Rust, (2) symlink syncing for Buck2 cells, (3) watch_file declarations. Consider how to make it configurable (which languages to enable, custom paths).",
+  "id": "turnkey-ax4",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Design use_turnkey direnv function",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

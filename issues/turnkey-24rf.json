@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-kdjx",
+    "turnkey-rmzq"
+  ],
+  "blocks": [
+    "turnkey-w97j"
+  ],
+  "closed_at": "2026-01-19T21:26:46.925920653+01:00",
+  "close_reason": "Created solidity-hello example with Counter contract, tests, and rules.star",
+  "created": "2026-01-19T21:06:21.307819018+01:00",
+  "description": "Create examples/solidity-hello/ with:\n- src/Counter.sol - simple counter contract\n- test/Counter.t.sol - basic tests\n- foundry.toml\n- rules.star with solidity_library, solidity_contract, solidity_test\n\nVerify: buck2 build and buck2 test work\n\nPart of Solidity support (turnkey-ri2t).",
+  "id": "turnkey-24rf",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create Solidity example: simple contract",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T08:51:03.822700888+01:00",
+  "close_reason": "Fixed: symlinks now use semver sorting to pick greatest version",
+  "created": "2026-01-12T08:23:49.763008852+01:00",
+  "description": "Symlink now correctly points to greatest semver version instead of first alphabetically.\n\n## Fixed\n- Added semver parsing and comparison in rust-deps-cell.nix\n- Versions sorted descending, greatest picked for symlink\n- Example: windows_x86_64_msvc now links to 0.52.6 (was 0.48.5)\n\n## Future Enhancement\nFor full spec-based filtering (filtering by Cargo.toml version specs before sorting):\n1. Parse workspace.dependencies from Cargo.toml\n2. Implement Cargo's version matching (^, ~, *, etc.)\n3. Filter versions by compatibility before sorting\n\nCurrent fix is correct for all practical cases since:\n- Direct deps usually have a single resolved version\n- Transitive deps with multiple versions should use the greatest",
+  "id": "turnkey-vtk",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Symlink to resolved version from Cargo.toml, not arbitrary first",
+  "type": "task",
+  "updated_at": "2026-01-12T08:51:03.822700888+01:00"
+}

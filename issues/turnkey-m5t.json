@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-emc",
+    "turnkey-ish"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-13T21:33:39.42745316+01:00",
+  "close_reason": "Implemented git workflow E2E test (06-git-workflow.sh). Tests branch switching, feature branch deps, and merge workflow.",
+  "created": "2026-01-10T17:36:53.969472506+01:00",
+  "description": "Test scenario: PR workflow with dep changes\n\n1. Start with working project on main branch\n2. Create feature branch, add new dependency\n3. Verify deps files updated, commit changes\n4. Switch back to main - verify old deps restored\n5. Switch to feature branch - verify new deps active\n6. Merge to main, verify deps correctly merged\n\nValidates: git branch switching, no stale state",
+  "id": "turnkey-m5t",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "E2E: Git workflow with dependency updates",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

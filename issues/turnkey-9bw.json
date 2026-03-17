@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-4zq"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-11T22:47:53.000917854+01:00",
+  "close_reason": "Added comprehensive documentation for pydeps-gen and all deps-gen tools to docs/dependency-management.md",
+  "created": "2026-01-10T12:13:03.269591336+01:00",
+  "description": "Update documentation:\n1. Add pydeps-gen section to docs/dependency-management.md\n2. Add usage examples to README or separate doc\n3. Document supported input formats\n4. Document output format\n5. Document CLI flags and options\n\nExamples:\n  pydeps-gen --requirements requirements.txt -o python-deps.toml\n  pydeps-gen --pyproject pyproject.toml -o python-deps.toml",
+  "id": "turnkey-9bw",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Document pydeps-gen usage",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

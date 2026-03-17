@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-08T21:18:06.444838039+01:00",
+  "close_reason": "Fixed indentation by using regular string with explicit 4-space prefix",
+  "created": "2026-01-08T20:51:33.755977288+01:00",
+  "description": "The godeps cell entry in the generated .buckconfig is not properly indented. It should align with other cell entries under [cells] section.\n\nCurrent:\n```\n[cells]\n    root = .\n    toolchains = .turnkey/toolchains\n    prelude = prelude\n    none = none\ngodeps = .turnkey/godeps\n```\n\nExpected:\n```\n[cells]\n    root = .\n    toolchains = .turnkey/toolchains\n    prelude = prelude\n    none = none\n    godeps = .turnkey/godeps\n```",
+  "id": "turnkey-40b",
+  "labels": [],
+  "priority": 4,
+  "status": "closed",
+  "title": "Fix godeps cell indentation in .buckconfig",
+  "type": "bug",
+  "updated_at": "2026-01-08T21:18:06.444838039+01:00"
+}

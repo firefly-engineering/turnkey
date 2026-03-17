@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-tz0"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-10T18:13:21.132142634+01:00",
+  "close_reason": "Simplified .envrc to use generated turnkey-direnv-lib.sh (146 lines → 17 lines)",
+  "created": "2026-01-10T17:27:50.508502775+01:00",
+  "description": "After implementing use_turnkey, update .envrc to: (1) use flake . --no-pure-eval, (2) source TURNKEY_DIRENV_LIB, (3) use turnkey. Remove all inline shell functions and regeneration logic.",
+  "id": "turnkey-b0d",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Simplify .envrc to use turnkey directive",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

@@ -1,0 +1,16 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-21T17:53:15.585932619+01:00",
+  "close_reason": "Implemented preserved sections markers with DepsValue type, marker parsing, serialization, and SetDeps preservation. All 12 tests pass.",
+  "created": "2026-01-21T17:48:32.687718467+01:00",
+  "description": "",
+  "id": "turnkey-u9ko",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "Implement preserved sections markers for rules.star",
+  "type": "task",
+  "updated_at": "2026-01-21T17:53:15.585932619+01:00"
+}

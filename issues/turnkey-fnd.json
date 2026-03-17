@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-3as"
+  ],
+  "closed_at": "2026-01-11T22:53:08.575836075+01:00",
+  "close_reason": "Implemented CheckGoImports function in go/pkg/staleness/imports.go using go/parser for reliable import extraction with comprehensive tests",
+  "created": "2026-01-09T23:35:09.033073623+01:00",
+  "description": "Parse Go import statements to detect when deps in BUCK files are stale. When imports change, the deps array needs updating. Consider using go/parser or simple regex for speed.",
+  "id": "turnkey-fnd",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Go import statement parsing for dep changes",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-c8o"
+  ],
+  "blocks": [
+    "turnkey-pzv"
+  ],
+  "closed_at": "2026-01-08T22:05:47.464552181+01:00",
+  "close_reason": "Implemented: staleness check in enterShell warns when go-deps.toml is older than go.mod/go.sum, optional pre-commit hook via autoRegenerate option",
+  "created": "2026-01-08T20:52:12.699485618+01:00",
+  "description": "Automatically regenerate the Go deps registry when go.mod or go.sum changes.\n\nApproaches to consider:\n\n1. **Pre-commit hook**: Run generator before commits that touch go.mod/go.sum\n2. **Nix-native IFD**: Use import-from-derivation to parse go.mod/go.sum at eval time\n3. **devenv enterShell hook**: Check if registry is stale and regenerate\n4. **File watcher**: Background process that watches for changes\n\nConsiderations:\n- IFD is powerful but can slow evaluation and cause issues with flake pure mode\n- Pre-commit hooks require developer discipline\n- enterShell hooks run on every shell entry (may be slow)\n- Should warn if go.mod/go.sum is newer than generated registry\n\nRecommended: Start with pre-commit hook + staleness check in enterShell.",
+  "id": "turnkey-3u4",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Auto-regenerate Go deps on go.mod/go.sum changes",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

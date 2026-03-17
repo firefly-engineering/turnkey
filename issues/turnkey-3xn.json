@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-ce6"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-16T18:53:09.411241377+01:00",
+  "close_reason": "Completed: jsdeps-gen, js-deps-cell.nix, JavaScript adapter, turnkey module integration with pnpm support",
+  "created": "2026-01-09T13:29:42.88771787+01:00",
+  "description": "Create jsdeps-gen tool that generates Buck2 targets from pnpm lockfile.\n\n**Why pnpm:**\n- Stricter dependency resolution (no phantom deps)\n- pnpm-lock.yaml is well-structured and deterministic\n- Used by rules_js (Aspect) - proven approach\n- Better suited for monorepo setups\n\n**Implementation:**\n1. Parse pnpm-lock.yaml\n2. Generate Nix derivations to fetch npm tarballs\n3. Create BUCK files for each package\n4. Organize into jsdeps cell\n\nDepends on: native TypeScript toolchain support\n\nSee: examples/typescript-hello/ for context",
+  "id": "turnkey-3xn",
+  "labels": [],
+  "priority": 4,
+  "status": "closed",
+  "title": "TypeScript deps cell: pnpm integration",
+  "type": "feature",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

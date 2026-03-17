@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T13:18:46.887559364+01:00",
+  "close_reason": "Created examples/rust-hello/ with rust_binary using @prelude//:rules.bzl",
+  "created": "2026-01-09T13:11:30.805775769+01:00",
+  "description": "Create examples/rust/hello/ with a simple Rust binary.\n\nFiles needed:\n- examples/rust/hello/main.rs - simple hello world\n- examples/rust/hello/BUCK - rust_binary target\n\nShould build with:\n- `cargo build` (needs Cargo.toml at repo root or in example dir)\n- `buck2 build //examples/rust/hello:hello`",
+  "id": "turnkey-wyu",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Rust: simple hello world example",
+  "type": "task",
+  "updated_at": "2026-01-09T13:18:46.887559364+01:00"
+}

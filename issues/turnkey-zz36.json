@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-19T20:23:21.731652636+01:00",
+  "close_reason": "Added golangci-lint to registry and toolchain.toml",
+  "created": "2026-01-19T20:18:07.351747658+01:00",
+  "description": "Add golangci-lint to the registry and toolchain.toml for Go linting support.",
+  "id": "turnkey-zz36",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add golangci-lint to toolchain",
+  "type": "task",
+  "updated_at": "2026-01-19T20:23:21.731652636+01:00"
+}

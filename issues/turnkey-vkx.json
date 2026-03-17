@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-10T13:08:42.060693514+01:00",
+  "close_reason": "Implemented in .envrc",
+  "created": "2026-01-10T13:07:38.467985279+01:00",
+  "description": "Add automation to .envrc that regenerates python-deps.toml when pyproject.toml changes. Should run: uv lock, uv export --format pylock.toml, pydeps-gen --lock pylock.toml",
+  "id": "turnkey-vkx",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add Python deps auto-regeneration to .envrc",
+  "type": "task",
+  "updated_at": "2026-01-10T13:08:42.060693514+01:00"
+}

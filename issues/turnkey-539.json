@@ -1,0 +1,17 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-538"
+  ],
+  "closed_at": "2026-01-08T20:25:43.657945041+01:00",
+  "created": "2026-01-08T19:13:33.219546501+01:00",
+  "description": "Design the architecture for a Nix-managed cell containing pre-built Go dependencies.\n\nKey questions:\n- How to structure the cell (one BUCK file per package? flat structure?)\n- How to generate go_library targets from Nix derivations\n- How to map Go import paths to Buck2 targets\n- How Buck2 resolves `deps = [\"//deps:golang.org/x/text\"]` style references\n\nConsider:\n- Cell should be generated from go.mod/go.sum\n- Nix builds the Go packages, Buck2 just references them\n- Import paths must match what Go code expects",
+  "id": "turnkey-539",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Design Nix-managed Go deps cell",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

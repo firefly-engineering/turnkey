@@ -1,0 +1,14 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-01-22T13:42:27.596951052+01:00",
+  "description": "soldeps-gen currently lacks prefetching logic for Git/NPM dependencies. Implement nix-prefetch-cached support similar to other generators.",
+  "id": "turnkey-1lqu",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "Implement prefetching in soldeps-gen",
+  "type": "feature",
+  "updated_at": "2026-01-22T13:42:27.596951052+01:00"
+}

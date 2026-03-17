@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-08T20:18:01.772730155+01:00",
+  "created": "2026-01-08T20:17:55.579497543+01:00",
+  "description": "Exit criteria for Phase 1: Toolchain Cell Generation (COMPLETED)\n\n✅ Verified criteria:\n1. `buck2 build //examples/hello:hello` succeeds\n2. `buck2 run //examples/hello:hello` prints expected output\n3. Toolchains cell auto-generated with correct Buck2 rules\n4. .buckconfig symlink managed by devenv enterShell\n5. .turnkey/toolchains symlink points to Nix store\n6. Implicit dependencies resolved (go → python, cxx)\n7. No manual .buckconfig editing required\n\nTest: User declares `go = {}` in toolchain.toml, enables buck2, builds work.",
+  "id": "turnkey-541",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Phase 1 Exit Criteria (reference)",
+  "type": "task",
+  "updated_at": "2026-01-08T20:18:03.358179247+01:00"
+}

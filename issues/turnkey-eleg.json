@@ -1,0 +1,23 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-c8ti",
+    "turnkey-ew72"
+  ],
+  "blocks": [
+    "turnkey-kvil",
+    "turnkey-rmzq",
+    "turnkey-ux1i"
+  ],
+  "closed_at": "2026-01-19T21:13:17.091451008+01:00",
+  "close_reason": "Created solidity_library.bzl with optimizer and remapping support",
+  "created": "2026-01-19T21:05:50.882816683+01:00",
+  "description": "Create nix/buck2/prelude-extensions/solidity/solidity_library.bzl\n\nAttributes:\n- srcs: list of .sol source files\n- deps: other solidity_library targets\n- remappings: dict of import remappings (optional overrides)\n- solc_version: per-target compiler version (optional)\n- optimizer: bool (default True)\n- optimizer_runs: int (default 200)\n\nImplementation:\n- Collect remappings from deps + explicit remappings\n- Build solc standard JSON input\n- Run solc --standard-json\n- Output compiled artifacts directory\n- Return SolidityLibraryInfo provider\n\nReference: nix/buck2/prelude-extensions/typescript/ts_library.bzl\n\nPart of Solidity support (turnkey-ri2t).",
+  "id": "turnkey-eleg",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create solidity_library rule",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

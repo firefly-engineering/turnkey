@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-4oa"
+  ],
+  "blocks": [
+    "turnkey-545"
+  ],
+  "closed_at": "2026-01-09T21:52:27.804074731+01:00",
+  "close_reason": "Implemented tk sync on shell entry in buck2.nix enterShell hook. Added syncOnShellEntry option to configure.",
+  "created": "2026-01-09T17:22:42.591184443+01:00",
+  "description": "Run `tk sync` automatically when entering the devenv shell.\n\nThis ensures the workspace is always in sync when starting development.\n\nImplementation in devenv enterShell:\n```nix\nenterShell = ''\n  # ... existing setup ...\n  tk sync --quiet\n'';\n```\n\nFlags:\n- `--quiet`: Only show output if something was regenerated\n\nShould be fast when nothing is stale (just timestamp checks).",
+  "id": "turnkey-7ew",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Shell entry: Run tk sync on shell entry",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

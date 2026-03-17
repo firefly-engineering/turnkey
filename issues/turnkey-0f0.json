@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-08T21:58:33.527607462+01:00",
+  "close_reason": "Implemented: godeps-gen packaged as Nix derivation with buildGoModule, exported via flake.nix packages, added to toolchain registry",
+  "created": "2026-01-08T21:53:33.156301591+01:00",
+  "description": "Create a Nix package for godeps-gen and use it for automatic go-deps.toml generation.\n\n**Goals:**\n\n1. **Nix package for godeps-gen**\n   ```nix\n   # flake.nix outputs\n   packages.godeps-gen = pkgs.buildGoModule { ... };\n   ```\n\n2. **Automatic go-deps.toml generation**\n   - Use godeps-gen in a Nix derivation to generate go-deps.toml\n   - Input: go.mod + go.sum from the repo\n   - Output: Nix store path with go-deps.toml\n   - This removes the need for manual regeneration\n\n3. **Integration options**\n   ```nix\n   # Option A: IFD (import from derivation)\n   goDepsToml = pkgs.runCommand \"go-deps-toml\" { } ''\n     ${godeps-gen}/bin/godeps-gen --go-mod ${./go.mod} ... \u003e $out\n   '';\n   \n   # Option B: Declarative option\n   buck2.goModFile = ./go.mod;\n   buck2.goSumFile = ./go.sum;\n   # turnkey generates go-deps.toml automatically\n   ```\n\n4. **Expose to downstream consumers**\n   - Add to registry as implicit dependency\n   - Available in devenv shell\n   - Can be used in CI/CD pipelines\n\n**Note:** The --prefetch flag requires network access, so IFD approach needs careful handling (fixed-output derivation or pre-computed hashes).",
+  "id": "turnkey-0f0",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Package godeps-gen as Nix derivation",
+  "type": "task",
+  "updated_at": "2026-01-08T21:58:33.527607462+01:00"
+}

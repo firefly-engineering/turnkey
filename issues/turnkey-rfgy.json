@@ -1,0 +1,21 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [
+    "turnkey-o05a",
+    "turnkey-xbsi"
+  ],
+  "blocks": [
+    "turnkey-omxx"
+  ],
+  "closed_at": "2026-01-21T17:38:57.386387099+01:00",
+  "close_reason": "Implemented mapper package that converts extraction results to Buck2 targets and applies changes to rules.star using the starlark object model.",
+  "created": "2026-01-21T17:27:47.385555874+01:00",
+  "description": "# Mapping Layer\n\nComponent that converts extracted imports to Buck2 target references.\n\n## Responsibilities\n\n1. Take extraction protocol output\n2. Apply mapping rules (import path → Buck2 target)\n3. Consider configured deps files (go-deps.toml, rust-deps.toml, etc.)\n4. Output mutation commands for the object model\n\n## Tasks\n\n- [ ] Define mapping configuration format\n- [ ] Implement import → target mapper for each language\n- [ ] Handle internal vs external deps detection\n- [ ] Integrate with existing *-deps.toml files\n- [ ] Generate mutation commands from mapping output",
+  "id": "turnkey-rfgy",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Phase 4: Mapping Layer",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

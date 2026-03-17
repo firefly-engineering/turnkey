@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T12:27:01.210042992+01:00",
+  "close_reason": "Added BUCK file (blocked by rustdeps cell issues turnkey-8zc)",
+  "created": "2026-01-12T12:16:45.51728185+01:00",
+  "description": "Add Buck2 build target for the pydeps-gen Rust tool.",
+  "id": "turnkey-j0j",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Add BUCK file for cmd/pydeps-gen",
+  "type": "task",
+  "updated_at": "2026-01-12T12:27:01.210042992+01:00"
+}

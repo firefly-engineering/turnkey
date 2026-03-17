@@ -1,0 +1,25 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-2l8",
+    "turnkey-4ny",
+    "turnkey-emc",
+    "turnkey-ish",
+    "turnkey-nvs"
+  ],
+  "blocks": [
+    "turnkey-2t5",
+    "turnkey-66b"
+  ],
+  "closed_at": "2026-01-13T11:32:22.766799073+01:00",
+  "close_reason": "E2E greenfield-template test passing - validates full new user workflow",
+  "created": "2026-01-10T17:36:05.674240375+01:00",
+  "description": "Test scenario: New user onboarding flow\n\n1. Create fresh NixOS container with only nix installed\n2. Run 'nix flake init -t github:firefly-engineering/turnkey'\n3. Enter devshell (direnv allow)\n4. Add Go/Python/Rust hello world code\n5. Verify deps files are auto-generated\n6. Run 'tk build //...' and 'tk test //...'\n7. Verify builds succeed\n\nValidates: template works, onboarding is smooth, all toolchains functional",
+  "id": "turnkey-1us",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "E2E: Greenfield project from template",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

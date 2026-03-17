@@ -1,0 +1,22 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [
+    "turnkey-2e0a",
+    "turnkey-dp4d",
+    "turnkey-yu7"
+  ],
+  "blocks": [
+    "turnkey-0bya"
+  ],
+  "closed_at": "2026-01-22T10:50:06.469399992+01:00",
+  "close_reason": "Implemented goparse, buckgen libraries and CLI; integrated into Nix; removed gobuckify and patches",
+  "created": "2026-01-22T10:29:18.646478968+01:00",
+  "description": "Create src/cmd/buckgen/ CLI that generates BUCK files for Go vendor directories.\n\n## Goals\n- Drop-in replacement for gobuckify in Nix builds\n- Read gobuckify.json config format (backward compatible)\n- Scan vendor/ directory and generate rules.star files\n- No scaffolding required (no go.mod, main.go, vendor/modules.txt)\n\n## Structure\n```\nsrc/cmd/buckgen/\n├── main.go         # CLI entry point\n└── config.go       # Config loading (gobuckify.json compatible)\n```\n\n## Usage\n```bash\nbuckgen /path/to/godeps-cell\n# Reads gobuckify.json, scans vendor/, writes rules.star files\n```\n\n## Nix Integration\n- Add to nix/packages/buckgen.nix\n- Wire into flake outputs",
+  "id": "turnkey-ksi6",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "buckgen CLI: Command-line tool",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

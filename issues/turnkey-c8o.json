@@ -1,0 +1,22 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-8i7",
+    "turnkey-9ws",
+    "turnkey-hnz"
+  ],
+  "blocks": [
+    "turnkey-3u4"
+  ],
+  "closed_at": "2026-01-08T21:46:32.635554073+01:00",
+  "close_reason": "Implemented in godeps-gen tool. Parses go.mod/go.sum, uses nix-prefetch-github for hashes, outputs go-deps.toml.",
+  "created": "2026-01-08T20:51:54.637133501+01:00",
+  "description": "Create a Go tool to generate the deps cell from go.mod and go.sum files.\n\n**Implementation approach:**\n- Write in Go, located at `tools/godeps-gen/`\n- Build with Buck2 (dogfood our own system)\n- Expose as Nix package for downstream consumers\n\n**The generator should:**\n- Parse go.mod to extract direct dependencies and versions\n- Parse go.sum for checksums (h1: hashes)\n- Convert Go module checksums to Nix SRI hashes\n- Handle module paths → repo URL mapping (github.com/foo/bar → GitHub)\n- Support transitive dependencies from go.sum entries\n\n**Output options:**\n1. Generate TOML (go-deps.toml) - simpler, human-readable\n2. Generate Nix directly - more integrated, no intermediate file\n3. IFD approach - run generator during Nix eval (complex but seamless)\n\n**Dogfooding:**\n- `tools/godeps-gen/BUCK` defines go_binary target\n- Built via `buck2 build //tools/godeps-gen`\n- Nix package wraps the Buck2-built binary\n\n**Example workflow:**\n```bash\ngodeps-gen --go-mod ./go.mod --go-sum ./go.sum --output go-deps.toml\n```\n\nOr for direct Nix integration:\n```bash\ngodeps-gen --go-mod ./go.mod --go-sum ./go.sum --format nix \u003e go-deps.nix\n```",
+  "id": "turnkey-c8o",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Generate Go deps registry from go.mod/go.sum",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

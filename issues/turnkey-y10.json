@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-10T12:13:35.96583521+01:00",
+  "close_reason": "Superseded by turnkey-1b2 (Implement pydeps-gen tool) with more detailed subtasks",
+  "created": "2026-01-09T17:21:49.60348287+01:00",
+  "description": "CLI tool to generate python-deps.toml from Python dependency files.\n\nSimilar to godeps-gen but for Python:\n- Parse pyproject.toml, requirements.txt, or poetry.lock\n- Prefetch packages from PyPI\n- Output python-deps.toml with Nix hashes\n\nUsage: pydeps-gen [--requirements requirements.txt] \u003e python-deps.toml",
+  "id": "turnkey-y10",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "pydeps-gen: Generate python-deps.toml from requirements",
+  "type": "feature",
+  "updated_at": "2026-01-10T12:13:35.96583521+01:00"
+}

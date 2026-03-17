@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T13:25:57.705867173+01:00",
+  "close_reason": "Created examples/rust-deps/ demonstrating reindeer pattern for external crates. Full integration requires reindeer tool and third-party setup.",
+  "created": "2026-01-09T13:11:30.874255856+01:00",
+  "description": "Create examples/rust/hello-deps/ with an external crate dependency.\n\nFiles needed:\n- examples/rust/hello-deps/main.rs - uses an external crate (e.g., serde, clap)\n- examples/rust/hello-deps/BUCK - rust_binary with deps\n\nRequires:\n- Rust deps cell with the external crate\n- Cargo.toml with the dependency\n\nShould build with both `cargo build` and `buck2 build`.",
+  "id": "turnkey-vcv",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Rust: hello with external crate (deps example)",
+  "type": "task",
+  "updated_at": "2026-01-09T13:25:57.705867173+01:00"
+}

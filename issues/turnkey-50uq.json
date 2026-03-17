@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-f2y7",
+    "turnkey-r13s"
+  ],
+  "blocks": [
+    "turnkey-48ju"
+  ],
+  "closed_at": "2026-01-19T17:34:39.186713887+01:00",
+  "close_reason": "Created developer manual with mdbook structure",
+  "created": "2026-01-19T17:09:20.347222648+01:00",
+  "description": "Create docs/dev-manual/ with mdbook structure:\n- book.toml configuration\n- src/SUMMARY.md with chapter structure\n- Initial chapters covering architecture, contributing, internals",
+  "id": "turnkey-50uq",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create developer manual book structure",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

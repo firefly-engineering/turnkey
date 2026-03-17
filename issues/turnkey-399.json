@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-knb"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-08T14:36:40.101839+01:00",
+  "close_reason": "Phase 1 verified: toolchains cell generated with go/genrule, wrapper script injects config for supported commands",
+  "created": "2026-01-08T14:17:02.480152+01:00",
+  "description": "Verify buck2 --help works, toolchains cell generated correctly, wrapper injects config.",
+  "id": "turnkey-399",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "Test and verify Phase 1",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-d17b"
+  ],
+  "blocks": [
+    "turnkey-0ub4"
+  ],
+  "closed_at": "2026-01-16T19:05:16.363670074+01:00",
+  "close_reason": "Added assert_commands_in_devshell helper to assertions.sh",
+  "created": "2026-01-16T19:03:46.994303187+01:00",
+  "description": "Add a new helper function to e2e/harness/lib/assertions.sh that checks multiple commands exist in a single devshell session.\n\nCurrent pattern (slow - N devshell invocations):\n  assert_command_in_devshell \"buck2\"\n  assert_command_in_devshell \"go\"\n  assert_command_in_devshell \"godeps-gen\"\n\nNew pattern (fast - 1 devshell invocation):\n  assert_commands_in_devshell buck2 go godeps-gen\n\nThe helper should:\n- Accept multiple command names as arguments\n- Check all commands exist in single devshell call\n- Report which command(s) are missing on failure\n- Exit with proper error code\n\nExpected savings: ~13-15s per command after the first",
+  "id": "turnkey-1kek",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add assert_commands_in_devshell helper for batch checks",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

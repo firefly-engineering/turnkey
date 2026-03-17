@@ -1,0 +1,16 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-21T20:55:59.548720119+01:00",
+  "close_reason": "Added comprehensive IDE integration documentation covering VS Code, JetBrains IDEs, Neovim, and Emacs with file watcher configurations and sync.toml options.",
+  "created": "2026-01-21T17:49:04.124920152+01:00",
+  "description": "Document how to set up file watchers in IDEs (VSCode, IntelliJ) to auto-run tk rules sync on save. Include sync.toml configuration examples.",
+  "id": "turnkey-6ty1",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Document IDE integration for rules.star sync",
+  "type": "task",
+  "updated_at": "2026-01-21T20:55:59.548720119+01:00"
+}

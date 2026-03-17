@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-19T15:51:57.409863226+01:00",
+  "close_reason": "Implemented workspace inheritance for get_edition. Added find_workspace_root helper and updated gen-rust-buck to pass crate_dir for automatic workspace resolution.",
+  "created": "2026-01-17T08:28:45.098053655+01:00",
+  "description": "The get_edition() function in python/cargo/toml.py doesn't handle edition.workspace = true. When a Cargo.toml uses workspace inheritance (edition.workspace = true), the function should resolve it from the workspace root's [workspace.package] section.",
+  "id": "turnkey-ln6j",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Fix get_edition to handle workspace inheritance",
+  "type": "task",
+  "updated_at": "2026-01-19T15:51:57.409863226+01:00"
+}

@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T13:26:51.181350105+01:00",
+  "close_reason": "Created examples/python-deps/ demonstrating third-party pattern. Full integration requires pip-to-buck tooling or manual vendoring.",
+  "created": "2026-01-09T13:11:43.551342097+01:00",
+  "description": "Create examples/python/hello-deps/ with an external package dependency.\n\nFiles needed:\n- examples/python/hello-deps/__init__.py\n- examples/python/hello-deps/__main__.py - uses external package (e.g., click, requests)\n- examples/python/hello-deps/BUCK - python_binary with deps\n\nRequires:\n- Python deps cell with the external package\n- pyproject.toml or requirements.txt\n\nShould work with both native Python and buck2 run.",
+  "id": "turnkey-uq2",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Python: hello with external package (deps example)",
+  "type": "task",
+  "updated_at": "2026-01-09T13:26:51.181350105+01:00"
+}

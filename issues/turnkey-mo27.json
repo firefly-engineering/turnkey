@@ -1,0 +1,19 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [
+    "turnkey-0bya",
+    "turnkey-yu7"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-22T10:50:06.493120773+01:00",
+  "close_reason": "Implemented goparse, buckgen libraries and CLI; integrated into Nix; removed gobuckify and patches",
+  "created": "2026-01-22T10:29:25.801936067+01:00",
+  "description": "Clean up gobuckify artifacts after buckgen is integrated and validated.\n\n## Files to Remove\n- nix/packages/gobuckify.nix\n- nix/patches/gobuckify/01-use-go-directly.patch\n- nix/patches/gobuckify/02-fix-goroutine-closure.patch\n- nix/patches/gobuckify/03-fix-platform-select-syntax.patch\n- nix/patches/gobuckify/04-fix-cross-platform-analysis.patch\n- nix/patches/gobuckify/05-configurable-buildfile-name.patch\n\n## Other Cleanup\n- Remove gobuckify from flake.nix package list\n- Update any documentation referencing gobuckify",
+  "id": "turnkey-mo27",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Remove gobuckify and patches",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

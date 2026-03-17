@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-4oa"
+  ],
+  "closed_at": "2026-01-09T17:52:01.73281696+01:00",
+  "close_reason": "Implemented syncconfig package with TOML-based staleness rules configuration. Added .turnkey/sync.toml example config.",
+  "created": "2026-01-09T17:21:28.767145944+01:00",
+  "description": "Define staleness rules for dependency cells:\n\n- Go: go.mod + go.sum → go-deps.toml\n- Rust: Cargo.toml + Cargo.lock → rust-deps.toml  \n- Python: pyproject.toml / requirements.txt → python-deps.toml\n\nRules should be declarative and easy to extend for new languages.\nConsider a config format like:\n\n[deps.go]\nsources = [\"go.mod\", \"go.sum\"]\ntarget = \"go-deps.toml\"\ngenerator = \"godeps-gen\"\n",
+  "id": "turnkey-1q6",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Dependency staleness rules configuration",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

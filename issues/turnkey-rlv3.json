@@ -1,0 +1,16 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-21T20:54:37.923743053+01:00",
+  "close_reason": "Added e2e test 09-rules-star-sync.sh that tests staleness detection, sync, preservation markers, and build verification.",
+  "created": "2026-01-21T17:48:57.136361946+01:00",
+  "description": "End-to-end tests: (1) Add import to Go file, run check, verify stale, run sync, verify updated, run build. (2) Test preservation markers are respected. (3) Test unmapped import warnings.",
+  "id": "turnkey-rlv3",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Add integration tests for rules.star sync",
+  "type": "task",
+  "updated_at": "2026-01-21T20:54:37.923743053+01:00"
+}

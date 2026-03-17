@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-1kek",
+    "turnkey-dfei"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-16T19:14:38.849276986+01:00",
+  "close_reason": "Completed E2E test batching - 73 → 29 devshell calls (~60% reduction)",
+  "created": "2026-01-16T19:03:56.635584202+01:00",
+  "description": "Refactor all E2E tests to minimize devshell invocations using the new helper functions.\n\nTests to refactor (current devshell calls -\u003e target):\n- 01-greenfield-template.sh: 6 -\u003e 2\n- 02-ci-headless.sh: 7 -\u003e 2-3\n- 03-native-tools-sync.sh: 9 -\u003e 2-3\n- 04-multi-language.sh: 21 -\u003e 3-4\n- 05-brownfield-adoption.sh: 8 -\u003e 2-3\n- 06-git-workflow.sh: 8 -\u003e 2-3\n- 07-reproducibility.sh: 6 -\u003e 2\n- 08-error-recovery.sh: 8 -\u003e 2-3\n\nStrategy:\n1. Group operations by phase (pre-commit vs post-commit)\n2. Batch all command assertions into single call\n3. Batch deps generation commands where possible\n4. Batch build/run commands\n\nDepends on: run_in_devshell_script and assert_commands_in_devshell helpers\n\nExpected total savings: ~60% reduction in test time (~15 min saved)",
+  "id": "turnkey-0ub4",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Refactor E2E tests to use batched devshell calls",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

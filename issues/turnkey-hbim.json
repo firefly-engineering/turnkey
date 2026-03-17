@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-20T14:56:06.00525174+01:00",
+  "close_reason": "Added Solidity and Jsonnet language documentation",
+  "created": "2026-01-20T14:51:25.044050969+01:00",
+  "description": "The user manual's Language Support section currently covers:\n- Go\n- Rust\n- Python\n- TypeScript\n\nWe need to add documentation for:\n\n**Solidity:**\n- solidity_library rule\n- solidity_contract rule  \n- solidity_test rule (wraps forge test)\n- Dependency management (npm packages + Foundry git deps)\n- Auto-generated import remappings\n- Per-target solc_version support\n\n**Jsonnet:**\n- jsonnet_library rule\n- External variables (ext_strs, ext_codes)\n- Top-level arguments (tla_strs, tla_codes)\n- Import paths and dependencies\n- Using jrsonnet (Rust implementation) for speed\n\n**Files to create:**\n- docs/user-manual/src/languages/solidity.md\n- docs/user-manual/src/languages/jsonnet.md\n\n**Files to update:**\n- docs/user-manual/src/SUMMARY.md (add to Language Support section)",
+  "id": "turnkey-hbim",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Add Solidity and Jsonnet to language support documentation",
+  "type": "task",
+  "updated_at": "2026-01-20T14:56:06.00525174+01:00"
+}

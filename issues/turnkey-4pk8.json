@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-19T20:09:06.06192124+01:00",
+  "close_reason": "Added clippy, rustfmt, rust-analyzer, and cargo-edit to registry and toolchain.toml",
+  "created": "2026-01-19T20:05:53.387872291+01:00",
+  "description": "Make sure essential Rust development tools are included in the devenv shell:\n- cargo clippy (linting)\n- rustfmt (formatting)\n- cargo-edit (for cargo add/rm)\n- rust-analyzer (LSP, if not already available)\n\nThese should be available when rust/cargo is declared in toolchain.toml. May need to use rustup components or nixpkgs rust-bin overlay for proper toolchain composition.",
+  "id": "turnkey-4pk8",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Ensure Rust tooling (clippy, rustfmt, etc.) available in toolchain",
+  "type": "task",
+  "updated_at": "2026-01-19T20:09:06.06192124+01:00"
+}

@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-qvc"
+  ],
+  "blocks": [
+    "turnkey-545"
+  ],
+  "closed_at": "2026-01-09T21:52:28.661921044+01:00",
+  "close_reason": "Implemented turnkey-check pre-commit hook that runs tk check. Added preCommitCheck option to configure.",
+  "created": "2026-01-09T17:22:50.0460978+01:00",
+  "description": "Add pre-commit hook that runs `tk check` before commits.\n\nPrevents committing when BUCK files or deps are out of sync.\n\nHook configuration (git-hooks / pre-commit):\n```yaml\n- repo: local\n  hooks:\n    - id: turnkey-check\n      name: Check BUCK files in sync\n      entry: tk check\n      language: system\n      pass_filenames: false\n```\n\nOn failure, suggest running `tk sync` to fix.",
+  "id": "turnkey-0il",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Pre-commit hook: tk check validation",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

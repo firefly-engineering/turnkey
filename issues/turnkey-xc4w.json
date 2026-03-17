@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-21T03:33:42.991959024+01:00",
+  "close_reason": "Implemented tiered CI smoke test suite with GitHub Actions workflow",
+  "created": "2026-01-19T19:57:18.397774456+01:00",
+  "description": "Identify and implement a smoke test suite suitable for CI pipelines.\n\n## Goals\n- Fast enough to run on every PR (~2-5 minutes max)\n- Catches most regressions without running full test suite\n- Tests critical paths across all supported languages\n\n## Candidate Tests\n\n### Nix/Flake Health\n- `nix flake check --no-build` - validates flake structure\n- `nix build .#turnkey-prelude` - prelude builds correctly\n- `nix develop --impure -c true` - shell enters successfully\n\n### Buck2 Integration\n- Build a simple target from each language:\n  - `buck2 build //examples/go-hello:go-hello`\n  - `buck2 build //examples/rust-hello:rust-hello`\n  - `buck2 build //examples/python-hello:python-hello`\n  - `buck2 build //examples/typescript-hello:typescript-hello`\n- Run one target to verify runtime works\n\n### Dependency Cells\n- Verify godeps cell builds\n- Verify rustdeps cell builds  \n- Verify pydeps cell builds\n- Verify jsdeps cell builds\n\n### Tool Smoke Tests\n- `godeps-gen --help`\n- `rustdeps-gen --help`\n- `pydeps-gen --help`\n- `jsdeps-gen --help`\n- `tk --help`\n\n## Implementation\n- Create `scripts/ci-smoke.sh` or similar\n- Add GitHub Actions workflow\n- Consider matrix testing across platforms (linux, darwin)",
+  "id": "turnkey-xc4w",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Define CI smoke test suite",
+  "type": "task",
+  "updated_at": "2026-01-21T03:33:42.991959024+01:00"
+}

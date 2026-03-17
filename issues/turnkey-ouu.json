@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-10T13:11:55.526096153+01:00",
+  "close_reason": "Implemented hash-based staleness detection in .envrc using SHA256 hashes stored in .turnkey-deps-hashes",
+  "created": "2026-01-10T13:08:52.953621313+01:00",
+  "description": "Replace timestamp-based checks in .envrc with hash-based checks. Store input file hashes in .turnkey-deps-hashes and compare to detect when regeneration is needed. More reliable than -nt timestamp comparisons.",
+  "id": "turnkey-ouu",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "Implement hash-based staleness detection for deps regeneration",
+  "type": "task",
+  "updated_at": "2026-01-10T13:11:55.526096153+01:00"
+}

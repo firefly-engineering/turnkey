@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-mch"
+  ],
+  "blocks": [
+    "turnkey-8dl"
+  ],
+  "closed_at": "2026-01-13T19:09:12.473980704+01:00",
+  "close_reason": "Created adapter files with mkXxxDepPackage and mkXxxDepsCell functions",
+  "created": "2026-01-13T19:04:38.171767603+01:00",
+  "description": "",
+  "id": "turnkey-ub6",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create Go adapter (adapters/go.nix with mkGoDepPackage, mkGoDepsCell)",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

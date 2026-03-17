@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T12:51:04.218723486+01:00",
+  "close_reason": "Implemented gen-rust-buck.py which parses Cargo.toml to generate BUCK files with:\n- Dependency resolution\n- crate_root detection\n- proc_macro support\n- Cargo env vars\n- Linux-only filtering\n\nREMAINING LIMITATIONS:\n- No feature resolution (serde_derive fails due to missing features on quote/proc_macro2)\n- No build script support (rustversion fails due to build.rs)\n- Simple crates work, complex proc-macro crates still need reindeer\n\nFor full Cargo compatibility, recommend using rust-deps-cell-reindeer.nix (not yet integrated).",
+  "created": "2026-01-12T12:26:53.504504713+01:00",
+  "description": "The rust-deps-cell.nix generates simple BUCK files that don't handle complex crates:\n\n1. **clap**: Uses `clap_builder` crate but BUCK file doesn't declare the dependency\n2. **serde**: Has multiple crate roots (src/lib.rs, src/core/lib.rs) - needs explicit crate_root\n3. **clap**: Uses include_str! for files in examples/ dir which aren't included in srcs glob\n\nCurrent BUCK generation (nix/buck2/rust-deps-cell.nix line 47):\n```nix\nrust_library(\n    name = \"${dep.crateName}\",\n    srcs = glob([\"src/**/*.rs\"]),\n    edition = \"2021\",\n    visibility = [${visibility}],\n)\n```\n\nNeeds to:\n- Parse Cargo.toml for dependencies and add them to deps\n- Handle crates with multiple possible crate roots\n- Include non-.rs files that are referenced via include_str!/include_bytes!",
+  "id": "turnkey-8zc",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "rustdeps cell: improve BUCK generation for complex crates",
+  "type": "bug",
+  "updated_at": "2026-01-12T12:51:04.218723486+01:00"
+}

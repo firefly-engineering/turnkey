@@ -1,0 +1,18 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-bwc0"
+  ],
+  "closed_at": "2026-01-22T13:37:28.204766628+01:00",
+  "close_reason": "Completed review. Found unpinned inputs and impurity issues. Created follow-up tasks.",
+  "created": "2026-01-22T13:34:53.463267887+01:00",
+  "description": "Audit flake.nix, nix/devenv, nix/packages.\nQuality Criteria:\n- Pinned inputs\n- Isolated modules\n- Correct vendorHash\n- Hermeticity",
+  "id": "turnkey-h6tk",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Review Core Nix Infrastructure",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

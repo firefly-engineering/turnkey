@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-21T09:48:29.025212603+01:00",
+  "close_reason": "All phases complete: Phase 1 (parser/staleness), Phase 2 (import detection/mapping), Phase 3 (tk integration/config). Feature is fully implemented with tk rules check/sync commands and auto-sync before buck2 commands when enabled.",
+  "created": "2026-01-20T10:38:45.634556716+01:00",
+  "description": "Create a tool that automatically regenerates rules.star files when the source code changes a target's dependency graph. This would detect when Go imports change, Rust dependencies change, etc. and update the corresponding rules.star with the correct deps list.",
+  "id": "turnkey-59y3",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create tool to auto-update rules.star when dependencies change",
+  "type": "feature",
+  "updated_at": "2026-01-21T09:48:29.025212603+01:00"
+}

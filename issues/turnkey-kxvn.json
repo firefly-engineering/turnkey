@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-19T23:34:44.144716653+01:00",
+  "close_reason": "Created vision book with Why Turnkey, Core Principles, and Architecture Overview chapters",
+  "created": "2026-01-19T19:56:53.759869651+01:00",
+  "description": "Create a new mdbook (or section in user-manual) explaining turnkey's high-level vision and objectives.\n\n## Key Themes to Cover\n\n### Native Tool Compatibility\n- Normal commands work as expected (go build, cargo build, npm install, etc.)\n- LSP and IDE integrations work seamlessly\n- Developers shouldn't need to learn new commands for basic workflows\n- tw wrappers are transparent - enhance rather than replace\n\n### Monorepo-like Environment Without Full Source Storage\n- Operate like a monorepo (unified versioning, atomic changes across deps)\n- But without storing source code of all dependencies in the repo\n- Nix provides hermetic dependency resolution\n- Buck2 cells provide the \"virtual monorepo\" abstraction\n\n### Incremental Build/Test\n- Reduce CI load through proper caching and incrementality\n- AI agents benefit from fast feedback loops\n- Only rebuild/retest what changed\n- Remote execution and caching strategies\n\n### Continuum of Experience\n- From OSS-style prototype (quick iteration, minimal ceremony)\n- To large-scale enterprise (governance, compliance, reproducibility)\n- Same tools scale up without rewrites\n- Progressive adoption - start simple, add rigor as needed\n\n## Format\n- Should be accessible to newcomers explaining \"why turnkey\"\n- Include diagrams showing the architecture vision\n- Link to detailed docs for each area",
+  "id": "turnkey-kxvn",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create vision book documenting high-level objectives",
+  "type": "feature",
+  "updated_at": "2026-01-19T23:34:44.144716653+01:00"
+}

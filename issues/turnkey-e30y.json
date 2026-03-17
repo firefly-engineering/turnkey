@@ -1,0 +1,16 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-22T16:58:14.771767382+01:00",
+  "close_reason": "Added tk rules documentation to CLI reference.",
+  "created": "2026-01-22T13:46:43.221320826+01:00",
+  "description": "Add missing documentation for 'tk rules' subcommand in docs/user-manual/src/reference/cli.md.",
+  "id": "turnkey-e30y",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Document 'tk rules' in CLI manual",
+  "type": "task",
+  "updated_at": "2026-01-22T16:58:14.771767382+01:00"
+}

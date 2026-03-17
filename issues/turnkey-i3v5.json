@@ -1,0 +1,16 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-21T17:44:55.807828328+01:00",
+  "close_reason": "Core refactoring complete for Go. New architecture: starlark object model, extraction protocol, go-deps-extract, mapper, rulessync. Additional language extractors (Phase 5) can be added incrementally.",
+  "created": "2026-01-21T17:27:17.488950206+01:00",
+  "description": "# Overview\n\nRefactor the rules.star auto-sync system to use a cleaner architecture:\n\n1. **Language-specific extractors** - Separate binaries that use native tooling for each language\n2. **Starlark object model** - Proper AST-based parsing with modification tracking\n3. **Mutation API** - Clean interface for adding/removing deps, creating targets\n4. **Smart serialization** - Preserve unchanged code, only re-serialize modified parts\n\n## Why\n\nCurrent approach has issues:\n- Fragile text editing with bracket counting and regex\n- Go regex parsing other languages' imports\n- Tight coupling between detection, mapping, and mutation\n- Hacky preservation of unchanged code\n\n## Phases\n\n- Phase 1: Starlark Object Model (foundation)\n- Phase 2: Extraction Protocol\n- Phase 3: Go Extractor (reference implementation)\n- Phase 4: Mapping Layer\n- Phase 5: Additional Language Extractors\n- Phase 6: Integration (replace current implementation)",
+  "id": "turnkey-i3v5",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "Refactor rules.star sync to use proper object model",
+  "type": "epic",
+  "updated_at": "2026-01-21T17:44:55.807828328+01:00"
+}

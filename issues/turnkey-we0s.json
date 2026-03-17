@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-8dl",
+    "turnkey-cj3",
+    "turnkey-ep3"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-13T19:17:44.111821175+01:00",
+  "close_reason": "All Buck2 builds and tests pass with new deps-cell library",
+  "created": "2026-01-13T19:04:55.272260856+01:00",
+  "description": "",
+  "id": "turnkey-we0s",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Verify Buck2 builds work with new deps-cell library",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

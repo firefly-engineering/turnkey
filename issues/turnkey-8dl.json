@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-ub6"
+  ],
+  "blocks": [
+    "turnkey-9jkz",
+    "turnkey-we0s"
+  ],
+  "closed_at": "2026-01-13T19:10:08.861848505+01:00",
+  "close_reason": "Updated to use new deps-cell library",
+  "created": "2026-01-13T19:04:49.182108256+01:00",
+  "description": "",
+  "id": "turnkey-8dl",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Update go-deps-cell.nix to use new library",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

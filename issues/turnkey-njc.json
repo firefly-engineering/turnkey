@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-emc",
+    "turnkey-ish"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-13T21:42:56.783542385+01:00",
+  "close_reason": "Implemented brownfield adoption E2E test (05-brownfield-adoption.sh). Tests adopting existing Go project with turnkey.",
+  "created": "2026-01-10T17:36:15.07808228+01:00",
+  "description": "Test scenario: Adding turnkey to existing language project\n\n1. Create NixOS container\n2. Create a standard Go/Python/Rust project with existing deps (go.mod, pyproject.toml, Cargo.toml)\n3. Add turnkey flake.nix boilerplate (import turnkey module)\n4. Add .envrc with 'use flake'\n5. Enter devshell - verify deps files auto-generated\n6. Verify 'tk build' works without modifying source code\n7. Verify language-native tools still work (go build, cargo build, pytest)\n\nValidates: brownfield adoption, no disruption to existing workflows",
+  "id": "turnkey-njc",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "E2E: Adopt existing project (brownfield)",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

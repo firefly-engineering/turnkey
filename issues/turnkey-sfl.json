@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T17:41:12.168923078+01:00",
+  "close_reason": "Added test and remote_test_execution toolchains. Tests work for Go, Rust, and Python.",
+  "created": "2026-01-09T17:29:43.193900618+01:00",
+  "description": "Add a test toolchain to the Buck2 toolchains cell so that go_test, rust_test, python_test etc. targets can be run via buck2 test.\n\nCurrently buck2 test fails with:\n```\nUnknown target `test` from package `toolchains//`.\n```\n\nNeed to add test runner configuration to:\n- .turnkey/toolchains/BUCK\n- Possibly toolchains cell generation in nix/buck2/toolchains-cell.nix\n\nReference the prelude's test toolchain patterns.",
+  "id": "turnkey-sfl",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add test toolchain to Buck2 configuration",
+  "type": "task",
+  "updated_at": "2026-01-09T17:41:12.168923078+01:00"
+}

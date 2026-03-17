@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T12:19:18.052865278+01:00",
+  "close_reason": "Added BUCK file",
+  "created": "2026-01-12T12:16:42.447708126+01:00",
+  "description": "Add Buck2 build target for the godeps-gen Go tool.",
+  "id": "turnkey-aif",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Add BUCK file for cmd/godeps-gen",
+  "type": "task",
+  "updated_at": "2026-01-12T12:19:18.052865278+01:00"
+}

@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-ax4"
+  ],
+  "blocks": [
+    "turnkey-b0d"
+  ],
+  "closed_at": "2026-01-10T18:06:17.607237418+01:00",
+  "close_reason": "Implemented: direnv-lib.nix generates turnkey-direnv-lib.sh with use_turnkey function, tool paths, and language-specific regeneration based on toolchain.toml",
+  "created": "2026-01-10T17:27:48.39243053+01:00",
+  "description": "Create a Nix derivation that generates turnkey-direnv-lib.sh based on toolchain.toml configuration. The script should:\n\n1. Read enabled languages from toolchain.toml (go, python, rust, etc.)\n2. Generate regeneration blocks only for enabled languages\n3. Generate watch_file entries only for relevant files\n4. Include helper functions (_turnkey_hash_files, _turnkey_needs_regen, etc.)\n5. Inject tool paths from Nix (godeps-gen, pydeps-gen, rustdeps-gen, uv)\n6. Export via TURNKEY_DIRENV_LIB environment variable\n\nThis makes the script declarative - add 'python = {}' to toolchain.toml and the Python regeneration + watch_file entries appear automatically.",
+  "id": "turnkey-tz0",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Generate turnkey-direnv-lib.sh from Nix",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

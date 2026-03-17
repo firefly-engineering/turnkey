@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-13T10:40:58.291131715+01:00",
+  "close_reason": "Added schema_version = 1 to godeps (output.go), pydeps-gen (main.rs), and rustdeps-gen (main.rs)",
+  "created": "2026-01-13T10:35:35.61659498+01:00",
+  "description": "## Problem\n\nOur dependency TOML files (go-deps.toml, rust-deps.toml, python-deps.toml) have no version indicator. If we need to make breaking schema changes, there is no way to detect old files or migrate them.\n\n## Proposed Solution\n\nAdd a version field at the top of each dependency file:\n\n```toml\n# go-deps.toml\nversion = 1\n\n[deps.\"github.com/google/uuid\"]\nversion = \"v1.6.0\"\nhash = \"sha256-...\"\n```\n\n```toml\n# rust-deps.toml\nversion = 1\n\n[deps.\"serde@1.0.0\"]\nname = \"serde\"\nversion = \"1.0.0\"\nhash = \"sha256-...\"\n```\n\n```toml\n# python-deps.toml\nversion = 1\n\n[deps.\"requests\"]\nversion = \"2.31.0\"\nhash = \"sha256-...\"\n```\n\n## Implementation\n\n1. Update *-deps-gen tools to emit `version = 1` at top of output\n2. Update Nix cell builders to read and validate version\n3. Provide clear error messages for version mismatches\n4. Document version history and migration paths\n\n## Version Semantics\n\n- `version = 1`: Initial stable format\n- Future versions increment on breaking changes\n- Cell builders should reject unknown/unsupported versions with helpful error\n\n## Benefits\n\n- Safe schema evolution\n- Clear error messages for outdated files\n- Enables automatic migration tooling in future\n- Documents format stability expectations",
+  "id": "turnkey-64j",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Add schema version to dependency TOML files",
+  "type": "task",
+  "updated_at": "2026-01-13T10:40:58.291131715+01:00"
+}

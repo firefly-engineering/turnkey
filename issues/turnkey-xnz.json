@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-kxs"
+  ],
+  "blocks": [
+    "turnkey-545"
+  ],
+  "closed_at": "2026-01-09T21:52:29.678079009+01:00",
+  "close_reason": "Created comprehensive docs/tk.md with overview, quick start, command reference, configuration, staleness detection, and troubleshooting sections.",
+  "created": "2026-01-09T17:23:05.83026313+01:00",
+  "description": "Comprehensive documentation for the tk command.\n\nContents:\n1. Overview - what tk does and why\n2. Quick start - basic usage\n3. Command reference:\n   - tk build/run/test/... (buck2 passthrough with sync)\n   - tk sync (explicit sync)\n   - tk check (CI validation)\n4. Configuration:\n   - syncFirstCommands vs passThroughCommands\n   - --no-sync flag\n   - TURNKEY_NO_ALIAS env var\n5. Staleness rules:\n   - How staleness is detected\n   - What triggers regeneration\n6. Troubleshooting:\n   - Common issues\n   - Debug flags\n\nLocation: docs/tk.md",
+  "id": "turnkey-xnz",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Documentation: tk command reference",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

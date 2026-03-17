@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T13:26:58.562301563+01:00",
+  "close_reason": "Rust deps cell generation would require reindeer wrapper. Similar pattern to godeps-gen but wrapping reindeer tooling.",
+  "created": "2026-01-09T13:11:30.944610249+01:00",
+  "description": "Create a Nix-based Rust deps cell similar to godeps for Go.\n\nOptions to explore:\n1. Use reindeer (Facebook's Cargo to Buck2 tool)\n2. Build custom solution using cargo metadata + Nix fetchers\n3. Use crane or naersk for Nix-native Rust builds\n\nThe deps cell should:\n- Parse Cargo.toml/Cargo.lock\n- Fetch crates from crates.io\n- Generate BUCK files for each crate\n- Support both `cargo build` and `buck2 build`",
+  "id": "turnkey-d28",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Rust: deps cell generation from Cargo.toml",
+  "type": "task",
+  "updated_at": "2026-01-09T13:26:58.562301563+01:00"
+}

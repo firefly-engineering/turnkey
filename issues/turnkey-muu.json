@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-qs7"
+  ],
+  "blocks": [
+    "turnkey-knb"
+  ],
+  "closed_at": "2026-01-08T14:21:29.8723+01:00",
+  "close_reason": "Added import for buck2.nix in default.nix",
+  "created": "2026-01-08T14:17:00.961191+01:00",
+  "description": "Import the new buck2.nix module in nix/devenv/turnkey/default.nix",
+  "id": "turnkey-muu",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "Update devenv module to import buck2.nix",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

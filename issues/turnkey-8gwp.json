@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-kx9o"
+  ],
+  "blocks": [
+    "turnkey-7qna"
+  ],
+  "closed_at": "2026-01-16T16:36:41.023343369+01:00",
+  "created": "2026-01-16T16:25:51.417778648+01:00",
+  "description": "Create nix/buck2/prelude.nix that:\n1. Fetches upstream buck2-prelude from GitHub at pinned commit\n2. Applies patches from nix/patches/prelude/ (if any exist)\n3. Copies extensions from nix/buck2/prelude-extensions/\n4. Exports as turnkey-prelude derivation\n\nAlso create the directory structure:\n- nix/buck2/prelude-extensions/ (empty initially)\n- nix/patches/prelude/ (empty initially)",
+  "id": "turnkey-8gwp",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create prelude.nix derivation",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

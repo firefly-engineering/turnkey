@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-01-08T23:34:57.489939708+01:00",
+  "description": "Currently go-deps.toml must be tracked in git because Nix flakes only see git-tracked files.\n\n**Options to explore:**\n1. `git add -N` in .envrc - adds to index without staging content\n2. Flake input approach - separate derivation/flake for deps\n3. IFD (Import From Derivation) with --impure\n4. Accept git-tracking as the right tradeoff (deterministic file)\n\n**Context:**\n- Nix flakes filter source to git-tracked files for reproducibility\n- --no-pure-eval doesn't help with this\n- go-deps.toml is deterministic given go.mod+go.sum, so tracking isn't truly impure",
+  "id": "turnkey-0k0",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "Explore options for untracked go-deps.toml",
+  "type": "task",
+  "updated_at": "2026-01-08T23:34:57.489939708+01:00"
+}

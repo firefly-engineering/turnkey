@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-di93",
+    "turnkey-l4fr",
+    "turnkey-u4dv",
+    "turnkey-vqnb"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-19T16:46:46.175136383+01:00",
+  "close_reason": "All subtasks completed - BUCK renamed to rules.star",
+  "created": "2026-01-19T16:33:47.206734705+01:00",
+  "description": "Rename all BUCK files to rules.star to make buck2 less visible as an implementation detail.\n\n## Rationale\n- 'rules.star' clearly indicates Starlark syntax\n- Doesn't signal 'this is a Buck project'\n- Descriptive of contents (build rules)\n- Aligns with .turnkey isolation dir hiding buck-out artifacts\n\n## Scope\n- ~33 BUCK files to rename to rules.star\n- Nix adapters generating files (go, rust, python, javascript)\n- buckconfig [buildfile] name = rules.star\n- gobuckify config: buildfile_name = rules.star\n- Documentation updates\n\n## Prerequisites\n- gobuckify patch for configurable buildfile name (done)",
+  "id": "turnkey-h4zd",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Rename BUCK files to rules.star across the codebase",
+  "type": "epic",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

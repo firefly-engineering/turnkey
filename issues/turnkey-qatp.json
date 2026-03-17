@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-flx4",
+    "turnkey-y4y7"
+  ],
+  "blocks": [
+    "turnkey-8qbh"
+  ],
+  "closed_at": "2026-01-19T21:22:00.72593123+01:00",
+  "close_reason": "Created Solidity deps-cell adapter with npm and git support",
+  "created": "2026-01-19T21:05:32.164145211+01:00",
+  "description": "Create nix/lib/deps-cell/adapters/solidity.nix that:\n- Handles both npm and git dependency sources\n- Fetches packages using appropriate fetcher (fetchurl for npm, fetchGit for git)\n- Generates rules.star with filegroup targets for each dependency\n- Auto-generates remappings based on package structure\n\nReference: nix/lib/deps-cell/adapters/javascript.nix\n\nPart of Solidity support (turnkey-ri2t).",
+  "id": "turnkey-qatp",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create Solidity deps-cell adapter",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

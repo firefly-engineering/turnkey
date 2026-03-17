@@ -1,0 +1,25 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-1us",
+    "turnkey-2t5",
+    "turnkey-dw7",
+    "turnkey-emc",
+    "turnkey-m5t",
+    "turnkey-njc",
+    "turnkey-s52",
+    "turnkey-tps"
+  ],
+  "closed_at": "2026-01-16T10:55:33.490095667+01:00",
+  "close_reason": "All E2E test scenarios implemented and passing",
+  "created": "2026-01-10T17:35:55.819715238+01:00",
+  "description": "End-to-end testing infrastructure for validating turnkey workflows. Tests should run in isolated NixOS containers to ensure reproducibility. Cover greenfield (new projects), brownfield (existing projects), and ongoing development scenarios.",
+  "id": "turnkey-ish",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "E2E testing infrastructure and scenarios",
+  "type": "epic",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

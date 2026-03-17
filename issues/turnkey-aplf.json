@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-01-16T20:14:20.787286133+01:00",
+  "description": "## Problem\n\nCurrently, BUCK files for Rust dependencies are generated globally, which may prevent caching opportunities. When any dependency changes, the entire generation process runs again.\n\n## Investigation Areas\n\n### Option 1: Hash-based caching\nCache the BUCK generation by computing a hash from:\n- Rust toolchain version/hash\n- The dependency itself (crate + version)\n- Unified features computation for that dependency\n\nThis would allow skipping regeneration for unchanged dependencies.\n\n### Option 2: Per-dependency Nix packages (preferred)\nCreate a 2nd layer of Nix packages at per-dependency granularity:\n- Each dependency gets its own Nix derivation\n- The unified set of features is an additional input to the derivation\n- Nix's built-in caching handles invalidation automatically\n- Cleaner architecture - leverages Nix's strengths\n\n## Benefits\n- Faster incremental builds when only some deps change\n- Better cache hit rates in CI\n- Reduced redundant work\n\n## Questions to Answer\n1. How much time is currently spent on global BUCK generation?\n2. What's the feature unification algorithm and can it be made per-dep?\n3. How would per-dep packages compose in the final cell?",
+  "id": "turnkey-aplf",
+  "labels": [],
+  "comments": [
+    {
+      "text": "## Investigation Findings (2026-01-21)\n\n### Current Architecture\n\nCargo.lock -\u003e rustdeps-gen -\u003e rust-deps.toml -\u003e rust-deps-cell.nix -\u003e rustdeps/ cell\n\nThe rust-deps-cell.nix orchestrates:\n- fetch all crates\n- compute-unified-features (global)\n- gen-rust-buck (per crate)\n\n**Key insight**: The entire rustdeps cell is a single Nix derivation. When rust-deps.toml changes (even one crate), everything regenerates.\n\n### Key Files Identified\n\n- src/cmd/rustdeps-gen/src/main.rs - Generates rust-deps.toml from Cargo.lock\n- src/cmd/compute-unified-features/__main__.py - Global feature unification\n- src/cmd/gen-rust-buck/__main__.py - Per-crate BUCK file generation\n- nix/buck2/rust-deps-cell.nix - Orchestrates entire cell build\n- nix/lib/deps-cell/adapters/rust.nix - Per-crate package builder\n- src/python/cargo/features.py - Feature unification algorithm\n\n### Challenge: Feature Unification is Global\n\nThe feature unification algorithm needs to know what features ALL crates in the graph request:\n1. collect_feature_requirements() - scans all crates for requested features\n2. collect_forwarded_features() - handles forwarding like alloc = [\"dep/alloc\"]\n3. expand_features() - expands feature definitions recursively\n\nThis is inherently global - crate A's features depend on what crate B requests.\n\n### Proposed Approach (for future work)\n\nPer-crate derivations with shared feature computation:\n1. rust-deps.toml -\u003e unified-features.json (single derivation)\n2. Each crate gets its own derivation using features.json\n3. Compose all crate derivations into final cell\n\n### Next Steps When Resuming\n\n1. Benchmark current generation time\n2. Identify if bottleneck is fetching, feature computation, or BUCK generation\n3. Prototype per-crate derivations\n4. Validate features still unify correctly",
+      "author": "Yann Hodique",
+      "timestamp": "2026-01-21T20:03:22Z"
+    }
+  ],
+  "priority": 3,
+  "status": "open",
+  "title": "Investigate per-dependency BUCK generation for Rust",
+  "type": "task",
+  "updated_at": "2026-01-21T21:07:58.657194341+01:00"
+}

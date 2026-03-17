@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T22:28:18.683191293+01:00",
+  "close_reason": "Implemented user-extensible registries for rustc_flags and build script fixups",
+  "created": "2026-01-12T15:08:14.798055637+01:00",
+  "description": "Currently rust-deps-cell.nix has hardcoded build script fixups for serde and serde_core (generating OUT_DIR/private.rs). This should be moved to a user-extensible registry pattern.\n\nProposed approach:\n- Add a buildScriptFixups option to the buck2 config\n- Accept a Nix attrset mapping crate names to fixup derivations or shell commands\n- Fixups receive crate metadata (name, version, vendorPath) as context\n- Default registry includes known fixups (serde, serde_core)\n\nExample config:\n```nix\nbuck2.buildScriptFixups = {\n  serde_core = { crateName, version, vendorPath }: ''\n    mkdir -p \"$out/${vendorPath}/out_dir\"\n    cat \u003e \"$out/${vendorPath}/out_dir/private.rs\" \u003c\u003c 'EOF'\n    // generated content using ${version}\n    EOF\n  '';\n  my_crate = { ... }: ''\n    # custom fixup\n  '';\n};\n```\n\nRelated: turnkey-d45 (rustc_flags registry)",
+  "id": "turnkey-9o1",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Make build script fixups user-extensible via registry",
+  "type": "task",
+  "updated_at": "2026-01-12T22:28:18.683191293+01:00"
+}

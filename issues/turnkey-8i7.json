@@ -1,0 +1,24 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-538"
+  ],
+  "blocks": [
+    "turnkey-9ws",
+    "turnkey-c8o",
+    "turnkey-hnz",
+    "turnkey-hoa",
+    "turnkey-nnn"
+  ],
+  "closed_at": "2026-01-08T21:20:22.915343499+01:00",
+  "close_reason": "Refactored: go-deps-registry.nix for declarations, go-deps-cell.nix for building. Tested with hello-deps example.",
+  "created": "2026-01-08T20:51:43.736726297+01:00",
+  "description": "Currently go-deps-example.nix hardcodes dependency sources (fetchFromGitHub calls). This should be refactored to use a registry pattern similar to the toolchain registry.\n\nGoals:\n- Separate dependency declaration from BUCK generation logic\n- Create a Go deps registry mapping import paths to Nix fetchers\n- Allow registry to be extended/overridden like toolchain registry\n- Keep go-deps generation logic reusable\n\nExample structure:\n```nix\n# nix/buck2/go-deps-registry.nix\n{\n  \"github.com/google/uuid\" = {\n    version = \"v1.6.0\";\n    sha256 = \"sha256-...\";\n  };\n}\n```",
+  "id": "turnkey-8i7",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Extract Go deps into registry pattern",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T13:26:58.634072688+01:00",
+  "close_reason": "Python deps cell generation would require pip-to-buck wrapper. Different approach than Go due to Python ecosystem.",
+  "created": "2026-01-09T13:11:43.625290021+01:00",
+  "description": "Create a Nix-based Python deps cell similar to godeps for Go.\n\nOptions to explore:\n1. Use poetry2nix for Poetry projects\n2. Use pip2nix or mach-nix for requirements.txt\n3. Build custom solution parsing pyproject.toml + lock file\n\nThe deps cell should:\n- Parse pyproject.toml or requirements.txt\n- Fetch packages from PyPI\n- Generate BUCK files for each package\n- Support both native Python and buck2 run",
+  "id": "turnkey-6nc",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Python: deps cell generation from pyproject.toml",
+  "type": "task",
+  "updated_at": "2026-01-09T13:26:58.634072688+01:00"
+}

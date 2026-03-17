@@ -1,0 +1,20 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [
+    "turnkey-4yel",
+    "turnkey-o05a",
+    "turnkey-rfgy"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-21T17:44:33.993273547+01:00",
+  "close_reason": "Integrated new architecture into tk rules command. Uses rulessync package to orchestrate extraction, mapping, and starlark-based writing.",
+  "created": "2026-01-21T17:27:50.402306234+01:00",
+  "description": "# Integration\n\nReplace current rules.star sync implementation with new architecture.\n\n## Tasks\n\n- [ ] New tk rules sync implementation using:\n  - Starlark object model for parsing/writing\n  - Language extractors for dependency detection\n  - Mapping layer for import → target conversion\n  - Mutation API for applying changes\n- [ ] Remove old implementation (src/go/pkg/rules/ detector/mapper files)\n- [ ] Update documentation\n- [ ] End-to-end tests\n\n## Notes\n\nNo backwards compatibility needed - this hasn't been released publicly.",
+  "id": "turnkey-omxx",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Phase 6: Integration",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

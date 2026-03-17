@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-clb"
+  ],
+  "blocks": [
+    "turnkey-mbw"
+  ],
+  "closed_at": "2026-01-10T12:36:33.78768953+01:00",
+  "close_reason": "Implemented using ureq crate for PyPI JSON API",
+  "created": "2026-01-10T12:12:14.444143426+01:00",
+  "description": "Query PyPI JSON API to resolve package versions:\n- Endpoint: https://pypi.org/pypi/{package}/json (latest)\n- Endpoint: https://pypi.org/pypi/{package}/{version}/json (specific)\n- Extract download URL for sdist (source distribution)\n- Prefer .tar.gz over .zip for consistency\n- Handle package name normalization (underscores vs hyphens)\n- Cache responses to avoid repeated queries\n\nNote: If requirements.txt has pinned versions, can skip resolution.",
+  "id": "turnkey-vii",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Implement PyPI API client for version resolution",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

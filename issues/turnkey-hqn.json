@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-0ej",
+    "turnkey-9as"
+  ],
+  "closed_at": "2026-01-08T22:41:34.134477217+01:00",
+  "close_reason": "Implemented: pkg/godeps library with types, parser, prefetch, output modules. Main.go refactored to use library.",
+  "created": "2026-01-08T22:35:34.719318217+01:00",
+  "description": "Refactor godeps-gen from a monolithic main.go into a proper library structure to enable unit testing.\n\n**Proposed structure:**\n```\ntools/godeps-gen/\n├── main.go                 # CLI entry point only\n├── cmd/\n│   └── root.go             # CLI flag handling, wiring\n└── pkg/\n    └── godeps/\n        ├── parser.go       # go.mod/go.sum parsing (uses modfile)\n        ├── parser_test.go  # Unit tests for parsing\n        ├── prefetch.go     # Prefetcher interface + implementations\n        ├── prefetch_test.go\n        ├── output.go       # TOML output generation\n        ├── output_test.go\n        └── types.go        # Dependency struct, etc.\n```\n\n**Key design decisions:**\n\n1. **Prefetcher interface:**\n   ```go\n   type Prefetcher interface {\n       Prefetch(importPath, version string) (hash string, err error)\n       Supports(importPath string) bool\n   }\n   ```\n\n2. **Composable prefetchers:**\n   - GitHubPrefetcher (github.com/*)\n   - GolangOrgPrefetcher (golang.org/x/* -\u003e github.com/golang/*)\n   - GoProxyPrefetcher (any module via proxy.golang.org)\n   - ChainPrefetcher (tries each in order)\n\n3. **Testable parser:**\n   ```go\n   func ParseGoMod(data []byte, includeIndirect bool) ([]Dependency, error)\n   func ParseGoSum(data []byte) (map[string]string, error)\n   ```\n   Takes bytes, not file paths - easy to test with inline data.\n\n4. **Output formatter:**\n   ```go\n   func FormatTOML(deps []Dependency, w io.Writer) error\n   ```\n   Writes to io.Writer for testability.\n\n**Benefits:**\n- Unit testable without filesystem or network\n- Mock prefetchers for fast tests\n- Clear separation of concerns\n- Reusable library for other tools",
+  "id": "turnkey-hqn",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Refactor godeps-gen into library + CLI structure",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

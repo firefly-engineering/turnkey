@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-10T10:27:48.474745226+01:00",
+  "close_reason": "Implemented rustdeps-gen tool in commit 9f1a63d",
+  "created": "2026-01-09T17:21:37.467887397+01:00",
+  "description": "CLI tool to generate rust-deps.toml from Cargo.toml/Cargo.lock.\n\nSimilar to godeps-gen but for Rust:\n- Parse Cargo.lock for dependency versions\n- Prefetch crates from crates.io\n- Output rust-deps.toml with Nix hashes\n\nUsage: rustdeps-gen [--cargo-lock Cargo.lock] \u003e rust-deps.toml",
+  "id": "turnkey-9km",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "rustdeps-gen: Generate rust-deps.toml from Cargo.lock",
+  "type": "feature",
+  "updated_at": "2026-01-10T10:27:48.474745226+01:00"
+}

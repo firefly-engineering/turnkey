@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T13:21:11.443267623+01:00",
+  "close_reason": "Python toolchain mapping verified - added system_python_toolchain alongside python_bootstrap",
+  "created": "2026-01-09T13:11:43.414418612+01:00",
+  "description": "Verify the existing Python toolchain mapping in mappings.nix works correctly.\n\nCurrent mapping:\n```nix\npython = {\n  skip = false;\n  targets = [{\n    name = \"python_bootstrap\";\n    rule = \"system_python_bootstrap_toolchain\";\n    load = \"@prelude//toolchains:python.bzl\";\n    visibility = [ \"PUBLIC\" ];\n  }];\n  implicitDependencies = [ ];\n};\n```\n\nVerify:\n1. Adding `python = {}` to toolchain.toml adds python to toolchains cell\n2. The generated BUCK file has correct python toolchain target\n3. `buck2 build` can use the python toolchain for python targets",
+  "id": "turnkey-7ag",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Python: verify toolchain mapping works",
+  "type": "task",
+  "updated_at": "2026-01-09T13:21:11.443267623+01:00"
+}

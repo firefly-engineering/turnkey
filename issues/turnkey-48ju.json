@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-50uq",
+    "turnkey-qhvt",
+    "turnkey-r13s"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-19T18:29:33.389665281+01:00",
+  "close_reason": "Documentation migrated to user-manual and developer-manual books. Created docs/README.md documenting the migration.",
+  "created": "2026-01-19T17:09:20.416725054+01:00",
+  "description": "Move existing documentation from docs/ to appropriate books:\n- User-facing docs → user-manual\n- Architecture/design docs → dev-manual\n- Cleanup orphaned/outdated docs",
+  "id": "turnkey-48ju",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Migrate existing docs to appropriate books",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

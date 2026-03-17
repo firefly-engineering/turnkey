@@ -1,0 +1,25 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-0il",
+    "turnkey-4oa",
+    "turnkey-7ew",
+    "turnkey-qvc",
+    "turnkey-tva",
+    "turnkey-xnz"
+  ],
+  "blocks": [
+    "turnkey-536"
+  ],
+  "closed_at": "2026-01-09T23:31:40.418351974+01:00",
+  "close_reason": "All dependencies completed: tk sync, tk check, pre-commit hook, shell entry sync, buck2 alias, and documentation are all implemented.",
+  "created": "2026-01-08T20:18:37.945612233+01:00",
+  "description": "Exit criteria for Phase 5: Sync \u0026 Maintenance\n\nRequired for completion:\n\nSync mechanism:\n1. Detect when native project files change (go.mod, Cargo.toml, etc.)\n2. Regenerate BUCK files automatically or on-demand\n3. `turnkey sync` command to manually trigger regeneration\n\nWatch mode:\n1. `turnkey watch` monitors for changes\n2. Automatically regenerates affected BUCK files\n3. Integrates with devenv/direnv for seamless DX\n\nCI integration:\n1. `turnkey check` validates BUCK files are in sync\n2. Non-zero exit if regeneration needed\n3. Clear error messages showing what's out of sync\n\nDiff tool:\n1. `turnkey diff` shows what would change\n2. Preview regeneration without applying\n\nTest scenarios:\n- Add new Go file → BUCK file updated\n- Add new dependency to go.mod → deps cell regenerated\n- CI fails if BUCK files out of sync with go.mod",
+  "id": "turnkey-545",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Phase 5 Exit Criteria",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

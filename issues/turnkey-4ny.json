@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-emc"
+  ],
+  "blocks": [
+    "turnkey-1us"
+  ],
+  "closed_at": "2026-01-13T11:32:28.669424647+01:00",
+  "close_reason": "E2E infrastructure complete and greenfield test passing",
+  "created": "2026-01-13T11:16:43.019405721+01:00",
+  "description": "",
+  "id": "turnkey-4ny",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "E2E: Create test runner script (runner.sh)",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

@@ -1,0 +1,21 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [
+    "turnkey-ksi6",
+    "turnkey-yu7"
+  ],
+  "blocks": [
+    "turnkey-mo27"
+  ],
+  "closed_at": "2026-01-22T10:50:06.480730373+01:00",
+  "close_reason": "Implemented goparse, buckgen libraries and CLI; integrated into Nix; removed gobuckify and patches",
+  "created": "2026-01-22T10:29:22.375735011+01:00",
+  "description": "Update nix/lib/deps-cell/adapters/go.nix to use buckgen instead of gobuckify.\n\n## Changes Required\n\n1. Replace gobuckify invocation (line 244) with buckgen\n2. Remove scaffolding generation:\n   - Remove go.mod generation (lines 209-220)\n   - Remove main.go generation (lines 222-233)\n   - Remove vendor/modules.txt generation (lines 197-205)\n3. Update nix/buck2/go-deps-cell.nix to use buckgen package instead of gobuckify\n\n## Validation\n- Build godeps cell with new tool\n- Verify generated rules.star files match expected format\n- Test Go builds work correctly",
+  "id": "turnkey-0bya",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Integrate buckgen into go-deps-cell",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

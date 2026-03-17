@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-8dl",
+    "turnkey-cj3",
+    "turnkey-ep3"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-13T21:00:37.378278327+01:00",
+  "close_reason": "Already deleted during fixup migration",
+  "created": "2026-01-13T19:04:54.376752914+01:00",
+  "description": "",
+  "id": "turnkey-9jkz",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Delete old nix/buck2/fixups/ and nix/buck2/rustc-flags/ directories",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

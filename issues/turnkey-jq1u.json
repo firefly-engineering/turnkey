@@ -1,0 +1,18 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-bwc0"
+  ],
+  "closed_at": "2026-01-22T13:42:28.125967896+01:00",
+  "close_reason": "Completed review. All generators are deterministic. soldeps-gen lacks prefetching.",
+  "created": "2026-01-22T13:34:53.901377318+01:00",
+  "description": "Audit src/cmd/*-gen tools.\nQuality Criteria:\n- Deterministic *-deps.toml\n- Respect lock files\n- Error handling",
+  "id": "turnkey-jq1u",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Audit Dependency Generators",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

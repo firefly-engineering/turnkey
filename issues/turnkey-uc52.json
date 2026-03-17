@@ -1,0 +1,16 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-21T18:00:50.018361208+01:00",
+  "close_reason": "Implemented python-deps-extract with import parsing and stdlib detection. Added Python mapping to mapper/syncer.",
+  "created": "2026-01-21T17:48:46.305852241+01:00",
+  "description": "Implement Python extractor using ast module. Parse import/from statements. Map to python-deps.toml entries. Output extraction protocol JSON.",
+  "id": "turnkey-uc52",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Python dependency extractor",
+  "type": "task",
+  "updated_at": "2026-01-21T18:00:50.018361208+01:00"
+}

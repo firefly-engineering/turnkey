@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-08T20:23:17.37369356+01:00",
+  "created": "2026-01-08T19:01:52.738776117+01:00",
+  "description": "Currently users must explicitly declare clang in toolchain.toml for Go builds to work, because Buck2's cxx toolchain needs clang in PATH during action execution.\n\nIdeally, the mappings.nix should distinguish between:\n1. Buck2 toolchain rules (go, cxx, python, genrule) - generate targets in toolchains cell\n2. Runtime dependencies (clang, python3) - packages needed in PATH for Buck2 actions\n\nWhen a user declares `go = {}`, turnkey should automatically ensure clang is available in the devenv shell without requiring explicit declaration.\n\nProposed solution:\n- Add `runtimeDependencies` field to mappings.nix entries\n- Have buck2.nix collect these and add them to devenv packages\n- Example: cxx mapping would have `runtimeDependencies = [ \"clang\" ]`",
+  "id": "turnkey-537",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Implicit runtime dependencies for Buck2 toolchains",
+  "type": "feature",
+  "updated_at": "2026-01-08T20:23:18.976992963+01:00"
+}

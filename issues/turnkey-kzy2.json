@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-13T22:34:11.304892635+01:00",
+  "close_reason": "Fixed by generating textflag.h and funcdata.h locally in packages with assembly files. Commit efa3fcf.",
+  "created": "2026-01-13T21:33:24.232819519+01:00",
+  "description": "Some Go dependencies like golang.org/x/sys use assembly code with #include directives that fail to build with Buck2's Go rules. The build fails with errors like:\n\n.turnkey/godeps/vendor/golang.org/x/sys/unix/asm_linux_amd64.s:8: #include: open .../textflag.h: no such file or directory\n\nNeed to investigate how to properly handle Go packages with assembly files in Buck2.",
+  "id": "turnkey-kzy2",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Support Go dependencies with assembly code",
+  "type": "bug",
+  "updated_at": "2026-01-13T22:34:11.304892635+01:00"
+}

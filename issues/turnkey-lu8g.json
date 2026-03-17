@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-ew72",
+    "turnkey-y4y7"
+  ],
+  "closed_at": "2026-01-19T21:11:37.013804166+01:00",
+  "close_reason": "Added solc and foundry to registry and toolchain.toml",
+  "created": "2026-01-19T21:05:16.940385041+01:00",
+  "description": "Add solc (Solidity compiler) and foundry (forge, cast, anvil) to nix/registry/default.nix and toolchain.toml.\n\nPart of Solidity support (turnkey-ri2t).",
+  "id": "turnkey-lu8g",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add solc and foundry to registry",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

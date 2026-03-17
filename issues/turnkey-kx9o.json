@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-588m",
+    "turnkey-7qna",
+    "turnkey-8gwp",
+    "turnkey-w2dh"
+  ],
+  "closed_at": "2026-01-16T18:19:10.571256341+01:00",
+  "close_reason": "Nix-backed prelude implemented and verified with E2E tests",
+  "created": "2026-01-16T16:25:43.551381749+01:00",
+  "description": "Replace bundled prelude with a Nix-backed prelude cell that can be patched and extended.\n\nSee docs/plans/nix-prelude-and-typescript.md for full plan.\n\n**Goal:**\n- Fetch upstream buck2-prelude at pinned commit\n- Apply turnkey patches (nix/patches/prelude/)\n- Add custom rules (nix/buck2/prelude-extensions/)\n- Symlink from .turnkey/prelude like other cells\n\n**Why:**\n- Enables TypeScript integration\n- Allows prelude customization without forking\n- Centralizes maintenance in turnkey (not each downstream repo)",
+  "id": "turnkey-kx9o",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Nix-backed prelude cell",
+  "type": "epic",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

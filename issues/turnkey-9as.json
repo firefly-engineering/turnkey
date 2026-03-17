@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-hqn"
+  ],
+  "blocks": [
+    "turnkey-f63"
+  ],
+  "closed_at": "2026-01-08T23:00:05.5218922+01:00",
+  "close_reason": "Completed: implemented GopkgIn, UberGo, and GoProxy prefetchers with tests",
+  "created": "2026-01-08T22:35:52.326472046+01:00",
+  "description": "Current godeps-gen only supports GitHub prefetching via nix-prefetch-github. We need to support multiple sources.\n\n**Required prefetchers:**\n\n1. **GitHub** (github.com/owner/repo)\n   - Tool: nix-prefetch-github\n   - Already partially implemented\n\n2. **golang.org/x/** \n   - Maps to github.com/golang/*\n   - Example: golang.org/x/mod -\u003e github.com/golang/mod\n   - Use nix-prefetch-github with owner=golang\n\n3. **Go module proxy** (fallback for any module)\n   - Tool: nix-prefetch-url with proxy.golang.org\n   - URL: https://proxy.golang.org/{module}/@v/{version}.zip\n   - Works for any public Go module\n   - Different hash semantics (zip vs git archive)\n\n4. **Other common hosts:**\n   - gopkg.in/* -\u003e github.com mapping\n   - go.uber.org/* -\u003e github.com/uber-go/*\n   - gitlab.com, bitbucket.org (need different prefetchers)\n\n**Nix package buildInputs:**\n```nix\nbuildInputs = [\n  pkgs.nix-prefetch-github\n  pkgs.nix-prefetch  # or nix-prefetch-url\n];\n\n# Or wrap in a script that has these in PATH\nnativeBuildInputs = [ pkgs.makeWrapper ];\npostInstall = ''\n  wrapProgram $out/bin/godeps-gen \\\n    --prefix PATH : ${lib.makeBinPath [ pkgs.nix-prefetch-github ]}\n'';\n```\n\n**Design:**\n```go\ntype Prefetcher interface {\n    Prefetch(importPath, version string) (string, error)\n    Supports(importPath string) bool\n}\n\n// Chain tries each prefetcher in order\ntype ChainPrefetcher []Prefetcher\n\nfunc (c ChainPrefetcher) Prefetch(path, version string) (string, error) {\n    for _, p := range c {\n        if p.Supports(path) {\n            return p.Prefetch(path, version)\n        }\n    }\n    return \"\", fmt.Errorf(\"no prefetcher supports %s\", path)\n}\n```\n\nDepends on: turnkey-hqn (library refactor)",
+  "id": "turnkey-9as",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Implement multi-source prefetcher system for godeps-gen",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

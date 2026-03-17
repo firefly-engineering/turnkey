@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-11T21:26:06.081174714+01:00",
+  "close_reason": "Cannot reproduce - the mold-wrapped deprecation warning is no longer appearing. May have been fixed in a recent nixpkgs update (current: Jan 8, 2026). Reopen if it reappears.",
+  "created": "2026-01-10T18:11:47.364924309+01:00",
+  "description": "During Nix evaluation, there's a warning: 'mold-wrapped' has been renamed to 'mold'. Need to find where this comes from in our flake/devenv config and update it.",
+  "id": "turnkey-6s5",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Fix mold-wrapped deprecation warning",
+  "type": "bug",
+  "updated_at": "2026-01-11T21:26:06.081174714+01:00"
+}

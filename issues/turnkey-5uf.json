@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T13:24:04.152208392+01:00",
+  "close_reason": "Added nodejs/typescript to registry. Buck2 prelude lacks native TS toolchain, so these are marked skip=true. Can be used via genrule.",
+  "created": "2026-01-09T13:12:00.237750411+01:00",
+  "description": "TypeScript: add toolchain mapping\n\nFINDING: Buck2 bundled prelude does not have a system_typescript_toolchain.\nThe js/ directory provides js_library and js_bundle rules, but they require:\n- A worker tool (Node.js based)\n- Custom setup for the worker_runner\n\nOPTIONS:\n1. Use genrule-based TypeScript compilation (simple but not native)\n2. Create custom TypeScript toolchain rules (complex)\n3. Defer TypeScript support until Buck2 adds native support\n\nRECOMMENDATION: Use genrule approach for now to demonstrate integration,\ndocument that full TypeScript support would require additional work.",
+  "id": "turnkey-5uf",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "TypeScript: add toolchain mapping",
+  "type": "task",
+  "updated_at": "2026-01-09T13:24:04.152208392+01:00"
+}

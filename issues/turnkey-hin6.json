@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-8z0"
+  ],
+  "closed_at": "2026-01-19T18:48:16.195475369+01:00",
+  "close_reason": "Added buck2.javascript configuration to flake-parts module. The infrastructure (jsdeps-gen, js-deps-cell.nix) can now build jsdeps cells. Note: TypeScript rules don't yet consume npm deps from jsdeps cell - needs separate enhancement.",
+  "created": "2026-01-19T18:44:07.278997795+01:00",
+  "description": "Add buck2.javascript configuration to flake-parts/turnkey matching go/rust/python pattern.\n\nInfrastructure already exists:\n- jsdeps-gen: parses pnpm-lock.yaml → js-deps.toml\n- js-deps-cell.nix: builds jsdeps cell from js-deps.toml\n- nix/lib/deps-cell/adapters/javascript.nix: adapter implementation\n\nNeed to add to nix/flake-parts/turnkey/default.nix:\n- buck2.javascript.enable option\n- buck2.javascript.depsFile option (path to js-deps.toml)\n- buck2.javascript.lockFile option (pnpm-lock.yaml)\n- jsdepsCell building logic\n- Pass jsdepsCell to devenv shell config\n\nOnce this is done, typescript-hello-deps example can be added.",
+  "id": "turnkey-hin6",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Add JavaScript dependency support to flake-parts module",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

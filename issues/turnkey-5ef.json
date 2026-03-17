@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-13T09:36:48.803152801+01:00",
+  "close_reason": "Implemented: externalized fixup scripts to nix/buck2/fixups/ - see commit f067b6f",
+  "created": "2026-01-13T09:29:33.941899928+01:00",
+  "description": "## Problem\n\n`nix/buck2/rust-deps-cell.nix` has grown to ~730 lines, with the majority being inline shell scripts for build script fixups (especially the `ring` fixup which is ~400+ lines of symbol prefix headers and compilation commands).\n\nCurrent issues:\n1. **Inline scripts are hard to maintain** - The ring fixup alone is massive and mixed with Nix code\n2. **Limited composability** - While users can override via `buildScriptFixups`, the default registry is monolithic\n3. **No separation of concerns** - Fixup logic, symbol lists, and Nix wiring are all interleaved\n\n## Proposed Solution\n\n### 1. Externalize fixup scripts\nMove fixup content to separate files:\n```\nnix/buck2/fixups/\n  serde.nix       # serde and serde_core fixups\n  ring.nix        # ring native compilation\n  ring-symbols.txt  # symbol list (can be generated/updated separately)\n```\n\n### 2. Create a fixup registry input pattern\nAllow users to compose fixups from multiple sources:\n```nix\nturnkey.toolchains.buck2 = {\n  # Default fixups (serde, ring, etc.) are included automatically\n  # Users can add their own or override defaults\n  buildScriptFixups = {\n    # Override default ring fixup\n    ring = import ./my-custom-ring-fixup.nix;\n    \n    # Add new fixup\n    my-crate = { patchVersion, ... }: ''...'';\n  };\n  \n  # Or import from external flake\n  buildScriptFixupsExtra = [\n    inputs.some-fixup-collection.fixups\n  ];\n};\n```\n\n### 3. Symbol list generation\nFor ring specifically, consider:\n- Extracting symbol list to a separate file\n- Potentially auto-generating from ring's build.rs (future enhancement)\n\n## Implementation Steps\n\n1. [ ] Create `nix/buck2/fixups/` directory structure\n2. [ ] Extract serde fixups to `serde.nix`\n3. [ ] Extract ring fixup to `ring.nix`\n4. [ ] Move ring symbol lists to separate header files or data\n5. [ ] Update `rust-deps-cell.nix` to import from fixups directory\n6. [ ] Add `buildScriptFixupsExtra` option for composing multiple registries\n7. [ ] Document the fixup authoring pattern\n\n## Benefits\n\n- **Maintainability**: Each fixup is self-contained and testable\n- **Composability**: Users can mix default and custom fixups\n- **Readability**: Main cell builder is cleaner and focuses on orchestration\n- **Shareability**: Fixups could be shared across projects via flake inputs",
+  "id": "turnkey-5ef",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Refactor rust-deps-cell.nix: externalize fixup scripts and improve composability",
+  "type": "task",
+  "updated_at": "2026-01-13T09:36:48.803152801+01:00"
+}

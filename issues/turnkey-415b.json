@@ -1,0 +1,16 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-21T20:52:54.875644673+01:00",
+  "close_reason": "Added PostCommands field to WrapperRule. Go wrapper now defaults to running 'go mod tidy' after go get/mod commands to ensure correct direct/indirect classification.",
+  "created": "2026-01-21T09:09:12.156475471+01:00",
+  "description": "## Problem\n\nWhen adding new Go imports, the go.mod file may be updated with dependencies marked as `// indirect` even when they should be direct. This causes issues with the Nix build because the generated vendor/modules.txt doesn't mark them as `## explicit`.\n\nExample: Adding `go.starlark.net/syntax` import caused build failures because starlark was marked indirect in go.mod.\n\n## Solution\n\nThe `tw` wrapper (or a pre-commit hook) should run `go mod tidy` automatically after any command that modifies go.mod. This ensures:\n- Direct vs indirect dependencies are correctly classified\n- Unused dependencies are removed\n- go-deps.toml stays in sync (via the existing sync mechanism)\n\n## Implementation options\n\n1. **Extend tw wrapper**: After running `go get`, `go mod download`, etc., automatically run `go mod tidy` if go.mod changed\n2. **Pre-commit hook**: Run `go mod tidy` as part of the pre-commit checks\n3. **Both**: tw for immediate feedback, pre-commit as safety net\n\n## Acceptance criteria\n\n- [ ] `go mod tidy` runs automatically when go.mod is modified\n- [ ] Direct imports are never marked as indirect after the auto-tidy\n- [ ] go-deps.toml is regenerated with correct direct/indirect flags",
+  "id": "turnkey-415b",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Run go mod tidy automatically after go.mod changes",
+  "type": "task",
+  "updated_at": "2026-01-21T20:52:54.875644673+01:00"
+}

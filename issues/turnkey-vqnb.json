@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-h4zd"
+  ],
+  "closed_at": "2026-01-19T16:46:39.175228444+01:00",
+  "close_reason": "Completed rules.star rename",
+  "created": "2026-01-19T16:34:40.823401747+01:00",
+  "description": "Update all documentation references from BUCK to rules.star.\n\nFiles to update:\n- docs/*.md (search for BUCK file references)\n- CLAUDE.md\n- README if exists\n- Code comments mentioning BUCK files\n\nAlso update any error messages or log output that reference BUCK files.",
+  "id": "turnkey-vqnb",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Update documentation for rules.star rename",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

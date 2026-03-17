@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-3as"
+  ],
+  "closed_at": "2026-01-11T22:51:32.157212497+01:00",
+  "close_reason": "Implemented CheckGoSrcList and CheckGoTestSrcList functions in go/pkg/staleness/srclist.go with comprehensive tests",
+  "created": "2026-01-09T23:35:02.654106067+01:00",
+  "description": "Detect when Go package BUCK files are stale due to added/removed .go files. Compare current glob results against what's declared in srcs. Fast file-system based check without parsing.",
+  "id": "turnkey-rjs",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Go source file list staleness detection",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

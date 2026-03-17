@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T12:27:01.286875934+01:00",
+  "close_reason": "Added BUCK file (blocked by rustdeps cell issues turnkey-8zc)",
+  "created": "2026-01-12T12:16:46.360142809+01:00",
+  "description": "Add Buck2 build target for the nix-prefetch-cached Rust tool.",
+  "id": "turnkey-bmb",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Add BUCK file for cmd/nix-prefetch-cached",
+  "type": "task",
+  "updated_at": "2026-01-12T12:27:01.286875934+01:00"
+}

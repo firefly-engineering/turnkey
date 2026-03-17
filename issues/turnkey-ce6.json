@@ -1,0 +1,25 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-588m"
+  ],
+  "blocks": [
+    "turnkey-3qog",
+    "turnkey-3xn",
+    "turnkey-kgit",
+    "turnkey-kssn",
+    "turnkey-u903",
+    "turnkey-x1pn"
+  ],
+  "closed_at": "2026-01-16T18:53:04.149280489+01:00",
+  "close_reason": "TypeScript support implemented via nix-backed prelude with typescript_library/typescript_binary rules and tsc from Nix",
+  "created": "2026-01-09T13:29:42.828357872+01:00",
+  "description": "Implement proper TypeScript/JavaScript support beyond genrule approach.\n\nCurrent state:\n- Using genrule for tsc compilation\n- No native ts_binary or ts_library rules\n\nRequired work:\n1. Understand Buck2 js_library worker model\n2. Create worker tool for TypeScript compilation\n3. Implement ts_library and ts_binary rules\n4. Support npm dependencies via node_modules or vendoring\n\nReference: Buck2 prelude js/ directory uses worker-based execution\nSee: examples/typescript-hello/ for current genrule approach",
+  "id": "turnkey-ce6",
+  "labels": [],
+  "priority": 4,
+  "status": "closed",
+  "title": "TypeScript: native Buck2 toolchain support",
+  "type": "feature",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

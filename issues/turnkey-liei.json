@@ -1,0 +1,18 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-bwc0"
+  ],
+  "closed_at": "2026-01-22T13:40:18.083574701+01:00",
+  "close_reason": "Completed review. Buck2 configuration is hermetic and correct. Created one minor follow-up task.",
+  "created": "2026-01-22T13:34:53.689187289+01:00",
+  "description": "Audit .buckconfig, toolchain.toml, nix/buck2.\nQuality Criteria:\n- Hermetic paths\n- Deterministic BUCK files\n- Incrementality",
+  "id": "turnkey-liei",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Review Buck2 Toolchain \u0026 Rules",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

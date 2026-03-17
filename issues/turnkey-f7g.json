@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-13T10:38:19.67356429+01:00",
+  "close_reason": "Implemented: see commit 63a6ccb",
+  "created": "2026-01-13T10:29:57.845508763+01:00",
+  "description": "## Problem\n\n`rust-deps-cell.nix` still has inline `defaultRustcFlagsRegistry`:\n\n```nix\ndefaultRustcFlagsRegistry = {\n  serde_json = [\"--cfg\" 'fast_arithmetic=\\\"64\\\"'];\n  rustix = [\"--cfg\" \"libc\" \"--cfg\" \"linux_like\" \"--cfg\" \"linux_kernel\"];\n};\n```\n\nThis should be externalized to match the fixups pattern for consistency and maintainability.\n\n## Proposed Solution\n\n### 1. Create rustc-flags directory\n\n```\nnix/buck2/rustc-flags/\n├── default.nix      # Composition layer (like fixups/default.nix)\n├── serde.nix        # serde_json flags\n└── rustix.nix       # rustix flags (platform detection)\n```\n\n### 2. Make it an extensible registry\n\nSimilar to `buildScriptFixups`, users should be able to:\n- Override default flags for specific crates\n- Add flags for new crates\n- Use version-specific keys (e.g., `\"rustix@0.39.0\"`)\n\n### 3. Update rust-deps-cell.nix\n\nReplace inline definition with import:\n```nix\ndefaultRustcFlagsRegistry = import ./rustc-flags { inherit lib; };\n```\n\n## Benefits\n\n- Consistency with fixups pattern\n- Easier to add new crate flags\n- Better separation of concerns\n- Potential for auto-generation from build script analysis\n\n## Related\n\n- Follows pattern established in turnkey-5ef (fixups externalization)\n- Uses same user-extensible registry pattern from turnkey-d45",
+  "id": "turnkey-f7g",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Externalize rustc_flags registry to modular files like fixups",
+  "type": "task",
+  "updated_at": "2026-01-13T10:38:19.67356429+01:00"
+}

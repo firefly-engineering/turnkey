@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-1kek",
+    "turnkey-dfei"
+  ],
+  "closed_at": "2026-01-16T19:04:16.610383792+01:00",
+  "close_reason": "Investigation complete: Root cause identified as repeated nix develop calls (~13-15s each). Created implementation tasks for optimization.",
+  "created": "2026-01-16T17:54:46.157906562+01:00",
+  "description": "E2E tests are taking 150-220+ seconds each. Need to investigate:\n\n1. Are Nix builds being cached properly between tests?\n2. Can we share devenv derivations across test runs?\n3. Should we pre-build common derivations before running tests?\n4. Profile where time is spent: nix eval, nix build, buck2 build?\n\nCurrent timings observed:\n- brownfield-adoption: 207s\n- ci-headless: 158s\n- error-recovery: 215s\n\nEach test creates an isolated project with its own flake.nix which may cause full Nix evaluations.",
+  "id": "turnkey-d17b",
+  "labels": [
+    "performance"
+  ],
+  "priority": 2,
+  "status": "closed",
+  "title": "Investigate e2e test performance and Nix caching",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

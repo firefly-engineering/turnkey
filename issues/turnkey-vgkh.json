@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-8qbh"
+  ],
+  "blocks": [
+    "turnkey-rjsj"
+  ],
+  "closed_at": "2026-01-19T21:24:48.1125313+01:00",
+  "close_reason": "Added Solidity options to flake-parts module",
+  "created": "2026-01-19T21:06:18.976043815+01:00",
+  "description": "Modify nix/flake-parts/turnkey/default.nix to add Solidity language options:\n\nbuck2.solidity = {\n  enable = mkEnableOption \"Solidity support\";\n  depsFile = mkOption { type = types.path; };\n};\n\nPart of Solidity support (turnkey-ri2t).",
+  "id": "turnkey-vgkh",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add Solidity options to flake-parts module",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

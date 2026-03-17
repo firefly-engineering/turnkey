@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-kxs"
+  ],
+  "blocks": [
+    "turnkey-545"
+  ],
+  "closed_at": "2026-01-09T21:52:26.341885966+01:00",
+  "close_reason": "Implemented buck2 alias to tk in devenv shell with TURNKEY_NO_ALIAS env var to disable. Added aliasBuck2 option to buck2.nix.",
+  "created": "2026-01-09T17:22:34.054630845+01:00",
+  "description": "Configure devenv shell to alias buck2 to tk for transparent usage.\n\nIn devenv shell entry:\n```bash\nalias buck2='tk'\n```\n\nThis way users can continue using `buck2 build` etc. and get automatic sync.\n\nAlso provide the `tk` command directly for those who prefer it.\n\nConsider: environment variable to disable alias for debugging\n```bash\nTURNKEY_NO_ALIAS=1  # Use raw buck2\n```",
+  "id": "turnkey-tva",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Shell integration: buck2 alias to tk",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

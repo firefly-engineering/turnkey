@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-20T14:56:00.612682319+01:00",
+  "close_reason": "Fixed build output path to show .turnkey isolation dir",
+  "created": "2026-01-20T14:48:24.108586692+01:00",
+  "description": "The docs/user-manual/src/workflows/building.md shows the wrong build output path.\n\n**Current (incorrect):**\n```\nbuck-out/\n├── v2/\n│   └── gen/\n│       └── root/\n│           └── path/to/target/\n```\n\n**Should be:**\n```\nbuck-out/\n├── .turnkey/\n│   └── gen/\n│       └── root/\n│           └── path/to/target/\n```\n\n**Why .turnkey?**\nThe isolation directory is set to `.turnkey` (via BUCK_ISOLATION_DIR) so that language tools don't get confused by build artifacts:\n- Go ignores directories starting with `.\" when scanning for packages\n- Cargo ignores dot-directories\n- pytest ignores dot-directories by default\n\nThis prevents errors like Go trying to parse generated .go files in buck-out, or pytest collecting test files from build outputs.\n\nShould also add a brief explanation of this in the docs.",
+  "id": "turnkey-m005",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Fix build output path in building.md documentation",
+  "type": "task",
+  "updated_at": "2026-01-20T14:56:00.612682319+01:00"
+}

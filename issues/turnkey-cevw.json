@@ -1,0 +1,16 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-21T18:05:59.35953193+01:00",
+  "close_reason": "Implemented TypeScript/JavaScript dependency extractor with ES6 imports, dynamic imports, CommonJS requires, export from, Node.js builtin detection, and scoped package handling. Added TypeScriptConfig to mapper and runTypescriptExtractor to syncer.",
+  "created": "2026-01-21T17:48:47.543752643+01:00",
+  "description": "Implement TypeScript extractor using TS compiler API or a parser. Parse import/require statements. Map to js-deps.toml entries. Output extraction protocol JSON.",
+  "id": "turnkey-cevw",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "TypeScript dependency extractor",
+  "type": "task",
+  "updated_at": "2026-01-21T18:05:59.35953193+01:00"
+}

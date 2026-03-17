@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-19T20:23:21.798317188+01:00",
+  "close_reason": "Added ruff to registry and toolchain.toml",
+  "created": "2026-01-19T20:21:34.764632887+01:00",
+  "description": "Add ruff (Python linter/formatter) to the registry and toolchain.toml.",
+  "id": "turnkey-d5xa",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add ruff to toolchain",
+  "type": "task",
+  "updated_at": "2026-01-19T20:23:21.798317188+01:00"
+}

@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-19T23:30:52.953095346+01:00",
+  "close_reason": "Implemented jsonnet_library rule with example",
+  "created": "2026-01-19T19:58:40.724563689+01:00",
+  "description": "Add Buck2 rules for compiling Jsonnet files to JSON.\n\n## Background\nJsonnet is a data templating language that extends JSON with variables, functions, conditionals, and imports. It's commonly used for:\n- Kubernetes manifests\n- Configuration files\n- Infrastructure as code (Terraform, etc.)\n\nBuck2's default prelude does not include Jsonnet support.\n\n## Desired Rules\n\n### jsonnet_library\nCompile Jsonnet to JSON, exposing outputs for other rules to consume.\n```starlark\njsonnet_library(\n    name = \"config\",\n    srcs = [\"config.jsonnet\"],\n    deps = [\":common\"],  # Other jsonnet_library targets\n    ext_strs = {\"env\": \"prod\"},  # --ext-str flags\n    ext_codes = {\"count\": \"3\"},  # --ext-code flags\n)\n```\n\n### jsonnet_to_json (or similar)\nGenerate JSON files from Jsonnet sources.\n```starlark\njsonnet_to_json(\n    name = \"k8s-manifests\",\n    src = \"deployment.jsonnet\",\n    deps = [\":config\"],\n    multi = True,  # Multi-file output mode (-m)\n)\n```\n\n## Toolchain\n- Add `jsonnet` to registry (nixpkgs has it)\n- Create `system_jsonnet_toolchain` rule\n- Support both `jsonnet` and `go-jsonnet` implementations\n\n## Implementation Notes\n- Jsonnet has import resolution that needs careful handling\n- JSONNET_PATH environment variable for library paths\n- Consider how deps translate to import paths\n- Multi-file output mode generates multiple JSON files\n\n## References\n- https://jsonnet.org/\n- https://github.com/google/jsonnet\n- https://github.com/google/go-jsonnet",
+  "id": "turnkey-9chx",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add Jsonnet rules to prelude extensions",
+  "type": "feature",
+  "updated_at": "2026-01-19T23:30:52.953095346+01:00"
+}

@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-b69x",
+    "turnkey-ihlp"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-19T18:39:33.468116756+01:00",
+  "close_reason": "Added docs/user-manual/src/configuration/turnkey-directory.md covering isolation directory convention, tool-specific behavior, and Jest/Vitest configuration examples.",
+  "created": "2026-01-19T16:10:09.190425278+01:00",
+  "description": "Document the .turnkey isolation directory convention and its benefits.\n\nTopics to cover:\n- Why we use .turnkey as the default isolation dir\n- How Go, Cargo, and other tools ignore dot-prefixed directories\n- The --isolation-dir translation behavior in tk\n- Migration notes (one-time cache invalidation)\n- How to use multiple isolation dirs (.turnkey-foo, .turnkey-bar)\n\nTool-specific behavior:\n- Go: Automatically ignores directories starting with . or _ (built-in)\n- Cargo: Doesn't auto-discover crates in dot directories (built-in)\n- pytest: Automatically ignores dot directories (built-in)\n- Jest: Requires testPathIgnorePatterns config: ['/node_modules/', '/buck-out/', '/\\\\.']\n- Vitest: Requires exclude config: ['**/node_modules/**', '**/buck-out/**', '**/.*/**']\n\nInclude example Jest/Vitest configs for JS/TS projects.\n\nLocation: docs/ or update existing Buck2 documentation",
+  "id": "turnkey-zk3j",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Document .turnkey isolation dir convention",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

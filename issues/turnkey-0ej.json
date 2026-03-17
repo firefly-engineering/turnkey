@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-hqn"
+  ],
+  "blocks": [
+    "turnkey-2kx"
+  ],
+  "closed_at": "2026-01-08T22:50:39.733048861+01:00",
+  "close_reason": "Completed: 45 unit tests with 77.9% coverage across parser, output, and prefetch modules",
+  "created": "2026-01-08T22:36:13.272926901+01:00",
+  "description": "Add comprehensive unit tests for go.mod and go.sum parsing.\n\n**go.mod parsing tests:**\n\n1. **Basic cases:**\n   - Single require statement\n   - Require block with multiple deps\n   - Mixed single + block requires\n   - Empty go.mod (no deps)\n\n2. **Indirect dependencies:**\n   - Direct deps only (--indirect=false)\n   - Include indirect (--indirect=true)\n   - Mixed direct and indirect\n\n3. **Edge cases:**\n   - Comments in various positions\n   - Blank lines in require block\n   - Trailing comments after version\n   - Very long module paths\n   - Version with +incompatible suffix\n   - Pseudo-versions (v0.0.0-20231234-abc123)\n\n4. **Replace directives (for future):**\n   - Replace with version\n   - Replace with local path\n   - Replace block syntax\n\n5. **Malformed input:**\n   - Invalid syntax (graceful error)\n   - Missing version\n   - Truncated file\n\n**go.sum parsing tests:**\n\n1. **Basic cases:**\n   - Single entry\n   - Multiple entries\n   - With and without /go.mod entries\n\n2. **Hash formats:**\n   - h1: hashes (standard)\n   - Filtering /go.mod hashes\n\n3. **Edge cases:**\n   - Duplicate entries (same module, different versions)\n   - Extra whitespace\n   - Empty file\n\n**Test data strategy:**\n```go\nfunc TestParseGoMod_RequireBlock(t *testing.T) {\n    input := []byte(`\nmodule example.com/mymod\n\ngo 1.21\n\nrequire (\n    github.com/foo/bar v1.0.0\n    github.com/baz/qux v2.0.0 // indirect\n)\n`)\n    deps, err := ParseGoMod(input, true)\n    // assertions...\n}\n```\n\nDepends on: turnkey-hqn (library structure)",
+  "id": "turnkey-0ej",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Comprehensive unit tests for godeps-gen parsing",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

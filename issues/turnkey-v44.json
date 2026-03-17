@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-13T09:38:33.537426634+01:00",
+  "close_reason": "Documented in docs/go-deps-cell-design.md - see commit 8402780",
+  "created": "2026-01-09T22:13:45.38811232+01:00",
+  "description": "When manually writing BUCK files that depend on Go packages from the godeps cell, the correct target format is:\n\n```starlark\n@godeps//vendor/\u003cimport-path\u003e:\u003ctarget-name\u003e\n```\n\nWhere:\n- `vendor/` prefix is required (deps are under vendor/ in the godeps cell)\n- `\u003ctarget-name\u003e` is the directory name (last path component), not the package name\n\nExample:\n- Wrong: `@godeps//github.com/pelletier/go-toml/v2:go-toml`\n- Right: `@godeps//vendor/github.com/pelletier/go-toml/v2:v2`\n\nThis should be documented and ideally we should have a BUCK file generator for project Go code that handles this automatically (like gobuckify does for the godeps cell).\n\nRelated: Consider adding BUCK file generation to tk sync for project Go packages.",
+  "id": "turnkey-v44",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Document correct godeps target path format for BUCK files",
+  "type": "task",
+  "updated_at": "2026-01-13T09:38:33.537426634+01:00"
+}

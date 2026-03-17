@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-brw"
+  ],
+  "blocks": [
+    "turnkey-muu"
+  ],
+  "closed_at": "2026-01-08T14:20:48.916798+01:00",
+  "close_reason": "Created nix/devenv/turnkey/buck2.nix with toolchain generation, wrapper script, and prelude options",
+  "created": "2026-01-08T14:17:00.139147+01:00",
+  "description": "Core Buck2 generation module. Parse toolchains, resolve deps, generate BUCK file, create wrapper script. Add turnkey.buck2.enable option.",
+  "id": "turnkey-qs7",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "Create nix/devenv/turnkey/buck2.nix",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

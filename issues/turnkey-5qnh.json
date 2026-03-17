@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-f2y7",
+    "turnkey-r13s"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-19T17:34:39.270556298+01:00",
+  "close_reason": "Added rules.star for both documentation books",
+  "created": "2026-01-19T17:09:20.488967591+01:00",
+  "description": "Create rules.star files for each documentation book with mdbook_book() targets that can be built and served",
+  "id": "turnkey-5qnh",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add rules.star for doc books",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

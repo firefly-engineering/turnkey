@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-b7c"
+  ],
+  "closed_at": "2026-01-08T14:36:40.213691+01:00",
+  "close_reason": "Phase 1 complete: mappings.nix, buck2.nix module, wrapper script all working",
+  "created": "2026-01-08T14:16:30.330404+01:00",
+  "description": "Generate Buck2 toolchains cell from toolchain.toml. Create mappings.nix, buck2.nix module, wrapper script. MVP deliverable.",
+  "id": "turnkey-ug8",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "Phase 1: Toolchain Cell Generation",
+  "type": "feature",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

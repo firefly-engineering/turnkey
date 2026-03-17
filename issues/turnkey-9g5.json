@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-10T13:08:42.105680783+01:00",
+  "close_reason": "Implemented in .envrc",
+  "created": "2026-01-10T13:07:40.302381902+01:00",
+  "description": "Add watch_file entries in .envrc for pyproject.toml, pylock.toml, Cargo.toml, Cargo.lock so direnv triggers regeneration on changes",
+  "id": "turnkey-9g5",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add watch_file entries for Python and Rust deps",
+  "type": "task",
+  "updated_at": "2026-01-10T13:08:42.105680783+01:00"
+}

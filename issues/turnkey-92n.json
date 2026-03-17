@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-3as"
+  ],
+  "closed_at": "2026-01-11T22:54:37.033211295+01:00",
+  "close_reason": "Implemented hash-based Cache type in go/pkg/staleness/cache.go with CachedCheck for efficient staleness detection with full test coverage",
+  "created": "2026-01-09T23:35:18.365822168+01:00",
+  "description": "Implement hash-based caching to avoid re-parsing unchanged source files. Store hash of file list + import signatures. Only re-parse when hash changes. Critical for performance on large codebases.",
+  "id": "turnkey-92n",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Hash-based staleness cache for BUCK files",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

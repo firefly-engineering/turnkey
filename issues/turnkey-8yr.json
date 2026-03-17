@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-clb"
+  ],
+  "blocks": [
+    "turnkey-gtj"
+  ],
+  "closed_at": "2026-01-10T12:36:33.622831338+01:00",
+  "close_reason": "Implemented in cmd/pydeps-gen/src/main.rs",
+  "created": "2026-01-10T12:12:01.875318587+01:00",
+  "description": "Parse pyproject.toml to extract dependencies:\n- Read [project.dependencies] array (PEP 621)\n- Read [project.optional-dependencies] for extras\n- Handle [tool.poetry.dependencies] for Poetry projects\n- Handle version specifiers (\u003e=, ~=, ==, etc.)\n- Consider [tool.uv.sources] for monorepo local deps (skip these)\n\nKey challenge: pyproject.toml specifies version RANGES, not pinned versions.\nMay need to resolve to specific versions via PyPI API.",
+  "id": "turnkey-8yr",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Implement pyproject.toml parsing",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

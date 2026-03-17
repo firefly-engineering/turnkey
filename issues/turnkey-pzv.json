@@ -1,0 +1,24 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-3u4",
+    "turnkey-540",
+    "turnkey-543",
+    "turnkey-b7c",
+    "turnkey-nnn"
+  ],
+  "blocks": [
+    "turnkey-5cm"
+  ],
+  "closed_at": "2026-01-09T13:05:14.263053495+01:00",
+  "close_reason": "Phase 3 complete - Go project integration working with Buck2 and native go build",
+  "created": "2026-01-08T14:16:32.480857+01:00",
+  "description": "Generate BUCK files from go.mod. Create generators/go.nix. Support go_library, go_binary, go_test targets.",
+  "id": "turnkey-pzv",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Phase 3: Go Project Integration",
+  "type": "feature",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

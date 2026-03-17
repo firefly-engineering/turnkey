@@ -1,0 +1,22 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-2ph",
+    "turnkey-92n",
+    "turnkey-fnd",
+    "turnkey-qnt",
+    "turnkey-rjs"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-11T22:57:45.742207909+01:00",
+  "close_reason": "Implemented complete staleness detection in go/pkg/staleness/ with support for Go, Rust, and Python. Includes source file tracking, import/use statement parsing, and hash-based caching for performance.",
+  "created": "2026-01-09T17:21:57.227395943+01:00",
+  "description": "Detect when BUCK files need regeneration due to source changes.\n\nTriggers:\n- New source files added to package\n- Source files deleted from package\n- Import statements changed (new deps)\n\nChallenges:\n- Need to parse source files to detect import changes\n- Different logic per language (Go imports, Rust use, Python import)\n- Must be fast enough to run on every build\n\nConsider: hash-based detection of source file list + imports",
+  "id": "turnkey-3as",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "BUCK file staleness detection",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

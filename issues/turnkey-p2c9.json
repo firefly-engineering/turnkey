@@ -1,0 +1,19 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [
+    "turnkey-4yel",
+    "turnkey-xbsi"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-21T17:49:10.683849139+01:00",
+  "close_reason": "Replaced with individual extractor tasks: turnkey-7k8h (Rust), turnkey-uc52 (Python), turnkey-cevw (TypeScript), turnkey-20xv (Solidity)",
+  "created": "2026-01-21T17:27:48.618520419+01:00",
+  "description": "# Additional Language Extractors\n\nImplement extractors for non-Go languages using native tooling.\n\n## Extractors\n\n| Language | Implementation | Tooling |\n|----------|---------------|---------|\n| Rust | Rust binary | `cargo_metadata` crate |\n| Python | Python script | `ast` module |\n| TypeScript | Node.js script | TypeScript compiler API |\n| Solidity | Rust or JS | `solang-parser` or `solc` |\n\n## Tasks\n\n- [ ] Rust extractor using cargo_metadata\n- [ ] Python extractor using ast module\n- [ ] TypeScript extractor using TS compiler API\n- [ ] Solidity extractor\n- [ ] Integration tests for each extractor\n\n## Notes\n\nEach extractor should:\n- Output the standard extraction protocol JSON\n- Handle language-specific edge cases\n- Be independently testable",
+  "id": "turnkey-p2c9",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Phase 5: Additional Language Extractors",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

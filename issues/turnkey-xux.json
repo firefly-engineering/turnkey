@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-d6x"
+  ],
+  "blocks": [
+    "turnkey-gvfz",
+    "turnkey-raf"
+  ],
+  "closed_at": "2026-01-13T19:10:16.625229994+01:00",
+  "close_reason": "Rust fixups are still imported from old location, adapter references them correctly",
+  "created": "2026-01-13T19:04:36.980053746+01:00",
+  "description": "",
+  "id": "turnkey-xux",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create Rust fixups (fixups/rust/serde.nix, ring.nix, rustix.nix)",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

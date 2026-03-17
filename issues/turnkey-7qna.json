@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-8gwp",
+    "turnkey-kx9o"
+  ],
+  "blocks": [
+    "turnkey-w2dh"
+  ],
+  "closed_at": "2026-01-16T16:36:41.095909567+01:00",
+  "created": "2026-01-16T16:25:58.625224374+01:00",
+  "description": "Research and pin the buck2-prelude commit that matches the buck2 version in nixpkgs.\n\nSteps:\n1. Check buck2 version in nixpkgs (buck2 --version)\n2. Find corresponding commit in facebook/buck2 repo\n3. Use that commit for prelude.nix\n4. Document version compatibility policy",
+  "id": "turnkey-7qna",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Pin prelude to matching buck2 version",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

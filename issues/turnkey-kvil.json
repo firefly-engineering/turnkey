@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-eleg"
+  ],
+  "blocks": [
+    "turnkey-rmzq"
+  ],
+  "closed_at": "2026-01-19T21:14:33.195927297+01:00",
+  "close_reason": "Created solidity_test.bzl using forge test with fuzz and fork support",
+  "created": "2026-01-19T21:06:06.626486898+01:00",
+  "description": "Create nix/buck2/prelude-extensions/solidity/solidity_test.bzl\n\nAttributes:\n- srcs: test source files (*.t.sol)\n- deps: solidity_library targets\n- test_match: test function pattern (optional)\n- fork_url: RPC URL for mainnet forking (optional)\n- fuzz_runs: fuzz testing iterations (default 256)\n\nImplementation:\n- Create temporary Foundry project structure\n- Symlink sources and dependencies\n- Generate remappings.txt from deps\n- Run forge test with Buck2 test runner integration\n- Parse forge JSON output for test results\n\nPart of Solidity support (turnkey-ri2t).",
+  "id": "turnkey-kvil",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create solidity_test rule",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

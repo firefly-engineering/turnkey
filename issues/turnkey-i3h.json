@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-z4b"
+  ],
+  "blocks": [
+    "turnkey-4zq"
+  ],
+  "closed_at": "2026-01-10T12:36:34.100567745+01:00",
+  "close_reason": "Added to flake.nix packages and registry, toolchain.toml",
+  "created": "2026-01-10T12:12:40.593481579+01:00",
+  "description": "Update flake.nix and registry:\n1. Add pydeps-gen to packages in flake.nix\n2. Add pydeps-gen to registry mapping\n3. Add to toolchain.toml if needed for shell availability\n4. Test that 'pydeps-gen --help' works in dev shell",
+  "id": "turnkey-i3h",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add pydeps-gen to toolchain registry",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

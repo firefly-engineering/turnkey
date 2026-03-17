@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-kxs"
+  ],
+  "blocks": [
+    "turnkey-0il",
+    "turnkey-545"
+  ],
+  "closed_at": "2026-01-09T17:55:25.442729294+01:00",
+  "close_reason": "Already implemented as part of turnkey-4oa. tk check exits with code 0 if files are up-to-date, code 1 if stale.",
+  "created": "2026-01-09T17:22:25.692051518+01:00",
+  "description": "Implement `tk check` subcommand for CI validation.\n\nBehavior:\n- Check all staleness rules (deps + BUCK files)\n- Do NOT regenerate anything\n- Exit 0 if everything in sync\n- Exit 1 if anything stale, with clear error message\n\nCI usage:\n```yaml\n- name: Check BUCK files in sync\n  run: tk check\n```\n\nOutput on failure:\n```\ntk check\nERROR: Files out of sync\n\n  go-deps.toml is stale (go.mod is newer)\n  Run 'tk sync' to regenerate\n\nExit 1\n```",
+  "id": "turnkey-qvc",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "tk check: CI validation subcommand",
+  "type": "feature",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

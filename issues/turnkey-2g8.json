@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-11T21:36:57.331165807+01:00",
+  "close_reason": "Fixed. tk sync now regenerates all three deps files (go-deps.toml, rust-deps.toml, python-deps.toml) when their source files change.",
+  "created": "2026-01-10T18:39:07.180607955+01:00",
+  "description": "Currently 'tk sync' only regenerates go-deps.toml. It should also regenerate python-deps.toml and rust-deps.toml when their respective source files (pyproject.toml, Cargo.lock) are present.",
+  "id": "turnkey-2g8",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "tk sync should regenerate all deps files, not just go-deps.toml",
+  "type": "bug",
+  "updated_at": "2026-01-11T21:36:57.331165807+01:00"
+}

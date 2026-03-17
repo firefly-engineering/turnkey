@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-542",
+    "turnkey-ug8"
+  ],
+  "blocks": [
+    "turnkey-pzv"
+  ],
+  "closed_at": "2026-01-09T12:50:14.331610307+01:00",
+  "close_reason": "Phase 2 complete - project scaffolding implemented",
+  "created": "2026-01-08T14:16:31.57976+01:00",
+  "description": "Generate complete Buck2 project structure. Create scaffolding.nix, handle prelude strategies (bundled, git, nix).",
+  "id": "turnkey-b7c",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Phase 2: Project Scaffolding",
+  "type": "feature",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

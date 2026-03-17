@@ -1,0 +1,16 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-21T18:56:23.53104235+01:00",
+  "close_reason": "Implemented Solidity dependency extractor using tree-sitter with tree-sitter-solidity 1.2.13. Detects external libraries like @openzeppelin/contracts and internal relative imports. Fixed ABI compatibility by upgrading tree-sitter to 0.25.",
+  "created": "2026-01-21T17:48:48.996867514+01:00",
+  "description": "Implement Solidity extractor using solang-parser or solc. Parse import statements. Map to solidity-deps.toml entries. Output extraction protocol JSON.",
+  "id": "turnkey-20xv",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Solidity dependency extractor",
+  "type": "task",
+  "updated_at": "2026-01-21T18:56:23.53104235+01:00"
+}

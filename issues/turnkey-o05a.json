@@ -1,0 +1,19 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-omxx",
+    "turnkey-rfgy"
+  ],
+  "closed_at": "2026-01-21T17:33:18.101459685+01:00",
+  "close_reason": "Implemented starlark package with AST-based parser, object model with modification tracking, mutation API, and span-preserving writer. All 9 tests pass.",
+  "created": "2026-01-21T17:27:26.478313127+01:00",
+  "description": "# Starlark Object Model\n\nCreate a proper rules.star parser and object model using `go.starlark.net/syntax`.\n\n## Location\n```\nsrc/go/pkg/starlark/\n├── model.go       # RulesFile, Target, Attribute types\n├── parser.go      # Parse rules.star → object model\n├── writer.go      # Object model → rules.star (preserving unchanged)\n├── mutator.go     # Mutation API\n└── *_test.go      # Tests\n```\n\n## Tasks\n\n- [ ] Design data model types (RulesFile, Target, Attribute, etc.)\n- [ ] Implement parser using `go.starlark.net/syntax`\n- [ ] Implement span-preserving writer (unchanged → original text)\n- [ ] Implement mutation API (SetDeps, AddDep, RemoveDep, SetAttribute)\n- [ ] Add target creation/deletion support\n- [ ] Unit tests for round-tripping (parse → serialize = identical)\n- [ ] Unit tests for mutation (parse → mutate → serialize = correct diff)\n\n## Key Design Points\n\n- Parse to AST, wrap in types that track modification state\n- Serialize back preserving original spans for unchanged nodes\n- Track modification at attribute level, not just target level",
+  "id": "turnkey-o05a",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "Phase 1: Starlark Object Model",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

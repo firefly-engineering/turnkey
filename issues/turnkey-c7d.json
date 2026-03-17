@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T13:29:35.09278781+01:00",
+  "close_reason": "Implemented reindeer integration with cargoLockFile option",
+  "created": "2026-01-12T12:52:31.565165582+01:00",
+  "description": "The current gen-rust-buck.py approach has limitations:\n- No feature resolution\n- No build script support\n- Complex proc-macro crates fail (serde_derive, etc.)\n\nFacebook's reindeer tool (https://github.com/facebookincubator/reindeer) properly handles:\n- Feature resolution\n- Build scripts (via rust_build_script rules)\n- Platform-specific compilation\n- All Cargo edge cases\n\n## Implementation Status\n\nReindeer integration is now implemented in `nix/buck2/rust-deps-cell-reindeer.nix` with:\n\n1. **Cargo.lock parsing** - Extracts all crates.io packages from Cargo.lock\n2. **Fixed-output derivation for vendoring** - Network access for cargo vendor\n3. **Reindeer buckify** - Generates Buck2 rules with proper features, deps, proc_macro\n4. **Build script fixups** - Common crates configured to skip build scripts\n5. **Post-processing** - Splits single BUCK file into per-crate files for compatibility\n6. **Dep rewriting** - Handles deps, named_deps, platform_deps\n\n### Known Limitations\n\n- Crates using `include!()` macros for data files (e.g., icu_properties_data) need additional handling\n- Test/example/bench directories are removed to avoid crate_root detection issues\n\n### Usage\n\n```nix\nturnkey.toolchains.buck2 = {\n  enable = true;\n  cargoLockFile = ./Cargo.lock;\n  cargoVendorHash = \"sha256-...\";  # Get from build failure\n};\n```\n\n### Files\n\n- `nix/buck2/rust-deps-cell-reindeer.nix` - Main implementation\n- `nix/buck2/split-reindeer-buck.py` - Post-processing script\n- `nix/flake-parts/turnkey/default.nix` - Added cargoLockFile/cargoVendorHash options",
+  "id": "turnkey-c7d",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Integrate reindeer for full Cargo compatibility in rustdeps cell",
+  "type": "feature",
+  "updated_at": "2026-01-12T13:29:35.09278781+01:00"
+}

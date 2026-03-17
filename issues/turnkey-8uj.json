@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-13T09:23:19.603816812+01:00",
+  "close_reason": "Implemented rustfeatures-gen tool",
+  "created": "2026-01-12T17:07:29.641070164+01:00",
+  "description": "## Problem\n\nrust-features.toml requires manual maintenance to specify feature overrides for vendored crates. Currently we hand-craft entries like:\n\n```toml\n[overrides]\nclap = { add = [\"derive\"] }\n```\n\nThis won't scale as the project grows - every time a local binary needs a feature not present in the vendored dependency graph, someone must manually update this file.\n\n## Solution\n\nCreate a tool (likely `rustfeatures-gen` or extend `rustdeps-gen`) that:\n\n1. Scans the source tree for local Rust targets (BUCK files with `rust_binary`, `rust_library`, etc.)\n2. Parses their dependencies and required features\n3. Cross-references with the computed unified features from vendored crates\n4. Generates rust-features.toml with any additional features needed\n\n## Discovery Sources\n\nThe information is already in the source tree:\n- `cmd/*/BUCK` - local Rust binaries with deps\n- `Cargo.toml` files (if using Cargo for local development)\n- Feature requirements can be inferred from `#[derive(Parser)]` etc.\n\n## Acceptance Criteria\n\n- [ ] Tool discovers local Rust targets from BUCK files\n- [ ] Tool determines which features those targets need\n- [ ] Tool generates rust-features.toml automatically\n- [ ] Integrates with existing rustdeps-gen or as a separate tool\n- [ ] Documents the workflow for keeping features in sync",
+  "id": "turnkey-8uj",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create tool to auto-generate rust-features.toml from source tree",
+  "type": "feature",
+  "updated_at": "2026-01-13T09:23:19.603816812+01:00"
+}

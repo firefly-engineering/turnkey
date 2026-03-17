@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-c2n",
+    "turnkey-d6x",
+    "turnkey-raf",
+    "turnkey-ub6"
+  ],
+  "closed_at": "2026-01-13T19:09:10.020989307+01:00",
+  "close_reason": "Created core library files: default.nix, phases.nix, hooks.nix, fetchers.nix",
+  "created": "2026-01-13T19:04:34.973133942+01:00",
+  "description": "",
+  "id": "turnkey-mch",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create core deps-cell library (phases.nix, hooks.nix, fetchers.nix)",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

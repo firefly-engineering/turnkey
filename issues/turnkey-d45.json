@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T22:28:18.663165901+01:00",
+  "close_reason": "Implemented user-extensible registries for rustc_flags and build script fixups",
+  "created": "2026-01-12T15:08:06.051843632+01:00",
+  "description": "Currently gen-rust-buck.py has hardcoded build script cfg flags (e.g., serde_json's fast_arithmetic). This should be moved to a user-extensible registry pattern so downstream users can add their own fixups without modifying turnkey source.\n\nProposed approach:\n- Add a rustcFlagsFixups option to the buck2 config in flake-parts module\n- Accept a Nix attrset mapping crate names to lists of rustc flags\n- Pass this as JSON to gen-rust-buck.py\n- Default registry includes known fixups (serde_json)\n\nExample config:\n```nix\nbuck2.rustcFlagsFixups = {\n  serde_json = [\"--cfg\" \"fast_arithmetic=\\\"64\\\"\"];\n  my_crate = [\"--cfg\" \"custom_flag\"];\n};\n```",
+  "id": "turnkey-d45",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Make rustc_flags fixups user-extensible via registry",
+  "type": "task",
+  "updated_at": "2026-01-12T22:28:18.663165901+01:00"
+}

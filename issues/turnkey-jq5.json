@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-10T13:08:42.088905938+01:00",
+  "close_reason": "Implemented in .envrc",
+  "created": "2026-01-10T13:07:39.359751347+01:00",
+  "description": "Add automation to .envrc that regenerates rust-deps.toml when Cargo.toml or Cargo.lock changes. Should run: rustdeps-gen --manifest Cargo.toml --lockfile Cargo.lock",
+  "id": "turnkey-jq5",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add Rust deps auto-regeneration to .envrc",
+  "type": "task",
+  "updated_at": "2026-01-10T13:08:42.088905938+01:00"
+}

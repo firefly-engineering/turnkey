@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-1us",
+    "turnkey-emc",
+    "turnkey-kol6"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-16T10:55:15.1770241+01:00",
+  "close_reason": "E2E test added, tw has default rules for go/cargo/uv",
+  "created": "2026-01-10T17:36:23.28483355+01:00",
+  "description": "Test scenario: Developers use native tools, Buck2 stays in sync\n\n1. Start with working turnkey project\n2. Add new dependency using native tool:\n   - Go: 'go get github.com/some/pkg'\n   - Python: 'uv add requests'\n   - Rust: 'cargo add serde'\n3. Trigger direnv reload\n4. Verify deps files auto-updated\n5. Verify 'tk build' still works with new dep\n6. Modify source to use new dep, rebuild\n\nValidates: bi-directional sync, no lock-in to Buck2 workflows",
+  "id": "turnkey-66b",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "E2E: Language-native tools stay in sync",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

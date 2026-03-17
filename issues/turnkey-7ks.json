@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-emc"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-13T11:32:28.716264987+01:00",
+  "close_reason": "E2E infrastructure complete and greenfield test passing",
+  "created": "2026-01-13T11:16:43.136941587+01:00",
+  "description": "",
+  "id": "turnkey-7ks",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "E2E: Create GitHub Actions CI workflow",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

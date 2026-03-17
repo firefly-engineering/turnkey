@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-01-08T23:39:40.565793675+01:00",
+  "description": "Currently any modification to go.mod triggers a full refetch of all dependencies via godeps-gen --prefetch. This is slow for large dependency trees.\n\n**Current behavior:**\n1. go.mod changes → .envrc detects staleness\n2. Runs `godeps-gen --prefetch` which fetches ALL deps\n3. Overwrites entire go-deps.toml\n\n**Desired behavior:**\n1. go.mod changes → detect which deps changed\n2. Only prefetch new/changed dependencies\n3. Merge updates into existing go-deps.toml\n\n**Implementation ideas:**\n1. **Diff-based**: Parse old go-deps.toml, compare with go.mod, only fetch missing\n2. **Cache hashes**: Store fetched hashes in a cache, reuse on subsequent runs\n3. **Nix store dedup**: Leverage Nix store - if hash already exists, skip fetch\n4. **go.sum as source of truth**: go.sum changes less frequently, use it to detect actual changes\n\n**Related:**\n- godeps-gen prefetchers (turnkey-9as) already support multiple sources\n- nix-prefetch-github caches in Nix store, so repeated fetches are fast\n- Real bottleneck may be network latency per dep, not actual downloads",
+  "id": "turnkey-5dp",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "Incremental go-deps.toml updates",
+  "type": "feature",
+  "updated_at": "2026-01-08T23:39:40.565793675+01:00"
+}

@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-qs7"
+  ],
+  "closed_at": "2026-01-08T14:19:39.440844+01:00",
+  "close_reason": "Created nix/buck2/mappings.nix with Go, Rust, Python, CXX, genrule mappings",
+  "created": "2026-01-08T14:16:55.891221+01:00",
+  "description": "Declarative mapping of toolchain names to Buck2 rules. Include go, rust, python, cxx, genrule. Mark non-Buck2 tools as skip.",
+  "id": "turnkey-brw",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "Create nix/buck2/mappings.nix",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

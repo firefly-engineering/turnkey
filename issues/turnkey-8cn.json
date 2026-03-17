@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-10T12:36:40.734313157+01:00",
+  "close_reason": "Chose direct deps only for v1 - user provides pinned requirements.txt",
+  "created": "2026-01-10T12:12:47.092851645+01:00",
+  "description": "Decide how to handle transitive dependencies:\n\nOption A: Direct deps only (simple)\n- Only include packages explicitly listed in pyproject.toml/requirements.txt\n- User manages transitive deps manually\n- Matches current go-deps approach with --indirect flag\n\nOption B: Full resolution (complex)\n- Use pip's resolver to get full dependency tree\n- Generate all transitive deps in python-deps.toml\n- More complete but more complex\n\nRecommendation: Start with Option A (direct only), add --resolve flag later for Option B",
+  "id": "turnkey-8cn",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Handle transitive dependencies decision",
+  "type": "task",
+  "updated_at": "2026-01-10T12:36:40.734313157+01:00"
+}

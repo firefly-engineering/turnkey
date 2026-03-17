@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-20T22:53:30.97054792+01:00",
+  "close_reason": "Implemented jsonnet_test rule with assertion and golden file modes",
+  "created": "2026-01-20T09:29:31.79258152+01:00",
+  "description": "Add a `jsonnet_test` rule to the Jsonnet prelude extension for testing Jsonnet files.\n\n## Use Cases\n\n1. **Schema validation** - Verify generated JSON matches expected schema\n2. **Snapshot testing** - Compare output against known-good JSON files\n3. **Unit tests** - Test Jsonnet functions/libraries produce expected output\n\n## Potential Approaches\n\n### Option A: Golden file comparison\n```starlark\njsonnet_test(\n    name = \"config_test\",\n    src = \"config.jsonnet\",\n    golden = \"config.expected.json\",  # Compare output to this file\n    ext_strs = {\"env\": \"test\"},\n)\n```\n\n### Option B: Jsonnet native assertions\nJsonnet has built-in `std.assertEqual` - compile and check for assertion failures:\n```starlark\njsonnet_test(\n    name = \"lib_test\",\n    src = \"lib_test.jsonnet\",  # Contains std.assertEqual calls\n)\n```\n\n### Option C: External validator\n```starlark\njsonnet_test(\n    name = \"schema_test\",\n    src = \"config.jsonnet\",\n    schema = \"config.schema.json\",  # JSON Schema validation\n)\n```\n\n### Option D: jsonnunit framework\nUse https://github.com/legovaer/jsonnunit - a dedicated unit testing framework for Jsonnet:\n```starlark\njsonnet_test(\n    name = \"lib_test\",\n    src = \"lib_test.jsonnet\",\n    framework = \"jsonnunit\",  # Uses jsonnunit test runner\n)\n```\n\n## Implementation Notes\n\n- Should integrate with Buck2's test runner (`buck2 test`)\n- Consider supporting multiple test modes (golden, assertions, schema, jsonnunit)\n- Look at how `solidity_test` wraps `forge test` for patterns\n- Consider using jrsonnet (turnkey-vi1c) for faster test execution\n\n## References\n- Jsonnet assertions: https://jsonnet.org/ref/stdlib.html#assertEqual\n- JSON Schema: https://json-schema.org/\n- jsonnunit: https://github.com/legovaer/jsonnunit",
+  "id": "turnkey-6nn5",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Add jsonnet_test rule for testing Jsonnet files",
+  "type": "feature",
+  "updated_at": "2026-01-20T22:53:30.97054792+01:00"
+}

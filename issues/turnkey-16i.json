@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T11:41:06.670397446+01:00",
+  "close_reason": "Extracted semver utilities to nix/lib/semver.nix and updated rust-deps-cell.nix to use the new library",
+  "created": "2026-01-12T10:44:17.795224509+01:00",
+  "description": "The file nix/buck2/rust-deps-cell.nix contains semver parsing and comparison utilities (lines 82-127) that are duplicated/could be reused elsewhere. These should be extracted into a shared Nix library (e.g., nix/lib/semver.nix) for reuse across the codebase.\n\nCurrent location: nix/buck2/rust-deps-cell.nix\nFunctions to extract:\n- parseSemver: Parse version string into {major, minor, patch, prerelease}\n- compareSemver: Compare two parsed versions\n- compareVersionStrings: Compare version strings directly\n- semverSortDesc: Sort comparator for descending order",
+  "id": "turnkey-16i",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Extract semver utilities from rust-deps-cell.nix into reusable library",
+  "type": "task",
+  "updated_at": "2026-01-12T11:41:06.670397446+01:00"
+}

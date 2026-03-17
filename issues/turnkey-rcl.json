@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-11T22:37:58.193772857+01:00",
+  "close_reason": "Implemented nix-prefetch-cached wrapper with shared prefetch-cache library. All deps-gen tools now use cached prefetching automatically.",
+  "created": "2026-01-11T21:42:30.644093924+01:00",
+  "description": "The deps-gen tools (godeps-gen, rustdeps-gen, pydeps-gen) run prefetch loops that fetch every dependency to compute Nix hashes. This is slow and wasteful when we've already fetched these artifacts before.\n\nImplement a local cache that stores:\n- Key: (source, name, version) tuple (e.g., crates.io/serde/1.0.228)\n- Value: Nix SRI hash\n\nCache location options:\n- ~/.cache/turnkey/prefetch-cache.json\n- .turnkey/prefetch-cache.json (project-local)\n\nBenefits:\n- Dramatically faster regeneration when only a few deps change\n- Reduces network traffic to package registries\n- Makes CI faster on incremental changes\n\nImplementation considerations:\n- Should work across all three tools (Go, Rust, Python)\n- Consider a shared library/module for cache logic\n- Cache invalidation: trust the (name, version) tuple as immutable\n- Optional: TTL-based expiry for edge cases",
+  "id": "turnkey-rcl",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Cache prefetched artifact hashes to avoid redundant fetching",
+  "type": "task",
+  "updated_at": "2026-01-11T22:37:58.193772857+01:00"
+}

@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-539"
+  ],
+  "blocks": [
+    "turnkey-540",
+    "turnkey-8i7"
+  ],
+  "closed_at": "2026-01-08T20:41:34.034538794+01:00",
+  "close_reason": "Implemented: go build and buck2 build both work for hello-deps example with external github.com/google/uuid dependency",
+  "created": "2026-01-08T19:13:24.287893443+01:00",
+  "description": "Add a toy Go project that imports an external dependency (e.g., golang.org/x/text or similar).\n\nRequirements:\n- Code must build with native `go build` (no import rewriting)\n- When building with Buck2, deps loaded from Nix-managed cell\n- Start with a dependency that has no transitive dependencies\n\nApproach:\n1. Create examples/hello-deps/ with a go.mod and main.go importing one external pkg\n2. Generate a deps cell in Nix store with pre-built Go packages\n3. Configure Buck2 to resolve imports from the deps cell\n4. Verify both `go build` and `buck2 build` work",
+  "id": "turnkey-538",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Go external deps: simple case (no transitive)",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-20T15:01:30.793570915+01:00",
+  "close_reason": "De-emphasized Buck2 throughout vision docs - framed as 'incremental build system' with Buck2 as current implementation",
+  "created": "2026-01-20T14:46:39.226317421+01:00",
+  "description": "The user manual currently emphasizes Buck2 heavily throughout. While Buck2 is the current implementation, it's largely an implementation detail. We may support Bazel in the future, so the documentation should focus more on:\n\n**Properties we want (emphasize):**\n- Hermetic, reproducible builds\n- Incremental compilation\n- Remote caching and execution\n- Fine-grained dependency tracking\n- Fast feedback loops for developers and AI agents\n\n**Implementation details (de-emphasize):**\n- Buck2-specific commands and syntax\n- Buck2-specific configuration\n- References to 'Buck2' where 'build system' would suffice\n\n**Suggested changes:**\n1. In vision docs, talk about 'the build system' or 'incremental build system' rather than 'Buck2' where the specific tool doesn't matter\n2. Keep Buck2 references in practical/how-to sections where users need actual commands\n3. Frame the architecture as 'Nix + incremental build system + devenv' rather than 'Nix + Buck2 + devenv'\n4. Add a note that Bazel support may come in the future\n\n**Files to review:**\n- docs/user-manual/src/vision/*.md\n- docs/user-manual/src/introduction.md\n- docs/user-manual/src/SUMMARY.md (section naming)\n\nThis makes the documentation more future-proof and focuses on the value proposition rather than tool choice.",
+  "id": "turnkey-asn8",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "De-emphasize Buck2 as implementation detail in user manual",
+  "type": "task",
+  "updated_at": "2026-01-20T15:01:30.793570915+01:00"
+}

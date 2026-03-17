@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-vii"
+  ],
+  "blocks": [
+    "turnkey-gtj"
+  ],
+  "closed_at": "2026-01-10T12:36:33.860804995+01:00",
+  "close_reason": "Implemented using nix-prefetch-url --unpack and nix hash convert",
+  "created": "2026-01-10T12:12:21.554323176+01:00",
+  "description": "Prefetch packages and compute Nix SRI hashes:\n- Use 'nix-prefetch-url --unpack' for .tar.gz files\n- Use 'nix-prefetch-url --unpack' for .zip files  \n- Convert output to SRI format (sha256-base64)\n- Handle prefetch failures gracefully\n- Consider parallel prefetching for speed\n- Add --no-prefetch flag for testing\n\nPattern from rustdeps-gen:\n  nix-prefetch-url --unpack --type sha256 $URL\n  Convert hex to base64 for SRI format",
+  "id": "turnkey-mbw",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Implement Nix hash prefetching for Python packages",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

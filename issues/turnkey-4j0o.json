@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-21T03:45:46.127417544+01:00",
+  "close_reason": "Implemented three lightweight syntax validation hooks: starlark-lint (buck2), toml-syntax-check (Python tomllib), json-syntax-check (Python json). Total pre-commit runtime ~24s, under 30s target.",
+  "created": "2026-01-19T19:57:31.192563433+01:00",
+  "description": "Define an even lighter test suite suitable for pre-commit hooks.\n\n## Goals\n- Must complete in \u003c30 seconds (ideally \u003c10 seconds)\n- Run on every commit locally\n- Catch obvious errors before they hit CI\n- Should not require network access (no nix builds from scratch)\n\n## Current Pre-commit Hooks\nAlready have:\n- `nix-flake-check` - validates Nix files\n- `turnkey-check` (tk check) - verifies rules.star sync\n- `rust-edition-check` - Rust edition alignment\n- `monorepo-dep-check` - dependency rule compliance\n\n## Additional Candidates\n\n### Fast Syntax Checks\n- Starlark syntax validation (rules.star files)\n- TOML syntax validation (*.toml files)\n- JSON syntax validation (package.json, etc.)\n\n### Fast Static Analysis\n- Python type hints check (pyright/mypy on changed files only)\n- Rust clippy on changed crates only (if fast enough)\n- Go vet on changed packages only\n\n### NOT Suitable for Pre-commit\n- Full nix builds (too slow)\n- Buck2 builds (requires full graph)\n- Network-dependent operations\n- Full test suites\n\n## Implementation\n- Review current hooks in devenv config\n- Add new hooks that meet speed requirements\n- Document which checks run when in contributing guide\n- Consider `--no-verify` escape hatch documentation",
+  "id": "turnkey-4j0o",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Define lightweight pre-commit test suite",
+  "type": "task",
+  "updated_at": "2026-01-21T03:45:46.127417544+01:00"
+}

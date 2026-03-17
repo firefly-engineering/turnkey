@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-qatp"
+  ],
+  "closed_at": "2026-01-19T21:16:48.947514056+01:00",
+  "close_reason": "Added fetchGit and mkGitSpec for Foundry/Solidity git dependencies",
+  "created": "2026-01-19T21:05:21.673148414+01:00",
+  "description": "Modify nix/lib/deps-cell/fetchers.nix to add fetchGit type for Foundry git dependencies.\n\nShould support:\n- repo URL\n- rev (commit hash)\n- sha256 hash\n\nPart of Solidity support (turnkey-ri2t).",
+  "id": "turnkey-flx4",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add git fetcher to deps-cell fetchers",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

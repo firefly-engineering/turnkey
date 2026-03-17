@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T12:20:01.937761863+01:00",
+  "close_reason": "Fixed by using absolute Nix store paths for clang in the generated BUCK file via dynamicAttrs",
+  "created": "2026-01-09T09:48:45.735676249+01:00",
+  "description": "After \\`buck2 clean\\`, building Go code with cgo fails because clang is not in PATH.\n\n## Error\n\\`\\`\\`\ncgo: C compiler \"clang\" not found: exec: \"clang\": executable file not found in \\$PATH\n\\`\\`\\`\n\n## Context\n- Buck2 builds stdlib with CGO_ENABLED=1\n- CC=clang is set in the environment\n- But clang is not in the execution PATH\n\n## Investigation needed\n- How does Buck2 find C compilers?\n- Is this a toolchain configuration issue?\n- Should clang be in the runtime shell PATH?\n- How do other Buck2+Go projects handle this?\n\n## Likely fix\nThe cxx toolchain needs to make clang available to Buck2 build actions, \nnot just to the user shell.",
+  "id": "turnkey-bpc",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "Buck2 cgo builds fail - clang not in PATH",
+  "type": "bug",
+  "updated_at": "2026-01-09T12:20:01.937761863+01:00"
+}

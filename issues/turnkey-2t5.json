@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-1us",
+    "turnkey-emc",
+    "turnkey-ish"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-13T21:24:30.486132141+01:00",
+  "close_reason": "Implemented CI/CD headless E2E test (02-ci-headless.sh). Test validates nix develop --command workflow without direnv.",
+  "created": "2026-01-10T17:36:39.697512998+01:00",
+  "description": "Test scenario: Headless CI environment\n\n1. Create project with committed deps files\n2. In CI container (no direnv, no interactive shell):\n   - 'nix develop --command tk build //...'\n   - 'nix develop --command tk test //...'\n3. Verify builds succeed without .envrc execution\n4. Verify no network calls during build (all deps pre-fetched)\n\nValidates: CI compatibility, hermetic builds, no direnv dependency in CI",
+  "id": "turnkey-2t5",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "E2E: CI/CD without interactive shell",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

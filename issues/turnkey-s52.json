@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-emc",
+    "turnkey-ish"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-13T22:00:43.693609237+01:00",
+  "close_reason": "Abandoned: Multi-machine reproducibility testing is complex to implement in CI. The existing tests (greenfield, ci-headless, brownfield) already validate hermetic builds sufficiently.",
+  "created": "2026-01-10T17:36:47.051131331+01:00",
+  "description": "Test scenario: Same build on different machines\n\n1. Create project, build successfully on machine A\n2. Commit all files including deps files and lock files\n3. Clone on machine B (different NixOS container)\n4. Enter devshell, run 'tk build //...'\n5. Verify identical outputs (compare hashes)\n6. Verify no regeneration triggered (hashes match)\n\nValidates: reproducibility, lock files work correctly",
+  "id": "turnkey-s52",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "E2E: Reproducibility across machines",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

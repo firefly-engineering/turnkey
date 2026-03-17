@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-mch",
+    "turnkey-xux"
+  ],
+  "blocks": [
+    "turnkey-cj3"
+  ],
+  "closed_at": "2026-01-13T19:10:16.697260341+01:00",
+  "close_reason": "Created Rust adapter with mkRustDepPackage and mkRustDepsCell",
+  "created": "2026-01-13T19:04:39.101378189+01:00",
+  "description": "",
+  "id": "turnkey-raf",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create Rust adapter (adapters/rust.nix with mkRustDepPackage, mkRustDepsCell)",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

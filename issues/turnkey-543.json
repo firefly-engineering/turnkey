@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-pzv"
+  ],
+  "closed_at": "2026-01-09T13:05:14.183020407+01:00",
+  "close_reason": "All exit criteria met: go.mod parsing, BUCK generation, transitive deps, no import rewriting needed",
+  "created": "2026-01-08T20:18:21.296793403+01:00",
+  "description": "Exit criteria for Phase 3: Go Project Integration\n\nRequired for completion:\n1. Parse go.mod to discover Go packages in project\n2. Generate BUCK files with:\n   - go_library targets for library packages\n   - go_binary targets for main packages\n   - go_test targets for test files\n3. External dependencies from Nix-managed deps cell:\n   - Simple deps (no transitive) working\n   - Transitive dependency graphs resolved\n   - Code builds with both `go build` AND `buck2 build`\n4. No import path rewriting required\n\nTest scenarios:\n- `examples/hello/` builds (already done in Phase 1)\n- `examples/hello-deps/` with external dep builds\n- Real-world Go project (e.g., small CLI tool) builds with Buck2\n\nDepends on: turnkey-538, turnkey-539, turnkey-540",
+  "id": "turnkey-543",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Phase 3 Exit Criteria",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

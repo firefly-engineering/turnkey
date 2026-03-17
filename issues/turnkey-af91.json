@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-20T09:42:25.496764811+01:00",
+  "close_reason": "Implemented local target overrides via .turnkey/local.toml",
+  "created": "2026-01-20T09:33:45.925692918+01:00",
+  "description": "Add support for per-developer local argument overrides in the `tk` wrapper.\n\n## Problem\n\nWhen running targets locally, developers often need machine-specific arguments:\n- Different IP addresses for network binding\n- Custom ports to avoid conflicts\n- Debug flags only needed locally\n\nCurrently requires typing these every time or using shell aliases outside of tk.\n\n## Proposed Solution\n\nAdd a `.turnkey/local.toml` file (gitignored) that specifies default args per target:\n\n```toml\n# .turnkey/local.toml - Local overrides (not committed)\n\n[run.\"//docs/user-manual\"]\nargs = [\"-n\", \"100.64.25.26\"]\n\n[run.\"//src/cmd/server:server\"]\nargs = [\"--port\", \"9090\", \"--debug\"]\n\n[build.\"//some:target\"]\nargs = [\"--show-output\"]\n```\n\n## Behavior\n\n- `tk run //docs/user-manual` → `buck2 run //docs/user-manual -- -n 100.64.25.26`\n- `tk run //docs/user-manual -- --other` → `buck2 run //docs/user-manual -- -n 100.64.25.26 --other`\n- Explicit `--` args append to (don't replace) local overrides\n- Add `--no-local` flag to skip local overrides\n\n## Implementation Notes\n\n- Parse `.turnkey/local.toml` in tk's run/build command handling\n- Support wildcards? e.g., `[run.\"//docs/...\"]` for all targets under docs/\n- Consider `[env.\"//target\"]` section for environment variable overrides\n- Ensure the file is added to `.gitignore` template\n\n## Files to Modify\n\n- `src/cmd/tk/main.go` - Add local.toml parsing and arg injection\n- `src/go/pkg/syncconfig/` - May need new config types\n- `.gitignore` - Add `.turnkey/local.toml`",
+  "id": "turnkey-af91",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Add local target overrides to tk wrapper",
+  "type": "feature",
+  "updated_at": "2026-01-20T09:42:25.496764811+01:00"
+}

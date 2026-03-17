@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T12:19:18.129350138+01:00",
+  "close_reason": "Added BUCK file",
+  "created": "2026-01-12T12:16:47.125378272+01:00",
+  "description": "Add Buck2 build target for the godeps Go library package.",
+  "id": "turnkey-sb2",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Add BUCK file for go/pkg/godeps",
+  "type": "task",
+  "updated_at": "2026-01-12T12:19:18.129350138+01:00"
+}

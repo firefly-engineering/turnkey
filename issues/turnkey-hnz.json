@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-8i7"
+  ],
+  "blocks": [
+    "turnkey-c8o"
+  ],
+  "closed_at": "2026-01-08T21:46:25.858265265+01:00",
+  "close_reason": "Phase 1 complete: godeps-gen tool with go.mod/go.sum parsing and --prefetch for Nix hashes. Native go build works.",
+  "created": "2026-01-08T21:34:22.607060519+01:00",
+  "description": "Create the initial structure for the godeps-gen Go tool.\n\n**Phased approach:**\n\n**Phase 1: Native Go build**\n- Create `tools/godeps-gen/main.go`\n- Create `tools/godeps-gen/go.mod`\n- Implement core functionality\n- Verify: `cd tools/godeps-gen \u0026\u0026 go build \u0026\u0026 ./godeps-gen --help`\n\n**Phase 2: Model Buck2 dependencies**\n- Use godeps-gen to analyze its own go.mod/go.sum\n- Generate the deps needed for Buck2 build\n- This is dogfooding the tool on itself\n\n**Phase 3: Buck2 build**\n- Create `tools/godeps-gen/BUCK`\n- Verify: `buck2 build //tools/godeps-gen:godeps-gen`\n- Both build methods should produce working binaries\n\n**Initial functionality:**\n- Parse command line flags (--go-mod, --go-sum, --output, --format)\n- go.mod parser (require directives)\n- go.sum parser (h1: hashes)\n- TOML output generator (go-deps.toml format)\n\n**Success criteria:**\n- `go build` works\n- `buck2 build` works  \n- Output can be used by go-deps-cell.nix",
+  "id": "turnkey-hnz",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Scaffold tools/godeps-gen Go binary",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

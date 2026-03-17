@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-emc",
+    "turnkey-ish"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-13T21:52:24.924290421+01:00",
+  "close_reason": "Implemented error recovery E2E test (08-error-recovery.sh). Tests invalid deps, corrupted files, and BUCK file recovery.",
+  "created": "2026-01-10T17:37:02.755903522+01:00",
+  "description": "Test scenario: Things go wrong, user can recover\n\n1. Introduce invalid dependency (non-existent package)\n2. Verify clear error message during regeneration\n3. Fix dependency, verify regeneration succeeds\n4. Delete deps file manually, verify auto-regenerated\n5. Corrupt deps file, verify detected and regenerated\n6. Network failure during prefetch, verify graceful handling\n\nValidates: error messages, recovery paths, robustness",
+  "id": "turnkey-dw7",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "E2E: Error recovery and diagnostics",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

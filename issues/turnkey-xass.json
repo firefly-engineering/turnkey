@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-16T18:52:44.800089987+01:00",
+  "close_reason": "Completed: jsdeps-gen tool, js-deps-cell.nix, JavaScript adapter, turnkey module integration",
+  "created": "2026-01-16T18:16:39.324005961+01:00",
+  "description": "Implement pnpm dependency management following the same pattern as Go, Rust, and Python:\n\n## Why pnpm\n- Stricter dependency resolution (no phantom dependencies)\n- pnpm-lock.yaml is well-structured and deterministic\n- Used by rules_js (Aspect) - proven approach for Buck2/Bazel\n- Better suited for monorepo setups\n\n## Goals\n1. Take pnpm-lock.yaml as input\n2. Convert it to a list of artifacts to fetch with hashes\n3. Use Nix to fetch npm tarballs with proper caching\n4. Augment packages with BUCK files for Buck2 builds\n5. Organize into a `jsdeps` cell\n\n## Required Components\n\n### jsdeps-gen tool\n- Parse pnpm-lock.yaml\n- Generate TOML with package info and hashes\n- Similar to godeps-gen, rustdeps-gen, pydeps-gen\n\n### Nix derivations\n- Fetch npm tarballs from registry\n- Extract and organize packages\n- Generate BUCK files for each package\n\n### Buck2 rules\n- `npm_library` or `js_library` rule for npm packages\n- Integration with `typescript_library` for imports\n\n### Cell structure\n```\njsdeps//\n├── BUCK\n├── lodash/\n│   ├── BUCK\n│   └── ... (package contents)\n├── react/\n│   ├── BUCK\n│   └── ...\n```\n\n## Prior Art\n- rules_js uses pnpm and its lockfile\n- pnpm2nix for Nix integration\n\n## Example Usage\n```bash\n# Generate deps file from lockfile\njsdeps-gen --lock pnpm-lock.yaml -o js-deps.toml\n\n# Use in TypeScript library\ntypescript_library(\n    name = \"app\",\n    srcs = [\"app.ts\"],\n    deps = [\"jsdeps//:lodash\"],\n)\n```",
+  "id": "turnkey-xass",
+  "labels": [
+    "dependencies",
+    "typescript"
+  ],
+  "priority": 2,
+  "status": "closed",
+  "title": "Implement pnpm dependency management for TypeScript",
+  "type": "feature",
+  "updated_at": "2026-01-16T18:52:44.800089987+01:00"
+}

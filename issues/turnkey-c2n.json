@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-mch"
+  ],
+  "blocks": [
+    "turnkey-ep3"
+  ],
+  "closed_at": "2026-01-13T19:09:12.503627322+01:00",
+  "close_reason": "Created adapter files with mkXxxDepPackage and mkXxxDepsCell functions",
+  "created": "2026-01-13T19:04:39.983379342+01:00",
+  "description": "",
+  "id": "turnkey-c2n",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create Python adapter (adapters/python.nix with mkPythonDepPackage, mkPythonDepsCell)",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

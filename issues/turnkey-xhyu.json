@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-xcpo"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-20T20:40:42.07834766+01:00",
+  "close_reason": "Implemented deprecation and EOL metadata support for versioned registry",
+  "created": "2026-01-20T19:38:10.423123464+01:00",
+  "description": "Extend the versioned registry spec to support metadata on version entries.\n\n## Metadata Fields\n- `deprecated: bool` - Mark version as deprecated\n- `deprecationMessage: string` - Migration guidance\n- `eol: string` - End of life date (ISO 8601)\n\n## Example\n```nix\nversions = {\n  \"1.22\" = {\n    package = final.go_1_22;\n    deprecated = true;\n    deprecationMessage = \"Use 1.23 instead\";\n    eol = \"2025-02-01\";\n  };\n};\n```\n\n## Behavior\n- Warn (not error) when instantiating deprecated toolchains\n- Warn when EOL date has passed\n- Provide clear migration guidance in warning message\n- Consider environment variable to suppress warnings\n\n## Implementation Notes\n- Needs backward compatibility: plain derivations should still work\n- Detection: check if version entry has `package` attribute\n- Wire warnings into Turnkey's toolchain resolution\n\nRelated: docs/specs/versioned-registry.md\nDepends on: turnkey-xcpo implementation",
+  "id": "turnkey-xhyu",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Add deprecation and EOL metadata to versioned registry",
+  "type": "feature",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

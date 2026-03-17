@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-eleg"
+  ],
+  "blocks": [
+    "turnkey-rmzq"
+  ],
+  "closed_at": "2026-01-19T21:13:58.834467357+01:00",
+  "close_reason": "Created solidity_contract.bzl for extracting contract artifacts",
+  "created": "2026-01-19T21:05:51.780892386+01:00",
+  "description": "Create nix/buck2/prelude-extensions/solidity/solidity_contract.bzl\n\nAttributes:\n- contract: name of contract to extract\n- deps: solidity_library targets\n\nOutputs:\n- {name}.abi - Contract ABI (JSON)\n- {name}.bin - Deployment bytecode (hex)\n- {name}.metadata - Compiler metadata\n\nImplementation:\n- Read compiled output from deps\n- Extract specific contract artifacts\n- Return SolidityContractInfo provider\n\nPart of Solidity support (turnkey-ri2t).",
+  "id": "turnkey-ux1i",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create solidity_contract rule",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

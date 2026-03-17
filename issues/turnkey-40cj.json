@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-b69x",
+    "turnkey-ihlp"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-19T16:18:54.646197799+01:00",
+  "close_reason": "Resolved by using .turnkey isolation directory. Buck2 now outputs to buck-out/.turnkey/ which Go/Cargo/pytest automatically ignore. Implementation in turnkey-ihlp (buckconfig) and turnkey-b69x (tk wrapper).",
+  "created": "2026-01-16T16:56:03.400428142+01:00",
+  "description": "Native tools (go, cargo, uv) should exclude buck-out/ from their operations like build/test.\n\nCurrently 'go test ./...' picks up code from buck-out/v2/external_cells/bundled/prelude which causes spurious failures.\n\nThis should be handled by our tw wrappers, which we already use for dependency management. The wrappers should:\n- Set appropriate exclusion patterns (e.g., -skip for go test)\n- Or filter the package list to exclude buck-out/\n\nRelated: tw wrappers are currently focused on dependency sync, but could be extended to handle this.",
+  "id": "turnkey-40cj",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Exclude buck-out/ from native tool operations",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-ihlp"
+  ],
+  "blocks": [],
+  "created": "2026-01-19T16:15:35.016269702+01:00",
+  "description": "Add a pre-commit hook that verifies Jest/Vitest configs properly exclude buck-out directories.\n\nThe check should:\n1. Detect if project uses Jest (jest.config.js, jest.config.ts, or jest field in package.json)\n2. Detect if project uses Vitest (vitest.config.js, vitest.config.ts)\n3. Verify the config includes exclusion patterns for buck-out and/or dot directories:\n   - Jest: testPathIgnorePatterns should include '/buck-out/' or '/\\\\.'\n   - Vitest: exclude should include '**/buck-out/**' or '**/.*/**'\n4. Warn (or fail) if JS/TS tests are present but no exclusion is configured\n\nThis prevents spurious test failures from buck-out artifacts being picked up by test discovery.\n\nImplementation options:\n- Shell script in pre-commit\n- Python script for more robust config parsing\n- Could be part of existing turnkey-check or a new js-test-config-check\n\nRelated: turnkey-zk3j (documentation task)",
+  "id": "turnkey-1vag",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "Pre-commit check for JS/TS test config buck-out exclusion",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

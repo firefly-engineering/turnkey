@@ -1,0 +1,22 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-eleg",
+    "turnkey-kvil",
+    "turnkey-ux1i"
+  ],
+  "blocks": [
+    "turnkey-24rf"
+  ],
+  "closed_at": "2026-01-19T21:15:01.083319027+01:00",
+  "close_reason": "Created solidity.bzl module loader exporting all rules and providers",
+  "created": "2026-01-19T21:06:07.50463775+01:00",
+  "description": "Create nix/buck2/prelude-extensions/solidity/solidity.bzl as module loader that exports all rules:\n- solidity_library\n- solidity_contract\n- solidity_test\n- system_solidity_toolchain\n\nPart of Solidity support (turnkey-ri2t).",
+  "id": "turnkey-rmzq",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create Solidity module loader (solidity.bzl)",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

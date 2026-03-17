@@ -1,0 +1,22 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-1q6",
+    "turnkey-kxs"
+  ],
+  "blocks": [
+    "turnkey-545",
+    "turnkey-7ew"
+  ],
+  "closed_at": "2026-01-09T17:54:58.642798768+01:00",
+  "close_reason": "Implemented tk sync and tk check subcommands. Created syncer package that uses staleness and syncconfig packages. Sync detects stale files and regenerates them, check reports staleness without modifying files.",
+  "created": "2026-01-09T17:22:17.067094755+01:00",
+  "description": "Implement `tk sync` subcommand for explicit synchronization.\n\nBehavior:\n- Check all staleness rules (deps + BUCK files)\n- Regenerate everything that's stale\n- Report what was regenerated\n- Exit 0 if successful\n\nUseful for:\n- Initial project setup\n- Manual sync when needed\n- Debugging sync issues\n\nOutput example:\n```\ntk sync\nChecking go-deps.toml... stale (go.mod newer)\n  Regenerating go-deps.toml... done\nChecking examples/go-hello/BUCK... ok\nChecking examples/go-hello-deps/BUCK... ok\nSynced 1 file(s)\n```",
+  "id": "turnkey-4oa",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "tk sync: Explicit sync subcommand",
+  "type": "feature",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

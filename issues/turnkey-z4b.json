@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-gtj"
+  ],
+  "blocks": [
+    "turnkey-i3h"
+  ],
+  "closed_at": "2026-01-10T12:36:34.020517303+01:00",
+  "close_reason": "Created nix/packages/pydeps-gen.nix",
+  "created": "2026-01-10T12:12:35.427128654+01:00",
+  "description": "Create nix/packages/pydeps-gen.nix:\n- Build tool using appropriate builder (buildPythonApplication, buildRustPackage, or buildGoModule)\n- Wrap with nix and nix-prefetch-url in PATH\n- Add to flake.nix packages\n- Add to registry\n\nPattern from rustdeps-gen.nix:\n- Use makeWrapper to add nix tools to PATH\n- Export as packages.pydeps-gen",
+  "id": "turnkey-z4b",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create Nix package for pydeps-gen",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

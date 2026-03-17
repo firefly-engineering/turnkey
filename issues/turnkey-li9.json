@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T08:28:32.070917626+01:00",
+  "close_reason": "All 5 phases complete: toolchain cell, flake template scaffolding, Go/Rust/Python integration, tk sync \u0026 staleness detection",
+  "created": "2026-01-08T14:16:18.969641+01:00",
+  "description": "Make Buck2 and Nix/devenv toolchains fully interoperable. Phase 1: Toolchain cell generation. Phase 2: Project scaffolding. Phase 3: Go integration. Phase 4: Multi-language. Phase 5: Sync \u0026 maintenance.",
+  "id": "turnkey-li9",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "Buck2 + Nix Integration",
+  "type": "epic",
+  "updated_at": "2026-01-12T08:28:32.070917626+01:00"
+}

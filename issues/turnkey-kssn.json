@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-588m",
+    "turnkey-ce6"
+  ],
+  "blocks": [
+    "turnkey-kgit"
+  ],
+  "closed_at": "2026-01-16T18:41:45.866439056+01:00",
+  "close_reason": "Created jsdeps-gen tool in cmd/jsdeps-gen/ that parses pnpm-lock.yaml",
+  "created": "2026-01-16T16:26:39.470278869+01:00",
+  "description": "Create TypeScript dependency generator (like godeps-gen, pydeps-gen):\n\nInput: package-lock.json or pnpm-lock.yaml\nOutput: typescript-deps.toml with:\n- Package name, version\n- NPM tarball URL\n- SRI hash for reproducible fetching\n\nTool should:\n- Parse npm/pnpm lockfile format\n- Prefetch packages to compute hashes\n- Generate TOML compatible with deps cell builder\n\nLocation: cmd/tsdeps-gen/ (Rust, like other *deps-gen tools)",
+  "id": "turnkey-kssn",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Create tsdeps-gen tool",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

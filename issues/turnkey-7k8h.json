@@ -1,0 +1,16 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-21T17:57:34.186856245+01:00",
+  "close_reason": "Implemented rust-deps-extract using cargo metadata. Added Rust mapping support to mapper and syncer.",
+  "created": "2026-01-21T17:48:44.650643303+01:00",
+  "description": "Implement Rust extractor using cargo_metadata crate. Parse Cargo.toml and use statements. Output extraction protocol JSON. Handle workspace dependencies.",
+  "id": "turnkey-7k8h",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Rust dependency extractor",
+  "type": "task",
+  "updated_at": "2026-01-21T17:57:34.186856245+01:00"
+}

@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-20T14:41:07.353315514+01:00",
+  "close_reason": "Implemented: switched to jrsonnet v0.5.0-pre96-test with custom Nix package",
+  "created": "2026-01-20T10:51:25.969052591+01:00",
+  "description": "Replace go-jsonnet with jrsonnet (https://github.com/CertainLach/jrsonnet) for the jsonnet toolchain. jrsonnet is a Rust implementation that is significantly faster than the Go implementation. Changes needed:\n- Update nix/registry/default.nix to use jrsonnet instead of go-jsonnet\n- Verify the CLI is compatible (may need minor adjustments to jsonnet_library.bzl)\n- Update any documentation referencing go-jsonnet",
+  "id": "turnkey-vi1c",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Use jrsonnet (Rust) instead of go-jsonnet for jsonnet rules",
+  "type": "task",
+  "updated_at": "2026-01-20T14:41:07.353315514+01:00"
+}

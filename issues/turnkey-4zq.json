@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-i3h"
+  ],
+  "blocks": [
+    "turnkey-9bw"
+  ],
+  "closed_at": "2026-01-10T12:36:34.179250956+01:00",
+  "close_reason": "Verified with examples/python-hello-deps - imports six successfully",
+  "created": "2026-01-10T12:12:52.981856017+01:00",
+  "description": "Verify pydeps-gen works end-to-end:\n1. Create a test pyproject.toml or requirements.txt with 'six' dependency\n2. Run pydeps-gen to generate python-deps.toml\n3. Verify python-deps-cell.nix builds correctly\n4. Verify buck2 build //examples/python-hello-deps works\n5. Verify the example runs and imports six correctly\n\nThe example already exists at examples/python-hello-deps/",
+  "id": "turnkey-4zq",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Test pydeps-gen with python-hello-deps example",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

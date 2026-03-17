@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-8z0"
+  ],
+  "closed_at": "2026-01-19T19:41:26.887512905+01:00",
+  "close_reason": "Added npm_deps attribute to typescript_library and typescript_binary rules",
+  "created": "2026-01-19T18:48:25.307689162+01:00",
+  "description": "Enhance typescript_library and typescript_binary rules to consume npm dependencies from the jsdeps cell.\n\nCurrent state:\n- typescript_library only accepts deps from other typescript_library targets\n- jsdeps cell provides npm packages as filegroups\n\nNeed:\n1. Add node_modules attr to typescript_library/binary for jsdeps reference\n2. Generate node_modules directory structure from jsdeps packages\n3. Configure tsc to resolve modules from that directory\n4. Handle transitive npm dependencies\n\nExample usage:\n```starlark\ntypescript_library(\n    name = \"mylib\",\n    srcs = [\"index.ts\"],\n    node_modules = \"//jsdeps:node_modules\",  # or individual packages\n)\n```\n\nThis is required for typescript-hello-deps example.",
+  "id": "turnkey-78xi",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "TypeScript rules: support npm deps from jsdeps cell",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

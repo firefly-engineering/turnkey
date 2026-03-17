@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-13T09:25:56.995522649+01:00",
+  "close_reason": "Implemented proper cfg() expression parser",
+  "created": "2026-01-12T19:45:25.378819347+01:00",
+  "description": "## Problem\n\nCurrent target filtering in gen-rust-buck.py and compute-unified-features.py uses fragile string matching:\n- Checks for substrings like \"unix\", \"windows\", \"wasm32\"\n- Doesn't properly parse cfg() expressions\n- Can fail on complex expressions like `cfg(all(unix, not(target_os = \"macos\")))`\n\n## Solution\n\nImplement a proper cfg() expression parser that:\n1. Tokenizes the expression\n2. Builds an AST for all(), any(), not() combinators\n3. Evaluates against a target specification (e.g., x86_64-unknown-linux-gnu)\n\n## Reference\n\nCargo's cfg() syntax: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#platform-specific-dependencies\n\n## Current workaround\n\nString matching with priority ordering (check \"unix\" before exclusions).",
+  "id": "turnkey-514",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Implement proper cfg() expression parser for target filtering",
+  "type": "task",
+  "updated_at": "2026-01-13T09:25:56.995522649+01:00"
+}

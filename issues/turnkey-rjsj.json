@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-8qbh",
+    "turnkey-vgkh"
+  ],
+  "blocks": [
+    "turnkey-w97j"
+  ],
+  "closed_at": "2026-01-19T21:24:48.187933446+01:00",
+  "close_reason": "Added Solidity options to devenv buck2.nix module",
+  "created": "2026-01-19T21:06:20.068854074+01:00",
+  "description": "Modify nix/devenv/turnkey/buck2.nix to:\n- Build soldeps cell when solidity.enable = true\n- Register cell in .buckconfig\n- Handle soldeps-gen sync\n\nPart of Solidity support (turnkey-ri2t).",
+  "id": "turnkey-rjsj",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add Solidity cell handling to devenv buck2.nix",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

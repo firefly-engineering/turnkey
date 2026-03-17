@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-u4dv"
+  ],
+  "blocks": [
+    "turnkey-h4zd"
+  ],
+  "closed_at": "2026-01-19T16:46:39.157576596+01:00",
+  "close_reason": "Completed rules.star rename",
+  "created": "2026-01-19T16:34:35.273755673+01:00",
+  "description": "Rename all existing BUCK files to rules.star.\n\nFiles to rename (~33):\n- cmd/*/BUCK\n- go/pkg/*/BUCK\n- python/*/BUCK\n- rust/*/BUCK\n- examples/*/BUCK\n- e2e/fixtures/*/BUCK\n- templates/default/BUCK\n- testdata/BUCK\n\nCommand: find . -name BUCK -not -path './buck-out/*' -exec sh -c 'mv \"$1\" \"$(dirname $1)/rules.star\"' _ {} \\;",
+  "id": "turnkey-di93",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Rename all BUCK files to rules.star in repo",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

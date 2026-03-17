@@ -1,0 +1,23 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-kx9o",
+    "turnkey-w2dh"
+  ],
+  "blocks": [
+    "turnkey-ce6",
+    "turnkey-kssn",
+    "turnkey-u903"
+  ],
+  "closed_at": "2026-01-16T18:19:04.729948024+01:00",
+  "close_reason": "All 8 E2E tests pass with nix prelude (verified 2026-01-16)",
+  "created": "2026-01-16T16:26:13.186824546+01:00",
+  "description": "After integrating nix prelude, verify all existing E2E tests still pass:\n\n1. Run full E2E suite with prelude.strategy = 'nix'\n2. Test fallback to prelude.strategy = 'bundled' still works\n3. Add test case for prelude strategy switching if needed",
+  "id": "turnkey-588m",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Verify E2E tests pass with nix prelude",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-1vag",
+    "turnkey-40cj",
+    "turnkey-zk3j"
+  ],
+  "closed_at": "2026-01-19T16:18:41.427268349+01:00",
+  "close_reason": "Added [buck2] isolation_dir = .turnkey to generated buckconfig in nix/devenv/turnkey/buck2.nix",
+  "created": "2026-01-19T16:09:46.272640139+01:00",
+  "description": "Configure Buck2 to use .turnkey as the default isolation directory instead of v2.\n\nThis hides build artifacts under buck-out/.turnkey/ which Go, Cargo, and other tools ignore (directories starting with . are skipped during recursive operations like './...').\n\nImplementation:\n- Modify nix/devenv/turnkey/buck2.nix to add [buck2] section with isolation_dir = .turnkey\n- The buckconfig is generated, so this is a Nix code change, not editing a static file\n- Document the change and rationale\n- Note: First build after change will have cache miss (one-time cost)\n\nLocation: nix/devenv/turnkey/buck2.nix around line 271 (buckconfigContent)",
+  "id": "turnkey-ihlp",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Set default isolation_dir to .turnkey in .buckconfig",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

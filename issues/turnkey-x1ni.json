@@ -1,0 +1,16 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-21T20:38:12.671794554+01:00",
+  "close_reason": "Implemented mtime-based staleness detection for tk rules sync. Files where rules.star is newer than all source files are skipped. Added --force/-f and --all/-a flags to bypass staleness detection when needed.",
+  "created": "2026-01-21T17:48:43.346963769+01:00",
+  "description": "Three-tier staleness check: (1) git status for changed files, (2) mtime comparison, (3) content hash. Store hash in rules.star header comment. Scope extraction to only changed files for performance.",
+  "id": "turnkey-x1ni",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Implement staleness detection optimization",
+  "type": "task",
+  "updated_at": "2026-01-21T20:38:12.671794554+01:00"
+}

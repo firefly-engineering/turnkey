@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-x8l5"
+  ],
+  "closed_at": "2026-01-13T22:47:19.994337087+01:00",
+  "close_reason": "Research complete. Findings documented in docs/fuse-composition-research.md. Recommendation: Rust + fuser (Linux) + FUSE-T (macOS).",
+  "created": "2026-01-13T22:41:07.54040333+01:00",
+  "description": "Investigate FUSE options for the repository composition layer:\n\n1. **FUSE-T** (macOS)\n   - https://www.fuse-t.org/\n   - NFS-based approach (no kernel extension)\n   - Performance characteristics\n   - API and Go/Rust bindings\n\n2. **Linux FUSE**\n   - libfuse / fuse3\n   - Existing Go/Rust FUSE libraries\n   - Performance comparison\n\n3. **Cross-platform abstraction**\n   - Can we use a single codebase?\n   - What's the minimal API surface needed?\n\n4. **Alternatives**\n   - OverlayFS (Linux-only, kernel)\n   - BindFS\n   - 9P filesystem\n\nOutput: Recommendation document with chosen approach and rationale.",
+  "id": "turnkey-po9r",
+  "labels": [],
+  "priority": 4,
+  "status": "closed",
+  "title": "Research FUSE-T and Linux FUSE for cross-platform support",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

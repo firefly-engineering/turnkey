@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T15:17:34.159253852+01:00",
+  "close_reason": "Fixed by always setting explicit crate_root when src/lib.rs exists",
+  "created": "2026-01-12T15:13:44.493647774+01:00",
+  "description": "Building rustdeps-gen fails because base64 crate has ambiguous crate root.\n\n**FIXED**: Always explicitly set crate_root when src/lib.rs exists.\n\n**NEW ISSUE DISCOVERED**: Feature unification problem\n\nsynstructure requires syn with features: visit, extra-traits, derive, parsing, printing, clone-impls\nBut syn's default features only include: derive, parsing, printing, clone-impls, proc-macro\n\nWe only extract default features for each crate, not the features required by dependents.\n\nThis requires a more sophisticated solution:\n1. Parse the dependency graph\n2. Collect feature requirements from all dependents\n3. Build each crate with the union of all required features\n\nFor now, the crate_root fix is done. Feature unification is a separate task.",
+  "id": "turnkey-kfd",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "Fix crate_root inference for crates with examples",
+  "type": "bug",
+  "updated_at": "2026-01-12T15:17:34.159253852+01:00"
+}

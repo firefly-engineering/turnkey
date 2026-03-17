@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T12:06:27.476319975+01:00",
+  "close_reason": "Implemented cargo-prune-workspace in Go with prunedCargoSource Nix helper. Updated rustdeps-gen, pydeps-gen, and nix-prefetch-cached to use the new helper.",
+  "created": "2026-01-12T11:51:41.866817924+01:00",
+  "description": "In nix/packages/rustdeps-gen.nix and nix/packages/pydeps-gen.nix, we currently include Cargo.toml files from unrelated workspace members just to satisfy Cargo workspace resolution:\n\n```nix\nfileset = fs.unions [\n  (root + \"/Cargo.toml\")\n  (root + \"/Cargo.lock\")\n  (root + \"/cmd/rustdeps-gen\")\n  # Include other workspace members for Cargo workspace resolution (just Cargo.toml)\n  (root + \"/cmd/pydeps-gen/Cargo.toml\")\n  (root + \"/examples/rust-hello/Cargo.toml\")\n  ...\n];\n```\n\nThis is fragile - adding a new workspace member requires updating all package definitions.\n\n## Implementation Plan\n\n### 1. Rust CLI: cargo-prune-workspace (cmd/cargo-prune-workspace)\n\nA Rust tool that modifies Cargo.toml to keep only whitelisted workspace members:\n\n```bash\ncargo-prune-workspace --members cmd/rustdeps-gen,cmd/nix-prefetch-cached,rust/prefetch-cache\n```\n\n- Reads Cargo.toml from current directory (or --manifest-path)\n- Parses [workspace] members list\n- Removes entries not in the whitelist\n- Writes modified Cargo.toml in place (or to --output)\n- Use toml_edit crate to preserve formatting/comments\n\n### 2. Nix wrapper: prunedCargoSource (nix/lib/cargo.nix)\n\nHigher-level function that wraps fs.toSource and applies cargo-prune-workspace:\n\n```nix\nprunedCargoSource {\n  root = ./.;\n  members = [ \"cmd/rustdeps-gen\" \"rust/prefetch-cache\" ];\n  extraFiles = [ ./Cargo.lock ];  # additional files to include\n}\n```\n\nThis would:\n1. Use fs.toSource to create initial source\n2. Run cargo-prune-workspace as a derivation to patch Cargo.toml\n3. Return the pruned source\n\n### Result\n\nPackage definitions become simpler:\n```nix\nsrc = prunedCargoSource {\n  root = ../..;\n  members = [ \"cmd/rustdeps-gen\" \"cmd/nix-prefetch-cached\" \"rust/prefetch-cache\" ];\n};\n```\n\nNo need to manually track Cargo.toml files from other workspace members.\n\n**Files to create:**\n- cmd/cargo-prune-workspace/Cargo.toml\n- cmd/cargo-prune-workspace/src/main.rs\n- nix/packages/cargo-prune-workspace.nix\n- nix/lib/cargo.nix",
+  "id": "turnkey-amb",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "cargo-prune-workspace: helper to patch Cargo.toml workspace members for filtered builds",
+  "type": "task",
+  "updated_at": "2026-01-12T12:06:27.476319975+01:00"
+}

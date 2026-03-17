@@ -1,0 +1,20 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-mch"
+  ],
+  "blocks": [
+    "turnkey-xux"
+  ],
+  "closed_at": "2026-01-13T19:09:10.882496539+01:00",
+  "close_reason": "Created fixups/default.nix with registry API",
+  "created": "2026-01-13T19:04:35.789721382+01:00",
+  "description": "",
+  "id": "turnkey-d6x",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create fixup registry API (fixups/default.nix)",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

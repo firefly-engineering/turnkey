@@ -1,0 +1,22 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-0bya",
+    "turnkey-2e0a",
+    "turnkey-dp4d",
+    "turnkey-ksi6",
+    "turnkey-mo27"
+  ],
+  "closed_at": "2026-01-22T12:02:05.204636223+01:00",
+  "close_reason": "Epic complete: Replaced gobuckify with buckgen\n\nCreated new buckgen tool that parses Go files directly (no go list scaffolding needed).\n\nComponents built:\n- src/go/pkg/goparse/ - Go file parser with build constraint support\n- src/go/pkg/buckgen/ - BUCK file generation library\n- src/cmd/buckgen/ - CLI tool\n\nIssues resolved:\n1. Fixed double vendor/ path in deps\n2. Used directory name for target naming (consistency)\n3. Added package_name attribute for correct import resolution\n4. Filtered self-references from deps\n5. Filtered test files when collecting imports\n6. Fixed srcs glob to include assembly (.s, .S) files\n7. Excluded stub Go files (function declarations only) from srcs\n\nNote: Users may need to run `rm -rf .devenv .turnkey/godeps \u0026\u0026 direnv reload` after pulling these changes to force a fresh godeps cell rebuild.",
+  "created": "2026-01-09T20:53:12.199794382+01:00",
+  "description": "Currently gobuckify uses `go/packages` to analyze code, which requires valid Go modules that can be imported. This means go-deps-cell.nix has to generate dummy `main.go` and `go.mod` files just to make gobuckify happy.\n\nA cleaner approach would parse `.go` files directly to extract:\n- Package declarations\n- Import statements  \n- Build constraints (OS/arch-specific files)\n\nThis would eliminate the need for the godeps cell to contain scaffolding code.\n\nMay require forking gobuckify to implement this differently.",
+  "id": "turnkey-yu7",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Revisit gobuckify to not require importable code",
+  "type": "epic",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

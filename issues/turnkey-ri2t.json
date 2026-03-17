@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-19T21:28:01.217441501+01:00",
+  "close_reason": "Completed all 16 subtasks: Buck2 rules, deps management, module integration, and examples",
+  "created": "2026-01-19T19:59:42.587741805+01:00",
+  "description": "Add Buck2 rules for compiling Solidity smart contracts.\n\n## Background\nSolidity is the primary language for Ethereum smart contracts. Compilation produces:\n- ABI (Application Binary Interface) - JSON describing contract interface\n- Bytecode - EVM bytecode for deployment\n- Source maps - for debugging\n\n## Desired Rules\n\n### solidity_library\nCompile Solidity contracts, exposing artifacts for other rules.\n```starlark\nsolidity_library(\n    name = \"token\",\n    srcs = [\"ERC20.sol\", \"MyToken.sol\"],\n    deps = [\":openzeppelin\"],  # Other solidity_library targets\n    remappings = {\n        \"@openzeppelin/\": \"//third_party/openzeppelin/\",\n    },\n    solc_version = \"0.8.20\",  # Optional, use toolchain default\n    optimizer = True,\n    optimizer_runs = 200,\n)\n```\n\n### solidity_contract (or solidity_binary)\nBuild a deployable contract with all artifacts.\n```starlark\nsolidity_contract(\n    name = \"my_token\",\n    contract = \"MyToken\",  # Contract name within sources\n    deps = [\":token\"],\n    visibility = [\"PUBLIC\"],\n)\n```\n\nOutputs:\n- `my_token.abi` - Contract ABI (JSON)\n- `my_token.bin` - Bytecode (hex)\n- `my_token.metadata` - Compiler metadata\n\n### solidity_test (future)\nIntegration with testing frameworks like Foundry or Hardhat.\n\n## Toolchain\n- Add `solc` (Solidity compiler) to registry\n- nixpkgs has `solc` package\n- Consider supporting multiple solc versions (important for contract compatibility)\n- May want `foundry` toolchain for testing (forge, cast, anvil)\n\n## Implementation Notes\n- Solidity has complex import resolution (remappings, node_modules style)\n- Standard JSON input/output for compiler interface\n- Need to handle contract inheritance and libraries\n- Consider integration with OpenZeppelin and other common libraries\n- Source verification requires exact compiler settings\n\n## Third-party Dependencies\nConsider how to handle:\n- OpenZeppelin contracts\n- Other audited contract libraries\n- npm-style Solidity packages\n\n## References\n- https://docs.soliditylang.org/\n- https://github.com/ethereum/solidity\n- https://book.getfoundry.sh/ (Foundry)",
+  "id": "turnkey-ri2t",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add Solidity rules to prelude extensions",
+  "type": "feature",
+  "updated_at": "2026-01-19T21:28:01.217441501+01:00"
+}

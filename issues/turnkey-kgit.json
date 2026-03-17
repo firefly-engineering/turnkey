@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-ce6",
+    "turnkey-kssn"
+  ],
+  "blocks": [
+    "turnkey-x1pn"
+  ],
+  "closed_at": "2026-01-16T18:47:04.254583387+01:00",
+  "close_reason": "Completed as js-deps-cell.nix - covers both JavaScript and TypeScript",
+  "created": "2026-01-16T16:26:46.17310681+01:00",
+  "description": "Create Nix module to build TypeScript deps cell from typescript-deps.toml:\n\nSimilar to go-deps-cell.nix, rust-deps-cell.nix, python-deps-cell.nix:\n- Read typescript-deps.toml\n- Fetch npm packages using URLs and hashes\n- Generate BUCK files exposing packages as targets\n- Create cell structure for symlink to .turnkey/tsdeps\n\nLocation: nix/buck2/typescript-deps-cell.nix",
+  "id": "turnkey-kgit",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Create typescript-deps-cell.nix",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

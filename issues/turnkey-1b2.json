@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-10T12:36:40.817261192+01:00",
+  "close_reason": "pydeps-gen implemented in Rust, supports pyproject.toml and requirements.txt",
+  "created": "2026-01-10T12:13:10.731029413+01:00",
+  "description": "Generate python-deps.toml from pyproject.toml or requirements.txt.\n\nThis tool completes the Python dependency management story for turnkey, matching the existing godeps-gen and rustdeps-gen patterns.\n\nKey features:\n- Parse pyproject.toml (PEP 621) and requirements.txt\n- Query PyPI API for package metadata\n- Prefetch packages with nix-prefetch-url --unpack\n- Generate python-deps.toml with SRI hashes\n\nReferences:\n- Existing python-deps-cell.nix (already working)\n- examples/python-hello-deps (working example with 'six')\n- godeps-gen and rustdeps-gen patterns",
+  "id": "turnkey-1b2",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "Implement pydeps-gen tool",
+  "type": "epic",
+  "updated_at": "2026-01-10T12:36:40.817261192+01:00"
+}

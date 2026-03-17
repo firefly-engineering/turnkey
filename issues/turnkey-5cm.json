@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-544",
+    "turnkey-pzv"
+  ],
+  "blocks": [
+    "turnkey-536"
+  ],
+  "closed_at": "2026-01-09T13:28:04.584688352+01:00",
+  "close_reason": "Phase 4 complete. Added Rust/Python/TypeScript support with examples. Deps integration is documented for future work with reindeer/pip-to-buck.",
+  "created": "2026-01-08T14:16:33.426517+01:00",
+  "description": "Extend generators to Rust (Cargo.toml), Python (pyproject.toml). Consider reindeer for Rust.",
+  "id": "turnkey-5cm",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Phase 4: Multi-Language Support",
+  "type": "feature",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

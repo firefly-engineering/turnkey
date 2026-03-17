@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T12:33:57.631280983+01:00",
+  "close_reason": "Implemented generic nixCells registry in buck2.nix",
+  "created": "2026-01-09T12:31:09.656209412+01:00",
+  "description": "Currently godeps cell handling is hardcoded with specific variables:\n- godepsCellPath\n- hasGodeps\n- godepsCellConfig\n- godepsPlatformDetector\n\nAs we add more Nix-backed cells (e.g., rust deps, proto gen), this pattern won't scale.\n\n## Proposed Solution\n\nCreate a generic cell registry that:\n1. Defines all Nix-backed cells in one place\n2. Auto-generates the [cells] config entries\n3. Auto-generates platform detector specs for all cells\n4. Handles symlink creation in enterShell\n\n## Example structure\n\n```nix\nnixCells = {\n  godeps = {\n    enable = hasGodeps;\n    path = \".turnkey/godeps\";\n    derivation = cfg.godeps;\n  };\n  # Future cells can be added here\n};\n```\n\nThen loop over `nixCells` to generate config and symlinks.",
+  "id": "turnkey-5he",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Refactor buck2.nix to use generic cell registry",
+  "type": "task",
+  "updated_at": "2026-01-09T12:33:57.631280983+01:00"
+}

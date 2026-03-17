@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-8i7"
+  ],
+  "blocks": [],
+  "created": "2026-01-08T20:54:50.208823377+01:00",
+  "description": "Allow multiple Go dependency cells in a single repository, with BUCK targets specifying which cell to use.\n\nUse case:\n- Large monorepos with isolated Go projects that need different dependency versions\n- Gradual migration where old and new code coexist with different deps\n- Projects with conflicting transitive dependencies\n\nDesign ideas:\n\n1. **Named godeps cells**: Instead of single `godeps`, support `godeps_frontend`, `godeps_backend`, etc.\n   ```nix\n   buck2.godeps = {\n     default = ./go-deps-main.nix;\n     legacy = ./go-deps-legacy.nix;\n   };\n   ```\n\n2. **BUCK file marker**: Indicate which cell a package uses\n   ```python\n   # Option A: Target attribute\n   go_binary(\n       name = \"myapp\",\n       godeps_cell = \"legacy\",  # or annotation\n       deps = [\"godeps_legacy//vendor/...\"],\n   )\n   \n   # Option B: Package-level marker file\n   # .godeps file containing: legacy\n   ```\n\n3. **Generator awareness**: The go.mod→registry generator needs to know:\n   - Which go.mod/go.sum to read\n   - Which cell name to generate for\n   - Could use directory structure: `go-modules/frontend/go.mod` → `godeps_frontend`\n\n4. **Cell naming in .buckconfig**:\n   ```ini\n   [cells]\n       godeps = .turnkey/godeps/default\n       godeps_legacy = .turnkey/godeps/legacy\n   ```\n\nConsiderations:\n- Increases complexity significantly\n- May conflict with monorepo standardization (turnkey-nnn)\n- Could be future enhancement after single-cell pattern is solid\n\nRecommendation: Design the single-cell implementation to not preclude this, but defer actual multi-cell support.",
+  "id": "turnkey-hoa",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "Support multiple godeps cells per repository",
+  "type": "feature",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

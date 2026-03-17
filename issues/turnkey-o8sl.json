@@ -1,0 +1,16 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-22T13:49:09.057953923+01:00",
+  "close_reason": "Updated AGENTS.md to use 'tk' commands instead of 'buck2' for quality gates and cleaning.",
+  "created": "2026-01-22T13:46:41.806335682+01:00",
+  "description": "Change quality gates to use 'tk build'/'tk test' instead of 'buck2'. This ensures sync happens.",
+  "id": "turnkey-o8sl",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Update AGENTS.md to recommend 'tk' commands",
+  "type": "task",
+  "updated_at": "2026-01-22T13:49:09.057953923+01:00"
+}

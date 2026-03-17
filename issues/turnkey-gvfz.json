@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-xux"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-13T21:00:19.72079196+01:00",
+  "close_reason": "Migration complete: fixups moved to nix/lib/deps-cell/fixups/rust/, old directory deleted, rust-deps-cell.nix updated to use new location",
+  "created": "2026-01-13T19:04:52.794433746+01:00",
+  "description": "",
+  "id": "turnkey-gvfz",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Migrate fixups from nix/buck2/fixups/ to nix/lib/deps-cell/fixups/rust/",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

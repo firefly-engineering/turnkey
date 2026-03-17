@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T12:28:36.499267742+01:00",
+  "close_reason": "Added toolchains//... to target_platform_detector_spec. Now buck2 run toolchains//:go[go] works without --target-platforms",
+  "created": "2026-01-09T09:21:34.0092518+01:00",
+  "description": "Verify that the toolchain generation properly supports invocation via buck2 run.\n\n## What to verify\n\n1. `buck2 run toolchains//:go[go] -- version` works\n2. `buck2 run toolchains//:go[go] -- list ./...` works\n3. Other toolchain subtargets work as expected\n\n## Context\n\nWhen researching gobuckify integration, we noted that gobuckify uses:\n```\nbuck2 run toolchains//:go[go] -- list ...\n```\n\nOur toolchain generation should support this pattern, but we haven't verified it works.\n\n## Why this matters\n\n- gobuckify and other Buck2 Go tooling expect this to work\n- Users may want to invoke Go through Buck2 for consistency\n- Verifies our toolchain generation is complete",
+  "id": "turnkey-jrh",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Verify buck2 run toolchains//:go works correctly",
+  "type": "task",
+  "updated_at": "2026-01-09T12:28:36.499267742+01:00"
+}

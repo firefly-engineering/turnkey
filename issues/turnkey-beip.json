@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-17T08:38:04.96938651+01:00",
+  "close_reason": "Implemented pre-commit hook for monorepo dependency rules (all languages)",
+  "created": "2026-01-17T07:59:26.805316189+01:00",
+  "description": "Create a pre-commit hook that verifies dependencies are declared at the root level for all languages:\n\n**Go:**\n- Verify no nested go.mod files exist in subdirectories\n\n**Rust:**\n- Parse root Cargo.toml for [workspace.dependencies]\n- For each workspace member, verify shared deps use `workspace = true`\n- Fail if direct version specs are used for workspace deps\n\n**Python:**\n- Verify no nested pyproject.toml files with their own dependencies\n- All deps should be in root pyproject.toml\n\n**TypeScript/JavaScript:**\n- Verify no nested package.json with direct deps (should use workspace: protocol)\n- All deps should be in root package.json\n\nThe check should provide clear error messages explaining which file violates the rule and how to fix it.",
+  "id": "turnkey-beip",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add pre-commit check for monorepo dependency rules (all languages)",
+  "type": "task",
+  "updated_at": "2026-01-17T08:38:04.96938651+01:00"
+}

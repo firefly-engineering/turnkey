@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-19T18:42:24.095033921+01:00",
+  "close_reason": "Added registryExtensions option to flake-parts module. Expanded default registry with all standard toolchains. flake.nix now only needs 3 lines for custom packages instead of 30+.",
+  "created": "2026-01-19T17:18:44.19492601+01:00",
+  "description": "Currently, flake.nix must override the entire registry to add custom packages. This causes duplication since all default registry entries must be repeated.\n\nAdd a registry extension mechanism to allow extending the default registry rather than replacing it:\n\n```nix\nturnkey.toolchains = {\n  # Only specify additions, not the full registry\n  registryExtensions = {\n    beads = inputs.beads.packages.${system}.default;\n    mdbook = pkgs.mdbook;\n  };\n};\n```\n\nThe flake-parts module should merge:\n1. Default registry (nix/registry/default.nix)\n2. User's registryExtensions\n3. tw wrappers overlay (if enabled)\n\nThis reduces duplication and makes it easier to add new tools.",
+  "id": "turnkey-ry4a",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Reduce registry duplication with extension mechanism",
+  "type": "task",
+  "updated_at": "2026-01-19T18:42:24.095033921+01:00"
+}

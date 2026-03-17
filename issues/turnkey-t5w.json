@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T21:08:17.442071843+01:00",
+  "close_reason": "Implemented file sets in godeps-gen.nix",
+  "created": "2026-01-09T21:06:46.773884605+01:00",
+  "description": "Currently godeps-gen.nix uses `src = ../..;` which copies the entire repo to the Nix store.\n\nShould use Nix file sets (https://nix.dev/tutorials/working-with-local-files.html#file-sets) to include only the necessary files:\n- go.mod, go.sum\n- cmd/godeps-gen/\n- go/pkg/godeps/\n\nThis improves build efficiency and avoids unnecessary rebuilds when unrelated files change.",
+  "id": "turnkey-t5w",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Use Nix file sets for Go package sources",
+  "type": "task",
+  "updated_at": "2026-01-09T21:08:17.442071843+01:00"
+}

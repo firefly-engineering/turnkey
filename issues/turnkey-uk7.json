@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T13:26:58.701881883+01:00",
+  "close_reason": "TypeScript deps cell generation would require npm/yarn wrapper with Buck2 worker integration. Most complex of the three.",
+  "created": "2026-01-09T13:12:00.442706856+01:00",
+  "description": "Create a Nix-based TypeScript/npm deps cell similar to godeps for Go.\n\nOptions to explore:\n1. Use node2nix for package.json\n2. Use dream2nix for modern npm/yarn/pnpm\n3. Use npmlock2nix for package-lock.json\n4. Build custom solution\n\nThe deps cell should:\n- Parse package.json + lock file\n- Fetch packages from npm registry\n- Generate BUCK files for each package\n- Handle TypeScript type definitions\n- Support both native npm/node and buck2 run",
+  "id": "turnkey-uk7",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "TypeScript: deps cell generation from package.json",
+  "type": "task",
+  "updated_at": "2026-01-09T13:26:58.701881883+01:00"
+}

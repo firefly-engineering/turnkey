@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-x8l5"
+  ],
+  "blocks": [],
+  "created": "2026-01-13T22:41:17.887781918+01:00",
+  "description": "Add support for Bazel as an alternative to Buck2.\n\n## Requirements\n\n1. **WORKSPACE/MODULE.bazel generation** - Generate Bazel workspace files from turnkey config\n\n2. **External repository layout** - Map Nix dependencies to Bazel's external/ structure:\n   - Go: rules_go compatible layout\n   - Rust: rules_rust compatible layout  \n   - Python: rules_python compatible layout\n\n3. **Toolchain configuration** - Generate Bazel toolchain configs similar to current Buck2 toolchains cell\n\n4. **Build file generation** - Either:\n   - Use gazelle for Go\n   - Generate BUILD.bazel files directly\n   - Both approaches depending on language\n\n## Depends On\n\n- FUSE composition layer (turnkey-x8l5) - Makes this much cleaner\n- Or can be done with symlinks similar to current Buck2 approach\n\n## Non-Goals (initially)\n\n- Remote execution support\n- Bazel module (bzlmod) - start with WORKSPACE",
+  "id": "turnkey-wro0",
+  "labels": [],
+  "priority": 4,
+  "status": "open",
+  "title": "Add Bazel build system support",
+  "type": "feature",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

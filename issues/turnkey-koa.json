@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-09T13:18:46.812399578+01:00",
+  "close_reason": "Rust toolchain mapping verified - system_rust_toolchain works with bundled prelude",
+  "created": "2026-01-09T13:11:30.748348105+01:00",
+  "description": "Verify the existing Rust toolchain mapping in mappings.nix works correctly.\n\nCurrent mapping:\n```nix\nrust = {\n  skip = false;\n  targets = [{\n    name = \"rust\";\n    rule = \"system_rust_toolchain\";\n    load = \"@prelude//toolchains:rust.bzl\";\n    visibility = [ \"PUBLIC\" ];\n    attrs = { default_edition = \"2021\"; };\n  }];\n  implicitDependencies = [ \"cxx\" \"python\" ];\n};\n```\n\nVerify:\n1. Adding `rust = {}` to toolchain.toml adds rust to toolchains cell\n2. The generated BUCK file has correct rust toolchain target\n3. `buck2 build` can use the rust toolchain",
+  "id": "turnkey-koa",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Rust: verify toolchain mapping works",
+  "type": "task",
+  "updated_at": "2026-01-09T13:18:46.812399578+01:00"
+}

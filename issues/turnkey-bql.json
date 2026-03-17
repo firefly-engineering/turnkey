@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-13T09:19:45.924983392+01:00",
+  "close_reason": "sync.toml now generated from Nix configuration",
+  "created": "2026-01-12T15:10:54.051289445+01:00",
+  "description": "Currently `tk sync` reads from `.turnkey/sync.toml` to know how to regenerate deps files. This requires downstream users to create and maintain this file.\n\nThe configuration should be generated from Nix code with sensible defaults based on what's enabled:\n\n- If `goDepsFile` is set → generate go deps rule (go.mod + go.sum → go-deps.toml)\n- If `rustDepsFile` is set → generate rust deps rule (Cargo.toml + Cargo.lock → rust-deps.toml)  \n- If `pythonDepsFile` is set → generate python deps rule (pyproject.toml → python-deps.toml)\n\nProposed approach:\n1. Generate sync.toml as part of the devenv shell setup (like we do for .buckconfig)\n2. Derive the config from the buck2 options already declared in flake.nix\n3. Allow overrides for custom source paths or generator commands\n4. Remove the need for users to commit sync.toml to their repos\n\nThis keeps the turnkey philosophy: declare what you need in Nix, get sensible behavior automatically.",
+  "id": "turnkey-bql",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Move tk sync configuration to Nix with sensible defaults",
+  "type": "task",
+  "updated_at": "2026-01-13T09:19:45.924983392+01:00"
+}

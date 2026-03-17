@@ -1,0 +1,22 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-r13s"
+  ],
+  "blocks": [
+    "turnkey-50uq",
+    "turnkey-5qnh",
+    "turnkey-qhvt"
+  ],
+  "closed_at": "2026-01-19T17:17:53.90785705+01:00",
+  "close_reason": "Implemented mdbook toolchain support with prelude extension",
+  "created": "2026-01-19T17:09:20.208377321+01:00",
+  "description": "Add mdbook to the toolchain registry and create buck2 rules for building and serving mdbook projects. Should support:\n- mdbook_book() rule for building a book\n- Ability to run local dev server via 'tk run'\n- Integration with toolchains cell",
+  "id": "turnkey-f2y7",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Add mdbook toolchain support",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

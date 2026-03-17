@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-3as"
+  ],
+  "closed_at": "2026-01-11T22:57:31.319514291+01:00",
+  "close_reason": "Implemented CheckRustSrcList, CheckRustUses, and CheckRustPackage functions in go/pkg/staleness/rust.go with full test coverage",
+  "created": "2026-01-09T23:35:18.234865122+01:00",
+  "description": "Detect when Rust BUCK files are stale due to source changes. Track .rs files and use statements. Lower priority than Go since Rust has reindeer for BUCK generation.",
+  "id": "turnkey-2ph",
+  "labels": [],
+  "priority": 4,
+  "status": "closed",
+  "title": "Rust source file staleness detection",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-raf"
+  ],
+  "blocks": [
+    "turnkey-9jkz",
+    "turnkey-we0s"
+  ],
+  "closed_at": "2026-01-13T19:10:09.00573385+01:00",
+  "close_reason": "Updated to use new deps-cell library",
+  "created": "2026-01-13T19:04:50.126804985+01:00",
+  "description": "",
+  "id": "turnkey-cj3",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Update rust-deps-cell.nix to use new library",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

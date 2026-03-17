@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-9as"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-08T23:03:46.057900831+01:00",
+  "close_reason": "Completed: wrapped binary with nix-prefetch-github and nix in PATH, tested with GitHub and golang.org/x modules",
+  "created": "2026-01-08T22:36:39.392246806+01:00",
+  "description": "Update the godeps-gen Nix package to include prefetcher tools as runtime dependencies.\n\n**Current state:**\n- godeps-gen calls nix-prefetch-github but it's not in PATH\n- Non-GitHub modules fail silently\n\n**Required changes:**\n\n1. **Wrap the binary with prefetchers in PATH:**\n   ```nix\n   { pkgs, lib }:\n   \n   pkgs.buildGoModule {\n     pname = \"godeps-gen\";\n     # ...\n     \n     nativeBuildInputs = [ pkgs.makeWrapper ];\n     \n     postInstall = ''\n       wrapProgram $out/bin/godeps-gen \\\n         --prefix PATH : ${lib.makeBinPath [\n           pkgs.nix-prefetch-github\n           pkgs.nix-prefetch        # for generic URL fetching\n         ]}\n     '';\n   }\n   ```\n\n2. **Alternative: bundled prefetchers:**\n   - Implement prefetching in pure Go (no external tools)\n   - Use go-git or similar for cloning\n   - Compute hashes directly\n   - More portable but more complex\n\n3. **Hybrid approach:**\n   - Try Go-native first\n   - Fall back to nix tools if available\n   - Clear error messages if neither works\n\n**Testing:**\n- Verify `nix run .#godeps-gen -- --prefetch` works\n- Test with GitHub modules\n- Test with golang.org/x modules\n- Test with unknown hosts (should give clear error)\n\nDepends on: turnkey-9as (prefetcher system)",
+  "id": "turnkey-f63",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Update godeps-gen Nix package with prefetcher dependencies",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

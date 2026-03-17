@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-11T21:41:34.92781199+01:00",
+  "close_reason": "Fixed. rustdeps-gen now uses 'name@version' as TOML key to support multiple versions of the same crate.",
+  "created": "2026-01-11T21:37:34.382397597+01:00",
+  "description": "When Cargo.lock contains multiple versions of the same crate (e.g., webpki-roots 0.26.11 and 1.0.5), rustdeps-gen outputs duplicate [deps.crate-name] sections which is invalid TOML. The tool should either deduplicate or use array syntax.",
+  "id": "turnkey-e7d",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "rustdeps-gen produces duplicate TOML keys for multi-version crates",
+  "type": "bug",
+  "updated_at": "2026-01-11T21:41:34.92781199+01:00"
+}

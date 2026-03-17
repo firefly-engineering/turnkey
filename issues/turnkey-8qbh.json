@@ -1,0 +1,21 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-qatp"
+  ],
+  "blocks": [
+    "turnkey-rjsj",
+    "turnkey-vgkh"
+  ],
+  "closed_at": "2026-01-19T21:22:25.436728129+01:00",
+  "close_reason": "Created solidity-deps-cell.nix wrapper",
+  "created": "2026-01-19T21:05:33.254807869+01:00",
+  "description": "Create nix/buck2/solidity-deps-cell.nix as thin wrapper around the Solidity adapter.\n\nReference: nix/buck2/js-deps-cell.nix\n\nPart of Solidity support (turnkey-ri2t).",
+  "id": "turnkey-8qbh",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create solidity-deps-cell.nix wrapper",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

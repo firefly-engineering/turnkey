@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T08:21:38.878386852+01:00",
+  "close_reason": "Fixed by adding unversioned symlinks to rust-deps-cell.nix",
+  "created": "2026-01-12T08:16:56.117615194+01:00",
+  "description": "tk build //... fails with error: package rustdeps//vendor/itoa does not exist. The rust-hello-deps example cannot find its itoa dependency in the rustdeps vendor directory.",
+  "id": "turnkey-l6p",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "Build regression: rustdeps//vendor/itoa package does not exist",
+  "type": "bug",
+  "updated_at": "2026-01-12T08:21:38.878386852+01:00"
+}

@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-12T15:41:49.997543248+01:00",
+  "close_reason": "Implemented Cargo-style feature unification with feature forwarding support. Created compute-unified-features.py, updated gen-rust-buck.py and rust-deps-cell.nix. Build now succeeds.",
+  "created": "2026-01-12T15:17:28.706064069+01:00",
+  "description": "Currently gen-rust-buck.py only extracts default features for each crate. This doesn't work when a dependent requires non-default features.\n\n**Example**: synstructure requires syn with 'visit' and 'extra-traits' features, but syn's defaults don't include these.\n\n**Solution: Two-phase feature resolution**\n\n1. **Automatic unification** (gen-rust-buck.py):\n   - Parse all Cargo.toml files in vendored crates\n   - For each dependency declaration, collect requested features\n   - Compute union of all features required by any consumer\n   - This matches Cargo's behavior\n\n2. **Manual override file** (rust-features.toml):\n   - Separate from rust-deps.toml (which is generated)\n   - Allows explicit feature specification for conflict resolution\n   - Takes precedence over computed union\n\n```toml\n# rust-features.toml - manually maintained\n[overrides]\n# Explicit feature set (replaces computed union)\nsyn = [\"derive\", \"parsing\", \"printing\", \"visit\"]\n\n# Add features to computed union  \nserde = { add = [\"alloc\"] }\n\n# Remove features from computed union\nsome-crate = { remove = [\"incompatible-feature\"] }\n```\n\n3. **Nix integration**:\n   - rustFeaturesFile option alongside rustDepsFile\n   - Passed to gen-rust-buck.py as additional input\n\n**Risk**: Union can create invalid feature combinations. This is inherent to Cargo's model too - when conflicts occur, users must manually resolve via the override file.",
+  "id": "turnkey-aqb",
+  "labels": [],
+  "priority": 1,
+  "status": "closed",
+  "title": "Implement feature unification across Rust dependency graph",
+  "type": "task",
+  "updated_at": "2026-01-12T15:41:49.997543248+01:00"
+}

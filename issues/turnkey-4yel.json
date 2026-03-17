@@ -1,0 +1,21 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [
+    "turnkey-xbsi"
+  ],
+  "blocks": [
+    "turnkey-omxx",
+    "turnkey-p2c9"
+  ],
+  "closed_at": "2026-01-21T17:36:29.177109874+01:00",
+  "close_reason": "Implemented go-deps-extract binary using go list -json. Correctly classifies stdlib/external/internal imports, separates test imports.",
+  "created": "2026-01-21T17:27:45.68024078+01:00",
+  "description": "# Go Extractor\n\nReference implementation of a dependency extractor for Go.\n\n## Location\n```\nsrc/cmd/go-deps-extract/\n└── main.go\n```\n\n## Approach\n\nUse `go list -json` for accurate import detection:\n- Leverages Go's own tooling\n- Handles build tags correctly\n- Understands test files\n- No regex parsing\n\n## Tasks\n\n- [ ] Create go-deps-extract binary\n- [ ] Use `go list -json ./...` for import detection\n- [ ] Handle standard library vs external vs internal imports\n- [ ] Handle test files (separate from main package)\n- [ ] Output extraction protocol JSON\n- [ ] Integration tests",
+  "id": "turnkey-4yel",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Phase 3: Go Extractor",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

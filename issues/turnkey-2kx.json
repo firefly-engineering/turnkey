@@ -1,0 +1,18 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-0ej"
+  ],
+  "blocks": [],
+  "closed_at": "2026-01-13T09:44:29.002235831+01:00",
+  "close_reason": "Added integration tests with testdata fixtures - see commit 8213043",
+  "created": "2026-01-08T22:36:26.571035502+01:00",
+  "description": "Add integration tests that verify godeps-gen works with real-world Go modules.\n\n**Test scenarios:**\n\n1. **Simple module (1-2 deps):**\n   - Use turnkey's own go.mod as test case\n   - Verify correct output format\n\n2. **Complex module (many deps):**\n   - Test with a module like spf13/cobra or kubernetes client\n   - Verify transitive deps are captured\n   - Verify sorting is consistent\n\n3. **Various import paths:**\n   - github.com/* (standard)\n   - golang.org/x/* (Go team modules)\n   - gopkg.in/* (versioned imports)\n   - go.uber.org/* (custom domains)\n\n4. **Prefetch integration:**\n   - Mock prefetcher for fast tests\n   - Optional slow tests with real prefetching (CI only)\n\n**Test fixtures:**\n```\ntestdata/\n├── simple/\n│   ├── go.mod\n│   ├── go.sum\n│   └── expected.toml\n├── complex/\n│   ├── go.mod\n│   ├── go.sum\n│   └── expected.toml\n└── edge-cases/\n    ├── go.mod\n    ├── go.sum\n    └── expected.toml\n```\n\n**Golden file testing:**\n```go\nfunc TestIntegration_SimpleModule(t *testing.T) {\n    deps, _ := ParseGoMod(readFile(\"testdata/simple/go.mod\"), true)\n    // ... merge hashes from go.sum ...\n    \n    var buf bytes.Buffer\n    FormatTOML(deps, \u0026buf)\n    \n    golden := readFile(\"testdata/simple/expected.toml\")\n    if diff := cmp.Diff(golden, buf.String()); diff != \"\" {\n        t.Errorf(\"output mismatch (-want +got):\\n%s\", diff)\n    }\n}\n```\n\nDepends on: turnkey-0ej (unit tests first)",
+  "id": "turnkey-2kx",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Integration tests for godeps-gen with real modules",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-eleg",
+    "turnkey-ew72"
+  ],
+  "closed_at": "2026-01-19T21:12:06.193710048+01:00",
+  "close_reason": "Created providers.bzl with SolidityToolchainInfo, SolidityLibraryInfo, SolidityContractInfo",
+  "created": "2026-01-19T21:05:34.517586222+01:00",
+  "description": "Create nix/buck2/prelude-extensions/solidity/providers.bzl with:\n\n- SolidityToolchainInfo: solc_versions (dict), default_version, forge\n- SolidityLibraryInfo: output_dir, sources, remappings, solc_version\n- SolidityContractInfo: abi, bytecode, deployed_bytecode, metadata\n\nReference: nix/buck2/prelude-extensions/typescript/providers.bzl\n\nPart of Solidity support (turnkey-ri2t).",
+  "id": "turnkey-c8ti",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Create Solidity providers.bzl",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

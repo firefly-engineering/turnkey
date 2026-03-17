@@ -1,0 +1,22 @@
+{
+  "assignee": "",
+  "blocked_by": [
+    "turnkey-ce6",
+    "turnkey-kgit",
+    "turnkey-u903"
+  ],
+  "blocks": [
+    "turnkey-3qog"
+  ],
+  "closed_at": "2026-01-16T18:19:45.131268871+01:00",
+  "close_reason": "Added typescript to mappings.nix with Nix-resolved node/tsc paths",
+  "created": "2026-01-16T16:26:53.50886087+01:00",
+  "description": "Add TypeScript configuration options to turnkey flake-parts/devenv modules:\n\n1. Add typescript options to buck2 config:\n   - typescript.enable\n   - typescript.depsFile (path to typescript-deps.toml)\n   - typescript.packageJsonFile\n\n2. Add tsdeps-gen to default registry\n\n3. Generate tsdeps cell symlink when enabled\n\n4. Update .buckconfig generation for tsdeps cell\n\nSimilar pattern to go/rust/python integration.",
+  "id": "turnkey-x1pn",
+  "labels": [],
+  "priority": 3,
+  "status": "closed",
+  "title": "Add TypeScript to turnkey module",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

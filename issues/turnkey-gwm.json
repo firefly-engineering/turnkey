@@ -1,0 +1,16 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-08T19:03:02.938184994+01:00",
+  "close_reason": "Wrapper removed entirely - now using symlinks for .buckconfig and .turnkey/toolchains instead of wrapper script with --config-file injection",
+  "created": "2026-01-08T14:46:36.963484+01:00",
+  "description": "Split the buck2 wrapper script into a separate Nix package to reduce inline bash in the Nix module.\n\nThe wrapper package should:\n- Accept BUCK2_CONFIG_FILE environment variable as input\n- Handle --config-file injection for supported subcommands (build, test, run, query, etc.)\n- Pass through cleanly for unsupported subcommands\n- Be a standalone derivation that wraps any buck2 binary\n\nConsumer side (buck2.nix module) would then:\n- Generate the buckconfig file as a derivation\n- Set BUCK2_CONFIG_FILE env var pointing to the generated config\n- Use the wrapper package instead of inline writeShellScriptBin\n\nBenefits:\n- Cleaner separation of concerns\n- Easier to test the wrapper independently\n- Less inline bash in Nix code\n- Reusable wrapper for other contexts",
+  "id": "turnkey-gwm",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Refactor buck2 wrapper into separate package",
+  "type": "task",
+  "updated_at": "2026-01-08T19:03:02.938184994+01:00"
+}

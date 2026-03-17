@@ -1,0 +1,19 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-4aj2",
+    "turnkey-xhyu"
+  ],
+  "closed_at": "2026-01-20T20:01:34.889498316+01:00",
+  "close_reason": "Implemented versioned registry with lib helpers (mkRegistryOverlay, mkMetaPackage, resolveTool), converted embedded registry to versioned format, moved generators to internal packages",
+  "created": "2026-01-19T19:57:05.824383465+01:00",
+  "description": "Extend the toolchain registry to support multiple versions of each toolchain.\n\n## Current State\n- Registry maps toolchain name to a single package (e.g., `go = pkgs.go`)\n- No way to request a specific version (e.g., Go 1.21 vs 1.22)\n\n## Desired State\n- Support versioned toolchain requests in toolchain.toml:\n  ```toml\n  [toolchains]\n  go = { version = \"1.22\" }\n  rust = { version = \"1.75\" }\n  python = { version = \"3.12\" }\n  nodejs = { version = \"20\" }\n  typescript = { version = \"5.3\" }\n  ```\n- Default to latest stable if no version specified\n- Registry provides version resolution logic\n\n## Languages to Support\n- **Go**: go_1_21, go_1_22, go_1_23, etc.\n- **Rust**: Multiple rustc/cargo versions\n- **Python**: python310, python311, python312, python313\n- **Node.js**: nodejs_18, nodejs_20, nodejs_22\n- **TypeScript**: Different tsc versions\n\n## Implementation Ideas\n- Use nixpkgs version suffixed packages where available\n- Consider rust-overlay for Rust toolchains\n- Consider python-flake for Python versions\n- May need custom overlay for some toolchains\n\n## Considerations\n- How to handle toolchain-specific features (e.g., Rust editions)\n- Cross-version compatibility in monorepo (all code uses same version)\n- Migration path when bumping versions",
+  "id": "turnkey-xcpo",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Implement versioned toolchain registry",
+  "type": "feature",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

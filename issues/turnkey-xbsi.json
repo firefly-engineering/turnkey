@@ -1,0 +1,20 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [
+    "turnkey-4yel",
+    "turnkey-p2c9",
+    "turnkey-rfgy"
+  ],
+  "closed_at": "2026-01-21T17:34:57.093343181+01:00",
+  "close_reason": "Defined extraction protocol with Result, Package, and Import types. Supports test imports, build tags, aliases, and non-fatal errors.",
+  "created": "2026-01-21T17:27:44.423079099+01:00",
+  "description": "# Extraction Protocol\n\nDefine a JSON protocol for dependency extractors.\n\n## Schema\n\n```json\n{\n  \"version\": \"1\",\n  \"language\": \"go\",\n  \"packages\": [\n    {\n      \"path\": \"src/cmd/tk\",\n      \"files\": [\"main.go\", \"sync.go\"],\n      \"imports\": [\n        {\"path\": \"github.com/foo/bar\", \"kind\": \"external\"},\n        {\"path\": \"github.com/firefly-engineering/turnkey/src/go/pkg/rules\", \"kind\": \"internal\"}\n      ]\n    }\n  ]\n}\n```\n\n## Tasks\n\n- [ ] Define JSON schema for extraction output\n- [ ] Create Go types for protocol in a shared package\n- [ ] Document protocol for extractor implementers\n- [ ] Consider edge cases: build tags, test files, conditional compilation",
+  "id": "turnkey-xbsi",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Phase 2: Extraction Protocol",
+  "type": "task",
+  "updated_at": "2026-03-17T17:25:27Z"
+}

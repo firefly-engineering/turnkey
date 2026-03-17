@@ -1,0 +1,16 @@
+{
+  "assignee": "yann@firefly.engineering",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-01-22T12:40:13.246547544+01:00",
+  "close_reason": "Added gopls to nix/registry/default.nix and toolchain.toml",
+  "created": "2026-01-22T12:36:37.833453085+01:00",
+  "description": "",
+  "id": "turnkey-mjzu",
+  "labels": [],
+  "priority": 2,
+  "status": "closed",
+  "title": "Ensure gopls is available in toolchain",
+  "type": "task",
+  "updated_at": "2026-01-22T12:40:13.246547544+01:00"
+}
