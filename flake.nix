@@ -114,6 +114,7 @@
             };
             # Extend registry with turnkey-specific tools
             # (tk is already a built-in extension provided by the turnkey module)
+            # (jsonnet is now provided by toolbox as an alias for jrsonnet)
             registryExtensions =
               let
                 single = pkg: {
@@ -125,7 +126,6 @@
               in
               {
                 tw = single (import ./nix/packages/tw.nix { inherit pkgs lib; });
-                jsonnet = single (import ./nix/packages/jrsonnet.nix { inherit pkgs lib; });
               };
             # Enable Buck2 toolchain generation
             buck2 = {

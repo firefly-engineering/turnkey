@@ -34,7 +34,7 @@ foundry = {}      # Ethereum dev toolkit (forge, cast, anvil)
 mdbook = {}
 
 # Data templating
-jsonnet = {}  # Jsonnet to JSON compiler
+jrsonnet = {}  # Jsonnet to JSON compiler (Rust implementation)
 
 # Development utilities (not Buck2 toolchains)
 nix = {}
