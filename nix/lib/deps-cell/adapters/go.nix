@@ -103,12 +103,22 @@ rec {
     in
     pkgs.runCommand "dep-go-${lib.replaceStrings [ "/" "." ] [ "-" "-" ] importPath}"
       {
-        nativeBuildInputs = buildInputs;
+        nativeBuildInputs = buildInputs ++ [ pkgs.findutils ];
         src = fetchers.fetch fetchSpec;
       }
       ''
         mkdir -p $out
-        cp -r $src/* $out/
+
+        # Go proxy zips have the full module path as nested dirs
+        # (e.g., golang.org/x/example/hello@v.../reverse/reverse.go)
+        # fetchzip strips only the first level, so we need to find
+        # the actual content root (directory containing go.mod).
+        CONTENT_ROOT=$(find $src -name 'go.mod' -type f -printf '%h\n' | head -1)
+        if [ -n "$CONTENT_ROOT" ]; then
+          cp -r "$CONTENT_ROOT"/* $out/
+        else
+          cp -r $src/* $out/
+        fi
         chmod -R u+w $out
 
         # Apply fixup if provided
