@@ -20,11 +20,23 @@ def _mdbook_book_impl(ctx: AnalysisContext) -> list[Provider]:
     # Create a build script that sets up the directory structure and runs mdbook
     build_script = ctx.actions.declare_output("build.sh")
 
+    # Build PATH additions for preprocessors
+    preprocessor_paths = toolchain.preprocessor_paths or []
+    path_setup = []
+    if preprocessor_paths:
+        path_additions = ":".join(preprocessor_paths)
+        path_setup = [
+            "# Add preprocessor directories to PATH",
+            'export PATH="{}:$PATH"'.format(path_additions),
+            "",
+        ]
+
     # Build script content
     script_lines = [
         "#!/usr/bin/env bash",
         "set -euo pipefail",
         "",
+    ] + path_setup + [
         "# Arguments: mdbook_path out_dir book_toml src_files...",
         "MDBOOK=$1",
         "OUT_DIR=$2",
@@ -108,6 +120,7 @@ def _mdbook_book_impl(ctx: AnalysisContext) -> list[Provider]:
             "#!/usr/bin/env bash",
             "set -euo pipefail",
             "",
+        ] + path_setup + [
             "# Arguments: mdbook_path book_toml python3_path [serve args]",
             "MDBOOK=$1",
             "BOOK_TOML=$2",
@@ -140,6 +153,7 @@ def _mdbook_book_impl(ctx: AnalysisContext) -> list[Provider]:
             "#!/usr/bin/env bash",
             "set -euo pipefail",
             "",
+        ] + path_setup + [
             "# Arguments: mdbook_path book_toml python3_path [serve args]",
             "MDBOOK=$1",
             "BOOK_TOML=$2",

@@ -150,8 +150,13 @@ let
             # Dynamic attrs resolved from registry (e.g., absolute paths to compilers)
             dynamicAttrs =
               if t ? dynamicAttrs then t.dynamicAttrs resolvedRegistry else { };
-            # Merge: dynamic attrs override static attrs
-            attrs = staticAttrs // dynamicAttrs;
+            # Inject mdbook preprocessor paths from config
+            preprocessorAttrs =
+              if t.name == "mdbook" && cfg.mdbook.preprocessors != [] then
+                { preprocessor_paths = map (p: "${p}/bin") cfg.mdbook.preprocessors; }
+              else {};
+            # Merge: dynamic attrs override static attrs, preprocessors on top
+            attrs = staticAttrs // dynamicAttrs // preprocessorAttrs;
             attrLines =
               [ "    name = \"${t.name}\"," ]
               ++ [ "    visibility = ${builtins.toJSON t.visibility}," ]

@@ -11,6 +11,7 @@ MdbookToolchainInfo = provider(
         "mdbook": provider_field(typing.Any, default = None),  # RunInfo
         "python_path": provider_field(typing.Any, default = None),  # str
         "serve_output_dir": provider_field(typing.Any, default = None),  # str, e.g. ".turnkey/books"
+        "preprocessor_paths": provider_field(typing.Any, default = None),  # list[str], directories to add to PATH
     },
 )
 

@@ -502,6 +502,21 @@ in
           };
 
           # ==========================================================================
+          # mdbook configuration
+          # ==========================================================================
+          mdbook = {
+            preprocessors = mkOption {
+              type = types.listOf types.package;
+              default = [ ];
+              example = lib.literalExpression "[ pkgs.mdbook-admonish pkgs.mdbook-mermaid ]";
+              description = ''
+                List of mdbook preprocessor packages to make available during
+                mdbook builds. Their bin/ directories are added to PATH.
+              '';
+            };
+          };
+
+          # ==========================================================================
           # Pre-commit hook configuration (tk options)
           # ==========================================================================
           tk = {

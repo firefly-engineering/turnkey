@@ -22,6 +22,7 @@ def _system_mdbook_toolchain_impl(ctx: AnalysisContext) -> list[Provider]:
         mdbook = mdbook_run_info,
         python_path = ctx.attrs.python_path,
         serve_output_dir = ctx.attrs.serve_output_dir,
+        preprocessor_paths = ctx.attrs.preprocessor_paths,
     )
 
     return [
@@ -42,6 +43,11 @@ system_mdbook_toolchain = rule(
             attrs.string(),
             default = None,
             doc = "Directory for serve output relative to project root (e.g. '.turnkey/books'). If not set, outputs to book/ in the source directory.",
+        ),
+        "preprocessor_paths": attrs.list(
+            attrs.string(),
+            default = [],
+            doc = "Directories containing mdbook preprocessor binaries (added to PATH during build/serve).",
         ),
     },
     is_toolchain_rule = True,
