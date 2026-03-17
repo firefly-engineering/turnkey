@@ -828,6 +828,17 @@ in
       };
     };
 
+    mdbook = {
+      preprocessors = lib.mkOption {
+        type = lib.types.listOf lib.types.package;
+        default = [ ];
+        description = ''
+          List of mdbook preprocessor packages to make available during builds.
+          Their bin/ directories are added to PATH when mdbook runs.
+        '';
+      };
+    };
+
     tk = {
       aliasBuck2 = lib.mkOption {
         type = lib.types.bool;

@@ -913,6 +913,11 @@ in
               foundryTomlFile = cfg.buck2.solidity.foundryTomlFile;
             };
 
+            # mdbook configuration
+            mdbook = {
+              preprocessors = cfg.buck2.mdbook.preprocessors;
+            };
+
             # Pre-commit hook configuration
             tk = {
               aliasBuck2 = cfg.buck2.tk.aliasBuck2;
