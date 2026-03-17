@@ -14,16 +14,16 @@
 let
   # Pin to a specific buck2-prelude commit
   # This should be updated when buck2 version changes in nixpkgs
-  # Current buck2 version: 2025-12-01 (commit 75e4243c93877a3db4acf55f20d2e80a32523233)
+  # Current buck2 version: 2026-03-15 (from toolbox default)
   # Prelude must match buck2 version to avoid API incompatibilities
-  version = "2025-11-28";
-  rev = "0fabd579c12c585c612ecab4f397b50aae334099";
+  version = "2026-03-15";
+  rev = "27c8628d9bd9324e6dba3fd0e5c112e6ea4c5795";
 
   upstreamPrelude = pkgs.fetchFromGitHub {
     owner = "facebook";
     repo = "buck2-prelude";
     inherit rev;
-    hash = "sha256-h/NYUh+vcESfb8LpvTSoiCoSOnqg0birTseNXAxlt6Q=";
+    hash = "sha256-jTr/I75Vg7jBz0lyrud+Qr5fDtgVDkea7SwDaIyn+/8=";
   };
 
   # Directory containing patches to apply
