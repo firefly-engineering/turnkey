@@ -676,8 +676,13 @@ in
           mergeRegistries (mergeRegistries defaultRegistry builtinExtensions) cfg.registryExtensions
       );
 
-      # Build the turnkey-prelude derivation (Nix-backed prelude cell)
-      turnkeyPrelude = import ../../buck2/prelude.nix { inherit pkgs lib; };
+      # Resolve buck2-prelude from the registry, then apply turnkey extensions
+      upstreamPrelude =
+        if baseRegistry ? "buck2-prelude" then
+          turnkeyLib.resolveTool baseRegistry "buck2-prelude" {}
+        else
+          builtins.throw "buck2-prelude not found in registry; ensure toolbox overlay is applied";
+      turnkeyPrelude = import ../../buck2/prelude.nix { inherit pkgs lib upstreamPrelude; };
 
       # Build tw for wrapping native tools
       tw = import ../../packages/tw.nix { inherit pkgs lib; };

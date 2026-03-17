@@ -90,7 +90,6 @@
           packages.jsdeps-gen = import ./nix/packages/jsdeps-gen.nix { inherit pkgs lib; };
           packages.soldeps-gen = import ./nix/packages/soldeps-gen.nix { inherit pkgs lib; };
           packages.deps-extract = import ./nix/packages/deps-extract.nix { inherit pkgs lib; };
-          packages.turnkey-prelude = import ./nix/buck2/prelude.nix { inherit pkgs lib; };
 
           # Configure turnkey to use our local toolchain files
           # Each file creates a corresponding shell
