@@ -280,11 +280,13 @@ rec {
       host = lib.elemAt parts 0;
     in
     if host == "github.com" then
-      fetchers.mkGitHubSpec {
-        owner = lib.elemAt parts 1;
-        repo = lib.elemAt parts 2;
-        rev = version;
-        inherit sha256;
+      # Use Go proxy for GitHub modules too — fetchFromGitHub archives differ
+      # from Go module zips, so the hash must match the source the prefetcher
+      # actually used. The Go proxy is the canonical source for Go modules and
+      # works reliably for all public modules regardless of host.
+      fetchers.mkGoProxySpec {
+        modulePath = importPath;
+        inherit version sha256;
       }
     else if host == "golang.org" && lib.length parts >= 3 && lib.elemAt parts 1 == "x" then
       # golang.org/x/* -> use Go proxy (more reliable than GitHub for
@@ -294,14 +296,10 @@ rec {
         inherit version sha256;
       }
     else if lib.hasPrefix "go.uber.org/" importPath then
-      # go.uber.org/* -> github.com/uber-go/*
-      fetchers.mkGitHubSpec {
-        owner = "uber-go";
-        repo = lib.removePrefix "go.uber.org/" (
-          lib.head (lib.splitString "/" (lib.removePrefix "go.uber.org/" importPath))
-        );
-        rev = version;
-        inherit sha256;
+      # go.uber.org/* -> use Go proxy (consistent with prefetcher)
+      fetchers.mkGoProxySpec {
+        modulePath = importPath;
+        inherit version sha256;
       }
     else if lib.hasPrefix "gopkg.in/" importPath then
       # gopkg.in handling is complex - use go proxy as fallback

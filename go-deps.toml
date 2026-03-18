@@ -10,12 +10,12 @@ schema_version = 2
 [deps."github.com/google/uuid@v1.6.0"]
 import_path = "github.com/google/uuid"
 version = "v1.6.0"
-hash = "sha256-VWl9sqUzdOuhW0KzQlv0gwwUQClYkmZwSydHG2sALYw="
+hash = "sha256-Oz3yds86lLivFbfBZNWKBB+WTSu3h/GlIplzIG+0OqE="
 
 [deps."github.com/pelletier/go-toml/v2@v2.2.4"]
 import_path = "github.com/pelletier/go-toml/v2"
 version = "v2.2.4"
-hash = "sha256-VKUrpSaGzkewNSyE0sB6PWVIQiraY7UxE5Wve+76UFk="
+hash = "sha256-iqpke1tz6+U3KCpY2NYEXL8Zg7bwMua4eblXjnhRJho="
 
 [deps."go.starlark.net@v0.0.0-20260102030733-3fee463870c9"]
 import_path = "go.starlark.net"
@@ -25,9 +25,10 @@ hash = "sha256-5b2LBr4Q5UhcO6iBKXr6vjjstjUt6uZT9gCWDXojeOo="
 [deps."golang.org/x/mod@v0.31.0"]
 import_path = "golang.org/x/mod"
 version = "v0.31.0"
-hash = "sha256-eOvJXcF3QYztJxlBzHXPweJYG08YsLzPXXM8Px3IXA4="
+hash = "sha256-iJGWfJ4QtUB0gv4Im0zrQgRK2uKVFDll1+orBEXRytk="
 
 [deps."golang.org/x/sys@v0.40.0"]
 import_path = "golang.org/x/sys"
 version = "v0.40.0"
-hash = "sha256-beQ0c6q199u+e1ZuLm41LbGwourTRCtN/hImAaHsz+c="
+hash = "sha256-FwNcrDJUhmdraBS67f5xSBMcoT8/NLuE/aDAQI/8vGY="
+
