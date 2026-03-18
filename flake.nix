@@ -2,29 +2,31 @@
   description = "Turnkey toolchain management for Nix flakes";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/e4bae1bd10c9c57b2cf517953ab70060a828ee6f";
-    flake-parts.url = "github:hercules-ci/flake-parts/80daad04eddbbf5a4d883996a73f3f542fa437ac";
-    devenv.url = "github:cachix/devenv/9bfc4a64c3a798ed8fa6cee3a519a9eac5e73cb5";
+    nix-pins.url = "github:firefly-engineering/nix-pins";
+    nixpkgs.follows = "nix-pins/nixpkgs";
+    flake-parts.follows = "nix-pins/flake-parts";
 
     # Required by devenv for container support (even if unused)
     nix2container = {
-      url = "github:nlewo/nix2container/66f4b8a47e92aa744ec43acbb5e9185078983909";
+      url = "github:nlewo/nix2container";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    mk-shell-bin.url = "github:rrbutani/nix-mk-shell-bin/ff5d8bd4d68a347be5042e2f16caee391cd75887";
+    mk-shell-bin.url = "github:rrbutani/nix-mk-shell-bin";
 
     # Teller - versioned toolchain registry library
     teller = {
       url = "github:firefly-engineering/teller";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nix-pins.follows = "nix-pins";
     };
 
     # Toolbox - package registry (provides beads, beads_viewer, jj, go, rust, etc.)
     toolbox = {
       url = "github:firefly-engineering/toolbox";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nix-pins.follows = "nix-pins";
       inputs.teller.follows = "teller";
     };
+
+    devenv.follows = "toolbox/devenv";
   };
 
   outputs =
