@@ -93,6 +93,21 @@
           packages.soldeps-gen = import ./nix/packages/soldeps-gen.nix { inherit pkgs lib; };
           packages.deps-extract = import ./nix/packages/deps-extract.nix { inherit pkgs lib; };
 
+          # Expose turnkey-prelude for CI builds
+          packages.turnkey-prelude =
+            let
+              overlaidPkgs = import inputs.nixpkgs {
+                inherit system;
+                overlays = [
+                  inputs.teller.overlays.default
+                  inputs.toolbox.overlays.default
+                ];
+              };
+              registry = overlaidPkgs.turnkeyRegistry;
+              upstreamPrelude = inputs.teller.lib.resolveTool registry "buck2-prelude" {};
+            in
+            import ./nix/buck2/prelude.nix { inherit pkgs lib upstreamPrelude; };
+
           # Configure turnkey to use our local toolchain files
           # Each file creates a corresponding shell
           turnkey.toolchains = {
