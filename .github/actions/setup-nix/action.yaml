@@ -10,6 +10,10 @@ runs:
   steps:
     - name: Install Nix
       uses: DeterminateSystems/nix-installer-action@v16
+      with:
+        extra-conf: |
+          extra-substituters = https://firefly-toolbox.cachix.org
+          extra-trusted-public-keys = firefly-toolbox.cachix.org-1:4RgCoc0+CS7QhRarG109VmWlnlYi+rQ5JYrCsRP5aK8=
 
     - name: Setup Nix cache
       uses: DeterminateSystems/magic-nix-cache-action@v8
