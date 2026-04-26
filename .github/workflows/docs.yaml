@@ -33,15 +33,12 @@ jobs:
 
       - name: Build and assemble site
         run: |
-          cat > /tmp/build-docs.sh <<'SCRIPT'
-          set -euo pipefail
-
-          user_out=$(tk build --show-output //docs/user-manual:user-manual 2>/dev/null | awk '{print $2}')
-          dev_out=$(tk build --show-output //docs/developer-manual:developer-manual 2>/dev/null | awk '{print $2}')
-
-          mkdir -p _site
-          cp -r "$user_out" _site/user-manual
-          cp -r "$dev_out" _site/developer-manual
+          nix develop .#docs -c bash -c '
+            set -euo pipefail
+            mkdir -p _site
+            mdbook build docs/user-manual --dest-dir ../../_site/user-manual
+            mdbook build docs/developer-manual --dest-dir ../../_site/developer-manual
+          '
 
           cat > _site/index.html <<'HTML'
           <!DOCTYPE html>
@@ -61,9 +58,6 @@ jobs:
           </body>
           </html>
           HTML
-          SCRIPT
-          chmod +x /tmp/build-docs.sh
-          nix develop --impure -c bash /tmp/build-docs.sh
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
