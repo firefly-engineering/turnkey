@@ -837,7 +837,15 @@ in
           cfg.buck2.prelude.path;
 
       # Create a shell configuration for each declaration file
-      mkShellConfig = shellName: declarationFile: {
+      mkShellConfig = shellName: declarationFile:
+        let
+          # Parse the shell's toolchain file to check what it declares
+          shellDecl = builtins.fromTOML (builtins.readFile declarationFile);
+          shellToolchains = if shellDecl ? toolchains then builtins.attrNames shellDecl.toolchains else [];
+          # Only enable buck2 if the shell's toolchain actually declares it
+          shellNeedsBuck2 = cfg.buck2.enable && builtins.elem "buck2" shellToolchains;
+        in
+        {
         imports = [ ../../devenv/turnkey ];
 
         turnkey = {
@@ -847,7 +855,7 @@ in
 
           # Pass through Buck2 configuration with new language-specific namespaces
           buck2 = {
-            enable = cfg.buck2.enable;
+            enable = shellNeedsBuck2;
             prelude = {
               strategy = cfg.buck2.prelude.strategy;
               path = resolvedPreludePath;
