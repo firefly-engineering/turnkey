@@ -1,0 +1,3 @@
+# Lightweight toolchain for building documentation
+[toolchains]
+mdbook = {}

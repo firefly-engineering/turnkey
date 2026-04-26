@@ -108,11 +108,6 @@
             in
             import ./nix/buck2/prelude.nix { inherit pkgs lib upstreamPrelude; };
 
-          # Lightweight shell for building documentation (used by CI)
-          devShells.docs = pkgs.mkShell {
-            packages = [ pkgs.mdbook ];
-          };
-
           # Configure turnkey to use our local toolchain files
           # Each file creates a corresponding shell
           turnkey.toolchains = {
@@ -132,6 +127,7 @@
               overlaidPkgs.turnkeyRegistry;
             declarationFiles = {
               default = ./toolchain.toml; # Creates devShells.default with buck2 + nix + beads + go
+              docs = ./docs/toolchain.toml; # Lightweight shell for building documentation
             };
             # Extend registry with turnkey-specific tools
             # (tk is already a built-in extension provided by the turnkey module)
