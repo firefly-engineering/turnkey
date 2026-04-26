@@ -33,11 +33,11 @@ jobs:
 
       - name: Build and assemble site
         run: |
-          nix develop .#docs -c bash -c '
+          nix develop .#docs --impure -c bash -c '
             set -euo pipefail
             mkdir -p _site
-            mdbook build docs/user-manual --dest-dir ../../_site/user-manual
-            mdbook build docs/developer-manual --dest-dir ../../_site/developer-manual
+            mdbook build docs/user-manual --dest-dir "$PWD/_site/user-manual"
+            mdbook build docs/developer-manual --dest-dir "$PWD/_site/developer-manual"
           '
 
           cat > _site/index.html <<'HTML'
