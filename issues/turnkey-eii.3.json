@@ -7,14 +7,15 @@
   "blocks": [
     "turnkey-eii.4"
   ],
+  "closed_at": "2026-04-27T14:03:36Z",
   "created": "2026-04-27T13:37:12Z",
   "description": "Implement extern C callbacks for fuse_operations that delegate to FsCore: getattr, readdir, readlink, open, read, opendir, releasedir, statfs, init, destroy. Each callback retrieves FsCore from fuse_get_context private_data, converts C path to Rust, calls FsCore, converts result back to C types.",
   "id": "turnkey-eii.3",
   "labels": [],
   "parent": "turnkey-eii",
   "priority": 1,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Implement FUSE-T operation callbacks",
   "type": "task",
-  "updated_at": "2026-04-27T14:00:31Z"
+  "updated_at": "2026-04-27T14:03:36Z"
 }
