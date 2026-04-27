@@ -10,4 +10,3 @@ Turnkey is a toolchain management framework for Nix flakes that simplifies decla
 ## Quick Links
 
 - [GitHub Repository](https://github.com/firefly-engineering/turnkey)
-- [Getting Started](./user-manual/getting-started/index.html)
