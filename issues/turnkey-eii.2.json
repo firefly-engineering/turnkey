@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-eii.1"
+  ],
   "blocks": [],
   "created": "2026-04-27T13:37:12Z",
   "description": "Write minimal FFI bindings to libfuse3 C API: fuse_operations struct (~40 fields, exact ABI layout), fuse_new, fuse_mount, fuse_loop, fuse_unmount, fuse_destroy, fuse_get_context. Link against libfuse3.dylib from FUSE-T. Add compile-time size assertion for fuse_operations.",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Hand-written FFI bindings for libfuse3",
   "type": "task",
-  "updated_at": "2026-04-27T13:37:12Z"
+  "updated_at": "2026-04-27T13:37:18Z"
 }
