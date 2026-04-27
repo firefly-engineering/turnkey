@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use fuser::{Config, MountOption, Session};
+use fuser::{Config, MountOption};
 use log::{debug, error, info};
 
 use super::filesystem::CompositionFs;
@@ -164,20 +164,8 @@ impl CompositionBackend for FuseBackend {
                 MountOption::RO,
             ];
 
-            // Create the filesystem and session in this thread
+            // Create the filesystem
             let fs = CompositionFs::new(config, repo_root, state_machine);
-            let session = match Session::new(fs, &mount_point, &options) {
-                Ok(s) => s,
-                Err(e) => {
-                    error!("Failed to create FUSE session: {}", e);
-                    let mut s = status.lock().unwrap();
-                    *s = BackendStatus::Error {
-                        message: format!("FUSE mount failed: {}", e),
-                        recoverable: false,
-                    };
-                    return;
-                }
-            };
 
             // Update status to ready
             {
@@ -187,21 +175,15 @@ impl CompositionBackend for FuseBackend {
 
             debug!("Starting FUSE session event loop");
 
-            // Run the FUSE session via spawn - this blocks until unmounted
-            // The session will exit when fusermount -u is called or the mount is unmounted
-            match session.spawn() {
-                Ok(bg_session) => {
-                    // BackgroundSession will run until dropped
-                    // We keep it alive by holding the handle until should_stop is set
-                    while !should_stop.load(Ordering::SeqCst) {
-                        thread::sleep(Duration::from_millis(100));
-                    }
-                    drop(bg_session);
-                }
-                Err(e) => {
-                    if !should_stop.load(Ordering::SeqCst) {
-                        error!("FUSE session error: {}", e);
-                    }
+            // Run the FUSE session - this blocks until unmounted
+            if let Err(e) = fuser::mount2(fs, &mount_point, &options) {
+                if !should_stop.load(Ordering::SeqCst) {
+                    error!("FUSE session error: {}", e);
+                    let mut s = status.lock().unwrap();
+                    *s = BackendStatus::Error {
+                        message: format!("FUSE mount failed: {}", e),
+                        recoverable: false,
+                    };
                 }
             }
 

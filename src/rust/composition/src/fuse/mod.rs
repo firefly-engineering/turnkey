@@ -39,6 +39,7 @@
 
 mod backend;
 mod edit_overlay;
+pub mod fs_core;
 mod filesystem;
 mod patch_generator;
 pub mod platform;
