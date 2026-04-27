@@ -4,7 +4,9 @@
     "turnkey-eii.1",
     "turnkey-eii.2"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-eii.4"
+  ],
   "created": "2026-04-27T13:37:12Z",
   "description": "Implement extern C callbacks for fuse_operations that delegate to FsCore: getattr, readdir, readlink, open, read, opendir, releasedir, statfs, init, destroy. Each callback retrieves FsCore from fuse_get_context private_data, converts C path to Rust, calls FsCore, converts result back to C types.",
   "id": "turnkey-eii.3",

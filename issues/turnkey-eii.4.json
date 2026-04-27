@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-eii.3"
+  ],
   "blocks": [],
   "created": "2026-04-27T13:37:12Z",
   "description": "Create FuseTBackend implementing CompositionBackend. mount() creates FsCore, builds fuse_args, populates fuse_operations, spawns thread calling fuse_new+fuse_mount+fuse_loop. unmount() calls platform unmount causing fuse_loop to return. Wire up status, state machine, should_stop flag.",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Implement FuseTBackend for macOS",
   "type": "task",
-  "updated_at": "2026-04-27T13:37:12Z"
+  "updated_at": "2026-04-27T13:37:19Z"
 }
