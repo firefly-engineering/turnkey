@@ -3,7 +3,9 @@
   "blocked_by": [
     "turnkey-x8l5.1"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-x8l5.4"
+  ],
   "created": "2026-04-27T18:17:41Z",
   "description": "Wire the composition daemon to read cell configuration and expose actual Nix store paths under external/. Currently the daemon mounts with zero cells. It needs to present godeps, rustdeps, pydeps, etc. from the Nix store paths declared in the config file.",
   "id": "turnkey-x8l5.2",
