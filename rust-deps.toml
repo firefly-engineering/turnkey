@@ -172,10 +172,10 @@ name = "crypto-common"
 version = "0.1.7"
 hash = "sha256-0EfhaDP7K1h1awhkqr2iOfLzXsAjWlA9tWPAOjpmtis="
 
-[deps."ctrlc@3.5.1"]
+[deps."ctrlc@3.5.2"]
 name = "ctrlc"
-version = "3.5.1"
-hash = "sha256-1B7aYfw6N/tT0bIc7QC0E8hNeKnofhnjG+vBNSkWfcE="
+version = "3.5.2"
+hash = "sha256-YtVb+XBxc9CMRg1ANGlQWM/dWkZVr6nNZKQ1Q0ICilU="
 
 [deps."digest@0.10.7"]
 name = "digest"
@@ -451,6 +451,11 @@ hash = "sha256-60gbal4SlMmbkNbQneSWVEDj7oenMeHW+vOFVrB6aSA="
 name = "nix"
 version = "0.30.1"
 hash = "sha256-SXf1KbSQfB7niGvZhjGumU0HuzhkPNwPEmTeUlYcFDQ="
+
+[deps."nix@0.31.1"]
+name = "nix"
+version = "0.31.1"
+hash = "sha256-ST6yoygidVZGkofpLBoZ45jb1SGQBr7oWMhqBAMYfas="
 
 [deps."nohash-hasher@0.2.0"]
 name = "nohash-hasher"
