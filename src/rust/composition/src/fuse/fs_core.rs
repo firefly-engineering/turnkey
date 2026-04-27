@@ -702,25 +702,25 @@ impl FsCore {
             None => (path, None),
         };
 
+        // --- virtual files at mount root ---
+        if rest.is_none() {
+            if first == ".buckconfig" {
+                return ResolvedPath::VirtualFile {
+                    file: VirtualFile::BuckConfig,
+                };
+            }
+            if first == ".buckroot" {
+                return ResolvedPath::VirtualFile {
+                    file: VirtualFile::BuckRoot,
+                };
+            }
+        }
+
         // --- source directory branch ---
         if first == self.config.source_dir_name {
             return match rest {
                 None => ResolvedPath::Source,
                 Some(remainder) => {
-                    // Check for virtual files at the source root level
-                    if !remainder.contains('/') {
-                        if remainder == ".buckconfig" {
-                            return ResolvedPath::VirtualFile {
-                                file: VirtualFile::BuckConfig,
-                            };
-                        }
-                        if remainder == ".buckroot" {
-                            return ResolvedPath::VirtualFile {
-                                file: VirtualFile::BuckRoot,
-                            };
-                        }
-                    }
-
                     let real_path = self.repo_root.join(remainder);
                     ResolvedPath::SourceChild { real_path }
                 }

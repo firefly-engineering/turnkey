@@ -243,11 +243,11 @@ unsafe extern "C" fn fuse_readdir(
         ResolvedPath::Root => {
             fill(&core.config.source_dir_name);
             fill(&core.config.cell_prefix);
+            fill(".buckconfig");
+            fill(".buckroot");
             0
         }
         ResolvedPath::Source => {
-            fill(".buckconfig");
-            fill(".buckroot");
             match fs::read_dir(&core.repo_root) {
                 Ok(entries) => {
                     for entry in entries.flatten() {

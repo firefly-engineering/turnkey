@@ -326,28 +326,74 @@ impl Buck2Layout {
         let mut content = String::new();
 
         // Cell definitions
-        // .buckconfig lives inside the source directory (overlay on repo root).
-        // Paths are relative to where .buckconfig lives:
-        // - `root = .` (current directory, the repo root)
-        // - `prelude = prelude` (relative to repo root)
-        // - `<cell> = ../<cell_prefix>/<cell>` (sibling directory)
+        // .buckconfig lives at the mount root. All paths forward-only:
+        // - `root = <source_dir_name>` (repo pass-through)
+        // - `prelude = <cell_prefix>/prelude` (if prelude is a cell) or `<source_dir_name>/prelude`
+        // - `<cell> = <cell_prefix>/<cell>` (dependency cells)
         content.push_str("[cells]\n");
-        content.push_str("    root = .\n");
-        content.push_str("    prelude = prelude\n");
+        content.push_str("    none = .\n");
+        content.push_str(&format!("    root = {}\n", ctx.source_dir_name));
 
-        // Add cells for each dependency
-        for cell in &ctx.cells {
+        // Check if prelude is provided as a cell
+        let has_prelude_cell = ctx.cells.iter().any(|c| c.name == "prelude");
+        if has_prelude_cell {
             content.push_str(&format!(
-                "    {} = ../{}/{}\n",
+                "    prelude = {}/prelude\n",
+                ctx.cell_prefix
+            ));
+        } else {
+            content.push_str(&format!(
+                "    prelude = {}/prelude\n",
+                ctx.source_dir_name
+            ));
+        }
+
+        // Add cells for each dependency (skip prelude, already handled)
+        for cell in &ctx.cells {
+            if cell.name == "prelude" {
+                continue;
+            }
+            content.push_str(&format!(
+                "    {} = {}/{}\n",
                 cell.name, ctx.cell_prefix, cell.name
             ));
         }
 
         content.push('\n');
 
-        // Buildfile configuration
+        // Cell aliases (required by Buck2 prelude)
+        content.push_str("[cell_aliases]\n");
+        content.push_str("    config = prelude\n");
+        content.push_str("    ovr_config = prelude\n");
+        content.push_str("    fbcode = none\n");
+        content.push_str("    fbsource = none\n");
+        content.push_str("    fbcode_macros = none\n");
+        content.push_str("    buck = none\n");
+
+        content.push('\n');
+
+        // Parser configuration
+        content.push_str("[parser]\n");
+        content.push_str("    target_platform_detector_spec = ");
+        content.push_str("target:root//...->prelude//platforms:default");
+        for cell in &ctx.cells {
+            if cell.name != "prelude" && cell.name != "none" {
+                content.push_str(&format!(
+                    " target:{}//...->prelude//platforms:default",
+                    cell.name
+                ));
+            }
+        }
+        content.push('\n');
+
+        content.push('\n');
+
+        // Buildfile and build configuration
         content.push_str("[buildfile]\n");
         content.push_str("    name = rules.star\n");
+        content.push('\n');
+        content.push_str("[build]\n");
+        content.push_str("    execution_platforms = prelude//platforms:default\n");
 
         ConfigFile::new(".buckconfig", content)
     }
