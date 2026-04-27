@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-04-27T18:17:41Z",
+  "description": "Run buck2 build //... from /firefly/turnkey/root/ (the FUSE mount) and verify all targets build correctly. The virtual .buckconfig and .buckroot must be correct, and cell paths under external/ must be accessible to Buck2 actions.",
+  "id": "turnkey-x8l5.4",
+  "labels": [],
+  "parent": "turnkey-x8l5",
+  "priority": 2,
+  "status": "open",
+  "title": "Verify Buck2 builds work from FUSE mount",
+  "type": "task",
+  "updated_at": "2026-04-27T18:17:41Z"
+}
