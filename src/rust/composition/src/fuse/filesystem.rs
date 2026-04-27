@@ -30,10 +30,10 @@
 //! - `FailIfUpdating`: Return EAGAIN so the caller can retry
 
 use fuser::{
-    FileAttr, FileType, Filesystem, ReplyAttr, ReplyData, ReplyDirectory, ReplyEntry, ReplyOpen,
-    ReplyWrite, Request,
+    BsdFileFlags, Errno, FileAttr, FileHandle, FileType, Filesystem, FopenFlags, Generation,
+    INodeNo, LockOwner, OpenFlags, ReplyAttr, ReplyData, ReplyDirectory, ReplyEntry, ReplyOpen,
+    ReplyWrite, Request, TimeOrNow, WriteFlags,
 };
-use libc::{EAGAIN, ENOENT, ENOTDIR, EROFS};
 use log::{debug, warn};
 use std::collections::HashMap;
 use std::ffi::OsStr;
@@ -57,11 +57,11 @@ use crate::{BackendStatus, CompositionConfig};
 
 
 /// Reserved inode numbers
-const ROOT_INO: u64 = 1;
-const SOURCE_INO: u64 = 2;
-const CELL_PREFIX_INO: u64 = 3;
-const BUCKCONFIG_INO: u64 = 4;
-const BUCKROOT_INO: u64 = 5;
+const ROOT_INO: INodeNo = INodeNo(1);
+const SOURCE_INO: INodeNo = INodeNo(2);
+const CELL_PREFIX_INO: INodeNo = INodeNo(3);
+const BUCKCONFIG_INO: INodeNo = INodeNo(4);
+const BUCKROOT_INO: INodeNo = INodeNo(5);
 const FIRST_DYNAMIC_INO: u64 = 1000;
 
 /// Virtual file types
@@ -95,9 +95,9 @@ pub struct CompositionFs {
     /// Path to the repository root (for source/ pass-through)
     repo_root: PathBuf,
     /// Inode to path mapping
-    inode_map: RwLock<HashMap<u64, InodePath>>,
+    inode_map: RwLock<HashMap<INodeNo, InodePath>>,
     /// Path to inode mapping (for lookups)
-    path_map: RwLock<HashMap<PathBuf, u64>>,
+    path_map: RwLock<HashMap<PathBuf, INodeNo>>,
     /// Next inode number to allocate
     next_inode: AtomicU64,
     /// Current user ID
@@ -179,7 +179,7 @@ impl CompositionFs {
         let mut cell_paths = HashMap::new();
         let mut editable_cells = Vec::new();
         for cell in &config.cells {
-            inode_map.insert(next_ino, InodePath::Cell { name: cell.name.clone() });
+            inode_map.insert(INodeNo(next_ino), InodePath::Cell { name: cell.name.clone() });
             cell_paths.insert(cell.name.clone(), cell.source_path.clone());
             if cell.editable {
                 editable_cells.push(cell.name.clone());
@@ -268,7 +268,7 @@ impl CompositionFs {
     /// The double-check pattern handles race conditions where another
     /// thread may have inserted the same path while we were waiting
     /// for the write lock.
-    fn get_or_alloc_inode(&self, path: &PathBuf) -> u64 {
+    fn get_or_alloc_inode(&self, path: &PathBuf) -> INodeNo {
         // Fast path: read-only lookup (most common case)
         {
             let path_map = self.path_map.read().unwrap();
@@ -288,20 +288,20 @@ impl CompositionFs {
         }
 
         // Allocate a new inode
-        let ino = self.next_inode.fetch_add(1, Ordering::SeqCst);
+        let ino = INodeNo(self.next_inode.fetch_add(1, Ordering::SeqCst));
         inode_map.insert(ino, InodePath::Real { path: path.clone() });
         path_map.insert(path.clone(), ino);
         ino
     }
 
     /// Get the InodePath for an inode
-    fn get_inode_path(&self, ino: u64) -> Option<InodePath> {
+    fn get_inode_path(&self, ino: INodeNo) -> Option<InodePath> {
         let inode_map = self.inode_map.read().unwrap();
         inode_map.get(&ino).cloned()
     }
 
     /// Resolve an inode to a real filesystem path (if applicable)
-    fn resolve_real_path(&self, ino: u64) -> Option<PathBuf> {
+    fn resolve_real_path(&self, ino: INodeNo) -> Option<PathBuf> {
         match self.get_inode_path(ino)? {
             InodePath::Root | InodePath::CellPrefix | InodePath::Virtual { .. } => None,
             InodePath::Source => Some(self.repo_root.clone()),
@@ -315,7 +315,7 @@ impl CompositionFs {
     }
 
     /// Create FileAttr from filesystem metadata
-    fn metadata_to_attr(&self, ino: u64, meta: &fs::Metadata) -> FileAttr {
+    fn metadata_to_attr(&self, ino: INodeNo, meta: &fs::Metadata) -> FileAttr {
         let kind = if meta.is_dir() {
             FileType::Directory
         } else if meta.is_symlink() {
@@ -345,7 +345,7 @@ impl CompositionFs {
     }
 
     /// Create a virtual directory attribute
-    fn virtual_dir_attr(&self, ino: u64) -> FileAttr {
+    fn virtual_dir_attr(&self, ino: INodeNo) -> FileAttr {
         FileAttr {
             ino,
             size: 0,
@@ -366,7 +366,7 @@ impl CompositionFs {
     }
 
     /// Create a virtual file attribute
-    fn virtual_file_attr(&self, ino: u64, size: u64) -> FileAttr {
+    fn virtual_file_attr(&self, ino: INodeNo, size: u64) -> FileAttr {
         FileAttr {
             ino,
             size,
@@ -429,7 +429,7 @@ impl CompositionFs {
     }
 
     /// Find the inode for a cell by name
-    fn find_cell_inode(&self, name: &str) -> Option<u64> {
+    fn find_cell_inode(&self, name: &str) -> Option<INodeNo> {
         let inode_map = self.inode_map.read().unwrap();
         for (&ino, path) in inode_map.iter() {
             if let InodePath::Cell { name: cell_name } = path {
@@ -442,7 +442,7 @@ impl CompositionFs {
     }
 
     /// Classify an inode path into a FileClass for policy decisions
-    fn classify_inode(&self, ino: u64) -> Option<FileClass> {
+    fn classify_inode(&self, ino: INodeNo) -> Option<FileClass> {
         match self.get_inode_path(ino)? {
             InodePath::Root | InodePath::CellPrefix => Some(FileClass::VirtualDirectory),
             InodePath::Source => Some(FileClass::SourcePassthrough),
@@ -479,7 +479,7 @@ impl CompositionFs {
     ///
     /// Returns Ok(()) if the operation is allowed (possibly after waiting).
     /// Returns Err(errno) if the operation should be denied.
-    fn check_policy(&self, class: &FileClass, op: OperationType) -> Result<(), i32> {
+    fn check_policy(&self, class: &FileClass, op: OperationType) -> Result<(), Errno> {
         let state = self.get_policy_state();
         let decision = self.policy.check(class, state, op);
 
@@ -504,7 +504,7 @@ impl CompositionFs {
                 );
                 if let Err(e) = self.state_machine.wait_ready(Some(timeout)) {
                     warn!("Timeout waiting for stable state: {:?}", e);
-                    return Err(EAGAIN);
+                    return Err(Errno::EAGAIN);
                 }
                 Ok(())
             }
@@ -516,7 +516,7 @@ impl CompositionFs {
                     class,
                     state
                 );
-                Err(errno)
+                Err(Errno::from_i32(errno))
             }
         }
     }
@@ -524,7 +524,7 @@ impl CompositionFs {
     /// Check policy for an inode and operation
     ///
     /// Convenience method that classifies the inode and checks the policy.
-    fn check_inode_policy(&self, ino: u64, op: OperationType) -> Result<(), i32> {
+    fn check_inode_policy(&self, ino: INodeNo, op: OperationType) -> Result<(), Errno> {
         if let Some(class) = self.classify_inode(ino) {
             self.check_policy(&class, op)
         } else {
@@ -536,7 +536,7 @@ impl CompositionFs {
     /// Check policy for a cell access
     ///
     /// Convenience method for cell-related operations.
-    fn check_cell_policy(&self, cell_name: &str, op: OperationType) -> Result<(), i32> {
+    fn check_cell_policy(&self, cell_name: &str, op: OperationType) -> Result<(), Errno> {
         let class = FileClass::CellContent {
             cell: cell_name.to_string(),
         };
@@ -569,17 +569,17 @@ impl CompositionFs {
     ///
     /// Returns (cell_name, relative_path, original_path) if the inode is in an
     /// editable cell, otherwise returns an error.
-    fn check_edit_allowed(&self, ino: u64) -> Result<(String, PathBuf, PathBuf), i32> {
+    fn check_edit_allowed(&self, ino: INodeNo) -> Result<(String, PathBuf, PathBuf), Errno> {
         // Must have editing enabled
-        let overlay = self.edit_overlay.as_ref().ok_or(EROFS)?;
+        let overlay = self.edit_overlay.as_ref().ok_or(Errno::EROFS)?;
 
         // Must be a real path in a cell
-        let original_path = self.resolve_real_path(ino).ok_or(ENOENT)?;
-        let (cell_name, relative) = self.get_cell_info(&original_path).ok_or(EROFS)?;
+        let original_path = self.resolve_real_path(ino).ok_or(Errno::ENOENT)?;
+        let (cell_name, relative) = self.get_cell_info(&original_path).ok_or(Errno::EROFS)?;
 
         // Cell must be editable
         if !overlay.is_cell_editable(&cell_name) {
-            return Err(EROFS);
+            return Err(Errno::EROFS);
         }
 
         Ok((cell_name, relative, original_path))
@@ -643,7 +643,7 @@ impl CompositionFs {
         let mut inode_map = self.inode_map.write().unwrap();
 
         // Collect inodes to remove
-        let inodes_to_remove: Vec<u64> = path_map
+        let inodes_to_remove: Vec<INodeNo> = path_map
             .iter()
             .filter_map(|(path, &ino)| {
                 // Check if this path is under any of the affected cell source paths
@@ -684,21 +684,21 @@ impl CompositionFs {
 }
 
 impl Filesystem for CompositionFs {
-    fn lookup(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {
+    fn lookup(&self, _req: &Request, parent: INodeNo, name: &OsStr, reply: ReplyEntry) {
         let name_str = name.to_string_lossy();
-        debug!("lookup(parent={}, name={:?})", parent, name_str);
+        debug!("lookup(parent={:?}, name={:?})", parent, name_str);
 
         match self.get_inode_path(parent) {
             Some(InodePath::Root) => {
                 // Looking up in mount root - only source and cell prefix directories
                 if name_str == self.config.source_dir_name {
                     // Source directory (e.g., "root") - this is the overlay on repo
-                    reply.entry(&self.attr_ttl(), &self.virtual_dir_attr(SOURCE_INO), 0);
+                    reply.entry(&self.attr_ttl(), &self.virtual_dir_attr(SOURCE_INO), Generation(0));
                 } else if name_str == self.config.cell_prefix {
                     // Cell prefix directory (e.g., "external")
-                    reply.entry(&self.attr_ttl(), &self.virtual_dir_attr(CELL_PREFIX_INO), 0);
+                    reply.entry(&self.attr_ttl(), &self.virtual_dir_attr(CELL_PREFIX_INO), Generation(0));
                 } else {
-                    reply.error(ENOENT);
+                    reply.error(Errno::ENOENT);
                 }
             }
             Some(InodePath::CellPrefix) => {
@@ -711,16 +711,16 @@ impl Filesystem for CompositionFs {
                     }
                     if let Some(path) = self.resolve_real_path(ino) {
                         if let Ok(meta) = fs::metadata(&path) {
-                            reply.entry(&self.attr_ttl(), &self.metadata_to_attr(ino, &meta), 0);
+                            reply.entry(&self.attr_ttl(), &self.metadata_to_attr(ino, &meta), Generation(0));
                             return;
                         }
                     }
                 }
-                reply.error(ENOENT);
+                reply.error(Errno::ENOENT);
             }
             Some(InodePath::Virtual { .. }) => {
                 // Virtual files don't have children
-                reply.error(ENOENT);
+                reply.error(Errno::ENOENT);
             }
             Some(InodePath::Source) => {
                 // Source is an overlay: check virtual files first, then real files
@@ -730,7 +730,7 @@ impl Filesystem for CompositionFs {
                     reply.entry(
                         &self.attr_ttl(),
                         &self.virtual_file_attr(BUCKCONFIG_INO, content.len() as u64),
-                        0,
+                        Generation(0),
                     );
                     return;
                 }
@@ -739,7 +739,7 @@ impl Filesystem for CompositionFs {
                     reply.entry(
                         &self.attr_ttl(),
                         &self.virtual_file_attr(BUCKROOT_INO, content.len() as u64),
-                        0,
+                        Generation(0),
                     );
                     return;
                 }
@@ -748,11 +748,11 @@ impl Filesystem for CompositionFs {
                     let child_path = parent_path.join(name);
                     if let Ok(meta) = fs::symlink_metadata(&child_path) {
                         let ino = self.get_or_alloc_inode(&child_path);
-                        reply.entry(&self.attr_ttl(), &self.metadata_to_attr(ino, &meta), 0);
+                        reply.entry(&self.attr_ttl(), &self.metadata_to_attr(ino, &meta), Generation(0));
                         return;
                     }
                 }
-                reply.error(ENOENT);
+                reply.error(Errno::ENOENT);
             }
             Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
                 // Looking up in a real directory (cells or nested real paths)
@@ -765,20 +765,20 @@ impl Filesystem for CompositionFs {
                     let child_path = parent_path.join(name);
                     if let Ok(meta) = fs::symlink_metadata(&child_path) {
                         let ino = self.get_or_alloc_inode(&child_path);
-                        reply.entry(&self.attr_ttl(), &self.metadata_to_attr(ino, &meta), 0);
+                        reply.entry(&self.attr_ttl(), &self.metadata_to_attr(ino, &meta), Generation(0));
                         return;
                     }
                 }
-                reply.error(ENOENT);
+                reply.error(Errno::ENOENT);
             }
             None => {
-                reply.error(ENOENT);
+                reply.error(Errno::ENOENT);
             }
         }
     }
 
-    fn getattr(&mut self, _req: &Request, ino: u64, _fh: Option<u64>, reply: ReplyAttr) {
-        debug!("getattr(ino={})", ino);
+    fn getattr(&self, _req: &Request, ino: INodeNo, _fh: Option<FileHandle>, reply: ReplyAttr) {
+        debug!("getattr(ino={:?})", ino);
 
         match self.get_inode_path(ino) {
             Some(InodePath::Root) | Some(InodePath::CellPrefix) => {
@@ -796,7 +796,7 @@ impl Filesystem for CompositionFs {
                         return;
                     }
                 }
-                reply.error(ENOENT);
+                reply.error(Errno::ENOENT);
             }
             Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
                 // Check policy for cell paths (not source passthrough)
@@ -810,38 +810,38 @@ impl Filesystem for CompositionFs {
                         return;
                     }
                 }
-                reply.error(ENOENT);
+                reply.error(Errno::ENOENT);
             }
             None => {
-                reply.error(ENOENT);
+                reply.error(Errno::ENOENT);
             }
         }
     }
 
-    fn open(&mut self, _req: &Request, ino: u64, _flags: i32, reply: ReplyOpen) {
-        debug!("open(ino={})", ino);
+    fn open(&self, _req: &Request, ino: INodeNo, _flags: OpenFlags, reply: ReplyOpen) {
+        debug!("open(ino={:?})", ino);
         // We don't use file handles, just allow the open
-        reply.opened(0, 0);
+        reply.opened(FileHandle(0), FopenFlags::empty());
     }
 
-    fn opendir(&mut self, _req: &Request, ino: u64, _flags: i32, reply: ReplyOpen) {
-        debug!("opendir(ino={})", ino);
+    fn opendir(&self, _req: &Request, ino: INodeNo, _flags: OpenFlags, reply: ReplyOpen) {
+        debug!("opendir(ino={:?})", ino);
         // We don't use directory handles, just allow the open
-        reply.opened(0, 0);
+        reply.opened(FileHandle(0), FopenFlags::empty());
     }
 
     fn read(
-        &mut self,
+        &self,
         _req: &Request,
-        ino: u64,
-        _fh: u64,
-        offset: i64,
+        ino: INodeNo,
+        _fh: FileHandle,
+        offset: u64,
         size: u32,
-        _flags: i32,
-        _lock_owner: Option<u64>,
+        _flags: OpenFlags,
+        _lock_owner: Option<LockOwner>,
         reply: ReplyData,
     ) {
-        debug!("read(ino={}, offset={}, size={})", ino, offset, size);
+        debug!("read(ino={:?}, offset={}, size={})", ino, offset, size);
 
         // Check for virtual files first
         if let Some(InodePath::Virtual { file }) = self.get_inode_path(ino) {
@@ -871,7 +871,7 @@ impl Filesystem for CompositionFs {
             match File::open(&read_path) {
                 Ok(mut file) => {
                     use std::io::Seek;
-                    if file.seek(std::io::SeekFrom::Start(offset as u64)).is_ok() {
+                    if file.seek(std::io::SeekFrom::Start(offset)).is_ok() {
                         let mut buf = vec![0u8; size as usize];
                         match file.read(&mut buf) {
                             Ok(n) => {
@@ -885,22 +885,22 @@ impl Filesystem for CompositionFs {
                 Err(_) => {}
             }
         }
-        reply.error(ENOENT);
+        reply.error(Errno::ENOENT);
     }
 
     fn write(
-        &mut self,
+        &self,
         _req: &Request,
-        ino: u64,
-        _fh: u64,
-        offset: i64,
+        ino: INodeNo,
+        _fh: FileHandle,
+        offset: u64,
         data: &[u8],
-        _write_flags: u32,
-        _flags: i32,
-        _lock_owner: Option<u64>,
+        _write_flags: WriteFlags,
+        _flags: OpenFlags,
+        _lock_owner: Option<LockOwner>,
         reply: ReplyWrite,
     ) {
-        debug!("write(ino={}, offset={}, size={})", ino, offset, data.len());
+        debug!("write(ino={:?}, offset={}, size={})", ino, offset, data.len());
 
         // Check policy for cell paths before writing
         if let Err(errno) = self.check_inode_policy(ino, OperationType::Write) {
@@ -912,7 +912,7 @@ impl Filesystem for CompositionFs {
         let (cell_name, relative, original_path) = match self.check_edit_allowed(ino) {
             Ok(info) => info,
             Err(errno) => {
-                debug!("write denied: errno={}", errno);
+                debug!("write denied: errno={:?}", errno);
                 reply.error(errno);
                 return;
             }
@@ -922,12 +922,12 @@ impl Filesystem for CompositionFs {
         let overlay = match &self.edit_overlay {
             Some(o) => o,
             None => {
-                reply.error(EROFS);
+                reply.error(Errno::EROFS);
                 return;
             }
         };
 
-        match overlay.write(&cell_name, &relative, &original_path, offset, data) {
+        match overlay.write(&cell_name, &relative, &original_path, offset as i64, data) {
             Ok(written) => {
                 debug!(
                     "Wrote {} bytes to {}/{} via overlay",
@@ -939,30 +939,30 @@ impl Filesystem for CompositionFs {
             }
             Err(e) => {
                 warn!("Write failed for {}/{}: {}", cell_name, relative.display(), e);
-                reply.error(libc::EIO);
+                reply.error(Errno::EIO);
             }
         }
     }
 
     fn setattr(
-        &mut self,
+        &self,
         _req: &Request,
-        ino: u64,
+        ino: INodeNo,
         _mode: Option<u32>,
         _uid: Option<u32>,
         _gid: Option<u32>,
         size: Option<u64>,
-        _atime: Option<fuser::TimeOrNow>,
-        _mtime: Option<fuser::TimeOrNow>,
+        _atime: Option<TimeOrNow>,
+        _mtime: Option<TimeOrNow>,
         _ctime: Option<SystemTime>,
-        _fh: Option<u64>,
+        _fh: Option<FileHandle>,
         _crtime: Option<SystemTime>,
         _chgtime: Option<SystemTime>,
         _bkuptime: Option<SystemTime>,
-        _flags: Option<u32>,
+        _flags: Option<BsdFileFlags>,
         reply: ReplyAttr,
     ) {
-        debug!("setattr(ino={}, size={:?})", ino, size);
+        debug!("setattr(ino={:?}, size={:?})", ino, size);
 
         // Handle truncate via size parameter
         if let Some(new_size) = size {
@@ -978,7 +978,7 @@ impl Filesystem for CompositionFs {
             let overlay = match &self.edit_overlay {
                 Some(o) => o,
                 None => {
-                    reply.error(EROFS);
+                    reply.error(Errno::EROFS);
                     return;
                 }
             };
@@ -991,7 +991,7 @@ impl Filesystem for CompositionFs {
                     relative.display(),
                     e
                 );
-                reply.error(libc::EIO);
+                reply.error(Errno::EIO);
                 return;
             }
         }
@@ -1011,23 +1011,23 @@ impl Filesystem for CompositionFs {
                         return;
                     }
                 }
-                reply.error(ENOENT);
+                reply.error(Errno::ENOENT);
             }
             None => {
-                reply.error(ENOENT);
+                reply.error(Errno::ENOENT);
             }
         }
     }
 
     fn readdir(
-        &mut self,
+        &self,
         _req: &Request,
-        ino: u64,
-        _fh: u64,
-        offset: i64,
+        ino: INodeNo,
+        _fh: FileHandle,
+        offset: u64,
         mut reply: ReplyDirectory,
     ) {
-        debug!("readdir(ino={}, offset={})", ino, offset);
+        debug!("readdir(ino={:?}, offset={})", ino, offset);
 
         match self.get_inode_path(ino) {
             Some(InodePath::Root) => {
@@ -1035,7 +1035,7 @@ impl Filesystem for CompositionFs {
                 let source_name = self.config.source_dir_name.clone();
                 let cell_prefix = self.config.cell_prefix.clone();
 
-                let entries: Vec<(u64, FileType, String)> = vec![
+                let entries: Vec<(INodeNo, FileType, String)> = vec![
                     (ROOT_INO, FileType::Directory, ".".into()),
                     (ROOT_INO, FileType::Directory, "..".into()),
                     (SOURCE_INO, FileType::Directory, source_name),
@@ -1043,14 +1043,14 @@ impl Filesystem for CompositionFs {
                 ];
 
                 for (i, (inode, kind, name)) in entries.iter().enumerate().skip(offset as usize) {
-                    if reply.add(*inode, (i + 1) as i64, *kind, name) {
+                    if reply.add(*inode, (i + 1) as u64, *kind, name) {
                         break;
                     }
                 }
                 reply.ok();
             }
             Some(InodePath::CellPrefix) => {
-                let mut entries: Vec<(u64, FileType, String)> = vec![
+                let mut entries: Vec<(INodeNo, FileType, String)> = vec![
                     (CELL_PREFIX_INO, FileType::Directory, ".".into()),
                     (ROOT_INO, FileType::Directory, "..".into()),
                 ];
@@ -1063,7 +1063,7 @@ impl Filesystem for CompositionFs {
                 }
 
                 for (i, (inode, kind, name)) in entries.iter().enumerate().skip(offset as usize) {
-                    if reply.add(*inode, (i + 1) as i64, *kind, name) {
+                    if reply.add(*inode, (i + 1) as u64, *kind, name) {
                         break;
                     }
                 }
@@ -1073,7 +1073,7 @@ impl Filesystem for CompositionFs {
                 // Source is an overlay: merge real entries with virtual files
                 if let Some(path) = self.resolve_real_path(ino) {
                     if let Ok(read_dir) = fs::read_dir(&path) {
-                        let mut entries: Vec<(u64, FileType, String)> = vec![
+                        let mut entries: Vec<(INodeNo, FileType, String)> = vec![
                             (ino, FileType::Directory, ".".into()),
                             (ROOT_INO, FileType::Directory, "..".into()),
                         ];
@@ -1137,7 +1137,7 @@ impl Filesystem for CompositionFs {
                         for (i, (inode, kind, name)) in
                             entries.iter().enumerate().skip(offset as usize)
                         {
-                            if reply.add(*inode, (i + 1) as i64, *kind, name) {
+                            if reply.add(*inode, (i + 1) as u64, *kind, name) {
                                 break;
                             }
                         }
@@ -1145,7 +1145,7 @@ impl Filesystem for CompositionFs {
                         return;
                     }
                 }
-                reply.error(ENOTDIR);
+                reply.error(Errno::ENOTDIR);
             }
             Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
                 // Real directories (cells or nested paths) - no overlay
@@ -1156,7 +1156,7 @@ impl Filesystem for CompositionFs {
                 }
                 if let Some(path) = self.resolve_real_path(ino) {
                     if let Ok(read_dir) = fs::read_dir(&path) {
-                        let mut entries: Vec<(u64, FileType, String)> = vec![
+                        let mut entries: Vec<(INodeNo, FileType, String)> = vec![
                             (ino, FileType::Directory, ".".into()),
                             (ROOT_INO, FileType::Directory, "..".into()), // Simplified parent
                         ];
@@ -1178,7 +1178,7 @@ impl Filesystem for CompositionFs {
                         for (i, (inode, kind, name)) in
                             entries.iter().enumerate().skip(offset as usize)
                         {
-                            if reply.add(*inode, (i + 1) as i64, *kind, name) {
+                            if reply.add(*inode, (i + 1) as u64, *kind, name) {
                                 break;
                             }
                         }
@@ -1186,20 +1186,20 @@ impl Filesystem for CompositionFs {
                         return;
                     }
                 }
-                reply.error(ENOTDIR);
+                reply.error(Errno::ENOTDIR);
             }
             Some(InodePath::Virtual { .. }) => {
                 // Virtual files are not directories
-                reply.error(ENOTDIR);
+                reply.error(Errno::ENOTDIR);
             }
             None => {
-                reply.error(ENOENT);
+                reply.error(Errno::ENOENT);
             }
         }
     }
 
-    fn readlink(&mut self, _req: &Request, ino: u64, reply: fuser::ReplyData) {
-        debug!("readlink(ino={})", ino);
+    fn readlink(&self, _req: &Request, ino: INodeNo, reply: ReplyData) {
+        debug!("readlink(ino={:?})", ino);
 
         if let Some(path) = self.resolve_real_path(ino) {
             if let Ok(target) = fs::read_link(&path) {
@@ -1209,7 +1209,7 @@ impl Filesystem for CompositionFs {
                 }
             }
         }
-        reply.error(ENOENT);
+        reply.error(Errno::ENOENT);
     }
 }
 
@@ -1417,7 +1417,7 @@ mod tests {
 
         // CI policy denies with EAGAIN during building
         let result = fs.check_cell_policy("godeps", OperationType::Read);
-        assert!(matches!(result, Err(errno) if errno == crate::policy::EAGAIN));
+        assert!(matches!(result, Err(errno) if i32::from(errno) == crate::policy::EAGAIN));
     }
 
     #[test]
@@ -1587,7 +1587,7 @@ mod tests {
         // Should be rejected since cell is not editable
         let result = fs.check_edit_allowed(ino);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), EROFS);
+        assert_eq!(i32::from(result.unwrap_err()), libc::EROFS);
     }
 
     #[test]

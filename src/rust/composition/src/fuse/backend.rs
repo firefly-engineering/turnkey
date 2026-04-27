@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use fuser::{MountOption, Session};
+use fuser::{Config, MountOption, Session};
 use log::{debug, error, info};
 
 use super::filesystem::CompositionFs;
@@ -158,14 +158,15 @@ impl CompositionBackend for FuseBackend {
 
         let handle = thread::spawn(move || {
             // Create mount options - try minimal first (allow_other requires system config)
-            let options = vec![
+            let mut options = Config::default();
+            options.mount_options = vec![
                 MountOption::FSName("turnkey".to_string()),
                 MountOption::RO,
             ];
 
             // Create the filesystem and session in this thread
             let fs = CompositionFs::new(config, repo_root, state_machine);
-            let mut session = match Session::new(fs, &mount_point, &options) {
+            let session = match Session::new(fs, &mount_point, &options) {
                 Ok(s) => s,
                 Err(e) => {
                     error!("Failed to create FUSE session: {}", e);
@@ -186,11 +187,21 @@ impl CompositionBackend for FuseBackend {
 
             debug!("Starting FUSE session event loop");
 
-            // Run the FUSE session - this blocks until unmounted
+            // Run the FUSE session via spawn - this blocks until unmounted
             // The session will exit when fusermount -u is called or the mount is unmounted
-            if let Err(e) = session.run() {
-                if !should_stop.load(Ordering::SeqCst) {
-                    error!("FUSE session error: {}", e);
+            match session.spawn() {
+                Ok(bg_session) => {
+                    // BackgroundSession will run until dropped
+                    // We keep it alive by holding the handle until should_stop is set
+                    while !should_stop.load(Ordering::SeqCst) {
+                        thread::sleep(Duration::from_millis(100));
+                    }
+                    drop(bg_session);
+                }
+                Err(e) => {
+                    if !should_stop.load(Ordering::SeqCst) {
+                        error!("FUSE session error: {}", e);
+                    }
                 }
             }
 
