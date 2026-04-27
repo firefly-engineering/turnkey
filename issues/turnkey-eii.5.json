@@ -3,7 +3,9 @@
   "blocked_by": [
     "turnkey-eii.4"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-eii.6"
+  ],
   "created": "2026-04-27T13:37:12Z",
   "description": "Wire up cfg(target_os) to select FuseBackend: fuser on Linux, FuseTBackend on macOS. Add fuse-t feature flag to Cargo.toml. Update mod.rs, selector.rs. Ensure fuser dependency is Linux-only when using fuse-t on macOS.",
   "id": "turnkey-eii.5",
