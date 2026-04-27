@@ -1,34 +1,20 @@
 # Turnkey toolchain declaration
-# This demonstrates the full Buck2 + Nix integration with Go toolchain
+# Uses versioned toolchain meta-packages from toolbox where possible
 
 [toolchains]
 # Build tools
 buck2 = {}
 
-# Language toolchains (used by Buck2)
-# These are automatically wrapped with tw for auto-sync when dependency files change
-go = {}
-golangci-lint = {}  # Go linter
-gopls = {}
-rust = {}
-cargo = {}
-clippy = {}         # Rust linter
-rustfmt = {}        # Rust formatter
-rust-analyzer = {}  # Rust LSP server
-cargo-edit = {}     # Provides cargo add/rm/upgrade
-python = {}
-uv = {}        # Python package manager for lock file generation
-ruff = {}      # Python linter and formatter
-reindeer = {}  # Tool for generating Buck2 targets from Cargo.toml
+# Language toolchains (versioned meta-packages from toolbox)
+# Each bundles the compiler, LSP, linter, formatter, and related tools
+rust-toolchain = {}      # rust, rust-analyzer, cargo-edit (cargo/clippy/rustfmt ship with rust)
+go-toolchain = {}        # go, golangci-lint, gopls
+python-toolchain = {}    # python, uv, ruff, pytest
+typescript-toolchain = {} # typescript, nodejs, biome, bun
+solidity-toolchain = {}  # solc, foundry
 
-# JavaScript/TypeScript (no Buck2 toolchain, but available for genrule builds)
-nodejs = {}
-typescript = {}
-biome = {}  # Fast linter and formatter for JS/TS/JSON
-
-# Solidity toolchain
-solc = {}         # Solidity compiler (also generates Buck2 toolchain)
-foundry = {}      # Ethereum dev toolkit (forge, cast, anvil)
+# Buck2-specific tools
+reindeer = {}  # Generate Buck2 targets from Cargo.toml
 
 # Documentation tools
 mdbook = {}
@@ -38,7 +24,6 @@ jrsonnet = {}  # Jsonnet to JSON compiler (Rust implementation)
 
 # Development utilities (not Buck2 toolchains)
 nix = {}
-pytest = {}  # Python test runner
 beads = {}
 beads-viewer = {}
 jj = {}
