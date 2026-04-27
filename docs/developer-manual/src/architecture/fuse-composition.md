@@ -1,32 +1,35 @@
 # FUSE Composition Layer
 
-The FUSE composition layer provides a unified filesystem view of repositories and their dependencies. This document covers the architecture for developers extending or maintaining the composition system.
+The FUSE composition layer provides a unified filesystem view of repositories
+and their dependencies. This document covers the architecture for developers
+extending or maintaining the composition system.
 
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    CompositionBackend trait                      │
-├─────────────────────────────────────────────────────────────────┤
+┌────────────────────────────────────────────────────────────────┐
+│                   CompositionBackend trait                     │
+├────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────────┐       ┌─────────────────────┐         │
 │  │   FUSE Backend      │       │   Symlink Backend   │         │
 │  │   (Development)     │       │   (CI / Fallback)   │         │
 │  └─────────────────────┘       └─────────────────────┘         │
-│              │                           │                      │
-│              └───────────┬───────────────┘                      │
-│                          ▼                                      │
-│              ┌───────────────────────┐                          │
-│              │   Composition API     │                          │
-│              │   (shared interface)  │                          │
-│              └───────────────────────┘                          │
-└─────────────────────────────────────────────────────────────────┘
+│              │                           │                     │
+│              └───────────┬───────────────┘                     │
+│                          ▼                                     │
+│              ┌───────────────────────┐                         │
+│              │   Composition API     │                         │
+│              │   (shared interface)  │                         │
+│              └───────────────────────┘                         │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ## Core Components
 
 ### Backend Trait
 
-The `CompositionBackend` trait (`src/rust/composition/src/backend.rs`) defines the interface for all backends:
+The `CompositionBackend` trait (`src/rust/composition/src/backend.rs`) defines
+the interface for all backends:
 
 ```rust
 pub trait CompositionBackend: Send + Sync {
@@ -40,7 +43,8 @@ pub trait CompositionBackend: Send + Sync {
 
 ### Backend Selection
 
-The selector (`src/rust/composition/src/selector.rs`) automatically chooses the appropriate backend:
+The selector (`src/rust/composition/src/selector.rs`) automatically chooses the
+appropriate backend:
 
 ```rust
 pub fn select_backend(requested: BackendType) -> BackendSelection {
@@ -60,7 +64,8 @@ pub fn select_backend(requested: BackendType) -> BackendSelection {
 
 ### State Machine
 
-The consistency state machine (`src/rust/composition/src/state.rs`) manages transitions:
+The consistency state machine (`src/rust/composition/src/state.rs`) manages
+transitions:
 
 ```
 Settled ──manifest change──► Syncing ──nix build──► Building
@@ -71,13 +76,15 @@ Settled ──manifest change──► Syncing ──nix build──► Building
 ```
 
 Key types:
+
 - `ConsistencyStateMachine` - Thread-safe state management
 - `StateObserver` - Trait for state change notifications
 - `CellUpdate` - Pending cell updates during transitions
 
 ### Policy System
 
-The policy system (`src/rust/composition/src/policy.rs`) controls access during updates. See [FUSE Access Policy](./fuse-policy.md) for details.
+The policy system (`src/rust/composition/src/policy.rs`) controls access during
+updates. See [FUSE Access Policy](./fuse-policy.md) for details.
 
 ### Layout System
 
@@ -124,41 +131,58 @@ src/rust/composition/src/
 
 ## FUSE Backend Implementation
 
-The FUSE backend uses a layered architecture with a platform-agnostic core and platform-specific adapters.
+The FUSE backend uses a layered architecture with a platform-agnostic core and
+platform-specific adapters.
 
 ### FsCore (Platform-Agnostic)
 
-`FsCore` (`fs_core.rs`) contains all filesystem logic with **zero dependency on the `fuser` crate**:
+`FsCore` (`fs_core.rs`) contains all filesystem logic with **zero dependency on
+the `fuser` crate**:
 
-- **Path resolution**: `resolve_path(path) -> ResolvedPath` maps FUSE paths to logical locations (Root, Source, CellPrefix, Cell, VirtualFile, etc.)
-- **Inode management**: Allocation, mapping, and lookup using plain `u64` inode numbers
+- **Path resolution**: `resolve_path(path) -> ResolvedPath` maps FUSE paths to
+  logical locations (Root, Source, CellPrefix, Cell, VirtualFile, etc.)
+- **Inode management**: Allocation, mapping, and lookup using plain `u64` inode
+  numbers
 - **Virtual file generation**: `.buckconfig` and `.buckroot` content
 - **Policy checking**: Access control during dependency updates
 - **Edit overlay**: Copy-on-write editing of external dependencies
 
-Both the Linux and macOS backends delegate to `FsCore` for all filesystem logic, converting between their own FUSE types and FsCore's neutral types.
+Both the Linux and macOS backends delegate to `FsCore` for all filesystem logic,
+converting between their own FUSE types and FsCore's neutral types.
 
 ### Linux Backend (fuser crate)
 
 Uses the `fuser` crate's low-level inode-based API:
+
 - `CompositionFs` wraps `FsCore` and implements `fuser::Filesystem`
 - Converts between `fuser::INodeNo`/`FileAttr` and FsCore's `u64`/`FsAttr`
 - Feature flag: `fuse` (enables `dep:fuser`)
 
 ### macOS Backend (FUSE-T FFI)
 
-Uses direct C FFI to FUSE-T's libfuse3, bypassing the `fuser` crate entirely. This is necessary because `fuser` reads the FUSE file descriptor directly, which is incompatible with FUSE-T's NFS-based socket protocol.
+Uses direct C FFI to FUSE-T's libfuse3, bypassing the `fuser` crate entirely.
+This is necessary because `fuser` reads the FUSE file descriptor directly, which
+is incompatible with FUSE-T's NFS-based socket protocol.
 
-- **`bindings.rs`**: Hand-written FFI bindings to libfuse3 (44-field `fuse_operations` struct at 352 bytes, `fuse_new`, `fuse_mount`, `fuse_loop`, etc.)
-- **`operations.rs`**: `extern "C"` callbacks using the high-level path-based API. Each callback retrieves `FsCore` via a global `AtomicPtr` and delegates to `resolve_path()`
-- **`backend.rs`**: `FuseTBackend` spawns a thread calling `fuse_new` + `fuse_mount` + `fuse_loop`
+- **`bindings.rs`**: Hand-written FFI bindings to libfuse3 (44-field
+  `fuse_operations` struct at 352 bytes, `fuse_new`, `fuse_mount`, `fuse_loop`,
+  etc.)
+- **`operations.rs`**: `extern "C"` callbacks using the high-level path-based
+  API. Each callback retrieves `FsCore` via a global `AtomicPtr` and delegates
+  to `resolve_path()`
+- **`backend.rs`**: `FuseTBackend` spawns a thread calling `fuse_new` +
+  `fuse_mount` + `fuse_loop`
 - Feature flag: `fuse-t` (only `dep:libc` needed)
 - Links against `/usr/local/lib/libfuse3.dylib` (from FUSE-T)
 
 **FUSE-T quirks discovered during implementation:**
-- `fuse_get_context()->private_data` does not reliably pass the `user_data` from `fuse_new`. A global `AtomicPtr<FsCore>` is used instead.
-- `readdir` filler must pass null for the stat buffer. FUSE-T's NFS translation rejects certain stat formats with "RPC struct is bad".
-- The `fuse_operations` struct must include the newer `statx` and `syncfs` fields even if unused, to match the 352-byte C ABI.
+
+- `fuse_get_context()->private_data` does not reliably pass the `user_data` from
+  `fuse_new`. A global `AtomicPtr<FsCore>` is used instead.
+- `readdir` filler must pass null for the stat buffer. FUSE-T's NFS translation
+  rejects certain stat formats with "RPC struct is bad".
+- The `fuse_operations` struct must include the newer `statx` and `syncfs`
+  fields even if unused, to match the 352-byte C ABI.
 
 ### Conditional Compilation
 
@@ -173,13 +197,16 @@ pub use backend::FuseBackend;           // fuser-based
 pub use fuse_t::backend::FuseTBackend as FuseBackend;  // libfuse-t FFI
 ```
 
-The `selector.rs` gates on `#[cfg(any(feature = "fuse", feature = "fuse-t"))]` so both feature flags enable the FUSE code path.
+The `selector.rs` gates on `#[cfg(any(feature = "fuse", feature = "fuse-t"))]`
+so both feature flags enable the FUSE code path.
 
 ### Platform Detection
 
 Runtime FUSE availability checking in `platform.rs`:
+
 - **Linux**: Checks for `/dev/fuse`
-- **macOS**: Checks for FUSE-T bundle (`/Library/Filesystems/fuse-t.fs`) or library (`/usr/local/lib/libfuse-t.dylib`)
+- **macOS**: Checks for FUSE-T bundle (`/Library/Filesystems/fuse-t.fs`) or
+  library (`/usr/local/lib/libfuse-t.dylib`)
 
 ## Recovery System
 
@@ -246,6 +273,7 @@ impl StateObserver for StateLogger {
 ### Metrics
 
 Tracks performance metrics:
+
 - Operation counts (lookup, read, readdir, etc.)
 - Latency histograms
 - Cache hit rates
@@ -352,5 +380,7 @@ pub struct CellConfig {
 ## Related Documentation
 
 - [FUSE Access Policy](./fuse-policy.md) - Access control during updates
-- [Custom Layouts](../extending/custom-layouts.md) - Creating build system layouts
-- [Architecture Proposal](../../../../architecture/fuse-composition-layer.md) - Original design document
+- [Custom Layouts](../extending/custom-layouts.md) - Creating build system
+  layouts
+- [Architecture Proposal](../../../../architecture/fuse-composition-layer.md) -
+  Original design document

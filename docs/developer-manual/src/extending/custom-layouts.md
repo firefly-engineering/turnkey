@@ -1,6 +1,8 @@
 # Custom Layouts
 
-The composition layer uses a pluggable layout system to support different build systems. While Turnkey ships with Buck2 and Bazel layouts, you can create custom layouts for other build systems or specialized requirements.
+The composition layer uses a pluggable layout system to support different build
+systems. While Turnkey ships with Buck2 and Bazel layouts, you can create custom
+layouts for other build systems or specialized requirements.
 
 ## Layout Architecture
 
@@ -8,19 +10,19 @@ Layouts control how the composed filesystem presents dependencies:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Layout System                                 │
+│                   Layout System                                 │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
+│                                                                 │
 │  LayoutContext ──────────────► Layout.map_dep()                 │
-│  (mount point,                    │                              │
-│   repo root,                      ▼                              │
+│  (mount point,                   │                              │
+│   repo root,                     ▼                              │
 │   cells)            /firefly/project/external/godeps/vendor/... │
-│                                                                  │
+│                                                                 │
 │  LayoutContext ──────────────► Layout.generate_config()         │
-│                                   │                              │
-│                                   ▼                              │
-│                            .buckconfig, .buckroot, etc.          │
-│                                                                  │
+│                                  │                              │
+│                                  ▼                              │
+│                           .buckconfig, .buckroot, etc.          │
+│                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -383,9 +385,11 @@ mod tests {
 ### Module: `composition::layout`
 
 **Traits:**
+
 - `Layout` - Core layout trait
 
 **Structs:**
+
 - `LayoutContext` - Context for layout operations
 - `LayoutRegistry` - Registry for custom layouts
 - `CellInfo` - Information about a cell
@@ -395,11 +399,13 @@ mod tests {
 - `BazelLayout` - Built-in Bazel layout
 
 **Functions:**
+
 - `global_registry()` - Get the global layout registry
 - `available_layouts()` - List available layout names
 - `layout_by_name(name)` - Get a layout by name
 - `default_layout()` - Get the default layout (Buck2)
 
 **Type Aliases:**
+
 - `BoxedLayout` - `Box<dyn Layout>`
 - `LayoutFactory` - `fn() -> BoxedLayout`

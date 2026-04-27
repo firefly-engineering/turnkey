@@ -1,10 +1,15 @@
 # FUSE Access Policy System
 
-The FUSE composition layer includes a pluggable access policy system that controls how file operations behave during dependency updates. This allows developers to tune the trade-off between consistency and availability based on their workflow.
+The FUSE composition layer includes a pluggable access policy system that
+controls how file operations behave during dependency updates. This allows
+developers to tune the trade-off between consistency and availability based on
+their workflow.
 
 ## Overview
 
-When the composition system is updating (rebuilding Nix derivations), file access to dependency cells may need to be controlled. The policy system determines whether to:
+When the composition system is updating (rebuilding Nix derivations), file
+access to dependency cells may need to be controlled. The policy system
+determines whether to:
 
 - **Allow** the operation immediately
 - **Block** until the system becomes stable
@@ -14,7 +19,7 @@ When the composition system is updating (rebuilding Nix derivations), file acces
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     FUSE Operation                          │
-│  (lookup, getattr, read, readdir, write, create, ...)      │
+│   (lookup, getattr, read, readdir, write, create, ...)      │
 └─────────────────────────────────────────────────────────────┘
                              │
                              ▼
@@ -45,17 +50,20 @@ When the composition system is updating (rebuilding Nix derivations), file acces
 
 ### File Classes
 
-Files in the composition view are classified by their behavioral characteristics:
+Files in the composition view are classified by their behavioral
+characteristics:
 
-| Class | Description | Examples |
-|-------|-------------|----------|
-| `SourcePassthrough` | Repository source files | `src/main.rs`, `docs/README.md` |
-| `CellContent` | Dependency cell content | `external/godeps/vendor/...` |
-| `VirtualGenerated` | Generated virtual files | `.buckconfig`, `.buckroot` |
-| `VirtualDirectory` | Virtual directory structure | Mount root, cell prefix |
-| `EditLayer` | User modifications (future) | Local patches to dependencies |
+| Class               | Description                 | Examples                        |
+| ------------------- | --------------------------- | ------------------------------- |
+| `SourcePassthrough` | Repository source files     | `src/main.rs`, `docs/README.md` |
+| `CellContent`       | Dependency cell content     | `external/godeps/vendor/...`    |
+| `VirtualGenerated`  | Generated virtual files     | `.buckconfig`, `.buckroot`      |
+| `VirtualDirectory`  | Virtual directory structure | Mount root, cell prefix         |
+| `EditLayer`         | User modifications (future) | Local patches to dependencies   |
 
-**Key insight:** `SourcePassthrough` and virtual files are always accessible regardless of system state. Only `CellContent` access is subject to policy decisions.
+**Key insight:** `SourcePassthrough` and virtual files are always accessible
+regardless of system state. Only `CellContent` access is subject to policy
+decisions.
 
 ### System States
 
@@ -69,25 +77,25 @@ Settled ──manifest change──► Syncing ──nix build──► Building
    └───────────────────── Transitioning ◄───────────────┘
 ```
 
-| State | Description |
-|-------|-------------|
-| `Settled` | System is stable, no pending changes |
-| `Syncing` | Manifest changed, preparing for update |
-| `Building` | Nix derivation is building |
-| `Transitioning` | Atomically switching to new view |
-| `Error` | System encountered an error |
+| State           | Description                            |
+| --------------- | -------------------------------------- |
+| `Settled`       | System is stable, no pending changes   |
+| `Syncing`       | Manifest changed, preparing for update |
+| `Building`      | Nix derivation is building             |
+| `Transitioning` | Atomically switching to new view       |
+| `Error`         | System encountered an error            |
 
 ### Operation Types
 
-| Operation | Description |
-|-----------|-------------|
-| `Lookup` | Path lookup (finding a file) |
-| `Getattr` | Get file/directory attributes |
-| `Read` | Read file content |
-| `Readdir` | Read directory entries |
-| `Readlink` | Read symbolic link target |
-| `Open` / `Opendir` | Open file/directory |
-| `Write` / `Create` / `Unlink` | Write operations (future) |
+| Operation                     | Description                   |
+| ----------------------------- | ----------------------------- |
+| `Lookup`                      | Path lookup (finding a file)  |
+| `Getattr`                     | Get file/directory attributes |
+| `Read`                        | Read file content             |
+| `Readdir`                     | Read directory entries        |
+| `Readlink`                    | Read symbolic link target     |
+| `Open` / `Opendir`            | Open file/directory           |
+| `Write` / `Create` / `Unlink` | Write operations (future)     |
 
 ## Built-in Policies
 
@@ -95,59 +103,63 @@ Settled ──manifest change──► Syncing ──nix build──► Building
 
 **Best for:** CI pipelines, production builds where correctness is critical
 
-Blocks all cell access during any update phase. Reads will never return stale data, but may block for the duration of the Nix build.
+Blocks all cell access during any update phase. Reads will never return stale
+data, but may block for the duration of the Nix build.
 
 ```rust
 StrictPolicy::new()                    // Default 5-minute timeout
 StrictPolicy::with_timeout(Duration::from_secs(120))  // Custom timeout
 ```
 
-| State | CellContent | SourcePassthrough |
-|-------|-------------|-------------------|
-| Settled | Allow | Allow |
-| Syncing | Block | Allow |
-| Building | Block | Allow |
-| Transitioning | Block | Allow |
+| State         | CellContent | SourcePassthrough |
+| ------------- | ----------- | ----------------- |
+| Settled       | Allow       | Allow             |
+| Syncing       | Block       | Allow             |
+| Building      | Block       | Allow             |
+| Transitioning | Block       | Allow             |
 
 ### LenientPolicy
 
 **Best for:** Interactive development where latency matters
 
-Allows stale reads during syncing and building phases, only blocks during the brief transition phase.
+Allows stale reads during syncing and building phases, only blocks during the
+brief transition phase.
 
 ```rust
 LenientPolicy::new()
 ```
 
-| State | CellContent | SourcePassthrough |
-|-------|-------------|-------------------|
-| Settled | Allow | Allow |
-| Syncing | AllowStale | Allow |
-| Building | AllowStale | Allow |
-| Transitioning | Block | Allow |
+| State         | CellContent | SourcePassthrough |
+| ------------- | ----------- | ----------------- |
+| Settled       | Allow       | Allow             |
+| Syncing       | AllowStale  | Allow             |
+| Building      | AllowStale  | Allow             |
+| Transitioning | Block       | Allow             |
 
 ### CIPolicy
 
 **Best for:** CI/CD environments where blocking is undesirable
 
-Never blocks - immediately returns EAGAIN if the operation would need to wait. The caller can retry or handle the error.
+Never blocks - immediately returns EAGAIN if the operation would need to wait.
+The caller can retry or handle the error.
 
 ```rust
 CIPolicy::new()
 ```
 
-| State | CellContent | SourcePassthrough |
-|-------|-------------|-------------------|
-| Settled | Allow | Allow |
-| Syncing | Deny (EAGAIN) | Allow |
-| Building | Deny (EAGAIN) | Allow |
-| Transitioning | Deny (EAGAIN) | Allow |
+| State         | CellContent   | SourcePassthrough |
+| ------------- | ------------- | ----------------- |
+| Settled       | Allow         | Allow             |
+| Syncing       | Deny (EAGAIN) | Allow             |
+| Building      | Deny (EAGAIN) | Allow             |
+| Transitioning | Deny (EAGAIN) | Allow             |
 
 ### DevelopmentPolicy (Default)
 
 **Best for:** Day-to-day development work
 
 A balanced approach:
+
 - Syncing: Allow stale reads (quick phase)
 - Building: Block (wait for fresh data)
 - Error: Allow stale (degrade gracefully)
@@ -156,13 +168,13 @@ A balanced approach:
 DevelopmentPolicy::new()
 ```
 
-| State | CellContent | SourcePassthrough |
-|-------|-------------|-------------------|
-| Settled | Allow | Allow |
-| Syncing | AllowStale | Allow |
-| Building | Block | Allow |
-| Transitioning | Block | Allow |
-| Error | AllowStale | Allow |
+| State         | CellContent | SourcePassthrough |
+| ------------- | ----------- | ----------------- |
+| Settled       | Allow       | Allow             |
+| Syncing       | AllowStale  | Allow             |
+| Building      | Block       | Allow             |
+| Transitioning | Block       | Allow             |
+| Error         | AllowStale  | Allow             |
 
 ## Creating Custom Policies
 
@@ -223,12 +235,12 @@ impl AccessPolicy for MyPolicy {
 
 ## Policy Decision Types
 
-| Decision | Behavior | Use Case |
-|----------|----------|----------|
-| `Allow` | Proceed immediately | Stable state, always-accessible files |
-| `Block { timeout }` | Wait up to timeout for stable state | Ensuring consistency during builds |
-| `Deny { errno }` | Return error immediately | CI environments, fail-fast scenarios |
-| `AllowStale` | Proceed with warning log | Interactive development, quick feedback |
+| Decision            | Behavior                            | Use Case                                |
+| ------------------- | ----------------------------------- | --------------------------------------- |
+| `Allow`             | Proceed immediately                 | Stable state, always-accessible files   |
+| `Block { timeout }` | Wait up to timeout for stable state | Ensuring consistency during builds      |
+| `Deny { errno }`    | Return error immediately            | CI environments, fail-fast scenarios    |
+| `AllowStale`        | Proceed with warning log            | Interactive development, quick feedback |
 
 ### Convenience Constructors
 
@@ -302,19 +314,20 @@ WARN  Policy 'lenient': returning potentially stale data for cell 'godeps' durin
 
 ## Guidelines for Choosing a Policy
 
-| Scenario | Recommended Policy |
-|----------|-------------------|
-| CI/CD pipelines | `CIPolicy` - fail fast, let retry logic handle it |
-| Production builds | `StrictPolicy` - correctness over speed |
-| Interactive development | `DevelopmentPolicy` - balanced default |
-| Quick iteration | `LenientPolicy` - maximum availability |
-| Custom requirements | Implement `AccessPolicy` trait |
+| Scenario                | Recommended Policy                                |
+| ----------------------- | ------------------------------------------------- |
+| CI/CD pipelines         | `CIPolicy` - fail fast, let retry logic handle it |
+| Production builds       | `StrictPolicy` - correctness over speed           |
+| Interactive development | `DevelopmentPolicy` - balanced default            |
+| Quick iteration         | `LenientPolicy` - maximum availability            |
+| Custom requirements     | Implement `AccessPolicy` trait                    |
 
 ## API Reference
 
 ### Module: `composition::policy`
 
 **Types:**
+
 - `FileClass` - File classification enum
 - `SystemState` - System state enum
 - `OperationType` - Operation type enum
@@ -323,14 +336,17 @@ WARN  Policy 'lenient': returning potentially stale data for cell 'godeps' durin
 - `BoxedPolicy` - Type alias for `Box<dyn AccessPolicy>`
 
 **Built-in Policies:**
+
 - `StrictPolicy`
 - `LenientPolicy`
 - `CIPolicy`
 - `DevelopmentPolicy`
 
 **Functions:**
+
 - `default_policy()` - Returns a boxed `DevelopmentPolicy`
 
 **Constants:**
+
 - `EAGAIN` - Resource temporarily unavailable (11)
 - `EBUSY` - Device or resource busy (16)

@@ -6,7 +6,8 @@ This guide covers how external dependencies are managed in Turnkey projects.
 
 ### 1. No In-Repo Vendoring
 
-Dependencies are **never** vendored into the repository. All dependency sources live in the Nix store.
+Dependencies are **never** vendored into the repository. All dependency sources
+live in the Nix store.
 
 - No `vendor/` directories committed to git
 - No `node_modules/`, `__pycache__/`, or similar cached dependencies
@@ -14,15 +15,17 @@ Dependencies are **never** vendored into the repository. All dependency sources 
 
 ### 2. Language-Native Declarations Are the Source of Truth
 
-Each language has its own dependency declaration format. These are the **sole source of truth** for what dependencies are needed:
+Each language has its own dependency declaration format. These are the **sole
+source of truth** for what dependencies are needed:
 
-| Language | Declaration Files |
-|----------|-------------------|
-| Go       | `go.mod`, `go.sum` |
-| Rust     | `Cargo.toml`, `Cargo.lock` |
+| Language | Declaration Files           |
+| -------- | --------------------------- |
+| Go       | `go.mod`, `go.sum`          |
+| Rust     | `Cargo.toml`, `Cargo.lock`  |
 | Python   | `pyproject.toml`, `uv.lock` |
 
-These files define the dependency graph at the **module level** (not package/subpackage level).
+These files define the dependency graph at the **module level** (not
+package/subpackage level).
 
 ### 3. Per-Module Fetching with Deterministic Hashes
 
@@ -33,6 +36,7 @@ go.mod/go.sum  →  godeps-gen  →  go-deps.toml  →  Nix fetches each module
 ```
 
 The intermediate TOML file (`go-deps.toml`, `rust-deps.toml`, etc.) contains:
+
 - Module/crate/package identifiers
 - Versions (from lock file)
 - Nix-compatible SRI hashes (from prefetching)
@@ -46,6 +50,7 @@ go-deps.toml  →  go-deps-cell.nix  →  .turnkey/godeps/  (symlink to Nix stor
 ```
 
 The cell contains:
+
 - Fetched source files for each dependency
 - Generated rules.star files for Buck2 to consume
 - Any scaffolding needed by build tools (e.g., `modules.txt` for Go)
@@ -54,67 +59,69 @@ The cell contains:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           Source of Truth                                │
-│                                                                          │
-│    go.mod / go.sum          Cargo.toml / Cargo.lock       pyproject.toml │
+│                          Source of Truth                                │
+│                                                                         │
+│   go.mod / go.sum          Cargo.toml / Cargo.lock       pyproject.toml │
 └─────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         Hash Generation Tools                            │
-│                                                                          │
-│    godeps-gen                      rustdeps-gen             pydeps-gen   │
-│                                                                          │
-│    Reads dependency declaration, fetches each module via nix-prefetch-*  │
-│    Outputs TOML with per-module SRI hashes                               │
+│                        Hash Generation Tools                            │
+│                                                                         │
+│   godeps-gen                      rustdeps-gen             pydeps-gen   │
+│                                                                         │
+│   Reads dependency declaration, fetches each module via nix-prefetch-*  │
+│   Outputs TOML with per-module SRI hashes                               │
 └─────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         Dependency TOML Files                            │
-│                                                                          │
-│    go-deps.toml                rust-deps.toml           python-deps.toml │
-│                                                                          │
-│    [deps."github.com/foo/bar"]                                           │
-│    version = "v1.2.3"                                                    │
-│    hash = "sha256-..."                                                   │
+│                        Dependency TOML Files                            │
+│                                                                         │
+│   go-deps.toml                rust-deps.toml           python-deps.toml │
+│                                                                         │
+│   [deps."github.com/foo/bar"]                                           │
+│   version = "v1.2.3"                                                    │
+│   hash = "sha256-..."                                                   │
 └─────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         Nix Cell Builders                                │
-│                                                                          │
-│    go-deps-cell.nix         rust-deps-cell.nix      python-deps-cell.nix │
-│                                                                          │
-│    - Reads TOML, fetches each module via fetchFromGitHub/fetchurl        │
-│    - Assembles into directory structure                                  │
-│    - Generates rules.star files                                          │
+│                        Nix Cell Builders                                │
+│                                                                         │
+│   go-deps-cell.nix         rust-deps-cell.nix      python-deps-cell.nix │
+│                                                                         │
+│   - Reads TOML, fetches each module via fetchFromGitHub/fetchurl        │
+│   - Assembles into directory structure                                  │
+│   - Generates rules.star files                                          │
 └─────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         Buck2 Cells (in .turnkey/)                       │
-│                                                                          │
-│    .turnkey/godeps/           .turnkey/rustdeps/       .turnkey/pydeps/  │
-│    (symlinks to Nix store)                                               │
-│                                                                          │
-│    Contains: source files, rules.star files, cell config                 │
+│                        Buck2 Cells (in .turnkey/)                       │
+│                                                                         │
+│   .turnkey/godeps/           .turnkey/rustdeps/       .turnkey/pydeps/  │
+│   (symlinks to Nix store)                                               │
+│                                                                         │
+│   Contains: source files, rules.star files, cell config                 │
 └─────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                              Buck2 Build                                 │
-│                                                                          │
-│    buck2 build //my/package:target                                       │
-│                                                                          │
-│    References deps as: godeps//vendor/github.com/foo/bar:bar             │
-│    All sources already in Nix store - no network access needed           │
+│                             Buck2 Build                                 │
+│                                                                         │
+│   buck2 build //my/package:target                                       │
+│                                                                         │
+│   References deps as: godeps//vendor/github.com/foo/bar:bar             │
+│   All sources already in Nix store - no network access needed           │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Auto-Sync with Wrapped Tools
 
-When using `go`, `cargo`, or `uv` in a Turnkey shell, the tools are transparently wrapped to trigger automatic dependency synchronization when dependency files change.
+When using `go`, `cargo`, or `uv` in a Turnkey shell, the tools are
+transparently wrapped to trigger automatic dependency synchronization when
+dependency files change.
 
 ```bash
 # These trigger auto-sync when dependency files change
@@ -172,7 +179,9 @@ godeps-gen --prefetch -o go-deps.toml
 ```
 
 Options:
-- `--prefetch`: Fetch Nix hashes using nix-prefetch-github (required for valid hashes)
+
+- `--prefetch`: Fetch Nix hashes using nix-prefetch-github (required for valid
+  hashes)
 - `--indirect`: Include indirect (transitive) dependencies (default: true)
 - `-o`: Output file (default: stdout)
 
@@ -190,14 +199,17 @@ go_binary(
 
 ### Local Replace Directives
 
-Turnkey supports `replace` directives in `go.mod` that point to local paths. This is essential for monorepo setups.
+Turnkey supports `replace` directives in `go.mod` that point to local paths.
+This is essential for monorepo setups.
 
 **In go.mod:**
+
 ```go
 replace github.com/company/shared-lib => ../shared-lib
 ```
 
 **In go-deps.toml** (generated by godeps-gen):
+
 ```toml
 [replace."github.com/company/shared-lib"]
 import_path = "github.com/company/shared-lib"
@@ -205,6 +217,7 @@ local_path = "../shared-lib"
 ```
 
 **Configure the mapping in flake.nix:**
+
 ```nix
 turnkey.toolchains.buck2.go = {
   enable = true;
@@ -215,18 +228,21 @@ turnkey.toolchains.buck2.go = {
 };
 ```
 
-See the [Go language guide](../languages/go.md#local-replace-directives) for detailed documentation.
+See the [Go language guide](../languages/go.md#local-replace-directives) for
+detailed documentation.
 
 ### External Fork Replace Directives
 
 Turnkey also supports `replace` directives that point to external forks:
 
 **In go.mod:**
+
 ```go
 replace github.com/original/pkg => github.com/myfork/pkg v1.2.3
 ```
 
 **In go-deps.toml** (generated by godeps-gen):
+
 ```toml
 [deps."github.com/original/pkg@v1.2.3"]
 import_path = "github.com/original/pkg"
@@ -235,9 +251,12 @@ version = "v1.2.3"
 hash = "sha256-..."
 ```
 
-The cell builder fetches from `fetch_path` but stores under `import_path`, so your code continues importing from the original path while using the fork's source.
+The cell builder fetches from `fetch_path` but stores under `import_path`, so
+your code continues importing from the original path while using the fork's
+source.
 
-See the [Go language guide](../languages/go.md#external-fork-replacements) for detailed documentation.
+See the [Go language guide](../languages/go.md#external-fork-replacements) for
+detailed documentation.
 
 ## Rust Dependencies
 
@@ -257,13 +276,16 @@ rustdeps-gen --cargo-lock Cargo.lock -o rust-deps.toml
 ```
 
 Options:
+
 - `--cargo-lock`: Path to Cargo.lock file (default: Cargo.lock)
 - `--no-prefetch`: Skip prefetching (produces incorrect hashes)
 - `-o`: Output file (default: stdout)
 
 ### Handling Special Cases
 
-Some Rust crates require additional configuration. See the [Rust Dependency Handling](../../developer-manual/src/extending/dependency-generators.md) guide for:
+Some Rust crates require additional configuration. See the
+[Rust Dependency Handling](../../developer-manual/src/extending/dependency-generators.md)
+guide for:
 
 - Build scripts that emit rustc flags
 - Generated source files
@@ -295,11 +317,11 @@ pydeps-gen --lock pylock.toml -o python-deps.toml
 
 ### Input Formats
 
-| Format | Flag | Reproducibility | Notes |
-|--------|------|-----------------|-------|
-| pylock.toml (PEP 751) | `--lock` | Best | Exact versions and URLs |
-| pyproject.toml | `--pyproject` | Varies | Uses latest matching versions |
-| requirements.txt | `--requirements` | Varies | Pin versions with `==` for reproducibility |
+| Format                | Flag             | Reproducibility | Notes                                      |
+| --------------------- | ---------------- | --------------- | ------------------------------------------ |
+| pylock.toml (PEP 751) | `--lock`         | Best            | Exact versions and URLs                    |
+| pyproject.toml        | `--pyproject`    | Varies          | Uses latest matching versions              |
+| requirements.txt      | `--requirements` | Varies          | Pin versions with `==` for reproducibility |
 
 ### CLI Options
 
@@ -316,21 +338,27 @@ pydeps-gen --lock pylock.toml -o python-deps.toml
 
 ### Never Use vendorHash
 
-Nix's `buildGoModule` has a `vendorHash` that hashes the output of `go mod vendor`. This is problematic:
+Nix's `buildGoModule` has a `vendorHash` that hashes the output of
+`go mod vendor`. This is problematic:
 
-1. **Implementation-dependent**: The hash changes based on which packages are actually imported
-2. **Opaque**: You can't know the hash without running the build and letting it fail
+1. **Implementation-dependent**: The hash changes based on which packages are
+   actually imported
+2. **Opaque**: You can't know the hash without running the build and letting it
+   fail
 3. **Unstable**: Adding a new import from an existing module can change the hash
 
-Instead, use per-module fetching where each module has its own deterministic hash.
+Instead, use per-module fetching where each module has its own deterministic
+hash.
 
 ### Never Vendor in Repository
 
-Even temporarily. If you see a `vendor/` directory in the repo, something is wrong.
+Even temporarily. If you see a `vendor/` directory in the repo, something is
+wrong.
 
 ### Never Compute Hashes from Vendored Output
 
-The hash should come from the source (e.g., GitHub tarball), not from transformed/vendored output.
+The hash should come from the source (e.g., GitHub tarball), not from
+transformed/vendored output.
 
 ## Troubleshooting
 

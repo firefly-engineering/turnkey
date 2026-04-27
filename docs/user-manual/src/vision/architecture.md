@@ -8,7 +8,7 @@ Turnkey combines three powerful technologies - **Nix**, an **incremental build s
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Developer Experience                     │
+│                     Developer Experience                    │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │ go build    │  │ tk build    │  │ IDE / LSP           │  │
 │  │ cargo test  │  │ tk test     │  │ Autocomplete        │  │
@@ -18,7 +18,7 @@ Turnkey combines three powerful technologies - **Nix**, an **incremental build s
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                         Turnkey                              │
+│                         Turnkey                             │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │ tw wrappers │  │ tk CLI      │  │ Dep generators      │  │
 │  │ Auto-sync   │  │ Build wrap  │  │ godeps-gen, etc.    │  │
@@ -27,7 +27,7 @@ Turnkey combines three powerful technologies - **Nix**, an **incremental build s
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Core Technologies                         │
+│                    Core Technologies                        │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │    Nix      │  │Build System │  │      devenv         │  │
 │  │ Hermetic    │  │ Incremental │  │ Shell environment   │  │

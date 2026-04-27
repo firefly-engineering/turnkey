@@ -1,18 +1,22 @@
 # Build System Abstraction
 
-Turnkey supports multiple build systems through abstraction layers that separate build-system-agnostic specifications from build-system-specific rule generation.
+Turnkey supports multiple build systems through abstraction layers that separate
+build-system-agnostic specifications from build-system-specific rule generation.
 
 ## Overview
 
 The abstraction pattern allows:
 
-1. **Single source of truth** - Dependency specifications remain build-system-agnostic
-2. **Pluggable generators** - Each build system implements its own rule generation
-3. **Easy extensibility** - Adding new build systems requires only implementing generator protocols
+1. **Single source of truth** - Dependency specifications remain
+   build-system-agnostic
+2. **Pluggable generators** - Each build system implements its own rule
+   generation
+3. **Easy extensibility** - Adding new build systems requires only implementing
+   generator protocols
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Generic Specification                         │
+│                   Generic Specification                         │
 │  (NativeLibrarySpec, CellInfo, etc.)                            │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -34,12 +38,13 @@ The abstraction pattern allows:
 
 ### The Problem
 
-Pre-compiled native libraries (like ring's crypto code) need different rules for each build system:
+Pre-compiled native libraries (like ring's crypto code) need different rules for
+each build system:
 
-| Build System | Rule Type | Example |
-|--------------|-----------|---------|
-| Buck2 | `prebuilt_cxx_library` + `export_file` | Static linking with visibility |
-| Bazel | `cc_import` | Native C/C++ import |
+| Build System | Rule Type                              | Example                        |
+| ------------ | -------------------------------------- | ------------------------------ |
+| Buck2        | `prebuilt_cxx_library` + `export_file` | Static linking with visibility |
+| Bazel        | `cc_import`                            | Native C/C++ import            |
 
 ### The Abstraction
 
@@ -57,7 +62,8 @@ class NativeLibrarySpec:
     link_search_path: str   # Rustc -L path (default: "out_dir")
 ```
 
-This contains only the information needed to describe the library, not how to build it.
+This contains only the information needed to describe the library, not how to
+build it.
 
 #### NativeLibraryGenerator Protocol
 
@@ -128,6 +134,7 @@ class Buck2NativeLibraryGenerator:
 ```
 
 **Generated output:**
+
 ```starlark
 export_file(
     name = "ring_core_0_17_14___file",
@@ -170,6 +177,7 @@ class BazelNativeLibraryGenerator:
 ```
 
 **Generated output:**
+
 ```starlark
 cc_import(
     name = "ring_core_0_17_14__",
@@ -180,12 +188,12 @@ cc_import(
 
 ### File Locations
 
-| File | Purpose |
-|------|---------|
-| `src/python/buildsystem/__init__.py` | Module exports |
+| File                                       | Purpose                                                         |
+| ------------------------------------------ | --------------------------------------------------------------- |
+| `src/python/buildsystem/__init__.py`       | Module exports                                                  |
 | `src/python/buildsystem/native_library.py` | `NativeLibrarySpec`, `GeneratedRules`, `NativeLibraryGenerator` |
-| `src/python/buildsystem/buck2.py` | Buck2 implementation |
-| `src/python/buildsystem/bazel.py` | Bazel implementation (proof of concept) |
+| `src/python/buildsystem/buck2.py`          | Buck2 implementation                                            |
+| `src/python/buildsystem/bazel.py`          | Bazel implementation (proof of concept)                         |
 
 ### Usage in Generator
 
@@ -307,7 +315,10 @@ pub fn layout_by_name(name: &str) -> Option<BoxedLayout> {
 
 ## Design Principles
 
-1. **Specification vs Generation** - Keep specifications generic, push build-system details to generators
+1. **Specification vs Generation** - Keep specifications generic, push
+   build-system details to generators
 2. **Protocol-based** - Use protocols/traits for loose coupling
-3. **Singleton instances** - Generators are stateless, use module-level instances
-4. **Incremental adoption** - New build systems can be added without changing existing code
+3. **Singleton instances** - Generators are stateless, use module-level
+   instances
+4. **Incremental adoption** - New build systems can be added without changing
+   existing code
