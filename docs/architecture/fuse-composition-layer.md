@@ -327,18 +327,31 @@ Example: A patch to `vendor/serde@1.0.219/src/lib.rs` would be named:
 
 ### 4. Platform Backends
 
-**Linux (fuser):**
-- Native FUSE via `/dev/fuse`
-- Uses `fusermount3` or `fusermount` for unmount
-- No external dependencies (FUSE is typically available)
-- Best performance
+Both platforms share a platform-agnostic `FsCore` module that has **zero dependency on the `fuser` crate**. Each backend converts between its own FUSE API types and `FsCore`'s neutral types (`u64` inodes, `FsAttr`, `ResolvedPath`).
 
-**macOS (FUSE-T):**
-- NFS-based, no kernel extension required
-- Works on Apple Silicon (M1/M2/M3)
+**Linux (fuser crate):**
+- Native FUSE via `/dev/fuse` using the pure-Rust `fuser` crate (v0.17)
+- Low-level inode-based API: `CompositionFs` implements `fuser::Filesystem`
+- Uses `fusermount3` or `fusermount` for unmount
+- No external C dependencies
+- Best performance
+- Feature flag: `fuse` (enables `dep:fuser`)
+
+**macOS (FUSE-T with direct libfuse3 FFI):**
+- Direct hand-written FFI bindings to libfuse3 (`fuse_t/bindings.rs`)
+- High-level path-based API: callbacks in `fuse_t/operations.rs` use `FsCore::resolve_path()`
+- NFS-based under the hood (FUSE-T translates to NFS), no kernel extension required
+- Works on Apple Silicon (M1/M2/M3/M4)
 - Uses standard `umount` for unmount
 - Installation: `brew install macos-fuse-t/homebrew-cask/fuse-t`
-- Slightly higher latency due to NFS layer
+- Feature flag: `fuse-t` (only `dep:libc`, links against `libfuse3.dylib`)
+
+**Why not use `fuser` on macOS?** The `fuser` crate reads the FUSE file descriptor directly via its own event loop. FUSE-T replaces `/dev/fuse` with a Unix socket connected to an NFS server (`go-nfsv4`). The socket speaks FUSE-T's internal protocol, not the kernel FUSE protocol that `fuser` expects. Using libfuse3's own `fuse_loop()` handles this correctly.
+
+**FUSE-T implementation notes:**
+- `fuse_get_context()->private_data` does not reliably pass user data through. A global `AtomicPtr<FsCore>` is used instead.
+- `readdir` filler calls must pass null stat buffers. FUSE-T's NFS layer rejects certain stat formats.
+- The `fuse_operations` struct must be exactly 352 bytes (44 function pointers) including newer `statx` and `syncfs` fields.
 
 **Platform detection** (`platform.rs`):
 ```rust

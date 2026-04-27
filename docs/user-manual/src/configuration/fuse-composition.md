@@ -309,11 +309,26 @@ Configure your workspace to use the FUSE mount:
 
 Set the project root to the FUSE mount point for consistent path resolution.
 
-## Performance Notes
+## Platform Notes
 
-- **Linux**: Native FUSE with minimal overhead
-- **macOS**: FUSE-T uses NFS, slightly higher latency
-- **Symlinks**: Fastest for CI, no daemon overhead
+### Linux
+
+Uses native FUSE via `/dev/fuse` with the `fuser` Rust crate. Minimal overhead, best performance.
+
+### macOS
+
+Uses FUSE-T with direct C FFI bindings to libfuse3. FUSE-T translates FUSE operations to NFS internally, so there is slightly higher latency than native FUSE. No kernel extension is required — FUSE-T works on Apple Silicon without Recovery Mode.
+
+Install with:
+```bash
+brew install macos-fuse-t/homebrew-cask/fuse-t
+```
+
+### Symlinks (CI / Fallback)
+
+Fastest for CI, no daemon overhead. Automatically selected when FUSE is unavailable.
+
+## Performance Notes
 
 For large codebases, consider:
 - Using SSD/NVMe storage for the Nix store

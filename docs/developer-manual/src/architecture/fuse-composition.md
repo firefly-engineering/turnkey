@@ -108,38 +108,78 @@ src/rust/composition/src/
 ├── tracing.rs       # Logging and debugging
 ├── watcher.rs       # File watching (optional)
 └── fuse/            # FUSE backend (feature-gated)
-    ├── mod.rs
-    ├── filesystem.rs
-    ├── platform.rs
-    └── ...
+    ├── mod.rs               # Re-exports FuseBackend (platform-conditional)
+    ├── fs_core.rs           # Platform-agnostic filesystem logic (no fuser dependency)
+    ├── platform.rs          # Platform detection and FUSE availability checking
+    ├── filesystem.rs        # Linux: fuser Filesystem trait impl (wraps FsCore)
+    ├── backend.rs           # Linux: FuseBackend using fuser crate
+    ├── edit_overlay.rs      # Copy-on-write editing layer
+    ├── patch_generator.rs   # Unified diff generation for edits
+    └── fuse_t/              # macOS: direct libfuse-t backend
+        ├── mod.rs
+        ├── bindings.rs      # Hand-written FFI bindings to libfuse3
+        ├── operations.rs    # FUSE operation callbacks (path-based API)
+        └── backend.rs       # FuseTBackend implementing CompositionBackend
 ```
 
 ## FUSE Backend Implementation
 
-The FUSE backend (`src/rust/composition/src/fuse/`) implements the composition filesystem:
+The FUSE backend uses a layered architecture with a platform-agnostic core and platform-specific adapters.
 
-### Inode Management
+### FsCore (Platform-Agnostic)
 
-The filesystem uses an inode-based approach:
-- Root inode (1) represents the mount point
-- Source directory has a dedicated inode
-- Each cell gets a range of inodes
-- Virtual files (config) get special inodes
+`FsCore` (`fs_core.rs`) contains all filesystem logic with **zero dependency on the `fuser` crate**:
 
-### File Operations
+- **Path resolution**: `resolve_path(path) -> ResolvedPath` maps FUSE paths to logical locations (Root, Source, CellPrefix, Cell, VirtualFile, etc.)
+- **Inode management**: Allocation, mapping, and lookup using plain `u64` inode numbers
+- **Virtual file generation**: `.buckconfig` and `.buckroot` content
+- **Policy checking**: Access control during dependency updates
+- **Edit overlay**: Copy-on-write editing of external dependencies
 
-Key FUSE operations:
-- `lookup` - Resolve path to inode
-- `getattr` - Get file attributes
-- `read` - Read file content
-- `readdir` - List directory entries
-- `readlink` - Read symlink target
+Both the Linux and macOS backends delegate to `FsCore` for all filesystem logic, converting between their own FUSE types and FsCore's neutral types.
 
-### Platform Abstraction
+### Linux Backend (fuser crate)
 
-Platform-specific code is isolated in `platform.rs`:
-- Linux: Native FUSE via `/dev/fuse`
-- macOS: FUSE-T via NFS emulation
+Uses the `fuser` crate's low-level inode-based API:
+- `CompositionFs` wraps `FsCore` and implements `fuser::Filesystem`
+- Converts between `fuser::INodeNo`/`FileAttr` and FsCore's `u64`/`FsAttr`
+- Feature flag: `fuse` (enables `dep:fuser`)
+
+### macOS Backend (FUSE-T FFI)
+
+Uses direct C FFI to FUSE-T's libfuse3, bypassing the `fuser` crate entirely. This is necessary because `fuser` reads the FUSE file descriptor directly, which is incompatible with FUSE-T's NFS-based socket protocol.
+
+- **`bindings.rs`**: Hand-written FFI bindings to libfuse3 (44-field `fuse_operations` struct at 352 bytes, `fuse_new`, `fuse_mount`, `fuse_loop`, etc.)
+- **`operations.rs`**: `extern "C"` callbacks using the high-level path-based API. Each callback retrieves `FsCore` via a global `AtomicPtr` and delegates to `resolve_path()`
+- **`backend.rs`**: `FuseTBackend` spawns a thread calling `fuse_new` + `fuse_mount` + `fuse_loop`
+- Feature flag: `fuse-t` (only `dep:libc` needed)
+- Links against `/usr/local/lib/libfuse3.dylib` (from FUSE-T)
+
+**FUSE-T quirks discovered during implementation:**
+- `fuse_get_context()->private_data` does not reliably pass the `user_data` from `fuse_new`. A global `AtomicPtr<FsCore>` is used instead.
+- `readdir` filler must pass null for the stat buffer. FUSE-T's NFS translation rejects certain stat formats with "RPC struct is bad".
+- The `fuse_operations` struct must include the newer `statx` and `syncfs` fields even if unused, to match the 352-byte C ABI.
+
+### Conditional Compilation
+
+Platform selection happens at compile time:
+
+```rust
+// In fuse/mod.rs:
+#[cfg(target_os = "linux")]
+pub use backend::FuseBackend;           // fuser-based
+
+#[cfg(target_os = "macos")]
+pub use fuse_t::backend::FuseTBackend as FuseBackend;  // libfuse-t FFI
+```
+
+The `selector.rs` gates on `#[cfg(any(feature = "fuse", feature = "fuse-t"))]` so both feature flags enable the FUSE code path.
+
+### Platform Detection
+
+Runtime FUSE availability checking in `platform.rs`:
+- **Linux**: Checks for `/dev/fuse`
+- **macOS**: Checks for FUSE-T bundle (`/Library/Filesystems/fuse-t.fs`) or library (`/usr/local/lib/libfuse-t.dylib`)
 
 ## Recovery System
 
@@ -237,7 +277,11 @@ cargo test -p composition
 Test with actual FUSE mounts (requires FUSE):
 
 ```bash
+# Linux
 cargo test -p composition --features fuse -- --ignored
+
+# macOS (FUSE-T)
+cargo test -p composition --features fuse-t -- --ignored
 ```
 
 ### Mock Backend
