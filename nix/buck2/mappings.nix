@@ -275,7 +275,12 @@
 
   jj = {
     skip = true;
-    reason = "Jujutsu VCS tool";
+    reason = "Jujutsu VCS tool, bundled in vcs-toolchain";
+  };
+
+  vcs-toolchain = {
+    skip = true;
+    reason = "VCS meta-package (jj, git, gh, difftastic, delta)";
   };
 
   clang = {
