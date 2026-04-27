@@ -3,7 +3,9 @@
   "blocked_by": [
     "turnkey-x8l5.2"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-x8l5.3"
+  ],
   "created": "2026-04-27T18:17:41Z",
   "description": "Run buck2 build //... from /firefly/turnkey/root/ (the FUSE mount) and verify all targets build correctly. The virtual .buckconfig and .buckroot must be correct, and cell paths under external/ must be accessible to Buck2 actions.",
   "id": "turnkey-x8l5.4",
