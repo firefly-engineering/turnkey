@@ -5,14 +5,15 @@
     "turnkey-eii.2",
     "turnkey-eii.3"
   ],
+  "closed_at": "2026-04-27T13:44:44Z",
   "created": "2026-04-27T13:37:12Z",
   "description": "Extract platform-agnostic filesystem logic from CompositionFs into FsCore struct. FsCore handles path resolution, virtual file generation, inode allocation, policy checking, edit overlay. Define platform-neutral FsAttr and ResolvedPath types. CompositionFs becomes a thin fuser adapter wrapping FsCore. Must not break existing tests.",
   "id": "turnkey-eii.1",
   "labels": [],
   "parent": "turnkey-eii",
   "priority": 1,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Extract FsCore from CompositionFs",
   "type": "task",
-  "updated_at": "2026-04-27T13:37:38Z"
+  "updated_at": "2026-04-27T13:44:44Z"
 }
