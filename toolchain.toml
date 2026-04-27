@@ -1,5 +1,5 @@
 # Turnkey toolchain declaration
-# Uses versioned toolchain meta-packages from toolbox where possible
+# Uses versioned toolchain meta-packages from toolbox
 
 [toolchains]
 # Build tools
@@ -7,11 +7,11 @@ buck2 = {}
 
 # Language toolchains (versioned meta-packages from toolbox)
 # Each bundles the compiler, LSP, linter, formatter, and related tools
-rust-toolchain = {}      # rust, rust-analyzer, cargo-edit (cargo/clippy/rustfmt ship with rust)
-go-toolchain = {}        # go, golangci-lint, gopls
-python-toolchain = {}    # python, uv, ruff, pytest
-typescript-toolchain = {} # typescript, nodejs, biome, bun
-solidity-toolchain = {}  # solc, foundry
+rust-toolchain = { version = "2" }      # rust 1.94, rust-analyzer, cargo-edit
+go-toolchain = { version = "3" }        # go 1.26.2, golangci-lint 2.11.3, gopls 0.21.1
+python-toolchain = { version = "3" }    # python 3.13.12, uv 0.11.6, ruff 0.15.6, pytest 9.0.3
+typescript-toolchain = { version = "1" } # typescript 6.0.3, nodejs 24.14.0, biome 2.4.7, bun 1.3.11
+solidity-toolchain = { version = "2" }  # solc 0.8.34, foundry v1.5.1
 
 # Buck2-specific tools
 reindeer = {}  # Generate Buck2 targets from Cargo.toml

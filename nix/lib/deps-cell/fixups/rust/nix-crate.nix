@@ -26,10 +26,14 @@
       linux = [
         "--cfg" "linux"
         "--cfg" "linux_android"
+        # Cap lints to warn: the nix crate uses #![deny(unused)] which breaks
+        # with newer rustc versions that detect more dead code (e.g., GetCString)
+        "--cap-lints" "warn"
       ];
       macos = [
         "--cfg" "apple_targets"
         "--cfg" "bsd"
+        "--cap-lints" "warn"
       ];
     };
   };

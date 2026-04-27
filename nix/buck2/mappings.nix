@@ -142,6 +142,111 @@
   };
 
   # ==========================================================================
+  # Language Toolchain Meta-Packages
+  # ==========================================================================
+  # These map *-toolchain meta-packages to the same Buck2 rules as their
+  # individual components, enabling toolchain.toml to use versioned
+  # meta-packages while still generating the correct Buck2 toolchains.
+
+  rust-toolchain = {
+    skip = false;
+    targets = [
+      {
+        name = "rust";
+        rule = "system_rust_toolchain";
+        load = "@prelude//toolchains:rust.bzl";
+        visibility = [ "PUBLIC" ];
+        attrs = {
+          default_edition = "2021";
+        };
+      }
+    ];
+    implicitDependencies = [
+      "cxx"
+      "python-toolchain"
+    ];
+  };
+
+  go-toolchain = {
+    skip = false;
+    targets = [
+      {
+        name = "go";
+        rule = "system_go_toolchain";
+        load = "@prelude//toolchains/go:system_go_toolchain.bzl";
+        visibility = [ "PUBLIC" ];
+      }
+      {
+        name = "go_bootstrap";
+        rule = "system_go_bootstrap_toolchain";
+        load = "@prelude//toolchains/go:system_go_bootstrap_toolchain.bzl";
+        visibility = [ "PUBLIC" ];
+      }
+    ];
+    implicitDependencies = [
+      "python-toolchain"
+      "cxx"
+    ];
+  };
+
+  python-toolchain = {
+    skip = false;
+    targets = [
+      {
+        name = "python_bootstrap";
+        rule = "system_python_bootstrap_toolchain";
+        load = "@prelude//toolchains:python.bzl";
+        visibility = [ "PUBLIC" ];
+      }
+      {
+        name = "python";
+        rule = "system_python_toolchain";
+        load = "@prelude//toolchains:python.bzl";
+        visibility = [ "PUBLIC" ];
+      }
+    ];
+    implicitDependencies = [ ];
+  };
+
+  typescript-toolchain = {
+    skip = false;
+    targets = [
+      {
+        name = "typescript";
+        rule = "system_typescript_toolchain";
+        load = "@prelude//typescript:toolchain.bzl";
+        visibility = [ "PUBLIC" ];
+        dynamicAttrs = registry: {
+          node_path = "${registry.nodejs}/bin/node";
+          tsc_path = "${registry.typescript}/lib/node_modules/typescript/bin/tsc";
+        };
+      }
+    ];
+    implicitDependencies = [ ];
+  };
+
+  solidity-toolchain = {
+    skip = false;
+    targets = [
+      {
+        name = "solc";
+        rule = "system_solidity_toolchain";
+        load = "@prelude//solidity:toolchain.bzl";
+        visibility = [ "PUBLIC" ];
+        dynamicAttrs = registry: {
+          solc_path = "${registry.solc}/bin/solc";
+          forge_path = "${registry.foundry}/bin/forge";
+          cast_path = "${registry.foundry}/bin/cast";
+          anvil_path = "${registry.foundry}/bin/anvil";
+          jq_path = "${registry.jq}/bin/jq";
+          soldeps_path = ".turnkey/soldeps";
+        };
+      }
+    ];
+    implicitDependencies = [ ];
+  };
+
+  # ==========================================================================
   # Non-Buck2 Tools (skipped)
   # ==========================================================================
 
@@ -181,6 +286,47 @@
   lld = {
     skip = true;
     reason = "LLVM linker, needed in PATH for rustc linking but not a toolchain rule";
+  };
+
+  # Tools bundled in toolchain meta-packages (skipped when used individually)
+  golangci-lint = {
+    skip = true;
+    reason = "Go linter, bundled in go-toolchain";
+  };
+
+  gopls = {
+    skip = true;
+    reason = "Go LSP server, bundled in go-toolchain";
+  };
+
+  cargo-edit = {
+    skip = true;
+    reason = "Cargo add/rm/upgrade, bundled in rust-toolchain";
+  };
+
+  rust-analyzer = {
+    skip = true;
+    reason = "Rust LSP server, bundled in rust-toolchain";
+  };
+
+  uv = {
+    skip = true;
+    reason = "Python package manager, bundled in python-toolchain";
+  };
+
+  ruff = {
+    skip = true;
+    reason = "Python linter/formatter, bundled in python-toolchain";
+  };
+
+  pytest = {
+    skip = true;
+    reason = "Python test runner, bundled in python-toolchain";
+  };
+
+  biome = {
+    skip = true;
+    reason = "JS/TS linter/formatter, bundled in typescript-toolchain";
   };
 
   # Rust dependency tool
