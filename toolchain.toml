@@ -21,7 +21,6 @@ jrsonnet = {}  # Jsonnet to JSON compiler (Rust implementation)
 
 # Development utilities (not Buck2 toolchains)
 nix = {}
-beads = {}
-beads-viewer = {}
+beadwork = {}
 jj = {}
 tk = {}  # Turnkey CLI wrapper for buck2 with auto-sync

@@ -675,9 +675,9 @@ The goal is to make toolchain management in Nix flakes as simple as declaring wh
 
 ---
 
-## Beads Workflow Integration
+## Beadwork Integration
 
-This project uses [beads_viewer](https://github.com/Dicklesworthstone/beads_viewer) for issue tracking. Issues are stored in `.beads/` and tracked in git.
+This project uses [beadwork](https://github.com/jallum/beadwork) for issue tracking. Run `bw prime` to get started.
 
 ### Essential Commands
 

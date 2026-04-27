@@ -268,14 +268,9 @@
   };
 
   # Development tools
-  beads = {
+  beadwork = {
     skip = true;
-    reason = "Issue tracking tool";
-  };
-
-  beads-viewer = {
-    skip = true;
-    reason = "Issue visualization tool";
+    reason = "Issue tracking tool (bw CLI + TUI)";
   };
 
   jj = {
