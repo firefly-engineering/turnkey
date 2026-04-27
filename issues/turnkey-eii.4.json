@@ -3,7 +3,9 @@
   "blocked_by": [
     "turnkey-eii.3"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-eii.5"
+  ],
   "created": "2026-04-27T13:37:12Z",
   "description": "Create FuseTBackend implementing CompositionBackend. mount() creates FsCore, builds fuse_args, populates fuse_operations, spawns thread calling fuse_new+fuse_mount+fuse_loop. unmount() calls platform unmount causing fuse_loop to return. Wire up status, state machine, should_stop flag.",
   "id": "turnkey-eii.4",
