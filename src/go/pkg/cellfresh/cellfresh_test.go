@@ -7,6 +7,12 @@ import (
 	"testing"
 )
 
+func TestMain(m *testing.M) {
+	// Override KillCommand so tests don't kill the real buck2 daemon
+	KillCommand = func() error { return nil }
+	os.Exit(m.Run())
+}
+
 func TestReadSymlinkTargets(t *testing.T) {
 	root := t.TempDir()
 

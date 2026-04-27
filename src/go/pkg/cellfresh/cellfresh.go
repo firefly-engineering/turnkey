@@ -182,10 +182,16 @@ func diffTargets(saved, current map[string]string) []string {
 	return changes
 }
 
-// killDaemon runs "buck2 kill". Errors are ignored (best-effort).
-func killDaemon() error {
+// KillCommand is the function used to kill the buck2 daemon.
+// Tests can override this to avoid killing the real daemon.
+var KillCommand = func() error {
 	cmd := exec.Command("buck2", "kill")
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+// killDaemon runs the kill command. Errors are ignored (best-effort).
+func killDaemon() error {
+	return KillCommand()
 }
