@@ -51,9 +51,11 @@ unsafe fn fill_dir_stat(stbuf: *mut libc::stat, ino: u64, uid: u32, gid: u32) {
     (*stbuf).st_ino = ino as libc::ino_t;
     (*stbuf).st_mode = libc::S_IFDIR | 0o755;
     (*stbuf).st_nlink = 2;
+    (*stbuf).st_size = 4096;
     (*stbuf).st_uid = uid;
     (*stbuf).st_gid = gid;
     (*stbuf).st_blksize = 4096;
+    (*stbuf).st_blocks = 8;
     (*stbuf).st_atime = now;
     (*stbuf).st_mtime = now;
     (*stbuf).st_ctime = now;
@@ -91,25 +93,59 @@ unsafe fn fill_stat_from_metadata(stbuf: *mut libc::stat, meta: &fs::Metadata) {
     (*stbuf).st_ctime = meta.ctime() as libc::time_t;
 }
 
-/// Call the filler function with a directory entry name.
-///
-/// Returns 0 on success, or -EIO if the CString conversion fails.
-unsafe fn call_filler(
+/// Call the filler function with a directory entry name and stat.
+unsafe fn call_filler_with_stat(
     buf: *mut c_void,
     filler: bindings::fuse_fill_dir_t,
     name: &str,
+    stbuf: *const libc::stat,
 ) -> c_int {
     let Ok(cname) = CString::new(name) else {
         return -libc::EIO;
     };
-    filler.unwrap()(
-        buf,
-        cname.as_ptr(),
-        ptr::null(),
-        0,
-        0, // no special flags
-    );
+    filler.unwrap()(buf, cname.as_ptr(), stbuf, 0, 0);
     0
+}
+
+/// Call filler for a directory entry.
+unsafe fn filler_dir(
+    buf: *mut c_void,
+    filler: bindings::fuse_fill_dir_t,
+    name: &str,
+    ino: u64,
+    uid: u32,
+    gid: u32,
+) -> c_int {
+    let mut st: libc::stat = std::mem::zeroed();
+    fill_dir_stat(&mut st, ino, uid, gid);
+    call_filler_with_stat(buf, filler, name, &st)
+}
+
+/// Call filler for a regular file entry.
+unsafe fn filler_file(
+    buf: *mut c_void,
+    filler: bindings::fuse_fill_dir_t,
+    name: &str,
+    ino: u64,
+    size: u64,
+    uid: u32,
+    gid: u32,
+) -> c_int {
+    let mut st: libc::stat = std::mem::zeroed();
+    fill_virtual_file_stat(&mut st, ino, size, uid, gid);
+    call_filler_with_stat(buf, filler, name, &st)
+}
+
+/// Call filler for a real filesystem entry.
+unsafe fn filler_real(
+    buf: *mut c_void,
+    filler: bindings::fuse_fill_dir_t,
+    name: &str,
+    meta: &fs::Metadata,
+) -> c_int {
+    let mut st: libc::stat = std::mem::zeroed();
+    fill_stat_from_metadata(&mut st, meta);
+    call_filler_with_stat(buf, filler, name, &st)
 }
 
 // ---------------------------------------------------------------------------
@@ -181,24 +217,31 @@ unsafe extern "C" fn fuse_readdir(
         Err(e) => return e,
     };
 
-    // Always add . and ..
-    call_filler(buf, filler, ".");
-    call_filler(buf, filler, "..");
+    let uid = core.uid;
+    let gid = core.gid;
 
     match core.resolve_path(path) {
         ResolvedPath::Root => {
-            call_filler(buf, filler, &core.config.source_dir_name);
-            call_filler(buf, filler, &core.config.cell_prefix);
+            filler_dir(buf, filler, ".", 1, uid, gid);
+            filler_dir(buf, filler, "..", 1, uid, gid);
+            filler_dir(buf, filler, &core.config.source_dir_name, 2, uid, gid);
+            filler_dir(buf, filler, &core.config.cell_prefix, 3, uid, gid);
             0
         }
         ResolvedPath::Source => {
-            call_filler(buf, filler, ".buckconfig");
-            call_filler(buf, filler, ".buckroot");
+            filler_dir(buf, filler, ".", 2, uid, gid);
+            filler_dir(buf, filler, "..", 1, uid, gid);
+            let bc = core.get_virtual_file_content(VirtualFile::BuckConfig);
+            let br = core.get_virtual_file_content(VirtualFile::BuckRoot);
+            filler_file(buf, filler, ".buckconfig", 4, bc.len() as u64, uid, gid);
+            filler_file(buf, filler, ".buckroot", 5, br.len() as u64, uid, gid);
             match fs::read_dir(&core.repo_root) {
                 Ok(entries) => {
                     for entry in entries.flatten() {
                         if let Some(name) = entry.file_name().to_str() {
-                            call_filler(buf, filler, name);
+                            if let Ok(meta) = entry.metadata() {
+                                filler_real(buf, filler, name, &meta);
+                            }
                         }
                     }
                     0
@@ -207,20 +250,39 @@ unsafe extern "C" fn fuse_readdir(
             }
         }
         ResolvedPath::CellPrefix => {
+            filler_dir(buf, filler, ".", 3, uid, gid);
+            filler_dir(buf, filler, "..", 1, uid, gid);
             let cell_paths = core.cell_paths.read().unwrap();
-            for name in cell_paths.keys() {
-                call_filler(buf, filler, name);
+            let mut ino = 100u64;
+            for (name, cell_source) in cell_paths.iter() {
+                if let Ok(meta) = fs::symlink_metadata(cell_source) {
+                    filler_real(buf, filler, name, &meta);
+                } else {
+                    filler_dir(buf, filler, name, ino, uid, gid);
+                }
+                ino += 1;
             }
             0
         }
         ResolvedPath::SourceChild { real_path }
         | ResolvedPath::Cell { real_path, .. }
         | ResolvedPath::CellChild { real_path, .. } => {
+            // . and .. for real directories — use real metadata
+            if let Ok(meta) = fs::symlink_metadata(&real_path) {
+                filler_real(buf, filler, ".", &meta);
+            }
+            if let Some(parent) = real_path.parent() {
+                if let Ok(meta) = fs::symlink_metadata(parent) {
+                    filler_real(buf, filler, "..", &meta);
+                }
+            }
             match fs::read_dir(&real_path) {
                 Ok(entries) => {
                     for entry in entries.flatten() {
                         if let Some(name) = entry.file_name().to_str() {
-                            call_filler(buf, filler, name);
+                            if let Ok(meta) = entry.metadata() {
+                                filler_real(buf, filler, name, &meta);
+                            }
                         }
                     }
                     0

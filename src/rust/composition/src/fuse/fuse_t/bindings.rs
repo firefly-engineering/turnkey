@@ -316,6 +316,16 @@ pub struct fuse_operations {
             fi: *mut fuse_file_info,
         ) -> libc::off_t,
     >,
+    pub statx: Option<
+        unsafe extern "C" fn(
+            path: *const c_char,
+            flags: c_int,
+            mask: c_int,
+            stxbuf: *mut c_void, // struct statx*
+            fi: *mut fuse_file_info,
+        ) -> c_int,
+    >,
+    pub syncfs: Option<unsafe extern "C" fn(path: *const c_char) -> c_int>,
 }
 
 impl fuse_operations {
@@ -372,5 +382,32 @@ mod tests {
         assert!(ops.getattr.is_none());
         assert!(ops.readdir.is_none());
         assert!(ops.init.is_none());
+    }
+
+    #[test]
+    fn test_fuse_operations_size() {
+        // Must match C: sizeof(struct fuse_operations) = 352 on arm64 macOS
+        let rust_size = std::mem::size_of::<fuse_operations>();
+        // The C struct has 44 function pointer fields = 44 * 8 = 352 bytes on 64-bit
+        assert_eq!(rust_size, 352, "fuse_operations size mismatch: Rust={rust_size} expected=352");
+    }
+
+    #[test]
+    fn test_fuse_operations_field_offsets() {
+        use std::mem;
+        let base = std::ptr::null::<fuse_operations>();
+        unsafe {
+            // Key field offsets must match the C struct
+            assert_eq!(std::ptr::addr_of!((*base).getattr) as usize, 0, "getattr offset");
+            assert_eq!(std::ptr::addr_of!((*base).readlink) as usize, 8, "readlink offset");
+            assert_eq!(std::ptr::addr_of!((*base).open) as usize, 96, "open offset");
+            assert_eq!(std::ptr::addr_of!((*base).read) as usize, 104, "read offset");
+            assert_eq!(std::ptr::addr_of!((*base).statfs) as usize, 120, "statfs offset");
+            assert_eq!(std::ptr::addr_of!((*base).opendir) as usize, 184, "opendir offset");
+            assert_eq!(std::ptr::addr_of!((*base).readdir) as usize, 192, "readdir offset");
+            assert_eq!(std::ptr::addr_of!((*base).releasedir) as usize, 200, "releasedir offset");
+            assert_eq!(std::ptr::addr_of!((*base).init) as usize, 216, "init offset");
+            assert_eq!(std::ptr::addr_of!((*base).destroy) as usize, 224, "destroy offset");
+        }
     }
 }
