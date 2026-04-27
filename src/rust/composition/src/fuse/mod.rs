@@ -37,13 +37,24 @@
 //!     └── ...
 //! ```
 
-mod backend;
 mod edit_overlay;
 pub mod fs_core;
 mod filesystem;
 mod patch_generator;
 pub mod platform;
 
+// Linux: fuser-based backend
+#[cfg(target_os = "linux")]
+mod backend;
+#[cfg(target_os = "linux")]
+pub use backend::FuseBackend;
+
+// macOS: direct libfuse-t FFI backend
+#[cfg(target_os = "macos")]
+pub mod fuse_t;
+#[cfg(target_os = "macos")]
+mod backend;
+#[cfg(target_os = "macos")]
 pub use backend::FuseBackend;
 pub use edit_overlay::{EditOverlay, EditedFileInfo};
 pub use patch_generator::{PatchGenerator, PatchInfo};

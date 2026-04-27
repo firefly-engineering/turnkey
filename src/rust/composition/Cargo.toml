@@ -7,13 +7,14 @@ description = "Composition backend trait for FUSE and symlink-based repository v
 [features]
 default = []
 fuse = ["dep:fuser", "dep:libc"]
+fuse-t = ["dep:libc"]
 watcher = ["dep:notify", "dep:notify-debouncer-mini"]
 
 [dependencies]
 log.workspace = true
 thiserror.workspace = true
 
-# Optional FUSE support (Linux only)
+# Optional FUSE support (Linux: fuser crate, macOS: direct libfuse3 FFI)
 fuser = { workspace = true, optional = true }
 libc = { workspace = true, optional = true }
 
