@@ -6,14 +6,15 @@
   "blocks": [
     "turnkey-eii.5"
   ],
+  "closed_at": "2026-04-27T14:12:56Z",
   "created": "2026-04-27T13:37:12Z",
   "description": "Create FuseTBackend implementing CompositionBackend. mount() creates FsCore, builds fuse_args, populates fuse_operations, spawns thread calling fuse_new+fuse_mount+fuse_loop. unmount() calls platform unmount causing fuse_loop to return. Wire up status, state machine, should_stop flag.",
   "id": "turnkey-eii.4",
   "labels": [],
   "parent": "turnkey-eii",
   "priority": 1,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Implement FuseTBackend for macOS",
   "type": "task",
-  "updated_at": "2026-04-27T14:03:43Z"
+  "updated_at": "2026-04-27T14:12:56Z"
 }
