@@ -4,6 +4,7 @@
     "turnkey-eii.5"
   ],
   "blocks": [],
+  "closed_at": "2026-04-27T14:32:18Z",
   "created": "2026-04-27T13:37:12Z",
   "description": "Build turnkey-composed, mount the repo at /firefly/turnkey or /tmp/turnkey-fuse-test, verify: ls shows root/ and external/ dirs, source files readable via root/, cell content accessible via external/, virtual .buckconfig present.",
   "id": "turnkey-eii.6",
@@ -16,8 +17,8 @@
     }
   ],
   "priority": 1,
-  "status": "open",
+  "status": "closed",
   "title": "End-to-end test: mount turnkey repo via FUSE-T",
   "type": "task",
-  "updated_at": "2026-04-27T14:26:49Z"
+  "updated_at": "2026-04-27T14:32:18Z"
 }
