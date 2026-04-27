@@ -36,28 +36,10 @@ jobs:
           nix develop .#docs --impure -c bash -c '
             set -euo pipefail
             mkdir -p _site
+            mdbook build docs/landing --dest-dir "$PWD/_site"
             mdbook build docs/user-manual --dest-dir "$PWD/_site/user-manual"
             mdbook build docs/developer-manual --dest-dir "$PWD/_site/developer-manual"
           '
-
-          cat > _site/index.html <<'HTML'
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="utf-8">
-            <title>Turnkey Documentation</title>
-            <style>
-              body { font-family: system-ui, sans-serif; max-width: 600px; margin: 80px auto; padding: 0 20px; }
-              a { display: block; margin: 12px 0; font-size: 1.2em; }
-            </style>
-          </head>
-          <body>
-            <h1>Turnkey Documentation</h1>
-            <a href="user-manual/">User Manual</a>
-            <a href="developer-manual/">Developer Manual</a>
-          </body>
-          </html>
-          HTML
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
