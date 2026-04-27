@@ -1,6 +1,9 @@
 # composition - CompositionBackend trait for FUSE and symlink backends
 load("@prelude//:rules.bzl", "rust_library", "rust_test")
 
+# Detect platform for conditional FUSE backend selection
+_IS_MACOS = host_info().os.is_macos
+
 # Base library without optional features
 rust_library(
     name = "composition",
@@ -13,25 +16,32 @@ rust_library(
     visibility = ["PUBLIC"],
 )
 
-# Full-featured library with fuse and watcher support
+# Full-featured library with FUSE and watcher support
+# - Linux: uses fuser crate (feature="fuse")
+# - macOS: uses direct libfuse3 FFI (feature="fuse-t")
 rust_library(
     name = "composition-full",
     crate = "composition",  # Keep the original crate name for imports
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
     rustc_flags = [
-        "--cfg", "feature=\"fuse\"",
+        "--cfg", "feature=\"fuse-t\"" if _IS_MACOS else "feature=\"fuse\"",
         "--cfg", "feature=\"watcher\"",
     ],
+    exported_linker_flags = [
+        "-L/usr/local/lib",
+        "-lfuse3",
+    ] if _IS_MACOS else [],
     deps = [
-        "rustdeps//vendor/fuser:fuser",
         "rustdeps//vendor/libc:libc",
         "rustdeps//vendor/log:log",
         # Use versioned target to match notify-debouncer-mini's dependency
         "rustdeps//vendor/notify@8.2.0:notify",
         "rustdeps//vendor/notify-debouncer-mini:notify-debouncer-mini",
         "rustdeps//vendor/thiserror:thiserror",
-    ],
+    ] + ([] if _IS_MACOS else [
+        "rustdeps//vendor/fuser:fuser",
+    ]),
     visibility = ["PUBLIC"],
 )
 
