@@ -6,14 +6,15 @@
   "blocks": [
     "turnkey-eii.6"
   ],
+  "closed_at": "2026-04-27T14:12:56Z",
   "created": "2026-04-27T13:37:12Z",
   "description": "Wire up cfg(target_os) to select FuseBackend: fuser on Linux, FuseTBackend on macOS. Add fuse-t feature flag to Cargo.toml. Update mod.rs, selector.rs. Ensure fuser dependency is Linux-only when using fuse-t on macOS.",
   "id": "turnkey-eii.5",
   "labels": [],
   "parent": "turnkey-eii",
   "priority": 1,
-  "status": "open",
+  "status": "closed",
   "title": "Conditional compilation and feature flags",
   "type": "task",
-  "updated_at": "2026-04-27T13:37:19Z"
+  "updated_at": "2026-04-27T14:12:56Z"
 }
