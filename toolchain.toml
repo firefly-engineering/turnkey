@@ -17,10 +17,10 @@ solidity-toolchain = { version = "2" }  # solc 0.8.34, foundry v1.5.1
 mdbook-toolchain = { version = "1" }   # mdbook 0.4.52, admonish, mermaid, footnote, graphviz
 
 # Data templating
-jrsonnet = {}  # Jsonnet to JSON compiler (Rust implementation)
+jrsonnet = { version = "0.5.0-pre96-test" }
 
 # Development utilities (not Buck2 toolchains)
-nix = {}
-beadwork = {}
-jj = {}
-tk = {}  # Turnkey CLI wrapper for buck2 with auto-sync
+nix = { version = "2.34.1" }
+beadwork = { version = "0.12.3" }
+jj = { version = "0.40.0" }
+tk = {}  # Turnkey CLI wrapper (provided by registryExtensions, not toolbox)
