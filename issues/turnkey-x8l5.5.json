@@ -4,14 +4,15 @@
   "blocks": [
     "turnkey-x8l5.3"
   ],
+  "closed_at": "2026-04-27T18:44:41Z",
   "created": "2026-04-27T18:17:41Z",
   "description": "The Nix package for turnkey-composed needs to handle DYLD_LIBRARY_PATH on macOS (for libfuse3 from FUSE-T) via a wrapper script or rpath. Users shouldn't need to set env vars manually.",
   "id": "turnkey-x8l5.5",
   "labels": [],
   "parent": "turnkey-x8l5",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Package turnkey-composed with proper library paths",
   "type": "task",
-  "updated_at": "2026-04-27T18:42:35Z"
+  "updated_at": "2026-04-27T18:44:41Z"
 }
