@@ -113,11 +113,13 @@ fn check_fuse_linux() -> FuseAvailability {
 
 /// Check FUSE availability on macOS (FUSE-T)
 fn check_fuse_macos() -> FuseAvailability {
-    // Check for FUSE-T installation
-    // FUSE-T installs to /Library/Filesystems/fuse-t.fs
-    let fuse_t_path = Path::new("/Library/Filesystems/fuse-t.fs");
+    // Check for FUSE-T installation via multiple methods:
+    // 1. Traditional bundle path (/Library/Filesystems/fuse-t.fs)
+    // 2. Homebrew-installed library (libfuse-t in /usr/local/lib or Homebrew prefix)
+    let fuse_t_bundle = Path::new("/Library/Filesystems/fuse-t.fs");
+    let fuse_t_lib = Path::new("/usr/local/lib/libfuse-t.dylib");
 
-    if fuse_t_path.exists() {
+    if fuse_t_bundle.exists() || fuse_t_lib.exists() {
         let version = get_fuse_t_version();
         FuseAvailability::Available {
             implementation: "FUSE-T".to_string(),
