@@ -257,10 +257,10 @@ name = "fsevent-sys"
 version = "4.1.0"
 hash = "sha256-PfLMG85SQoXBtucyODxK3LazK9hTC4GDf8SQy9fF3ZQ="
 
-[deps."fuser@0.16.0"]
+[deps."fuser@0.17.0"]
 name = "fuser"
-version = "0.16.0"
-hash = "sha256-KI7U2G0aAKg2YoID3z96NZBmcLQwcqu31j7/o4C2Uo0="
+version = "0.17.0"
+hash = "sha256-guEdsUZUbNogjzuFPxZLmtj13vLULirdkA0gcEocLL4="
 
 [deps."generic-array@0.14.7"]
 name = "generic-array"
@@ -417,6 +417,11 @@ name = "litemap"
 version = "0.8.1"
 hash = "sha256-AyYQHlD9WGEPpHlKQ1z+OfngdnXyROn8jUV0Akasp5o="
 
+[deps."lock_api@0.4.14"]
+name = "lock_api"
+version = "0.4.14"
+hash = "sha256-ipVhwVq4QLptiiOXmKsv8DpT42neGOcLbDrrpDpwRwk="
+
 [deps."log@0.4.29"]
 name = "log"
 version = "0.4.29"
@@ -427,6 +432,11 @@ name = "memchr"
 version = "2.7.6"
 hash = "sha256-l/ki8GnJL7IF0Wr2Q4J/NLNp/dm0iZXdrgj3mPbHeMc="
 
+[deps."memoffset@0.9.1"]
+name = "memoffset"
+version = "0.9.1"
+hash = "sha256-/5eTGh6ascAzNMo+VFCgGja8NNE6zFd/aZuFruMxjA4="
+
 [deps."miniz_oxide@0.8.9"]
 name = "miniz_oxide"
 version = "0.8.9"
@@ -436,11 +446,6 @@ hash = "sha256-5qDEpg82Ff7UyOP7Cjw98hIVqavGlO/+0Zf1PPvuKWg="
 name = "mio"
 version = "1.1.1"
 hash = "sha256-60gbal4SlMmbkNbQneSWVEDj7oenMeHW+vOFVrB6aSA="
-
-[deps."nix@0.29.0"]
-name = "nix"
-version = "0.29.0"
-hash = "sha256-/i4t+f0dhhCjoKnIju3sblhxx3Dkqa0VWnWz2SQLDbk="
 
 [deps."nix@0.30.1"]
 name = "nix"
@@ -472,6 +477,16 @@ name = "num-traits"
 version = "0.2.19"
 hash = "sha256-5L0mKAem8o1xs1FxPfdG39Eiogz5oKWWzEuYz1nJFUk="
 
+[deps."num_enum@0.7.6"]
+name = "num_enum"
+version = "0.7.6"
+hash = "sha256-5+5WYWpBM51eMqgt6hDEbTUKYSTmxyHj57GKrlrXqtg="
+
+[deps."num_enum_derive@0.7.6"]
+name = "num_enum_derive"
+version = "0.7.6"
+hash = "sha256-f0B+UAyEEZgdzeAYY5wYQUZCx+BAjpzVnb14oFh6tSY="
+
 [deps."objc2@0.6.3"]
 name = "objc2"
 version = "0.6.3"
@@ -502,10 +517,25 @@ name = "page_size"
 version = "0.6.0"
 hash = "sha256-iPgYbpgnZ9gOVWODIUvoWkLRr2IMavCjKr6SgOkWJM0="
 
+[deps."parking_lot@0.12.5"]
+name = "parking_lot"
+version = "0.12.5"
+hash = "sha256-kqQxmjJ/AeMVteOSbZBBDJb1IojTGZ79gmkPVrNjcFI="
+
+[deps."parking_lot_core@0.9.12"]
+name = "parking_lot_core"
+version = "0.9.12"
+hash = "sha256-EoLH+cNcdZnNTXHLU6St1b4fUYXyMfaWIEdHGivqv2g="
+
 [deps."percent-encoding@2.3.2"]
 name = "percent-encoding"
 version = "2.3.2"
 hash = "sha256-ZnFfa0N7wX+lUIIVdhW01XiDZRJuwapkhV0s0TRLyMo="
+
+[deps."pkg-config@0.3.33"]
+name = "pkg-config"
+version = "0.3.33"
+hash = "sha256-wkdChwOn8D1zz8qv3oanI2/G/j2LAF2B51XdUyv7dXM="
 
 [deps."portable-atomic@1.13.0"]
 name = "portable-atomic"
@@ -522,6 +552,11 @@ name = "potential_utf"
 version = "0.1.4"
 hash = "sha256-un3YCqmuyU79UA2sg3wwyrnnOeihDOkCuFubat6BcjU="
 
+[deps."proc-macro-crate@3.5.0"]
+name = "proc-macro-crate"
+version = "3.5.0"
+hash = "sha256-hPue0gIQMas4ULaS9uY7z4p67f2U7LuWF/rdSk0zLt0="
+
 [deps."proc-macro2@1.0.106"]
 name = "proc-macro2"
 version = "1.0.106"
@@ -537,10 +572,25 @@ name = "r-efi"
 version = "5.3.0"
 hash = "sha256-7GkIPnWzp+SYzzhAqzQYilnLagps+2djhdoa+ye7xfk="
 
+[deps."redox_syscall@0.5.18"]
+name = "redox_syscall"
+version = "0.5.18"
+hash = "sha256-kRyluNkTDBMk2wAP9UVqrgTantNDt2ggCIbmNT96fkk="
+
 [deps."redox_users@0.4.6"]
 name = "redox_users"
 version = "0.4.6"
 hash = "sha256-UZjo3l0Y7v6H68c9zh9ymWDuxlJ+nhWTa9l/UFMNpsI="
+
+[deps."ref-cast@1.0.25"]
+name = "ref-cast"
+version = "1.0.25"
+hash = "sha256-gKPL6ydoagnvB/zPVnMltYx49FN+JOKFI8I9bglVuSs="
+
+[deps."ref-cast-impl@1.0.25"]
+name = "ref-cast-impl"
+version = "1.0.25"
+hash = "sha256-tRN51TXEZkrDEC7ZC2lJwOluNjm0D+U9vYq68EghqBs="
 
 [deps."regex@1.12.2"]
 name = "regex"
@@ -596,6 +646,11 @@ hash = "sha256-vx4h6NPBZLJxlyAboIz1INpbAZuTIw2BHXnaEgAFs7M="
 name = "saphyr-parser-bw"
 version = "0.0.601"
 hash = "sha256-qLhOnjUIsOfP1GVZavEW77FEUN9G4/zOhsra8Dp+cy0="
+
+[deps."scopeguard@1.2.0"]
+name = "scopeguard"
+version = "1.2.0"
+hash = "sha256-1xO+CU6/LFPa/L4ysLG8FKJyCZt29/YaqraoltEsTbc="
 
 [deps."semver@1.0.27"]
 name = "semver"
@@ -727,10 +782,25 @@ name = "toml_datetime"
 version = "0.6.11"
 hash = "sha256-rK7c9GQXKTCJ0hVjloFvcSkQWIpCKcNmiOA02BVd++w="
 
+[deps."toml_datetime@1.1.1+spec-1.1.0"]
+name = "toml_datetime"
+version = "1.1.1+spec-1.1.0"
+hash = "sha256-PSBu0Ngx00aXyZyCxetPjT2YinLFRQpN3WVaRenAkRE="
+
 [deps."toml_edit@0.22.27"]
 name = "toml_edit"
 version = "0.22.27"
 hash = "sha256-iK1BPbvNHq0hbYMDFNQUV+uZJD5XRkMC+onZDgxAHqA="
+
+[deps."toml_edit@0.25.11+spec-1.1.0"]
+name = "toml_edit"
+version = "0.25.11+spec-1.1.0"
+hash = "sha256-6hLIiG6e9BXoTKiFgx4Iwx8h2e+8fegT4tFq59mEPeE="
+
+[deps."toml_parser@1.1.2+spec-1.1.0"]
+name = "toml_parser"
+version = "1.1.2+spec-1.1.0"
+hash = "sha256-yscDp7RzbUlBHfqO46yWDgE02C5UFS3Ar+jquJVKEqU="
 
 [deps."toml_write@0.1.2"]
 name = "toml_write"
@@ -1071,6 +1141,11 @@ hash = "sha256-FNow0xAL/XJlIsVvSgFaWURDd2///5IZVUKuKmE9F8M="
 name = "winnow"
 version = "0.7.14"
 hash = "sha256-JN9ee/tr7phsmUtc4EpXOqzbeuornL/HMWLHyDNccPk="
+
+[deps."winnow@1.0.2"]
+name = "winnow"
+version = "1.0.2"
+hash = "sha256-edmob7ubNbcWrWLuiNKEFEC7IY6YIoVMLIaAd3y6/dI="
 
 [deps."wit-bindgen@0.51.0"]
 name = "wit-bindgen"
