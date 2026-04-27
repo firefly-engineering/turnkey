@@ -6,14 +6,15 @@
   "blocks": [
     "turnkey-x8l5.4"
   ],
+  "closed_at": "2026-04-27T18:45:47Z",
   "created": "2026-04-27T18:17:41Z",
   "description": "Wire the composition daemon to read cell configuration and expose actual Nix store paths under external/. Currently the daemon mounts with zero cells. It needs to present godeps, rustdeps, pydeps, etc. from the Nix store paths declared in the config file.",
   "id": "turnkey-x8l5.2",
   "labels": [],
   "parent": "turnkey-x8l5",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Populate external/ cells from config",
   "type": "task",
-  "updated_at": "2026-04-27T18:44:48Z"
+  "updated_at": "2026-04-27T18:45:47Z"
 }
