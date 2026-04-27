@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [
     "turnkey-eii.1"
   ],
@@ -12,8 +12,8 @@
   "labels": [],
   "parent": "turnkey-eii",
   "priority": 1,
-  "status": "open",
+  "status": "in_progress",
   "title": "Hand-written FFI bindings for libfuse3",
   "type": "task",
-  "updated_at": "2026-04-27T13:37:19Z"
+  "updated_at": "2026-04-27T13:48:36Z"
 }
