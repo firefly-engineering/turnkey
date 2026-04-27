@@ -3,7 +3,7 @@
 
 [toolchains]
 # Build tools
-buck2 = {}
+buck2-toolchain = { version = "3" }    # buck2 2026-04-15, reindeer 2026.04.27.00
 
 # Language toolchains (versioned meta-packages from toolbox)
 # Each bundles the compiler, LSP, linter, formatter, and related tools
@@ -13,11 +13,8 @@ python-toolchain = { version = "3" }    # python 3.13.12, uv 0.11.6, ruff 0.15.6
 typescript-toolchain = { version = "1" } # typescript 6.0.3, nodejs 24.14.0, biome 2.4.7, bun 1.3.11
 solidity-toolchain = { version = "2" }  # solc 0.8.34, foundry v1.5.1
 
-# Buck2-specific tools
-reindeer = {}  # Generate Buck2 targets from Cargo.toml
-
 # Documentation tools
-mdbook = {}
+mdbook-toolchain = { version = "1" }   # mdbook 0.4.52, admonish, mermaid, footnote, graphviz
 
 # Data templating
 jrsonnet = {}  # Jsonnet to JSON compiler (Rust implementation)
