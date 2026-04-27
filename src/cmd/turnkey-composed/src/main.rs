@@ -19,6 +19,7 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use composition::watcher::{ManifestWatcher, WatcherConfig, WatcherEvent};
+use composition::compose_config::ComposeFile;
 use composition::{create_backend, BackendType, CompositionConfig};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
@@ -52,13 +53,20 @@ struct Cli {
 enum Commands {
     /// Start the daemon and mount the composition view
     Start {
+        /// Path to compose.toml config file
+        ///
+        /// If provided, mount point, repo root, and cells are read from this file.
+        /// CLI flags --mount-point and --repo-root override the config file values.
+        #[arg(long)]
+        config: Option<PathBuf>,
+
         /// Mount point for the composition view
         #[arg(long)]
-        mount_point: PathBuf,
+        mount_point: Option<PathBuf>,
 
         /// Repository root path
         #[arg(long)]
-        repo_root: PathBuf,
+        repo_root: Option<PathBuf>,
 
         /// Backend type: auto, fuse, or symlink
         ///
@@ -120,6 +128,7 @@ fn main() -> Result<()> {
 
     match cli.command {
         Commands::Start {
+            config,
             mount_point,
             repo_root,
             backend,
@@ -135,10 +144,32 @@ fn main() -> Result<()> {
                 )
             })?;
 
+            // Build composition config from file and/or CLI flags
+            let composition_config = if let Some(config_path) = config {
+                let compose = ComposeFile::read(&config_path)
+                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+                let mut cfg = compose.into_composition_config();
+                // CLI flags override config file
+                if let Some(mp) = mount_point {
+                    cfg.mount_point = mp;
+                }
+                if let Some(rr) = repo_root {
+                    cfg.repo_root = rr;
+                }
+                cfg
+            } else {
+                // No config file — require CLI flags
+                let mp = mount_point
+                    .ok_or_else(|| anyhow::anyhow!("--mount-point or --config is required"))?;
+                let rr = repo_root
+                    .ok_or_else(|| anyhow::anyhow!("--repo-root or --config is required"))?;
+                CompositionConfig::new(&mp, &rr)
+            };
+
             if !foreground {
                 warn!("Daemonizing not yet implemented, running in foreground");
             }
-            run_daemon(&cli.socket, mount_point, repo_root, backend_type, !no_watch)
+            run_daemon(&cli.socket, composition_config, backend_type, !no_watch)
         }
         Commands::Stop => send_command(&cli.socket, IpcRequest::Stop),
         Commands::Status => send_command(&cli.socket, IpcRequest::Status),
@@ -149,8 +180,7 @@ fn main() -> Result<()> {
 /// Run the daemon process
 fn run_daemon(
     socket_path: &PathBuf,
-    mount_point: PathBuf,
-    repo_root: PathBuf,
+    config: CompositionConfig,
     backend_type: BackendType,
     enable_watch: bool,
 ) -> Result<()> {
@@ -175,9 +205,15 @@ fn run_daemon(
     })
     .context("Failed to set signal handler")?;
 
-    // Create composition config
-    let config = CompositionConfig::new(&mount_point, &repo_root);
-    // TODO: Load cell configuration from file
+    let mount_point = config.mount_point.clone();
+    let repo_root = config.repo_root.clone();
+
+    info!(
+        "Composition config: mount={}, repo={}, cells={}",
+        mount_point.display(),
+        repo_root.display(),
+        config.cells.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", ")
+    );
 
     // Create backend using automatic selection
     let mut backend = create_backend(backend_type, config)

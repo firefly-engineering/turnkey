@@ -283,8 +283,10 @@ dependencies = [
  "log",
  "notify",
  "notify-debouncer-mini",
+ "serde",
  "tempfile",
  "thiserror 2.0.18",
+ "toml",
 ]
 
 [[package]]

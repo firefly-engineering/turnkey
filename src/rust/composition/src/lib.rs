@@ -50,6 +50,7 @@
 use std::path::PathBuf;
 
 mod backend;
+pub mod compose_config;
 mod config;
 mod error;
 pub mod layout;
