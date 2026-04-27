@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-04-27T13:36:54Z",
+  "description": "Replace fuser crate on macOS with direct FFI to libfuse-t C API. fuser bypasses libfuse session loop and reads the FUSE fd directly, incompatible with FUSE-T NFS-based socket protocol. Use libfuse3 high-level API via hand-written FFI on macOS, keep fuser for Linux.",
+  "id": "turnkey-eii",
+  "labels": [],
+  "priority": 1,
+  "status": "open",
+  "title": "macOS FUSE-T direct backend - bypass fuser",
+  "type": "epic",
+  "updated_at": "2026-04-27T13:36:54Z"
+}
