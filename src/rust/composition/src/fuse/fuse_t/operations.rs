@@ -37,21 +37,41 @@ unsafe fn path_str<'a>(path: *const c_char) -> Result<&'a str, c_int> {
     CStr::from_ptr(path).to_str().map_err(|_| -libc::EINVAL)
 }
 
+/// Get current time as seconds since epoch.
+fn now_secs() -> libc::time_t {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as libc::time_t)
+        .unwrap_or(0)
+}
+
 /// Fill a `libc::stat` buffer with directory attributes.
-unsafe fn fill_dir_stat(stbuf: *mut libc::stat, uid: u32, gid: u32) {
+unsafe fn fill_dir_stat(stbuf: *mut libc::stat, ino: u64, uid: u32, gid: u32) {
+    let now = now_secs();
+    (*stbuf).st_ino = ino as libc::ino_t;
     (*stbuf).st_mode = libc::S_IFDIR | 0o755;
     (*stbuf).st_nlink = 2;
     (*stbuf).st_uid = uid;
     (*stbuf).st_gid = gid;
+    (*stbuf).st_blksize = 4096;
+    (*stbuf).st_atime = now;
+    (*stbuf).st_mtime = now;
+    (*stbuf).st_ctime = now;
 }
 
 /// Fill a `libc::stat` buffer with virtual-file attributes.
-unsafe fn fill_virtual_file_stat(stbuf: *mut libc::stat, size: u64, uid: u32, gid: u32) {
+unsafe fn fill_virtual_file_stat(stbuf: *mut libc::stat, ino: u64, size: u64, uid: u32, gid: u32) {
+    let now = now_secs();
+    (*stbuf).st_ino = ino as libc::ino_t;
     (*stbuf).st_mode = libc::S_IFREG | 0o444;
     (*stbuf).st_nlink = 1;
     (*stbuf).st_size = size as libc::off_t;
     (*stbuf).st_uid = uid;
     (*stbuf).st_gid = gid;
+    (*stbuf).st_blksize = 4096;
+    (*stbuf).st_atime = now;
+    (*stbuf).st_mtime = now;
+    (*stbuf).st_ctime = now;
 }
 
 /// Fill a `libc::stat` buffer from `fs::Metadata`.
@@ -87,7 +107,7 @@ unsafe fn call_filler(
         cname.as_ptr(),
         ptr::null(),
         0,
-        bindings::fuse_fill_dir_flags::FUSE_FILL_DIR_PLUS, // value doesn't matter with null stat + offset 0
+        0, // no special flags
     );
     0
 }
@@ -111,13 +131,25 @@ unsafe extern "C" fn fuse_getattr(
     ptr::write_bytes(stbuf, 0, 1);
 
     match core.resolve_path(path) {
-        ResolvedPath::Root | ResolvedPath::Source | ResolvedPath::CellPrefix => {
-            fill_dir_stat(stbuf, core.uid, core.gid);
+        ResolvedPath::Root => {
+            fill_dir_stat(stbuf, 1, core.uid, core.gid);
+            0
+        }
+        ResolvedPath::Source => {
+            fill_dir_stat(stbuf, 2, core.uid, core.gid);
+            0
+        }
+        ResolvedPath::CellPrefix => {
+            fill_dir_stat(stbuf, 3, core.uid, core.gid);
             0
         }
         ResolvedPath::VirtualFile { file } => {
+            let ino = match file {
+                VirtualFile::BuckConfig => 4,
+                VirtualFile::BuckRoot => 5,
+            };
             let content = core.get_virtual_file_content(file);
-            fill_virtual_file_stat(stbuf, content.len() as u64, core.uid, core.gid);
+            fill_virtual_file_stat(stbuf, ino, content.len() as u64, core.uid, core.gid);
             0
         }
         ResolvedPath::SourceChild { real_path }

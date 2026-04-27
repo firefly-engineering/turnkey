@@ -32,7 +32,7 @@ use log::info;
 
 use crate::{CompositionBackend, CompositionConfig, Error, Result, SymlinkBackend};
 
-#[cfg(feature = "fuse")]
+#[cfg(any(feature = "fuse", feature = "fuse-t"))]
 use crate::fuse::{check_fuse_availability, FuseAvailability, FuseBackend, Platform};
 
 /// Backend type for composition
@@ -97,7 +97,7 @@ pub struct BackendSelection {
 }
 
 /// Determine which backend to use based on request and availability
-#[cfg(feature = "fuse")]
+#[cfg(any(feature = "fuse", feature = "fuse-t"))]
 pub fn select_backend(requested: BackendType) -> BackendSelection {
     match requested {
         BackendType::Fuse => BackendSelection {
@@ -158,7 +158,7 @@ pub fn select_backend(requested: BackendType) -> BackendSelection {
 }
 
 /// Determine which backend to use (non-FUSE builds always use symlinks)
-#[cfg(not(feature = "fuse"))]
+#[cfg(not(any(feature = "fuse", feature = "fuse-t")))]
 pub fn select_backend(requested: BackendType) -> BackendSelection {
     match requested {
         BackendType::Fuse => BackendSelection {
@@ -211,7 +211,7 @@ pub fn create_backend(
 }
 
 /// Create a FUSE backend (or error if not available)
-#[cfg(feature = "fuse")]
+#[cfg(any(feature = "fuse", feature = "fuse-t"))]
 fn create_fuse_backend(config: CompositionConfig) -> Result<Box<dyn CompositionBackend>> {
     let availability = check_fuse_availability();
 
@@ -229,7 +229,7 @@ fn create_fuse_backend(config: CompositionConfig) -> Result<Box<dyn CompositionB
     }
 }
 
-#[cfg(not(feature = "fuse"))]
+#[cfg(not(any(feature = "fuse", feature = "fuse-t")))]
 fn create_fuse_backend(_config: CompositionConfig) -> Result<Box<dyn CompositionBackend>> {
     Err(Error::FuseUnavailable(
         "FUSE support not compiled in. Rebuild with --features fuse".to_string(),
@@ -240,18 +240,18 @@ fn create_fuse_backend(_config: CompositionConfig) -> Result<Box<dyn Composition
 ///
 /// This is a convenience function for checking FUSE availability without
 /// creating a backend.
-#[cfg(feature = "fuse")]
+#[cfg(any(feature = "fuse", feature = "fuse-t"))]
 pub fn is_fuse_available() -> bool {
     check_fuse_availability().is_available()
 }
 
-#[cfg(not(feature = "fuse"))]
+#[cfg(not(any(feature = "fuse", feature = "fuse-t")))]
 pub fn is_fuse_available() -> bool {
     false
 }
 
 /// Get installation instructions for FUSE on the current platform
-#[cfg(feature = "fuse")]
+#[cfg(any(feature = "fuse", feature = "fuse-t"))]
 pub fn fuse_install_instructions() -> Option<String> {
     match check_fuse_availability() {
         FuseAvailability::NotInstalled {
@@ -261,7 +261,7 @@ pub fn fuse_install_instructions() -> Option<String> {
     }
 }
 
-#[cfg(not(feature = "fuse"))]
+#[cfg(not(any(feature = "fuse", feature = "fuse-t")))]
 pub fn fuse_install_instructions() -> Option<String> {
     Some("FUSE support not compiled in. Rebuild with --features fuse".to_string())
 }

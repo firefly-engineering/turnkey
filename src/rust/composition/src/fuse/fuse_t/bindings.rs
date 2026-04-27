@@ -60,17 +60,12 @@ pub struct fuse_args {
     pub allocated: c_int,
 }
 
-/// Readdir flags
-#[repr(C)]
-pub enum fuse_readdir_flags {
-    FUSE_READDIR_PLUS = 1,
-}
+/// Readdir flags (passed as c_int)
+pub type fuse_readdir_flags = c_int;
 
-/// Fill dir flags
-#[repr(C)]
-pub enum fuse_fill_dir_flags {
-    FUSE_FILL_DIR_PLUS = 2,
-}
+/// Fill dir flags (passed as c_int, not a Rust enum, to avoid transmute panics)
+pub type fuse_fill_dir_flags = c_int;
+pub const FUSE_FILL_DIR_PLUS: fuse_fill_dir_flags = 2;
 
 /// fuse_fill_dir_t callback type for readdir
 pub type fuse_fill_dir_t = Option<
@@ -333,7 +328,7 @@ impl fuse_operations {
 
 // Link against FUSE-T's libfuse3
 #[link(name = "fuse3")]
-extern "C" {
+unsafe extern "C" {
     /// Create a new FUSE filesystem instance.
     /// We call the versioned symbol directly since fuse_new() is an inline wrapper.
     #[link_name = "fuse_new_30"]

@@ -62,7 +62,7 @@ mod status;
 pub mod symlink;
 pub mod tracing;
 
-#[cfg(feature = "fuse")]
+#[cfg(any(feature = "fuse", feature = "fuse-t"))]
 pub mod fuse;
 
 #[cfg(feature = "watcher")]
