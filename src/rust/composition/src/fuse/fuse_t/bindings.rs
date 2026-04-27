@@ -341,7 +341,8 @@ impl fuse_operations {
 unsafe extern "C" {
     /// Create a new FUSE filesystem instance.
     /// We call the versioned symbol directly since fuse_new() is an inline wrapper.
-    #[link_name = "fuse_new_30"]
+    /// Use _fuse_new_31 which supports the fuse3 readdir with flags parameter.
+    #[link_name = "fuse_new_31"]
     pub fn fuse_new(
         args: *mut fuse_args,
         op: *const fuse_operations,

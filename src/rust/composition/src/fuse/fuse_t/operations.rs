@@ -15,18 +15,30 @@ use std::ptr;
 use super::bindings;
 use crate::fuse::fs_core::{FsCore, ResolvedPath, VirtualFile};
 
+/// Global pointer to the FsCore instance.
+///
+/// FUSE-T's `fuse_get_context()->private_data` does not reliably point to
+/// our user_data, so we use a global instead. This is safe because only one
+/// FUSE session runs per process.
+static CORE_PTR: std::sync::atomic::AtomicPtr<FsCore> =
+    std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
+
+/// Set the global FsCore pointer. Must be called before fuse_loop.
+pub fn set_core(core: *const FsCore) {
+    CORE_PTR.store(core as *mut FsCore, std::sync::atomic::Ordering::Release);
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Retrieve `&FsCore` from the FUSE context's `private_data`.
+/// Retrieve `&FsCore` from the global pointer.
 ///
 /// # Safety
-/// Must only be called from within a FUSE callback where the context has been
-/// set up with a valid `FsCore` pointer as `private_data`.
+/// Must only be called after `set_core` has been called with a valid pointer
+/// that remains valid for the duration of the FUSE session.
 unsafe fn get_core<'a>() -> &'a FsCore {
-    let ctx = bindings::fuse_get_context();
-    &*((*ctx).private_data as *const FsCore)
+    &*CORE_PTR.load(std::sync::atomic::Ordering::Acquire)
 }
 
 /// Convert a C path pointer to a Rust `&str`.
@@ -166,7 +178,8 @@ unsafe extern "C" fn fuse_getattr(
     // Zero the stat buffer
     ptr::write_bytes(stbuf, 0, 1);
 
-    match core.resolve_path(path) {
+    let resolved = core.resolve_path(path);
+    match resolved {
         ResolvedPath::Root => {
             fill_dir_stat(stbuf, 1, core.uid, core.gid);
             0
@@ -217,31 +230,29 @@ unsafe extern "C" fn fuse_readdir(
         Err(e) => return e,
     };
 
-    let uid = core.uid;
-    let gid = core.gid;
+    let fill = |name: &str| {
+        if let Ok(cname) = CString::new(name) {
+            filler.unwrap()(buf, cname.as_ptr(), ptr::null(), 0, 0);
+        }
+    };
+
+    fill(".");
+    fill("..");
 
     match core.resolve_path(path) {
         ResolvedPath::Root => {
-            filler_dir(buf, filler, ".", 1, uid, gid);
-            filler_dir(buf, filler, "..", 1, uid, gid);
-            filler_dir(buf, filler, &core.config.source_dir_name, 2, uid, gid);
-            filler_dir(buf, filler, &core.config.cell_prefix, 3, uid, gid);
+            fill(&core.config.source_dir_name);
+            fill(&core.config.cell_prefix);
             0
         }
         ResolvedPath::Source => {
-            filler_dir(buf, filler, ".", 2, uid, gid);
-            filler_dir(buf, filler, "..", 1, uid, gid);
-            let bc = core.get_virtual_file_content(VirtualFile::BuckConfig);
-            let br = core.get_virtual_file_content(VirtualFile::BuckRoot);
-            filler_file(buf, filler, ".buckconfig", 4, bc.len() as u64, uid, gid);
-            filler_file(buf, filler, ".buckroot", 5, br.len() as u64, uid, gid);
+            fill(".buckconfig");
+            fill(".buckroot");
             match fs::read_dir(&core.repo_root) {
                 Ok(entries) => {
                     for entry in entries.flatten() {
                         if let Some(name) = entry.file_name().to_str() {
-                            if let Ok(meta) = entry.metadata() {
-                                filler_real(buf, filler, name, &meta);
-                            }
+                            fill(name);
                         }
                     }
                     0
@@ -250,39 +261,20 @@ unsafe extern "C" fn fuse_readdir(
             }
         }
         ResolvedPath::CellPrefix => {
-            filler_dir(buf, filler, ".", 3, uid, gid);
-            filler_dir(buf, filler, "..", 1, uid, gid);
             let cell_paths = core.cell_paths.read().unwrap();
-            let mut ino = 100u64;
-            for (name, cell_source) in cell_paths.iter() {
-                if let Ok(meta) = fs::symlink_metadata(cell_source) {
-                    filler_real(buf, filler, name, &meta);
-                } else {
-                    filler_dir(buf, filler, name, ino, uid, gid);
-                }
-                ino += 1;
+            for name in cell_paths.keys() {
+                fill(name);
             }
             0
         }
         ResolvedPath::SourceChild { real_path }
         | ResolvedPath::Cell { real_path, .. }
         | ResolvedPath::CellChild { real_path, .. } => {
-            // . and .. for real directories — use real metadata
-            if let Ok(meta) = fs::symlink_metadata(&real_path) {
-                filler_real(buf, filler, ".", &meta);
-            }
-            if let Some(parent) = real_path.parent() {
-                if let Ok(meta) = fs::symlink_metadata(parent) {
-                    filler_real(buf, filler, "..", &meta);
-                }
-            }
             match fs::read_dir(&real_path) {
                 Ok(entries) => {
                     for entry in entries.flatten() {
                         if let Some(name) = entry.file_name().to_str() {
-                            if let Ok(meta) = entry.metadata() {
-                                filler_real(buf, filler, name, &meta);
-                            }
+                            fill(name);
                         }
                     }
                     0
@@ -430,6 +422,13 @@ unsafe extern "C" fn fuse_destroy(_private_data: *mut c_void) {
 // Public API
 // ---------------------------------------------------------------------------
 
+unsafe extern "C" fn fuse_access(
+    _path: *const c_char,
+    _mask: c_int,
+) -> c_int {
+    0 // Allow all access
+}
+
 /// Build a `fuse_operations` struct populated with the implemented callbacks.
 pub fn build_operations() -> bindings::fuse_operations {
     let mut ops = bindings::fuse_operations::zeroed();
@@ -441,6 +440,7 @@ pub fn build_operations() -> bindings::fuse_operations {
     ops.read = Some(fuse_read);
     ops.readlink = Some(fuse_readlink);
     ops.statfs = Some(fuse_statfs);
+    ops.access = Some(fuse_access);
     ops.init = Some(fuse_init);
     ops.destroy = Some(fuse_destroy);
     ops

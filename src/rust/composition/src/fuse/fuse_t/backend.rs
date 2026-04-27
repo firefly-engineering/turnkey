@@ -110,6 +110,10 @@ impl CompositionBackend for FuseTBackend {
             let core = FsCore::new(config, repo_root, state_machine);
             let core_ptr = &core as *const FsCore as *mut c_void;
 
+            // Set the global pointer so callbacks can access FsCore
+            // (FUSE-T's private_data doesn't reliably pass our user_data through)
+            operations::set_core(&core as *const FsCore);
+
             // Build fuse_args: argv[0] = program name, then mount options
             let arg0 = CString::new("turnkey-composed").unwrap();
             let arg_ro = CString::new("-o").unwrap();
