@@ -12,6 +12,7 @@ rust_binary(
     ] if _IS_MACOS else [],
     deps = [
         "//src/rust/composition:composition-full",
+        "//src/rust/nix-eval:nix-eval",
         "rustdeps//vendor/anyhow:anyhow",
         "rustdeps//vendor/clap:clap",
         "rustdeps//vendor/ctrlc:ctrlc",

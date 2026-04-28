@@ -843,7 +843,7 @@ in
           shellDecl = builtins.fromTOML (builtins.readFile declarationFile);
           shellToolchains = if shellDecl ? toolchains then builtins.attrNames shellDecl.toolchains else [];
           # Only enable buck2 if the shell's toolchain actually declares it
-          shellNeedsBuck2 = cfg.buck2.enable && builtins.elem "buck2" shellToolchains;
+          shellNeedsBuck2 = cfg.buck2.enable && (builtins.elem "buck2" shellToolchains || builtins.elem "buck2-toolchain" shellToolchains);
         in
         {
         imports = [ ../../devenv/turnkey ];
