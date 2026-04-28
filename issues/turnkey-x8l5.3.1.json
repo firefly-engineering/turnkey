@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "turnkey-x8l5.3.2"
+  ],
   "created": "2026-04-28T06:09:50Z",
   "description": "Create serve_config.rs with [[mounts]] TOML format. Add 'serve' subcommand to daemon that reads ~/.config/turnkey/composed.toml and manages multiple mounts concurrently. Each mount gets its own cell discovery and FUSE backend.",
   "id": "turnkey-x8l5.3.1",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Multi-mount serve config and subcommand",
   "type": "task",
-  "updated_at": "2026-04-28T06:09:50Z"
+  "updated_at": "2026-04-28T06:09:58Z"
 }

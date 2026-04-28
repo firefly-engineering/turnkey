@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-x8l5.3.1"
+  ],
   "blocks": [],
   "created": "2026-04-28T06:09:50Z",
   "description": "Watch ~/.config/turnkey/composed.toml for changes. On change, diff the mount list: start new mounts, stop removed mounts, update changed mounts. No daemon restart needed.",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Config file watching with hot-reload",
   "type": "task",
-  "updated_at": "2026-04-28T06:09:50Z"
+  "updated_at": "2026-04-28T06:09:58Z"
 }
