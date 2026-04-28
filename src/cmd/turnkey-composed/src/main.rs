@@ -10,7 +10,7 @@
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -86,6 +86,16 @@ enum Commands {
         #[arg(long)]
         no_watch: bool,
     },
+    /// Run as a service, mounting all entries from config file
+    ///
+    /// Reads ~/.config/turnkey/composed.toml (or --config path) and manages
+    /// all mount entries concurrently. This is the subcommand that launchd/systemd runs.
+    Serve {
+        /// Path to service config file
+        #[arg(long, default_value_os_t = composition::serve_config::ServeConfig::default_path())]
+        config: PathBuf,
+    },
+
     /// Stop the daemon and unmount the composition view
     Stop,
     /// Query the daemon status
@@ -175,13 +185,149 @@ fn main() -> Result<()> {
             }
             run_daemon(&cli.socket, composition_config, backend_type, !no_watch)
         }
+        Commands::Serve { config } => run_serve(&config),
         Commands::Stop => send_command(&cli.socket, IpcRequest::Stop),
         Commands::Status => send_command(&cli.socket, IpcRequest::Status),
         Commands::Refresh => send_command(&cli.socket, IpcRequest::Refresh),
     }
 }
 
-/// Run the daemon process
+/// Run in service mode: manage multiple mounts from config file
+fn run_serve(config_path: &Path) -> Result<()> {
+    use composition::serve_config::ServeConfig;
+
+    info!("Reading service config from {:?}", config_path);
+    let config = ServeConfig::read(config_path)
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+    if config.mounts.is_empty() {
+        anyhow::bail!("No mounts configured in {:?}", config_path);
+    }
+
+    info!("Managing {} mount(s)", config.mounts.len());
+
+    // Set up signal handling
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+    ctrlc::set_handler(move || {
+        info!("Received shutdown signal");
+        r.store(false, Ordering::SeqCst);
+    })
+    .context("Failed to set signal handler")?;
+
+    // Start each mount in its own thread
+    let mut handles: Vec<(String, thread::JoinHandle<()>)> = Vec::new();
+    let mut backends: Vec<Arc<std::sync::Mutex<Box<dyn composition::CompositionBackend>>>> = Vec::new();
+
+    for entry in &config.mounts {
+        let backend_type = BackendType::from_str(&entry.backend).ok_or_else(|| {
+            anyhow::anyhow!("Invalid backend type '{}' for {:?}", entry.backend, entry.repo)
+        })?;
+
+        info!(
+            "Starting mount: {} -> {} (backend: {})",
+            entry.repo.display(),
+            entry.mount_point.display(),
+            entry.backend
+        );
+
+        // Discover and build cells
+        let nix = CliNixClient::new(&entry.repo);
+        let composition_config = discover::build_and_configure(&nix, &entry.mount_point, &entry.repo)
+            .map_err(|e| anyhow::anyhow!("Failed to discover cells for {:?}: {}", entry.repo, e))?;
+
+        // Create and mount backend
+        let mut backend = create_backend(backend_type, composition_config)
+            .with_context(|| format!("Failed to create backend for {:?}", entry.repo))?;
+
+        backend.mount()
+            .with_context(|| format!("Failed to mount {:?}", entry.mount_point))?;
+
+        backend.wait_ready(Some(Duration::from_secs(10)))
+            .with_context(|| format!("Mount timed out for {:?}", entry.mount_point))?;
+
+        info!("Mounted {:?} at {:?}", entry.repo, entry.mount_point);
+
+        let backend = Arc::new(std::sync::Mutex::new(backend));
+        backends.push(backend.clone());
+
+        // Start manifest watcher in a thread
+        let repo_root = entry.repo.clone();
+        let mount_label = format!("{}", entry.mount_point.display());
+        let running_clone = running.clone();
+        let backend_clone = backend;
+
+        let handle = thread::spawn(move || {
+            let watcher_config = WatcherConfig::new(&repo_root).with_debounce(500);
+            let watcher = match ManifestWatcher::new(watcher_config) {
+                Ok(w) => Some(w),
+                Err(e) => {
+                    warn!("[{}] Failed to create watcher: {}", mount_label, e);
+                    None
+                }
+            };
+
+            while running_clone.load(Ordering::SeqCst) {
+                if let Some(ref w) = watcher {
+                    while let Some(event) = w.try_recv() {
+                        match event {
+                            WatcherEvent::ManifestChanged { manifest_name, .. } => {
+                                info!("[{}] Manifest changed: {}, rebuilding cells", mount_label, manifest_name);
+                                let nix = CliNixClient::new(&repo_root);
+                                match discover::build_all_cells(&nix, nix_eval::current_system()) {
+                                    Ok(cells) => {
+                                        info!("[{}] Rebuilt {} cells", mount_label, cells.len());
+                                        if let Ok(mut b) = backend_clone.lock() {
+                                            if let Err(e) = b.refresh() {
+                                                error!("[{}] Refresh failed: {}", mount_label, e);
+                                            }
+                                        }
+                                    }
+                                    Err(e) => error!("[{}] Cell rebuild failed: {}", mount_label, e),
+                                }
+                            }
+                            WatcherEvent::Error { message } => {
+                                warn!("[{}] Watcher error: {}", mount_label, message);
+                            }
+                        }
+                    }
+                }
+                thread::sleep(Duration::from_millis(100));
+            }
+        });
+
+        handles.push((entry.mount_point.display().to_string(), handle));
+    }
+
+    info!("All mounts ready. Waiting for shutdown signal...");
+
+    // Wait for shutdown
+    while running.load(Ordering::SeqCst) {
+        thread::sleep(Duration::from_millis(200));
+    }
+
+    // Cleanup: unmount all backends
+    info!("Shutting down...");
+    for backend in &backends {
+        if let Ok(mut b) = backend.lock() {
+            if let Err(e) = b.unmount() {
+                error!("Failed to unmount: {}", e);
+            }
+        }
+    }
+
+    // Wait for watcher threads
+    for (label, handle) in handles {
+        if let Err(_) = handle.join() {
+            error!("Watcher thread for {} panicked", label);
+        }
+    }
+
+    info!("All mounts stopped");
+    Ok(())
+}
+
+/// Run the daemon process (single mount)
 fn run_daemon(
     socket_path: &PathBuf,
     config: CompositionConfig,

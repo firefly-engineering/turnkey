@@ -54,6 +54,7 @@ pub mod compose_config;
 mod config;
 pub mod discover;
 mod error;
+pub mod serve_config;
 pub mod layout;
 pub mod performance;
 pub mod policy;

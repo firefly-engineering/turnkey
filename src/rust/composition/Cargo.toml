@@ -11,6 +11,7 @@ fuse-t = ["dep:libc"]
 watcher = ["dep:notify", "dep:notify-debouncer-mini"]
 
 [dependencies]
+dirs.workspace = true
 log.workspace = true
 nix-eval.workspace = true
 serde.workspace = true
