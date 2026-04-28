@@ -197,6 +197,7 @@ unsafe extern "C" fn fuse_getattr(
                 VirtualFile::BuckConfig => 4,
                 VirtualFile::BuckRoot => 5,
                 VirtualFile::Envrc => 6,
+                VirtualFile::RootCellBuckConfig => 7,
             };
             let content = core.get_virtual_file_content(file);
             fill_virtual_file_stat(stbuf, ino, content.len() as u64, core.uid, core.gid);
@@ -255,10 +256,16 @@ unsafe extern "C" fn fuse_readdir(
             0
         }
         ResolvedPath::Source => {
+            // Virtual .buckconfig for the root cell (sets buildfile name)
+            fill(".buckconfig");
             match fs::read_dir(&core.repo_root) {
                 Ok(entries) => {
                     for entry in entries.flatten() {
                         if let Some(name) = entry.file_name().to_str() {
+                            // Skip the real .buckconfig (virtual one takes precedence)
+                            if name == ".buckconfig" {
+                                continue;
+                            }
                             if !core.is_excluded(name) {
                                 fill(name);
                             }
