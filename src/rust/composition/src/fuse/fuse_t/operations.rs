@@ -433,6 +433,161 @@ unsafe extern "C" fn fuse_destroy(_private_data: *mut c_void) {
     // no-op: FsCore lifetime is managed by the caller
 }
 
+/// Check if a resolved path is writable (only output mounts are writable)
+fn is_writable(resolved: &ResolvedPath) -> bool {
+    matches!(resolved, ResolvedPath::OutputMount { .. } | ResolvedPath::OutputChild { .. })
+}
+
+/// Get the real path for a writable resolved path, or return EROFS
+fn writable_real_path(resolved: &ResolvedPath) -> Result<&std::path::Path, c_int> {
+    match resolved {
+        ResolvedPath::OutputMount { real_path } | ResolvedPath::OutputChild { real_path } => {
+            Ok(real_path)
+        }
+        _ => Err(-libc::EROFS),
+    }
+}
+
+unsafe extern "C" fn fuse_mkdir(
+    path: *const c_char,
+    mode: libc::mode_t,
+) -> c_int {
+    let core = get_core();
+    let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
+    let resolved = core.resolve_path(path);
+    let real = match writable_real_path(&resolved) { Ok(p) => p, Err(e) => return e };
+    match std::fs::create_dir(real) {
+        Ok(()) => 0,
+        Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+    }
+}
+
+unsafe extern "C" fn fuse_unlink(path: *const c_char) -> c_int {
+    let core = get_core();
+    let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
+    let resolved = core.resolve_path(path);
+    let real = match writable_real_path(&resolved) { Ok(p) => p, Err(e) => return e };
+    match std::fs::remove_file(real) {
+        Ok(()) => 0,
+        Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+    }
+}
+
+unsafe extern "C" fn fuse_rmdir(path: *const c_char) -> c_int {
+    let core = get_core();
+    let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
+    let resolved = core.resolve_path(path);
+    let real = match writable_real_path(&resolved) { Ok(p) => p, Err(e) => return e };
+    match std::fs::remove_dir(real) {
+        Ok(()) => 0,
+        Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+    }
+}
+
+unsafe extern "C" fn fuse_create(
+    path: *const c_char,
+    _mode: libc::mode_t,
+    fi: *mut bindings::fuse_file_info,
+) -> c_int {
+    let core = get_core();
+    let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
+    let resolved = core.resolve_path(path);
+    let real = match writable_real_path(&resolved) { Ok(p) => p, Err(e) => return e };
+    match std::fs::File::create(real) {
+        Ok(_) => 0,
+        Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+    }
+}
+
+unsafe extern "C" fn fuse_write(
+    path: *const c_char,
+    buf: *const c_char,
+    size: libc::size_t,
+    offset: libc::off_t,
+    _fi: *mut bindings::fuse_file_info,
+) -> c_int {
+    let core = get_core();
+    let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
+    let resolved = core.resolve_path(path);
+    let real = match writable_real_path(&resolved) { Ok(p) => p, Err(e) => return e };
+
+    use std::io::Write;
+    let mut file = match std::fs::OpenOptions::new().write(true).open(real) {
+        Ok(f) => f,
+        Err(e) => return -(e.raw_os_error().unwrap_or(libc::EIO)),
+    };
+    if let Err(e) = file.seek(SeekFrom::Start(offset as u64)) {
+        return -(e.raw_os_error().unwrap_or(libc::EIO));
+    }
+    let data = std::slice::from_raw_parts(buf as *const u8, size);
+    match file.write(data) {
+        Ok(n) => n as c_int,
+        Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+    }
+}
+
+unsafe extern "C" fn fuse_truncate(
+    path: *const c_char,
+    size: libc::off_t,
+    _fi: *mut bindings::fuse_file_info,
+) -> c_int {
+    let core = get_core();
+    let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
+    let resolved = core.resolve_path(path);
+    let real = match writable_real_path(&resolved) { Ok(p) => p, Err(e) => return e };
+    match std::fs::File::options().write(true).open(real) {
+        Ok(f) => match f.set_len(size as u64) {
+            Ok(()) => 0,
+            Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+        },
+        Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+    }
+}
+
+unsafe extern "C" fn fuse_chmod(
+    path: *const c_char,
+    _mode: libc::mode_t,
+    _fi: *mut bindings::fuse_file_info,
+) -> c_int {
+    let core = get_core();
+    let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
+    let resolved = core.resolve_path(path);
+    if is_writable(&resolved) { 0 } else { -libc::EROFS }
+}
+
+unsafe extern "C" fn fuse_rename(
+    from: *const c_char,
+    to: *const c_char,
+    _flags: libc::c_uint,
+) -> c_int {
+    let core = get_core();
+    let from_path = match path_str(from) { Ok(p) => p, Err(e) => return e };
+    let to_path = match path_str(to) { Ok(p) => p, Err(e) => return e };
+    let from_resolved = core.resolve_path(from_path);
+    let to_resolved = core.resolve_path(to_path);
+    let from_real = match writable_real_path(&from_resolved) { Ok(p) => p, Err(e) => return e };
+    let to_real = match writable_real_path(&to_resolved) { Ok(p) => p, Err(e) => return e };
+    match std::fs::rename(from_real, to_real) {
+        Ok(()) => 0,
+        Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+    }
+}
+
+unsafe extern "C" fn fuse_symlink(
+    from: *const c_char,
+    to: *const c_char,
+) -> c_int {
+    let core = get_core();
+    let to_path = match path_str(to) { Ok(p) => p, Err(e) => return e };
+    let to_resolved = core.resolve_path(to_path);
+    let to_real = match writable_real_path(&to_resolved) { Ok(p) => p, Err(e) => return e };
+    let from_str = match path_str(from) { Ok(p) => p, Err(e) => return e };
+    match std::os::unix::fs::symlink(from_str, to_real) {
+        Ok(()) => 0,
+        Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -458,5 +613,15 @@ pub fn build_operations() -> bindings::fuse_operations {
     ops.access = Some(fuse_access);
     ops.init = Some(fuse_init);
     ops.destroy = Some(fuse_destroy);
+    // Write operations (only output mounts are writable, others return EROFS)
+    ops.mkdir = Some(fuse_mkdir);
+    ops.unlink = Some(fuse_unlink);
+    ops.rmdir = Some(fuse_rmdir);
+    ops.create = Some(fuse_create);
+    ops.write = Some(fuse_write);
+    ops.truncate = Some(fuse_truncate);
+    ops.chmod = Some(fuse_chmod);
+    ops.rename = Some(fuse_rename);
+    ops.symlink = Some(fuse_symlink);
     ops
 }

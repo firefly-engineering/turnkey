@@ -117,7 +117,7 @@ impl CompositionBackend for FuseTBackend {
             // Build fuse_args: argv[0] = program name, then mount options
             let arg0 = CString::new("turnkey-composed").unwrap();
             let arg_ro = CString::new("-o").unwrap();
-            let arg_ro_val = CString::new("ro,fsname=turnkey").unwrap();
+            let arg_ro_val = CString::new("fsname=turnkey").unwrap();
             let mut argv: Vec<*mut i8> = vec![
                 arg0.as_ptr() as *mut i8,
                 arg_ro.as_ptr() as *mut i8,
