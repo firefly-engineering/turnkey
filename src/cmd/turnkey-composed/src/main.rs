@@ -22,6 +22,7 @@ use composition::watcher::{ManifestWatcher, WatcherConfig, WatcherEvent};
 use composition::compose_config::ComposeFile;
 use composition::discover;
 use composition::{create_backend, BackendType, CompositionConfig};
+use nix_eval::CliNixClient;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 
@@ -164,7 +165,8 @@ fn main() -> Result<()> {
                     .ok_or_else(|| anyhow::anyhow!("--mount-point is required"))?;
                 let rr = repo_root
                     .ok_or_else(|| anyhow::anyhow!("--repo-root is required"))?;
-                discover::build_and_configure(&mp, &rr)
+                let nix = CliNixClient::new(&rr);
+                discover::build_and_configure(&nix, &mp, &rr)
                     .map_err(|e| anyhow::anyhow!("{}", e))?
             };
 
@@ -267,7 +269,8 @@ fn run_daemon(
                             manifest_name, path
                         );
                         // Rebuild cells directly via nix build
-                        match discover::build_all_cells(&repo_root) {
+                        let nix = CliNixClient::new(&repo_root);
+                        match discover::build_all_cells(&nix, nix_eval::current_system()) {
                             Ok(cells) => {
                                 info!("Rebuilt {} cells, refreshing backend", cells.len());
                                 // TODO: update backend's cell paths with new store paths

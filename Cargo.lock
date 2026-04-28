@@ -281,6 +281,7 @@ dependencies = [
  "fuser",
  "libc",
  "log",
+ "nix-eval",
  "notify",
  "notify-debouncer-mini",
  "serde",
@@ -912,6 +913,16 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+]
+
+[[package]]
+name = "nix-eval"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1761,6 +1772,7 @@ dependencies = [
  "ctrlc",
  "env_logger",
  "log",
+ "nix-eval",
  "serde",
  "serde_json",
 ]

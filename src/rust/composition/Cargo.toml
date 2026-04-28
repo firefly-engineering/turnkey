@@ -12,6 +12,7 @@ watcher = ["dep:notify", "dep:notify-debouncer-mini"]
 
 [dependencies]
 log.workspace = true
+nix-eval.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
