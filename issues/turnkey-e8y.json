@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-04-28T09:27:03Z",
+  "description": "Move toolchains cell generation from buck2.nix to flake-parts module so it can be exposed as a .#toolchains-cell package. The daemon should discover it via nix build like other cells, removing the .turnkey/toolchains symlink fallback.",
+  "id": "turnkey-e8y",
+  "labels": [],
+  "priority": 1,
+  "status": "open",
+  "title": "Expose toolchains-cell as flake package",
+  "type": "task",
+  "updated_at": "2026-04-28T09:27:03Z"
+}
