@@ -966,6 +966,24 @@ in
       # can build them directly with `nix build .#<cell>-cell`
       packages = lib.mapAttrs' (name: drv:
         lib.nameValuePair "${name}-cell" drv
-      ) allCells;
+      ) allCells // {
+        # Combined toolchain profile with all tools in bin/
+        # The daemon exposes this as a virtual bin/ directory at the mount root
+        toolchain-profile =
+          let
+            defaultDecl = cfg.declarationFiles.default or null;
+            toolchainPackages =
+              if defaultDecl != null then
+                turnkeyLib.resolveToolchains registry (builtins.fromTOML (builtins.readFile defaultDecl))
+              else
+                [];
+          in
+          pkgs.buildEnv {
+            name = "turnkey-toolchain-profile";
+            paths = toolchainPackages;
+            # Ignore collisions (multiple packages may provide the same binary name)
+            ignoreCollisions = true;
+          };
+      };
     };
 }

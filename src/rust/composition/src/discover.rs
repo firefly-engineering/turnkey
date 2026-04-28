@@ -53,7 +53,7 @@ pub fn build_all_cells(
         .collect())
 }
 
-/// Build all cells and return a fully configured `CompositionConfig`.
+/// Build all cells and the toolchain profile, return a fully configured `CompositionConfig`.
 pub fn build_and_configure(
     client: &dyn NixClient,
     mount_point: &Path,
@@ -62,10 +62,26 @@ pub fn build_and_configure(
     let system = nix_eval::current_system();
     let cells = build_all_cells(client, system)?;
 
+    // Also build the toolchain profile for bin/ exposure
+    let all_packages = client.list_packages(system)?;
+    let toolchain_profile = if all_packages.iter().any(|p| p == "toolchain-profile") {
+        info!("Building toolchain profile...");
+        match client.build(&["toolchain-profile"]) {
+            Ok(built) => built.get("toolchain-profile").cloned(),
+            Err(e) => {
+                warn!("Failed to build toolchain profile: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     let mut config = CompositionConfig::new(mount_point, repo_root);
     for (name, path) in &cells {
         config = config.with_cell(CellConfig::new(name, path));
     }
+    config.toolchain_profile = toolchain_profile;
 
     Ok(config)
 }

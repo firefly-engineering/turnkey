@@ -253,6 +253,18 @@ impl FsCore {
             .map(|c| (c.name, c.content))
             .collect();
 
+        // Add toolchain profile as a virtual bin/ output mount if available
+        let mut config = config;
+        if let Some(ref profile_path) = config.toolchain_profile {
+            let bin_path = profile_path.join("bin");
+            if bin_path.exists() {
+                config.output_mounts.push(crate::config::OutputMount {
+                    mount_as: "bin".to_string(),
+                    real_path: bin_path,
+                });
+            }
+        }
+
         Self {
             config,
             repo_root,

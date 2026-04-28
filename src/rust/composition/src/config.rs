@@ -78,6 +78,10 @@ pub struct CompositionConfig {
     /// on disk. The real directory is created if it doesn't exist.
     /// Example: `build` → `/tmp/turnkey-out/buck` mounts as `<mount>/build/`
     pub output_mounts: Vec<OutputMount>,
+
+    /// Path to the toolchain profile (Nix store path with bin/).
+    /// Exposed as a virtual `bin/` directory at the mount root.
+    pub toolchain_profile: Option<PathBuf>,
 }
 
 /// An output directory mapped into the FUSE view
@@ -105,6 +109,7 @@ impl CompositionConfig {
             patches_dir: PathBuf::from(".turnkey/patches"),
             exclude: Vec::new(),
             output_mounts: Vec::new(),
+            toolchain_profile: None,
         }
     }
 
