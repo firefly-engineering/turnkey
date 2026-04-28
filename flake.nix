@@ -47,6 +47,11 @@
         turnkey = ./nix/devenv/turnkey;
       };
 
+      # Export home-manager module for turnkey-composed service
+      flake.homeManagerModules = {
+        turnkey-composed = ./nix/home-manager/turnkey-composed.nix;
+      };
+
       # Flake templates for project initialization
       flake.templates = {
         default = {
