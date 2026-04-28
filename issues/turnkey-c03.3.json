@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-04-28T08:01:34Z",
+  "description": "When running from a FUSE mount, jj/git should transparently redirect to the real repo. Generate wrapper scripts that detect if PWD is under a known mount point, resolve the real repo root, and cd there before running the command. Config: vcs.transparent list. Wrappers added to PATH via the service or devenv.",
+  "id": "turnkey-c03.3",
+  "labels": [],
+  "parent": "turnkey-c03",
+  "priority": 2,
+  "status": "open",
+  "title": "Transparent VCS wrappers",
+  "type": "task",
+  "updated_at": "2026-04-28T08:01:34Z"
+}
