@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [
     "turnkey-x8l5.3.1",
     "turnkey-x8l5.3.2",
@@ -12,8 +12,8 @@
   "labels": [],
   "parent": "turnkey-x8l5.3",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Launchd plist and systemd unit templates",
   "type": "task",
-  "updated_at": "2026-04-28T06:09:58Z"
+  "updated_at": "2026-04-28T06:15:52Z"
 }
