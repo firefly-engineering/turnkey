@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-04-28T08:01:34Z",
+  "description": "File filtering, build output relocation, transparent VCS wrappers, and CLI overrides for the FUSE composition layer.",
+  "id": "turnkey-c03",
+  "labels": [],
+  "priority": 1,
+  "status": "open",
+  "title": "Advanced FUSE view features",
+  "type": "epic",
+  "updated_at": "2026-04-28T08:01:34Z"
+}
