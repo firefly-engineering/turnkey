@@ -65,6 +65,12 @@ pub struct CompositionConfig {
     ///
     /// Default: `.turnkey/patches`
     pub patches_dir: PathBuf,
+
+    /// Files and directories to exclude from the source pass-through.
+    ///
+    /// Entries are matched against the first path component under `root/`.
+    /// Trailing `/` is stripped. Examples: `.envrc`, `.devenv`, `buck-out`.
+    pub exclude: Vec<String>,
 }
 
 impl CompositionConfig {
@@ -81,6 +87,7 @@ impl CompositionConfig {
             enable_editing: false,
             edits_dir: PathBuf::from(".turnkey/edits"),
             patches_dir: PathBuf::from(".turnkey/patches"),
+            exclude: Vec::new(),
         }
     }
 
@@ -99,6 +106,12 @@ impl CompositionConfig {
     /// Add a cell configuration
     pub fn with_cell(mut self, cell: CellConfig) -> Self {
         self.cells.push(cell);
+        self
+    }
+
+    /// Add exclusion patterns for the source pass-through
+    pub fn with_excludes(mut self, excludes: Vec<String>) -> Self {
+        self.exclude = excludes;
         self
     }
 

@@ -41,6 +41,10 @@ pub struct MountEntry {
     /// Backend type: "auto", "fuse", or "symlink" (default: "auto")
     #[serde(default = "default_backend")]
     pub backend: String,
+
+    /// Files/directories to exclude from the source pass-through
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 fn default_backend() -> String {

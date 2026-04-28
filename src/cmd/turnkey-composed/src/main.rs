@@ -82,6 +82,10 @@ enum Commands {
         #[arg(long, short)]
         foreground: bool,
 
+        /// Files/directories to exclude from the source pass-through (repeatable)
+        #[arg(long)]
+        exclude: Vec<String>,
+
         /// Disable manifest file watching
         #[arg(long)]
         no_watch: bool,
@@ -157,6 +161,7 @@ fn main() -> Result<()> {
             mount_point,
             repo_root,
             backend,
+            exclude,
             foreground,
             no_watch,
         } => {
@@ -189,8 +194,12 @@ fn main() -> Result<()> {
                 let rr = repo_root
                     .ok_or_else(|| anyhow::anyhow!("--repo-root is required"))?;
                 let nix = CliNixClient::new(&rr);
-                discover::build_and_configure(&nix, &mp, &rr)
-                    .map_err(|e| anyhow::anyhow!("{}", e))?
+                let mut cfg = discover::build_and_configure(&nix, &mp, &rr)
+                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+                if !exclude.is_empty() {
+                    cfg = cfg.with_excludes(exclude);
+                }
+                cfg
             };
 
             if !foreground {
@@ -316,8 +325,13 @@ fn run_serve(config_path: &Path) -> Result<()> {
 
         // Discover and build cells
         let nix = CliNixClient::new(&entry.repo);
-        let composition_config = discover::build_and_configure(&nix, &entry.mount_point, &entry.repo)
+        let mut composition_config = discover::build_and_configure(&nix, &entry.mount_point, &entry.repo)
             .map_err(|e| anyhow::anyhow!("Failed to discover cells for {:?}: {}", entry.repo, e))?;
+
+        // Apply exclusion rules from config
+        if !entry.exclude.is_empty() {
+            composition_config = composition_config.with_excludes(entry.exclude.clone());
+        }
 
         // Create and mount backend
         let mut backend = create_backend(backend_type, composition_config)

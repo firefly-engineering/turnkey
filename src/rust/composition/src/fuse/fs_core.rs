@@ -688,6 +688,15 @@ impl FsCore {
     ///
     /// Paths are expected to start with "/" and use the configured
     /// `source_dir_name` and `cell_prefix`.
+    /// Check if a filename is in the exclusion list.
+    pub fn is_excluded(&self, name: &str) -> bool {
+        let name = name.trim_end_matches('/');
+        self.config.exclude.iter().any(|e| {
+            let e = e.trim_end_matches('/');
+            e == name
+        })
+    }
+
     pub fn resolve_path(&self, path: &str) -> ResolvedPath {
         // Normalise: strip leading '/' and trailing '/'
         let path = path.trim_start_matches('/').trim_end_matches('/');
@@ -721,6 +730,11 @@ impl FsCore {
             return match rest {
                 None => ResolvedPath::Source,
                 Some(remainder) => {
+                    // Check exclusion list against the first component under root/
+                    let first_component = remainder.split('/').next().unwrap_or(remainder);
+                    if self.is_excluded(first_component) {
+                        return ResolvedPath::NotFound;
+                    }
                     let real_path = self.repo_root.join(remainder);
                     ResolvedPath::SourceChild { real_path }
                 }

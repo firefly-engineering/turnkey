@@ -252,7 +252,9 @@ unsafe extern "C" fn fuse_readdir(
                 Ok(entries) => {
                     for entry in entries.flatten() {
                         if let Some(name) = entry.file_name().to_str() {
-                            fill(name);
+                            if !core.is_excluded(name) {
+                                fill(name);
+                            }
                         }
                     }
                     0
