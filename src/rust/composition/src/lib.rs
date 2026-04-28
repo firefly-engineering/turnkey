@@ -52,6 +52,7 @@ use std::path::PathBuf;
 mod backend;
 pub mod compose_config;
 mod config;
+pub mod discover;
 mod error;
 pub mod layout;
 pub mod performance;

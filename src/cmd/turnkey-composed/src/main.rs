@@ -20,6 +20,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use composition::watcher::{ManifestWatcher, WatcherConfig, WatcherEvent};
 use composition::compose_config::ComposeFile;
+use composition::discover;
 use composition::{create_backend, BackendType, CompositionConfig};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
@@ -144,12 +145,12 @@ fn main() -> Result<()> {
                 )
             })?;
 
-            // Build composition config from file and/or CLI flags
+            // Build composition config
             let composition_config = if let Some(config_path) = config {
+                // Explicit config file
                 let compose = ComposeFile::read(&config_path)
                     .map_err(|e| anyhow::anyhow!("{}", e))?;
                 let mut cfg = compose.into_composition_config();
-                // CLI flags override config file
                 if let Some(mp) = mount_point {
                     cfg.mount_point = mp;
                 }
@@ -158,12 +159,14 @@ fn main() -> Result<()> {
                 }
                 cfg
             } else {
-                // No config file — require CLI flags
+                // Auto-discover: bootstrap .turnkey/ symlinks via nix develop,
+                // then read them to build the cell configuration
                 let mp = mount_point
-                    .ok_or_else(|| anyhow::anyhow!("--mount-point or --config is required"))?;
+                    .ok_or_else(|| anyhow::anyhow!("--mount-point is required"))?;
                 let rr = repo_root
-                    .ok_or_else(|| anyhow::anyhow!("--repo-root or --config is required"))?;
-                CompositionConfig::new(&mp, &rr)
+                    .ok_or_else(|| anyhow::anyhow!("--repo-root is required"))?;
+                discover::bootstrap_and_discover(&mp, &rr)
+                    .map_err(|e| anyhow::anyhow!("{}", e))?
             };
 
             if !foreground {
@@ -261,11 +264,17 @@ fn run_daemon(
                 match event {
                     WatcherEvent::ManifestChanged { path, manifest_name } => {
                         info!(
-                            "Manifest changed: {} ({:?}), triggering refresh",
+                            "Manifest changed: {} ({:?}), re-bootstrapping cells",
                             manifest_name, path
                         );
-                        if let Err(e) = backend.refresh() {
-                            error!("Failed to refresh after manifest change: {}", e);
+                        // Re-bootstrap to update .turnkey/ symlinks
+                        if let Err(e) = discover::bootstrap(&repo_root) {
+                            error!("Failed to re-bootstrap after manifest change: {}", e);
+                        } else {
+                            info!("Cells re-bootstrapped, refreshing backend");
+                            if let Err(e) = backend.refresh() {
+                                error!("Failed to refresh backend: {}", e);
+                            }
                         }
                     }
                     WatcherEvent::Error { message } => {
