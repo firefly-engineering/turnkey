@@ -3,7 +3,8 @@
   "blocked_by": [],
   "blocks": [
     "turnkey-x8l5.3.2",
-    "turnkey-x8l5.3.3"
+    "turnkey-x8l5.3.3",
+    "turnkey-x8l5.3.4"
   ],
   "created": "2026-04-28T06:09:50Z",
   "description": "Create serve_config.rs with [[mounts]] TOML format. Add 'serve' subcommand to daemon that reads ~/.config/turnkey/composed.toml and manages multiple mounts concurrently. Each mount gets its own cell discovery and FUSE backend.",

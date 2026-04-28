@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-x8l5.3.1"
+  ],
   "blocks": [],
   "created": "2026-04-28T06:09:50Z",
   "description": "Create static service files: ~/Library/LaunchAgents/com.firefly.turnkey-composed.plist on macOS, ~/.config/systemd/user/turnkey-composed.service on Linux. Add 'install' subcommand that copies the service file into place. Service runs 'turnkey-composed serve'.",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Launchd plist and systemd unit templates",
   "type": "task",
-  "updated_at": "2026-04-28T06:09:50Z"
+  "updated_at": "2026-04-28T06:09:58Z"
 }
