@@ -706,12 +706,22 @@ impl FsCore {
     ///
     /// Paths are expected to start with "/" and use the configured
     /// `source_dir_name` and `cell_prefix`.
-    /// Check if a filename is in the exclusion list.
+    /// Check if a filename matches any exclusion pattern.
+    ///
+    /// Patterns support:
+    /// - Exact match: `.envrc` matches `.envrc`
+    /// - Prefix glob: `.buck*` matches `.buckconfig`, `.buckroot`
+    /// - Suffix glob: `*.toml` matches `go-deps.toml`
+    /// - Contains glob: `*deps*` matches `go-deps.toml`, `rustdeps`
     pub fn is_excluded(&self, name: &str) -> bool {
         let name = name.trim_end_matches('/');
-        self.config.exclude.iter().any(|e| {
-            let e = e.trim_end_matches('/');
-            e == name
+        self.config.exclude.iter().any(|pattern| {
+            let pattern = pattern.trim_end_matches('/');
+            if pattern.contains('*') {
+                glob_match(pattern, name)
+            } else {
+                pattern == name
+            }
         })
     }
 
@@ -811,10 +821,97 @@ impl FsCore {
     }
 }
 
+/// Simple glob matching with `*` wildcard.
+///
+/// Supports: `*.ext`, `prefix*`, `*mid*`, `exact`, and `pre*suf`.
+fn glob_match(pattern: &str, name: &str) -> bool {
+    if !pattern.contains('*') {
+        return pattern == name;
+    }
+
+    let parts: Vec<&str> = pattern.split('*').collect();
+
+    if parts.len() == 2 {
+        let (prefix, suffix) = (parts[0], parts[1]);
+        if prefix.is_empty() && suffix.is_empty() {
+            return true; // "*" matches everything
+        }
+        if prefix.is_empty() {
+            return name.ends_with(suffix); // "*.ext"
+        }
+        if suffix.is_empty() {
+            return name.starts_with(prefix); // "prefix*"
+        }
+        return name.starts_with(prefix) && name.ends_with(suffix)
+            && name.len() >= prefix.len() + suffix.len(); // "pre*suf"
+    }
+
+    // Multi-wildcard: check each part appears in order
+    let mut remaining = name;
+    for (i, part) in parts.iter().enumerate() {
+        if part.is_empty() {
+            continue;
+        }
+        if i == 0 {
+            // First part must be a prefix
+            if !remaining.starts_with(part) {
+                return false;
+            }
+            remaining = &remaining[part.len()..];
+        } else if i == parts.len() - 1 {
+            // Last part must be a suffix
+            if !remaining.ends_with(part) {
+                return false;
+            }
+        } else {
+            // Middle parts must appear somewhere
+            if let Some(pos) = remaining.find(part) {
+                remaining = &remaining[pos + part.len()..];
+            } else {
+                return false;
+            }
+        }
+    }
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::CellConfig;
+
+    #[test]
+    fn test_glob_match() {
+        // Exact match
+        assert!(glob_match(".envrc", ".envrc"));
+        assert!(!glob_match(".envrc", ".envrc2"));
+
+        // Prefix glob
+        assert!(glob_match(".buck*", ".buckconfig"));
+        assert!(glob_match(".buck*", ".buckroot"));
+        assert!(!glob_match(".buck*", ".git"));
+
+        // Suffix glob
+        assert!(glob_match("*.toml", "go-deps.toml"));
+        assert!(glob_match("*.toml", "rust-deps.toml"));
+        assert!(!glob_match("*.toml", "Cargo.lock"));
+
+        // Contains glob
+        assert!(glob_match("*deps*", "go-deps.toml"));
+        assert!(glob_match("*deps*", "rustdeps"));
+        assert!(!glob_match("*deps*", "flake.nix"));
+
+        // Wildcard matches everything
+        assert!(glob_match("*", "anything"));
+
+        // Prefix+suffix
+        assert!(glob_match(".git*e", ".gitignore"));
+        assert!(!glob_match(".git*e", ".gitconfig"));
+
+        // No wildcard = exact
+        assert!(glob_match("exact", "exact"));
+        assert!(!glob_match("exact", "inexact"));
+    }
 
     fn test_core(config: CompositionConfig, repo_root: PathBuf) -> FsCore {
         let sm = Arc::new(ConsistencyStateMachine::new());
