@@ -203,10 +203,27 @@ unsafe extern "C" fn fuse_getattr(
             fill_virtual_file_stat(stbuf, ino, content.len() as u64, core.uid, core.gid);
             0
         }
+        ResolvedPath::OutputMount { real_path } => {
+            // Output mounts appear as symlinks to the real directory.
+            // This ensures Buck2 follows the symlink and writes to the
+            // real filesystem directly, bypassing FUSE for all I/O.
+            let target = real_path.to_string_lossy();
+            let now = now_secs();
+            (*stbuf).st_ino = 100; // arbitrary
+            (*stbuf).st_mode = libc::S_IFLNK | 0o777;
+            (*stbuf).st_nlink = 1;
+            (*stbuf).st_size = target.len() as libc::off_t;
+            (*stbuf).st_uid = core.uid;
+            (*stbuf).st_gid = core.gid;
+            (*stbuf).st_blksize = 4096;
+            (*stbuf).st_atime = now;
+            (*stbuf).st_mtime = now;
+            (*stbuf).st_ctime = now;
+            0
+        }
         ResolvedPath::SourceChild { real_path }
         | ResolvedPath::Cell { real_path, .. }
         | ResolvedPath::CellChild { real_path, .. }
-        | ResolvedPath::OutputMount { real_path }
         | ResolvedPath::OutputChild { real_path } => {
             match fs::symlink_metadata(&real_path) {
                 Ok(meta) => {
@@ -388,7 +405,19 @@ unsafe extern "C" fn fuse_readlink(
         Err(e) => return e,
     };
 
-    let real_path = match core.resolve_path(path) {
+    let resolved = core.resolve_path(path);
+
+    // Output mounts are symlinks — return the target path directly
+    if let ResolvedPath::OutputMount { ref real_path } = resolved {
+        let target = real_path.to_string_lossy();
+        let bytes = target.as_bytes();
+        let to_copy = std::cmp::min(bytes.len(), size - 1);
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf as *mut u8, to_copy);
+        *buf.add(to_copy) = 0; // null terminate
+        return 0;
+    }
+
+    let real_path = match resolved {
         ResolvedPath::SourceChild { real_path }
         | ResolvedPath::Cell { real_path, .. }
         | ResolvedPath::CellChild { real_path, .. }

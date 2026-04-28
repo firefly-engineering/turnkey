@@ -181,10 +181,18 @@ impl CompositionBackend for FuseTBackend {
             }
 
             info!("FUSE-T filesystem mounted and ready");
-            debug!("Entering fuse_loop()");
 
-            // Run the event loop — this blocks until unmounted
-            let ret = unsafe { bindings::fuse_loop(fuse) };
+            // Try multi-threaded loop first, fall back to single-threaded
+            let ret = unsafe {
+                info!("Starting multi-threaded FUSE loop");
+                let r = bindings::fuse_loop_mt(fuse, 0);
+                if r != 0 && !should_stop.load(Ordering::SeqCst) {
+                    error!("fuse_loop_mt returned {}, trying single-threaded fallback", r);
+                    bindings::fuse_loop(fuse)
+                } else {
+                    r
+                }
+            };
             if ret != 0 && !should_stop.load(Ordering::SeqCst) {
                 error!("fuse_loop() returned {}", ret);
             }

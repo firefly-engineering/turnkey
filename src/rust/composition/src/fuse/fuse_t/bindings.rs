@@ -359,9 +359,9 @@ unsafe extern "C" {
     pub fn fuse_loop(f: *mut fuse) -> c_int;
 
     /// Run the multi-threaded FUSE event loop (blocks until unmounted).
-    /// Handles concurrent requests from multiple threads.
-    #[link_name = "fuse_loop_mt_32"]
-    pub fn fuse_loop_mt(f: *mut fuse, config: *mut fuse_loop_config) -> c_int;
+    /// clone_fd: 0 = share fd, 1 = clone fd per thread
+    #[link_name = "fuse_loop_mt_31"]
+    pub fn fuse_loop_mt(f: *mut fuse, clone_fd: c_int) -> c_int;
 
     /// Create a FUSE loop configuration.
     pub fn fuse_loop_cfg_create() -> *mut fuse_loop_config;
