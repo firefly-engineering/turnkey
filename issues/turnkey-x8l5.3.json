@@ -5,14 +5,15 @@
     "turnkey-x8l5.5"
   ],
   "blocks": [],
+  "closed_at": "2026-04-28T06:17:42Z",
   "created": "2026-04-27T18:17:41Z",
   "description": "Create a persistent service that starts the FUSE daemon on login and mounts the workspace automatically. Launchd plist on macOS, systemd unit on Linux. Should handle restarts on failure and clean unmount on shutdown.",
   "id": "turnkey-x8l5.3",
   "labels": [],
   "parent": "turnkey-x8l5",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Launchd/systemd service for composition daemon",
   "type": "task",
-  "updated_at": "2026-04-28T06:06:13Z"
+  "updated_at": "2026-04-28T06:17:42Z"
 }
