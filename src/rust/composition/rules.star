@@ -7,6 +7,7 @@ _IS_MACOS = host_info().os.is_macos
 # Common deps shared by all targets
 _COMMON_DEPS = [
     "//src/rust/nix-eval:nix-eval",
+    "rustdeps//vendor/dirs:dirs",
     "rustdeps//vendor/log:log",
     "rustdeps//vendor/serde:serde",
     "rustdeps//vendor/serde_json:serde_json",
