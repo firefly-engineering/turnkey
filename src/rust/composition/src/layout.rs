@@ -834,12 +834,16 @@ mod tests {
         // Check .buckconfig
         let buckconfig = configs.iter().find(|c| c.name == ".buckconfig").unwrap();
         assert!(buckconfig.content.contains("[cells]"));
-        assert!(buckconfig.content.contains("root = ."));
-        assert!(buckconfig.content.contains("prelude = prelude"));
-        assert!(buckconfig.content.contains("godeps = ../external/godeps"));
-        assert!(buckconfig.content.contains("rustdeps = ../external/rustdeps"));
+        assert!(buckconfig.content.contains("none = ."));
+        assert!(buckconfig.content.contains("root = root"));
+        assert!(buckconfig.content.contains("prelude = root/prelude"));
+        assert!(buckconfig.content.contains("godeps = external/godeps"));
+        assert!(buckconfig.content.contains("rustdeps = external/rustdeps"));
+        assert!(buckconfig.content.contains("[cell_aliases]"));
         assert!(buckconfig.content.contains("[buildfile]"));
         assert!(buckconfig.content.contains("name = rules.star"));
+        assert!(buckconfig.content.contains("[build]"));
+        assert!(buckconfig.content.contains("execution_platforms"));
 
         // Check .buckroot
         let buckroot = configs.iter().find(|c| c.name == ".buckroot").unwrap();

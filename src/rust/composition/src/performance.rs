@@ -733,24 +733,18 @@ mod tests {
     fn test_optimized_readdir_with_offset() {
         let reader = OptimizedReaddir::new(0);
 
-        // Read /tmp with different offsets
-        let entries_0 = reader.read_entries(
-            std::path::Path::new("/tmp"),
-            0,
-            |_path| 42,
-        );
+        // Create a stable temp directory with known entries
+        let dir = tempfile::tempdir().unwrap();
+        for i in 0..10 {
+            std::fs::write(dir.path().join(format!("file{}", i)), "").unwrap();
+        }
 
-        let entries_5 = reader.read_entries(
-            std::path::Path::new("/tmp"),
-            5,
-            |_path| 42,
-        );
+        let entries_0 = reader.read_entries(dir.path(), 0, |_path| 42);
+        let entries_5 = reader.read_entries(dir.path(), 5, |_path| 42);
 
         if let (Ok(e0), Ok(e5)) = (entries_0, entries_5) {
-            // Offset should skip entries
-            if e0.len() > 5 {
-                assert!(e5.len() < e0.len());
-            }
+            assert_eq!(e0.len(), 10);
+            assert_eq!(e5.len(), 5); // Offset 5 skips first 5 entries
         }
     }
 }
