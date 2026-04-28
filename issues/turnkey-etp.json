@@ -4,13 +4,14 @@
   "blocks": [
     "turnkey-391"
   ],
+  "closed_at": "2026-04-28T08:55:02Z",
   "created": "2026-04-28T08:47:51Z",
   "description": "Add a toolchain-profile flake package that combines all toolchain entries into a single derivation with bin/. The daemon builds it alongside cells. FsCore exposes it as a virtual bin/ directory at the mount root, pass-through to the profile's bin/.",
   "id": "turnkey-etp",
   "labels": [],
   "priority": 1,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Toolchain profile package and virtual bin/ directory",
   "type": "task",
-  "updated_at": "2026-04-28T08:48:17Z"
+  "updated_at": "2026-04-28T08:55:02Z"
 }
