@@ -159,13 +159,12 @@ fn main() -> Result<()> {
                 }
                 cfg
             } else {
-                // Auto-discover: bootstrap .turnkey/ symlinks via nix develop,
-                // then read them to build the cell configuration
+                // Auto-discover: build cell derivations directly via nix build
                 let mp = mount_point
                     .ok_or_else(|| anyhow::anyhow!("--mount-point is required"))?;
                 let rr = repo_root
                     .ok_or_else(|| anyhow::anyhow!("--repo-root is required"))?;
-                discover::bootstrap_and_discover(&mp, &rr)
+                discover::build_and_configure(&mp, &rr)
                     .map_err(|e| anyhow::anyhow!("{}", e))?
             };
 
@@ -267,13 +266,17 @@ fn run_daemon(
                             "Manifest changed: {} ({:?}), re-bootstrapping cells",
                             manifest_name, path
                         );
-                        // Re-bootstrap to update .turnkey/ symlinks
-                        if let Err(e) = discover::bootstrap(&repo_root) {
-                            error!("Failed to re-bootstrap after manifest change: {}", e);
-                        } else {
-                            info!("Cells re-bootstrapped, refreshing backend");
-                            if let Err(e) = backend.refresh() {
-                                error!("Failed to refresh backend: {}", e);
+                        // Rebuild cells directly via nix build
+                        match discover::build_all_cells(&repo_root) {
+                            Ok(cells) => {
+                                info!("Rebuilt {} cells, refreshing backend", cells.len());
+                                // TODO: update backend's cell paths with new store paths
+                                if let Err(e) = backend.refresh() {
+                                    error!("Failed to refresh backend: {}", e);
+                                }
+                            }
+                            Err(e) => {
+                                error!("Failed to rebuild cells: {}", e);
                             }
                         }
                     }

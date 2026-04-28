@@ -945,9 +945,27 @@ in
       # Generate shell configurations from declarationFiles
       shellConfigs = lib.mapAttrs mkShellConfig cfg.declarationFiles;
 
+      # Collect all non-null cells into an attrset for exposure
+      # Filter out non-derivation values (e.g., "bundled://" for prelude)
+      allCells = lib.filterAttrs (_: v: v != null && builtins.isPath v || lib.isDerivation v) ({
+        godeps = godepsCell;
+        rustdeps = rustdepsCell;
+        pydeps = pydepsCell;
+        jsdeps = jsdepsCell;
+        soldeps = soldepsCell;
+      } // lib.optionalAttrs (cfg.buck2.prelude.strategy == "nix") {
+        prelude = resolvedPreludePath;
+      });
+
     in
     lib.mkIf cfg.enable {
       # Create all shells from declaration files
       devenv.shells = shellConfigs;
+
+      # Expose cell derivations as packages so the composition daemon
+      # can build them directly with `nix build .#<cell>-cell`
+      packages = lib.mapAttrs' (name: drv:
+        lib.nameValuePair "${name}-cell" drv
+      ) allCells;
     };
 }

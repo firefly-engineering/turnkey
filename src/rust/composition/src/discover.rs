@@ -1,147 +1,194 @@
 //! Cell discovery and lifecycle management
 //!
-//! Manages the Nix-backed cells in `.turnkey/`:
-//! - **Bootstrap**: Runs `nix develop` to generate/refresh symlinks
-//! - **Discover**: Reads symlinks to build cell configuration
-//! - **Refresh**: Re-bootstraps and re-discovers when dependencies change
+//! Builds and discovers Nix-backed cells for the composition daemon:
+//! - **Build**: Runs `nix build .#<cell>-cell` to produce each cell derivation
+//! - **Discover**: Lists available `*-cell` packages from the flake
+//! - **Refresh**: Rebuilds cells when dependencies change
 //!
-//! The daemon always bootstraps on startup to ensure symlinks are current,
-//! then watches for changes that require re-generation.
+//! This uses Nix directly to build cell derivations, without going through
+//! the devenv shell. Each cell is built to a specific out-link path,
+//! allowing the daemon to control cell placement.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use log::{info, warn};
+use log::{debug, error, info, warn};
 
 use crate::config::{CellConfig, CompositionConfig};
 
-/// Names in `.turnkey/` that are NOT cells
-const SKIP_NAMES: &[&str] = &[
-    "sync.toml",
-    "compose.toml",
-    "books",
-    "pycache",
-    "edits",
-    "patches",
-    ".cell-targets",
-    "tmp",
-];
-
-/// Bootstrap `.turnkey/` symlinks by running `nix develop`.
+/// Discover available cell packages from the flake.
 ///
-/// This triggers the devenv shell entry script which creates/updates
-/// all cell symlinks, the toolchains cell, and config files.
-/// Always runs — ensures symlinks match the current flake.lock and deps files.
-pub fn bootstrap(repo_root: &Path) -> Result<(), DiscoverError> {
-    info!(
-        "Bootstrapping .turnkey/ via nix develop in {}",
-        repo_root.display()
-    );
+/// Runs `nix eval .#packages.<system> --apply builtins.attrNames` to list
+/// all packages, then filters for `*-cell` entries.
+fn list_cell_packages(repo_root: &Path) -> Result<Vec<String>, DiscoverError> {
+    let system = current_system();
 
     let output = Command::new("nix")
-        .args(["develop", "--impure", "-c", "true"])
+        .args([
+            "eval",
+            &format!(".#packages.{}", system),
+            "--apply", "builtins.attrNames",
+            "--json",
+            "--impure",
+        ])
         .current_dir(repo_root)
         .output()
-        .map_err(|e| DiscoverError::Bootstrap {
-            message: format!("failed to run nix develop: {}", e),
+        .map_err(|e| DiscoverError::Nix {
+            message: format!("failed to run nix eval: {}", e),
         })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(DiscoverError::Bootstrap {
-            message: format!("nix develop failed: {}", stderr.trim()),
+        return Err(DiscoverError::Nix {
+            message: format!("nix eval failed: {}", stderr.trim()),
         });
     }
 
-    info!("Bootstrap complete");
-    Ok(())
+    let names: Vec<String> = serde_json::from_slice(&output.stdout).map_err(|e| {
+        DiscoverError::Nix {
+            message: format!("failed to parse nix eval output: {}", e),
+        }
+    })?;
+
+    Ok(names
+        .into_iter()
+        .filter(|n| n.ends_with("-cell"))
+        .collect())
 }
 
-/// Discover cells from `.turnkey/` symlinks.
+/// Build a single cell and return its Nix store path.
 ///
-/// Reads all symlinks in `.turnkey/` that point to `/nix/store/` paths.
-/// The `toolchains` symlink is included (Buck2 needs it as a cell).
-pub fn discover_cells(
+/// Runs `nix build .#<package> --impure --no-link --print-out-paths`.
+fn build_cell(repo_root: &Path, package: &str) -> Result<PathBuf, DiscoverError> {
+    info!("Building cell: {}", package);
+
+    let output = Command::new("nix")
+        .args([
+            "build",
+            &format!(".#{}", package),
+            "--impure",
+            "--no-link",
+            "--print-out-paths",
+        ])
+        .current_dir(repo_root)
+        .output()
+        .map_err(|e| DiscoverError::Nix {
+            message: format!("failed to run nix build .#{}: {}", package, e),
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(DiscoverError::Nix {
+            message: format!("nix build .#{} failed: {}", package, stderr.trim()),
+        });
+    }
+
+    let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if path_str.is_empty() {
+        return Err(DiscoverError::Nix {
+            message: format!("nix build .#{} returned no output path", package),
+        });
+    }
+
+    debug!("  {} -> {}", package, path_str);
+    Ok(PathBuf::from(path_str))
+}
+
+/// Build all cells in a single `nix build` invocation and return a map of
+/// cell name → Nix store path.
+///
+/// Discovers available `*-cell` packages from the flake, builds them all
+/// at once (avoiding Nix lock contention from sequential builds), and
+/// returns the mapping. The cell name has the `-cell` suffix stripped
+/// (e.g., `godeps-cell` → `godeps`).
+pub fn build_all_cells(repo_root: &Path) -> Result<HashMap<String, PathBuf>, DiscoverError> {
+    let packages = list_cell_packages(repo_root)?;
+
+    if packages.is_empty() {
+        warn!("No *-cell packages found in the flake");
+        return Ok(HashMap::new());
+    }
+
+    info!("Building {} cells: {}", packages.len(), packages.join(", "));
+
+    // Build all cells in one nix build invocation
+    let mut args = vec![
+        "build".to_string(),
+        "--impure".to_string(),
+        "--no-link".to_string(),
+        "--print-out-paths".to_string(),
+    ];
+    for pkg in &packages {
+        args.push(format!(".#{}", pkg));
+    }
+
+    let output = Command::new("nix")
+        .args(&args)
+        .current_dir(repo_root)
+        .output()
+        .map_err(|e| DiscoverError::Nix {
+            message: format!("failed to run nix build: {}", e),
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(DiscoverError::Nix {
+            message: format!("nix build failed: {}", stderr.trim()),
+        });
+    }
+
+    // Parse output paths (one per line, in same order as packages)
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let paths: Vec<&str> = stdout.lines().filter(|l| !l.is_empty()).collect();
+
+    let mut cells = HashMap::new();
+    for (pkg, path) in packages.iter().zip(paths.iter()) {
+        let name = pkg.strip_suffix("-cell").unwrap_or(pkg).to_string();
+        debug!("  {} -> {}", name, path);
+        cells.insert(name, PathBuf::from(path));
+    }
+
+    info!("Built {} cells", cells.len());
+    Ok(cells)
+}
+
+/// Build all cells and return a CompositionConfig.
+pub fn build_and_configure(
     mount_point: &Path,
     repo_root: &Path,
 ) -> Result<CompositionConfig, DiscoverError> {
-    let turnkey_dir = repo_root.join(".turnkey");
-
-    if !turnkey_dir.exists() {
-        return Err(DiscoverError::NoTurnkeyDir(turnkey_dir));
-    }
+    let cells = build_all_cells(repo_root)?;
 
     let mut config = CompositionConfig::new(mount_point, repo_root);
-
-    let entries = std::fs::read_dir(&turnkey_dir).map_err(|e| DiscoverError::Io {
-        path: turnkey_dir.clone(),
-        source: e,
-    })?;
-
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let name_str = name.to_string_lossy();
-
-        if SKIP_NAMES.contains(&name_str.as_ref()) {
-            continue;
-        }
-
-        let path = entry.path();
-
-        if path.is_symlink() {
-            if let Ok(target) = std::fs::read_link(&path) {
-                let target_str = target.to_string_lossy();
-                if target_str.starts_with("/nix/store/") {
-                    info!("Discovered cell: {} -> {}", name_str, target_str);
-                    let cell = CellConfig::new(name_str.as_ref(), &target);
-                    config = config.with_cell(cell);
-                }
-            }
-        }
-    }
-
-    if config.cells.is_empty() {
-        warn!("No cells discovered in {}", turnkey_dir.display());
+    for (name, path) in &cells {
+        config = config.with_cell(CellConfig::new(name, path));
     }
 
     Ok(config)
 }
 
-/// Bootstrap and then discover cells.
-///
-/// Always bootstraps first to ensure symlinks are current, then reads them.
-pub fn bootstrap_and_discover(
-    mount_point: &Path,
-    repo_root: &Path,
-) -> Result<CompositionConfig, DiscoverError> {
-    bootstrap(repo_root)?;
-    discover_cells(mount_point, repo_root)
+/// Get the current Nix system string (e.g., "aarch64-darwin", "x86_64-linux").
+fn current_system() -> &'static str {
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    { "aarch64-darwin" }
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    { "x86_64-darwin" }
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    { "x86_64-linux" }
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    { "aarch64-linux" }
 }
 
 #[derive(Debug)]
 pub enum DiscoverError {
-    NoTurnkeyDir(PathBuf),
-    Io {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-    Bootstrap {
-        message: String,
-    },
+    Nix { message: String },
 }
 
 impl std::fmt::Display for DiscoverError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DiscoverError::NoTurnkeyDir(p) => {
-                write!(f, ".turnkey/ directory not found at {}", p.display())
-            }
-            DiscoverError::Io { path, source } => {
-                write!(f, "failed to read {}: {}", path.display(), source)
-            }
-            DiscoverError::Bootstrap { message } => {
-                write!(f, "bootstrap failed: {}", message)
-            }
+            DiscoverError::Nix { message } => write!(f, "{}", message),
         }
     }
 }
