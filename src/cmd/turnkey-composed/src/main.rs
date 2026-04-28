@@ -91,6 +91,11 @@ enum Commands {
         #[arg(long)]
         output: Vec<String>,
 
+        /// VCS tools to wrap with transparent redirect (repeatable)
+        /// Example: --vcs-wrap jj --vcs-wrap git
+        #[arg(long)]
+        vcs_wrap: Vec<String>,
+
         /// Disable manifest file watching
         #[arg(long)]
         no_watch: bool,
@@ -168,6 +173,7 @@ fn main() -> Result<()> {
             backend,
             exclude,
             output,
+            vcs_wrap,
             foreground,
             no_watch,
         } => {
@@ -214,6 +220,20 @@ fn main() -> Result<()> {
                 }
                 cfg
             };
+
+            // Generate VCS wrappers if requested
+            if !vcs_wrap.is_empty() {
+                let mount_map = std::collections::HashMap::from([(
+                    composition_config.mount_point.clone(),
+                    composition_config.repo_root.clone(),
+                )]);
+                match composition::vcs_wrappers::generate_wrappers(
+                    &vcs_wrap, &mount_map, &composition_config.source_dir_name,
+                ) {
+                    Ok(dir) => info!("VCS wrappers at {}", dir.display()),
+                    Err(e) => warn!("Failed to generate VCS wrappers: {}", e),
+                }
+            }
 
             if !foreground {
                 warn!("Daemonizing not yet implemented, running in foreground");
