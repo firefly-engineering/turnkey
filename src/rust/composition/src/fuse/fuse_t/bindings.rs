@@ -19,6 +19,7 @@ pub enum fuse_pollhandle {}
 pub enum fuse_bufvec {}
 pub enum fuse_conn_info {}
 pub enum fuse_config {}
+pub enum fuse_loop_config {}
 
 /// libfuse version struct, passed to fuse_new_30
 #[repr(C)]
@@ -356,6 +357,23 @@ unsafe extern "C" {
 
     /// Run the FUSE event loop (blocks until unmounted).
     pub fn fuse_loop(f: *mut fuse) -> c_int;
+
+    /// Run the multi-threaded FUSE event loop (blocks until unmounted).
+    /// Handles concurrent requests from multiple threads.
+    #[link_name = "fuse_loop_mt_32"]
+    pub fn fuse_loop_mt(f: *mut fuse, config: *mut fuse_loop_config) -> c_int;
+
+    /// Create a FUSE loop configuration.
+    pub fn fuse_loop_cfg_create() -> *mut fuse_loop_config;
+
+    /// Destroy a FUSE loop configuration.
+    pub fn fuse_loop_cfg_destroy(config: *mut fuse_loop_config);
+
+    /// Set the maximum number of threads.
+    pub fn fuse_loop_cfg_set_max_threads(config: *mut fuse_loop_config, max: libc::c_uint);
+
+    /// Set the number of idle threads to keep.
+    pub fn fuse_loop_cfg_set_idle_threads(config: *mut fuse_loop_config, idle: libc::c_uint);
 
     /// Unmount the FUSE filesystem.
     pub fn fuse_unmount(f: *mut fuse);
