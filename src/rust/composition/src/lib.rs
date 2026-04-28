@@ -55,6 +55,7 @@ mod config;
 pub mod discover;
 mod error;
 pub mod serve_config;
+pub mod service;
 pub mod synthetic;
 pub mod layout;
 pub mod performance;

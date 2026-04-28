@@ -96,6 +96,19 @@ enum Commands {
         config: PathBuf,
     },
 
+    /// Install as a system service (launchd on macOS, systemd on Linux)
+    ///
+    /// Creates a service file that runs `turnkey-composed serve` on login.
+    /// The service reads mount configuration from ~/.config/turnkey/composed.toml.
+    Install {
+        /// Also start the service immediately after installing
+        #[arg(long)]
+        start: bool,
+    },
+
+    /// Uninstall the system service
+    Uninstall,
+
     /// Stop the daemon and unmount the composition view
     Stop,
     /// Query the daemon status
@@ -186,6 +199,67 @@ fn main() -> Result<()> {
             run_daemon(&cli.socket, composition_config, backend_type, !no_watch)
         }
         Commands::Serve { config } => run_serve(&config),
+        Commands::Install { start } => {
+            use composition::serve_config::ServeConfig;
+            use composition::service;
+
+            // Find the turnkey-composed binary path
+            let binary = std::env::current_exe()
+                .context("Failed to determine binary path")?;
+            let config_path = ServeConfig::default_path();
+
+            // Ensure config file exists with a helpful template
+            if !config_path.exists() {
+                if let Some(parent) = config_path.parent() {
+                    std::fs::create_dir_all(parent).ok();
+                }
+                std::fs::write(
+                    &config_path,
+                    "# Turnkey composition daemon configuration\n\
+                     # Add mount entries below:\n\
+                     #\n\
+                     # [[mounts]]\n\
+                     # repo = \"/path/to/your/project\"\n\
+                     # mount_point = \"/firefly/project\"\n",
+                )
+                .ok();
+                info!("Created config template at {:?}", config_path);
+            }
+
+            let install_path = service::install_service(&binary, &config_path)
+                .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+            println!("Service installed at {}", install_path.display());
+            println!("Config file: {}", config_path.display());
+
+            if start {
+                service::load_service()
+                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+                println!("Service started");
+            } else {
+                println!("Run with --start to also start the service, or:");
+                if cfg!(target_os = "macos") {
+                    println!("  launchctl load -w {}", install_path.display());
+                } else {
+                    println!("  systemctl --user enable --now turnkey-composed.service");
+                }
+            }
+            Ok(())
+        }
+        Commands::Uninstall => {
+            use composition::service;
+            service::unload_service()
+                .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+            let path = service::service_install_path();
+            if path.exists() {
+                std::fs::remove_file(&path).ok();
+                println!("Service uninstalled from {}", path.display());
+            } else {
+                println!("No service file found at {}", path.display());
+            }
+            Ok(())
+        }
         Commands::Stop => send_command(&cli.socket, IpcRequest::Stop),
         Commands::Status => send_command(&cli.socket, IpcRequest::Status),
         Commands::Refresh => send_command(&cli.socket, IpcRequest::Refresh),
