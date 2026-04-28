@@ -83,5 +83,17 @@ pub fn build_and_configure(
     }
     config.toolchain_profile = toolchain_profile;
 
+    // Also discover the toolchains cell from .turnkey/toolchains symlink
+    // (built by devenv, not exposed as a flake package)
+    let toolchains_link = repo_root.join(".turnkey/toolchains");
+    if toolchains_link.is_symlink() {
+        if let Ok(target) = std::fs::read_link(&toolchains_link) {
+            if target.to_string_lossy().starts_with("/nix/store/") {
+                info!("Discovered toolchains cell from .turnkey/toolchains symlink");
+                config = config.with_cell(CellConfig::new("toolchains", &target));
+            }
+        }
+    }
+
     Ok(config)
 }
