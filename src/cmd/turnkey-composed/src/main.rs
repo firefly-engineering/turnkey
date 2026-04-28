@@ -308,11 +308,97 @@ fn run_serve(config_path: &Path) -> Result<()> {
         handles.push((entry.mount_point.display().to_string(), handle));
     }
 
-    info!("All mounts ready. Waiting for shutdown signal...");
+    info!("All mounts ready. Watching config file for changes...");
 
-    // Wait for shutdown
+    // Track mount state for hot-reload diffing
+    let mut active_mount_points: std::collections::HashSet<PathBuf> = config
+        .mounts
+        .iter()
+        .map(|m| m.mount_point.clone())
+        .collect();
+
+    // Watch the config file for changes
+    let config_path_owned = config_path.to_path_buf();
+    let config_mtime = std::fs::metadata(&config_path_owned)
+        .and_then(|m| m.modified())
+        .ok();
+    let last_config_mtime = Arc::new(std::sync::Mutex::new(config_mtime));
+
+    // Main event loop
     while running.load(Ordering::SeqCst) {
-        thread::sleep(Duration::from_millis(200));
+        // Check if config file changed
+        if let Ok(meta) = std::fs::metadata(&config_path_owned) {
+            if let Ok(mtime) = meta.modified() {
+                let mut last = last_config_mtime.lock().unwrap();
+                let changed = last.map(|l| mtime > l).unwrap_or(true);
+                if changed {
+                    *last = Some(mtime);
+                    // Skip the initial check (first iteration)
+                    if config_mtime.is_some() {
+                        info!("Config file changed, reloading...");
+                        match ServeConfig::read(&config_path_owned) {
+                            Ok(new_config) => {
+                                let new_mount_points: std::collections::HashSet<PathBuf> =
+                                    new_config.mounts.iter().map(|m| m.mount_point.clone()).collect();
+
+                                // Find removed mounts
+                                for mp in active_mount_points.difference(&new_mount_points) {
+                                    info!("Removing mount: {}", mp.display());
+                                    // Find and unmount the backend
+                                    // (simplified: we'd need a map of mount_point -> backend index)
+                                    // TODO: implement proper removal with backend lookup
+                                    warn!("Hot removal of mounts not yet implemented — restart the service");
+                                }
+
+                                // Find new mounts
+                                for entry in &new_config.mounts {
+                                    if !active_mount_points.contains(&entry.mount_point) {
+                                        info!("Adding new mount: {} -> {}", entry.repo.display(), entry.mount_point.display());
+
+                                        let backend_type = BackendType::from_str(&entry.backend)
+                                            .unwrap_or(BackendType::Auto);
+
+                                        #[cfg(target_os = "macos")]
+                                        if let Err(e) = composition::synthetic::ensure_mount_point(&entry.mount_point) {
+                                            error!("Failed to prepare mount point: {}", e);
+                                            continue;
+                                        }
+
+                                        #[cfg(not(target_os = "macos"))]
+                                        if let Err(e) = std::fs::create_dir_all(&entry.mount_point) {
+                                            error!("Failed to create mount point: {}", e);
+                                            continue;
+                                        }
+
+                                        let nix = CliNixClient::new(&entry.repo);
+                                        match discover::build_and_configure(&nix, &entry.mount_point, &entry.repo) {
+                                            Ok(comp_config) => {
+                                                match create_backend(backend_type, comp_config) {
+                                                    Ok(mut backend) => {
+                                                        if let Err(e) = backend.mount() {
+                                                            error!("Failed to mount {:?}: {}", entry.mount_point, e);
+                                                        } else {
+                                                            info!("Mounted new entry: {:?}", entry.mount_point);
+                                                            backends.push(Arc::new(std::sync::Mutex::new(backend)));
+                                                            active_mount_points.insert(entry.mount_point.clone());
+                                                        }
+                                                    }
+                                                    Err(e) => error!("Failed to create backend: {}", e),
+                                                }
+                                            }
+                                            Err(e) => error!("Failed to discover cells: {}", e),
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => error!("Failed to reload config: {}", e),
+                        }
+                    }
+                }
+            }
+        }
+
+        thread::sleep(Duration::from_millis(500));
     }
 
     // Cleanup: unmount all backends
@@ -325,7 +411,8 @@ fn run_serve(config_path: &Path) -> Result<()> {
         }
     }
 
-    // Wait for watcher threads
+    // Signal watcher threads to stop (they check `running`)
+    // Wait for them
     for (label, handle) in handles {
         if let Err(_) = handle.join() {
             error!("Watcher thread for {} panicked", label);
