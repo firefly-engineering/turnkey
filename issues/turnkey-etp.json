@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "turnkey-391"
+  ],
   "created": "2026-04-28T08:47:51Z",
   "description": "Add a toolchain-profile flake package that combines all toolchain entries into a single derivation with bin/. The daemon builds it alongside cells. FsCore exposes it as a virtual bin/ directory at the mount root, pass-through to the profile's bin/.",
   "id": "turnkey-etp",
