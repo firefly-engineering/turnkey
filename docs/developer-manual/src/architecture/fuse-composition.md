@@ -100,34 +100,71 @@ See [Custom Layouts](../extending/custom-layouts.md) for creating new layouts.
 ## Module Structure
 
 ```
+src/rust/nix-eval/src/          # Nix client abstraction (replaceable)
+├── lib.rs                      # NixClient trait
+├── cli.rs                      # CliNixClient (shells out to nix binary)
+└── error.rs
+
 src/rust/composition/src/
-├── lib.rs           # Public API exports
-├── backend.rs       # CompositionBackend trait
-├── config.rs        # CompositionConfig, CellConfig
-├── error.rs         # Error types
-├── layout.rs        # Layout system
-├── policy.rs        # Access policies
-├── recovery.rs      # Error recovery utilities
-├── selector.rs      # Backend selection logic
-├── state.rs         # Consistency state machine
-├── status.rs        # BackendStatus enum
-├── symlink.rs       # Symlink backend
-├── tracing.rs       # Logging and debugging
-├── watcher.rs       # File watching (optional)
-└── fuse/            # FUSE backend (feature-gated)
-    ├── mod.rs               # Re-exports FuseBackend (platform-conditional)
-    ├── fs_core.rs           # Platform-agnostic filesystem logic (no fuser dependency)
-    ├── platform.rs          # Platform detection and FUSE availability checking
-    ├── filesystem.rs        # Linux: fuser Filesystem trait impl (wraps FsCore)
-    ├── backend.rs           # Linux: FuseBackend using fuser crate
-    ├── edit_overlay.rs      # Copy-on-write editing layer
-    ├── patch_generator.rs   # Unified diff generation for edits
-    └── fuse_t/              # macOS: direct libfuse-t backend
+├── lib.rs                      # Public API exports
+├── backend.rs                  # CompositionBackend trait
+├── compose_config.rs           # compose.toml parser (single-mount legacy)
+├── config.rs                   # CompositionConfig, CellConfig
+├── discover.rs                 # Cell discovery via NixClient trait
+├── error.rs                    # Error types
+├── layout.rs                   # Layout system (Buck2Layout, BazelLayout)
+├── policy.rs                   # Access policies
+├── recovery.rs                 # Error recovery utilities
+├── selector.rs                 # Backend selection logic
+├── serve_config.rs             # Service config ([[mounts]] TOML format)
+├── service.rs                  # Launchd/systemd service generation
+├── state.rs                    # Consistency state machine
+├── status.rs                   # BackendStatus enum
+├── symlink.rs                  # Symlink backend
+├── synthetic.rs                # macOS synthetic firmlink management
+├── tracing.rs                  # Logging and debugging
+├── watcher.rs                  # File watching (optional)
+└── fuse/                       # FUSE backend (feature-gated)
+    ├── mod.rs                  # Re-exports FuseBackend (platform-conditional)
+    ├── fs_core.rs              # Platform-agnostic filesystem logic
+    ├── platform.rs             # Platform detection and FUSE availability
+    ├── filesystem.rs           # Linux: fuser Filesystem trait impl
+    ├── backend.rs              # Linux: FuseBackend using fuser crate
+    ├── edit_overlay.rs         # Copy-on-write editing layer
+    ├── patch_generator.rs      # Unified diff generation for edits
+    └── fuse_t/                 # macOS: direct libfuse-t backend
         ├── mod.rs
-        ├── bindings.rs      # Hand-written FFI bindings to libfuse3
-        ├── operations.rs    # FUSE operation callbacks (path-based API)
-        └── backend.rs       # FuseTBackend implementing CompositionBackend
+        ├── bindings.rs         # Hand-written FFI bindings to libfuse3
+        ├── operations.rs       # FUSE operation callbacks (path-based API)
+        └── backend.rs          # FuseTBackend implementing CompositionBackend
+
+nix/home-manager/
+└── turnkey-composed.nix        # Home-manager module for service management
 ```
+
+### Daemon Architecture
+
+The `turnkey-composed` daemon supports two modes:
+
+- **`start`**: Single mount, ad-hoc usage
+- **`serve`**: Multi-mount service mode, reads config file, watches for
+  changes
+
+In service mode, the daemon:
+1. Reads `~/.config/turnkey/composed.toml` for mount declarations
+2. For each mount: discovers cells via `nix-eval` crate, builds them,
+   creates the FUSE mount
+3. Watches manifest files for dependency changes (triggers cell rebuild)
+4. Watches the config file for new/removed mounts (hot-reload)
+5. On macOS, manages synthetic firmlinks for mount points under `/`
+
+### Nix Integration
+
+Cell derivations are exposed as flake packages (`godeps-cell`,
+`rustdeps-cell`, etc.) by the flake-parts module. The daemon builds them
+via the `NixClient` trait (currently `CliNixClient` which shells out to
+`nix`). This abstraction allows replacing the CLI with a direct Nix daemon
+client when one becomes available.
 
 ## FUSE Backend Implementation
 

@@ -1,6 +1,7 @@
 # FUSE Composition Layer
 
-The FUSE composition layer is an **optional enhancement** that provides a unified filesystem view of your repository and its dependencies at a fixed mount location. This enables:
+The FUSE composition layer provides a unified filesystem view of your
+repository and its dependencies at a fixed mount location. This enables:
 
 - Predictable paths for remote cache compatibility
 - Transparent editing of external dependencies
@@ -8,35 +9,52 @@ The FUSE composition layer is an **optional enhancement** that provides a unifie
 
 ## Quick Start
 
+### Manual (ad-hoc)
+
 ```bash
-# Start the composition daemon (builds cells via nix, mounts FUSE view)
-turnkey-composed start --mount-point ~/firefly/myproject --repo-root . --backend fuse
+# Start the daemon for a single repo
+turnkey-composed start --mount-point ~/firefly/turnkey --repo-root . --backend fuse
 
-# Check status
-turnkey-composed status
-
-# In another terminal, work from the mount point
-cd ~/firefly/myproject
+# Work from the mount point
+cd ~/firefly/turnkey
 buck2 build root//...
 
-# Stop the daemon
+# Stop
 turnkey-composed stop
 ```
 
-## When to Use FUSE
+### As a service (recommended)
 
-| Scenario | Recommendation |
-|----------|----------------|
-| Local development | **Use FUSE** - Best experience with editing support |
-| CI/CD pipelines | **Use symlinks** - No FUSE dependency |
-| Remote caching | **Use FUSE** - Fixed paths enable caching |
-| Containers without FUSE | **Use symlinks** - Automatic fallback |
+```bash
+# Install the service (runs on login)
+turnkey-composed install --start
+
+# Edit the config to declare your mounts
+vim ~/.config/turnkey/composed.toml
+```
+
+### With home-manager (declarative)
+
+```nix
+{
+  imports = [ turnkey.homeManagerModules.turnkey-composed ];
+
+  services.turnkey-composed = {
+    enable = true;
+    package = turnkey.packages.${system}.turnkey-composed;
+    mounts = {
+      myproject = {
+        repo = "/Users/me/src/myproject";
+        mountPoint = "/firefly/myproject";
+      };
+    };
+  };
+}
+```
 
 ## Prerequisites
 
 ### Linux
-
-FUSE is typically available out of the box on most Linux distributions:
 
 ```bash
 # Verify FUSE is available
@@ -49,223 +67,175 @@ sudo dnf install fuse3  # Fedora
 
 ### macOS
 
-Install FUSE-T, which works on Apple Silicon without kernel extensions:
+Install FUSE-T (no kernel extension, works on Apple Silicon):
 
 ```bash
 brew install macos-fuse-t/homebrew-cask/fuse-t
 ```
 
-**Mount point setup:** macOS root (`/`) is read-only. To use a fixed path like `/firefly/myproject`:
+**Mount points under `/`:** macOS root is read-only. The daemon
+automatically manages `/etc/synthetic.conf` entries and activates them
+via `apfs.util -t` when a mount point like `/firefly/turnkey` is
+requested. This requires `sudo` (the daemon prompts when needed).
 
-```bash
-# Add a synthetic firmlink (requires reboot)
-echo 'firefly' | sudo tee -a /etc/synthetic.conf
-# Reboot, then:
-sudo mkdir -p /firefly/myproject
+For paths under `~` (e.g., `~/firefly/turnkey`), no special setup is
+needed.
+
+## Service Configuration
+
+The service reads `~/.config/turnkey/composed.toml`:
+
+```toml
+# Mount a project
+[[mounts]]
+repo = "/Users/me/src/myproject"
+mount_point = "/firefly/myproject"
+
+# Mount another project
+[[mounts]]
+repo = "/Users/me/src/other-project"
+mount_point = "/firefly/other"
+backend = "fuse"  # Optional: "auto" (default), "fuse", or "symlink"
 ```
 
-Alternatively, use a path under your home directory (no reboot needed):
+The daemon watches this file for changes. When you add a new `[[mounts]]`
+entry, the daemon picks it up and mounts it automatically — no restart
+needed.
 
-```bash
-mkdir -p ~/firefly/myproject
+### Home-Manager Module
+
+The declarative alternative to editing the TOML file directly:
+
+```nix
+{
+  imports = [ turnkey.homeManagerModules.turnkey-composed ];
+
+  services.turnkey-composed = {
+    enable = true;
+    package = turnkey.packages.${system}.turnkey-composed;
+    mounts = {
+      myproject = {
+        repo = "/Users/me/src/myproject";
+        mountPoint = "/firefly/myproject";
+      };
+      other = {
+        repo = "/Users/me/src/other";
+        mountPoint = "/firefly/other";
+        backend = "fuse";  # Optional
+      };
+    };
+  };
+}
 ```
 
-## Configuration
+This generates the config file and manages the launchd agent (macOS) or
+systemd user service (Linux).
 
-The daemon discovers cells automatically from the flake. No special Nix configuration is needed — if your `flake.nix` uses the turnkey module with Buck2 enabled, the `*-cell` packages are exposed automatically.
+### Service Management
 
-### How Cell Discovery Works
+```bash
+# Install and start the service
+turnkey-composed install --start
+
+# Uninstall the service
+turnkey-composed uninstall
+
+# The service runs `turnkey-composed serve` which:
+# - Reads ~/.config/turnkey/composed.toml
+# - Builds cells via nix for each repo
+# - Mounts all entries
+# - Watches for config and manifest changes
+```
+
+## How Cell Discovery Works
 
 On startup, `turnkey-composed`:
 
-1. Runs `nix eval` to list `*-cell` packages from the flake (e.g., `godeps-cell`, `rustdeps-cell`)
-2. Runs `nix build` to build all cells in a single invocation (~3-4 seconds if cached)
-3. Uses the resulting Nix store paths to populate `external/` in the FUSE mount
+1. Runs `nix eval` to list `*-cell` packages from each repo's flake
+2. Runs `nix build` to build all cells in a single invocation (~3-4s if
+   cached)
+3. Uses the Nix store paths to populate `external/` in the FUSE mount
 
-This means:
-- No config file is needed for the basic case
-- Cells are always built from the current flake state
-- The daemon watches for manifest changes and rebuilds cells automatically
+Cells are always built from the current flake state. The daemon watches
+manifest files (`go-deps.toml`, `rust-deps.toml`, etc.) and rebuilds
+cells automatically when they change.
 
 ## Mount Structure
 
-When the daemon is running, the mount point presents:
-
 ```
-~/firefly/myproject/
+/firefly/myproject/
 ├── .buckconfig             # Virtual - generated by layout
 ├── .buckroot               # Virtual - marks Buck2 root
 ├── root/                   # Pass-through to your repository
 │   ├── src/
 │   ├── docs/
 │   ├── flake.nix
-│   └── ...                 # All repo files
+│   └── ...
 └── external/               # Dependency cells (from Nix store)
-    ├── godeps/             # Go dependencies
-    ├── rustdeps/           # Rust dependencies
-    ├── prelude/            # Buck2 prelude
-    ├── toolchains/         # Buck2 toolchains cell
+    ├── godeps/
+    ├── rustdeps/
+    ├── prelude/
+    ├── toolchains/
     └── ...
 ```
 
-**Key point:** Buck2 is run from the mount root (`~/firefly/myproject/`) where `.buckconfig` and `.buckroot` live. Source targets use the `root//` cell prefix (e.g., `buck2 build root//src/cmd/tk:tk`).
+Buck2 runs from the mount root. Source targets use the `root//` cell
+prefix: `buck2 build root//src/cmd/tk:tk`.
 
-## CLI Commands
+## CLI Reference
 
-### Starting and Stopping
-
-```bash
-# Start the daemon (discovers and builds cells automatically via nix)
-turnkey-composed start --mount-point ~/firefly/myproject --repo-root . --backend fuse
-
-# Start with explicit config file
-turnkey-composed start --config .turnkey/compose.toml --backend fuse
-
-# Stop the daemon
-turnkey-composed stop
-
-# Force unmount (if daemon is stuck)
-umount ~/firefly/myproject
-```
-
-### Status and Monitoring
+### Single Mount
 
 ```bash
-# Check daemon status
-turnkey-composed status
+# Start (foreground)
+turnkey-composed start --mount-point <path> --repo-root <path> [--backend fuse|symlink|auto]
+
+# With explicit config file
+turnkey-composed start --config <path>
 ```
 
-### Refreshing Dependencies
-
-The daemon watches manifest files (`go-deps.toml`, `rust-deps.toml`, etc.) and automatically rebuilds cells when they change. To trigger a manual refresh:
+### Service Mode
 
 ```bash
-turnkey-composed refresh
+# Run as a service (reads ~/.config/turnkey/composed.toml)
+turnkey-composed serve [--config <path>]
+
+# Install/uninstall the system service
+turnkey-composed install [--start]
+turnkey-composed uninstall
 ```
 
-## Access Policies
-
-The access policy controls how file operations behave during dependency updates.
-
-### Development (Default)
-
-Balanced policy for day-to-day work:
-- Allows quick reads during sync phase
-- Blocks during build phase for consistency
-- Degrades gracefully on errors
-
-### Strict
-
-Maximum consistency for production builds:
-- Blocks all cell access during updates
-- Never returns stale data
-- May have longer waits during builds
-
-Configure in Nix:
-```nix
-turnkey.fuse.accessPolicy = "strict";
-```
-
-Or via environment variable:
-```bash
-TURNKEY_ACCESS_POLICY=strict tk build //...
-```
-
-### Lenient
-
-Maximum availability for quick iteration:
-- Allows stale reads during updates
-- Only blocks during the brief transition phase
-- Fastest feedback loop
-
-### CI
-
-Fail-fast for automation:
-- Never blocks, returns EAGAIN immediately
-- Let retry logic handle conflicts
-- Ideal for CI/CD pipelines
-
-## Editing External Dependencies
-
-The FUSE layer supports editing external dependencies with automatic patch generation:
+### Control
 
 ```bash
-# Enable edit mode for a dependency
-tk compose edit godeps/github.com/spf13/cobra
-
-# Make your changes...
-vim /firefly/myproject/external/godeps/vendor/github.com/spf13/cobra/command.go
-
-# Generate patches from edits
-tk compose patch
-
-# View pending edits
-tk compose status --edits
-
-# Reset edits (discard changes)
-tk compose reset godeps/github.com/spf13/cobra
+turnkey-composed status     # Check daemon status
+turnkey-composed refresh    # Trigger manual cell rebuild
+turnkey-composed stop       # Stop the daemon
 ```
 
-### Patch Workflow
+## Platform Notes
 
-1. Enable edit mode for the dependency
-2. Make changes to files under `external/`
-3. Run `tk compose patch` to generate unified diffs
-4. Patches are stored in `.turnkey/patches/`
-5. Next `tk sync` applies patches automatically
+### Linux
 
-### Patch Format
+Uses native FUSE via `/dev/fuse` with the `fuser` Rust crate. Best
+performance.
 
-Generated patches are standard unified diffs:
+### macOS
 
-```
-.turnkey/patches/
-└── godeps/
-    └── vendor-github.com-spf13-cobra-command.go.patch
-```
+Uses FUSE-T with direct C FFI bindings to libfuse3. FUSE-T translates
+FUSE operations to NFS internally. No kernel extension required.
 
-These patches are automatically applied during Nix builds via the `userPatchesDir` configuration.
+The daemon handles synthetic firmlinks automatically for mount points
+under `/` (manages `/etc/synthetic.conf` and runs `apfs.util -t`).
 
-## Backend Selection
+### Symlinks (CI / Fallback)
 
-Turnkey automatically selects the best backend based on your environment:
-
-| Condition | Backend Selected |
-|-----------|-----------------|
-| FUSE available + enabled | FUSE |
-| FUSE enabled but unavailable | Symlink (with warning) |
-| FUSE disabled | Symlink |
-| CI environment detected | Symlink |
-| Container without /dev/fuse | Symlink |
-
-### Explicit Backend Selection
-
-```bash
-# Force FUSE (fails if FUSE-T not installed)
-turnkey-composed start --backend=fuse --mount-point ~/firefly/myproject --repo-root .
-
-# Force symlinks (no FUSE needed)
-turnkey-composed start --backend=symlink --mount-point ~/firefly/myproject --repo-root .
-
-# Auto-select (default — uses FUSE if available, falls back to symlinks)
-turnkey-composed start --backend=auto --mount-point ~/firefly/myproject --repo-root .
-```
-
-## Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `TURNKEY_FUSE_BACKEND` | Force backend selection | auto |
-| `TURNKEY_MOUNT_POINT` | Override mount point | from config |
-| `TURNKEY_ACCESS_POLICY` | Override access policy | development |
-| `TURNKEY_BLOCK_TIMEOUT` | Block timeout (seconds) | 300 |
-| `TURNKEY_FUSE_DEBUG` | Enable FUSE debug logging | false |
+Fastest for CI. No daemon needed. Automatically selected when FUSE is
+unavailable.
 
 ## Integration with IDEs
 
 ### VS Code / Cursor
-
-Configure your workspace to use the FUSE mount:
 
 ```json
 {
@@ -276,30 +246,5 @@ Configure your workspace to use the FUSE mount:
 
 ### IntelliJ / GoLand
 
-Set the project root to the FUSE mount point for consistent path resolution.
-
-## Platform Notes
-
-### Linux
-
-Uses native FUSE via `/dev/fuse` with the `fuser` Rust crate. Minimal overhead, best performance.
-
-### macOS
-
-Uses FUSE-T with direct C FFI bindings to libfuse3. FUSE-T translates FUSE operations to NFS internally, so there is slightly higher latency than native FUSE. No kernel extension is required — FUSE-T works on Apple Silicon without Recovery Mode.
-
-Install with:
-```bash
-brew install macos-fuse-t/homebrew-cask/fuse-t
-```
-
-### Symlinks (CI / Fallback)
-
-Fastest for CI, no daemon overhead. Automatically selected when FUSE is unavailable.
-
-## Performance Notes
-
-For large codebases, consider:
-- Using SSD/NVMe storage for the Nix store
-- Enabling `fallbackToSymlinks` for CI
-- Using `LenientPolicy` during rapid iteration
+Set the project root to the FUSE mount point for consistent path
+resolution.
