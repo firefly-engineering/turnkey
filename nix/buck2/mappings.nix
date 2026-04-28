@@ -283,6 +283,11 @@
     reason = "VCS meta-package (jj, git, gh, difftastic, delta)";
   };
 
+  turnkey-composed = {
+    skip = true;
+    reason = "FUSE composition daemon, not a Buck2 toolchain";
+  };
+
   clang = {
     skip = true;
     reason = "C/C++ compiler, needed in PATH for Buck2 actions but not a toolchain rule";

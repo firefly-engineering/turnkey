@@ -92,6 +92,7 @@
           packages.jsdeps-gen = import ./nix/packages/jsdeps-gen.nix { inherit pkgs lib; };
           packages.soldeps-gen = import ./nix/packages/soldeps-gen.nix { inherit pkgs lib; };
           packages.deps-extract = import ./nix/packages/deps-extract.nix { inherit pkgs lib; };
+          packages.turnkey-composed = import ./nix/packages/turnkey-composed.nix { inherit pkgs lib; };
 
           # Expose turnkey-prelude for CI builds
           packages.turnkey-prelude =
@@ -143,6 +144,7 @@
               in
               {
                 tw = single (import ./nix/packages/tw.nix { inherit pkgs lib; });
+                turnkey-composed = single (import ./nix/packages/turnkey-composed.nix { inherit pkgs lib; });
               };
             # Enable Buck2 toolchain generation
             buck2 = {

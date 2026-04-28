@@ -24,3 +24,4 @@ nix = { version = "2.34.1" }
 beadwork = { version = "0.12.3" }
 vcs-toolchain = { version = "2" }     # jj 0.40.0, git 2.54.0, gh, difftastic, delta
 tk = {}  # Turnkey CLI wrapper (provided by registryExtensions, not toolbox)
+turnkey-composed = {}  # FUSE composition daemon (provided by registryExtensions)
