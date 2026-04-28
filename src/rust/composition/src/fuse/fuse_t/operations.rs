@@ -203,7 +203,9 @@ unsafe extern "C" fn fuse_getattr(
         }
         ResolvedPath::SourceChild { real_path }
         | ResolvedPath::Cell { real_path, .. }
-        | ResolvedPath::CellChild { real_path, .. } => {
+        | ResolvedPath::CellChild { real_path, .. }
+        | ResolvedPath::OutputMount { real_path }
+        | ResolvedPath::OutputChild { real_path } => {
             match fs::symlink_metadata(&real_path) {
                 Ok(meta) => {
                     fill_stat_from_metadata(stbuf, &meta);
@@ -245,6 +247,9 @@ unsafe extern "C" fn fuse_readdir(
             fill(&core.config.cell_prefix);
             fill(".buckconfig");
             fill(".buckroot");
+            for om in &core.config.output_mounts {
+                fill(&om.mount_as);
+            }
             0
         }
         ResolvedPath::Source => {
@@ -271,7 +276,9 @@ unsafe extern "C" fn fuse_readdir(
         }
         ResolvedPath::SourceChild { real_path }
         | ResolvedPath::Cell { real_path, .. }
-        | ResolvedPath::CellChild { real_path, .. } => {
+        | ResolvedPath::CellChild { real_path, .. }
+        | ResolvedPath::OutputMount { real_path }
+        | ResolvedPath::OutputChild { real_path } => {
             match fs::read_dir(&real_path) {
                 Ok(entries) => {
                     for entry in entries.flatten() {
@@ -336,7 +343,9 @@ unsafe extern "C" fn fuse_read(
             ptr::copy_nonoverlapping(available.as_ptr(), buf as *mut u8, to_copy);
             to_copy as c_int
         }
-        ResolvedPath::SourceChild { real_path } | ResolvedPath::CellChild { real_path, .. } => {
+        ResolvedPath::SourceChild { real_path }
+        | ResolvedPath::CellChild { real_path, .. }
+        | ResolvedPath::OutputChild { real_path } => {
             let mut file = match std::fs::File::open(&real_path) {
                 Ok(f) => f,
                 Err(e) => return -(e.raw_os_error().unwrap_or(libc::EIO)),
@@ -353,7 +362,8 @@ unsafe extern "C" fn fuse_read(
         ResolvedPath::Root
         | ResolvedPath::Source
         | ResolvedPath::CellPrefix
-        | ResolvedPath::Cell { .. } => -libc::EISDIR,
+        | ResolvedPath::Cell { .. }
+        | ResolvedPath::OutputMount { .. } => -libc::EISDIR,
         ResolvedPath::NotFound => -libc::ENOENT,
     }
 }
@@ -372,7 +382,8 @@ unsafe extern "C" fn fuse_readlink(
     let real_path = match core.resolve_path(path) {
         ResolvedPath::SourceChild { real_path }
         | ResolvedPath::Cell { real_path, .. }
-        | ResolvedPath::CellChild { real_path, .. } => real_path,
+        | ResolvedPath::CellChild { real_path, .. }
+        | ResolvedPath::OutputChild { real_path } => real_path,
         ResolvedPath::NotFound => return -libc::ENOENT,
         _ => return -libc::EINVAL,
     };

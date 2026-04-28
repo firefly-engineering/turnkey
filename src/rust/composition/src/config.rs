@@ -71,6 +71,22 @@ pub struct CompositionConfig {
     /// Entries are matched against the first path component under `root/`.
     /// Trailing `/` is stripped. Examples: `.envrc`, `.devenv`, `buck-out`.
     pub exclude: Vec<String>,
+
+    /// Output directories to expose at the mount root.
+    ///
+    /// Each maps a virtual name (visible in the mount) to a real directory
+    /// on disk. The real directory is created if it doesn't exist.
+    /// Example: `build` → `/tmp/turnkey-out/buck` mounts as `<mount>/build/`
+    pub output_mounts: Vec<OutputMount>,
+}
+
+/// An output directory mapped into the FUSE view
+#[derive(Debug, Clone)]
+pub struct OutputMount {
+    /// Name visible in the mount root (e.g., "build")
+    pub mount_as: String,
+    /// Real directory on disk (e.g., "/tmp/turnkey-out/buck")
+    pub real_path: PathBuf,
 }
 
 impl CompositionConfig {
@@ -88,6 +104,7 @@ impl CompositionConfig {
             edits_dir: PathBuf::from(".turnkey/edits"),
             patches_dir: PathBuf::from(".turnkey/patches"),
             exclude: Vec::new(),
+            output_mounts: Vec::new(),
         }
     }
 
@@ -112,6 +129,15 @@ impl CompositionConfig {
     /// Add exclusion patterns for the source pass-through
     pub fn with_excludes(mut self, excludes: Vec<String>) -> Self {
         self.exclude = excludes;
+        self
+    }
+
+    /// Add an output mount (virtual directory at mount root → real directory)
+    pub fn with_output_mount(mut self, mount_as: impl Into<String>, real_path: impl Into<PathBuf>) -> Self {
+        self.output_mounts.push(OutputMount {
+            mount_as: mount_as.into(),
+            real_path: real_path.into(),
+        });
         self
     }
 

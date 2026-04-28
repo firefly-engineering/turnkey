@@ -109,6 +109,10 @@ pub(crate) enum ResolvedPath {
     Cell { name: String, real_path: PathBuf },
     CellChild { cell_name: String, real_path: PathBuf },
     VirtualFile { file: VirtualFile },
+    /// An output directory mounted at the root (e.g., "build" → /tmp/buck-out)
+    OutputMount { real_path: PathBuf },
+    /// A child path within an output mount
+    OutputChild { real_path: PathBuf },
     NotFound,
 }
 
@@ -721,6 +725,20 @@ impl FsCore {
             if first == ".buckroot" {
                 return ResolvedPath::VirtualFile {
                     file: VirtualFile::BuckRoot,
+                };
+            }
+        }
+
+        // --- output mount branch ---
+        for om in &self.config.output_mounts {
+            if first == om.mount_as {
+                return match rest {
+                    None => ResolvedPath::OutputMount {
+                        real_path: om.real_path.clone(),
+                    },
+                    Some(remainder) => ResolvedPath::OutputChild {
+                        real_path: om.real_path.join(remainder),
+                    },
                 };
             }
         }

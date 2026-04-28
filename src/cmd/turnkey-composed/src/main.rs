@@ -86,6 +86,11 @@ enum Commands {
         #[arg(long)]
         exclude: Vec<String>,
 
+        /// Output directories to mount: name:real_path (repeatable)
+        /// Example: --output build:/tmp/buck-out --output cargo-target:/tmp/cargo-target
+        #[arg(long)]
+        output: Vec<String>,
+
         /// Disable manifest file watching
         #[arg(long)]
         no_watch: bool,
@@ -162,6 +167,7 @@ fn main() -> Result<()> {
             repo_root,
             backend,
             exclude,
+            output,
             foreground,
             no_watch,
         } => {
@@ -198,6 +204,13 @@ fn main() -> Result<()> {
                     .map_err(|e| anyhow::anyhow!("{}", e))?;
                 if !exclude.is_empty() {
                     cfg = cfg.with_excludes(exclude);
+                }
+                for o in &output {
+                    if let Some((name, path)) = o.split_once(':') {
+                        cfg = cfg.with_output_mount(name, path);
+                    } else {
+                        warn!("Invalid --output format '{}', expected name:path", o);
+                    }
                 }
                 cfg
             };
