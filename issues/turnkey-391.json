@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-04-28T08:47:51Z",
+  "description": "FsCore generates a virtual .envrc file at the mount root containing 'PATH_add bin'. This is independent from the repo's .envrc (which is excluded from the view). Direnv picks it up automatically when the user cd's to the mount point.",
+  "id": "turnkey-391",
+  "labels": [],
+  "priority": 1,
+  "status": "open",
+  "title": "Virtual .envrc at mount root",
+  "type": "task",
+  "updated_at": "2026-04-28T08:47:51Z"
+}
