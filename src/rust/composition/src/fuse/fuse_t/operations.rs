@@ -493,15 +493,24 @@ unsafe extern "C" fn fuse_rmdir(path: *const c_char) -> c_int {
 
 unsafe extern "C" fn fuse_create(
     path: *const c_char,
-    _mode: libc::mode_t,
-    fi: *mut bindings::fuse_file_info,
+    mode: libc::mode_t,
+    _fi: *mut bindings::fuse_file_info,
 ) -> c_int {
     let core = get_core();
     let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
     let resolved = core.resolve_path(path);
     let real = match writable_real_path(&resolved) { Ok(p) => p, Err(e) => return e };
     match std::fs::File::create(real) {
-        Ok(_) => 0,
+        Ok(_) => {
+            // Set the requested permissions
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let perms = std::fs::Permissions::from_mode(mode as u32);
+                std::fs::set_permissions(real, perms).ok();
+            }
+            0
+        }
         Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
     }
 }
@@ -553,13 +562,24 @@ unsafe extern "C" fn fuse_truncate(
 
 unsafe extern "C" fn fuse_chmod(
     path: *const c_char,
-    _mode: libc::mode_t,
+    mode: libc::mode_t,
     _fi: *mut bindings::fuse_file_info,
 ) -> c_int {
     let core = get_core();
     let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
     let resolved = core.resolve_path(path);
-    if is_writable(&resolved) { 0 } else { -libc::EROFS }
+    let real = match writable_real_path(&resolved) { Ok(p) => p, Err(e) => return e };
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let perms = std::fs::Permissions::from_mode(mode as u32);
+        match std::fs::set_permissions(real, perms) {
+            Ok(()) => 0,
+            Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+        }
+    }
+    #[cfg(not(unix))]
+    { 0 }
 }
 
 unsafe extern "C" fn fuse_rename(
