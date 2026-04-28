@@ -6,13 +6,14 @@
   "blocks": [
     "turnkey-wro0"
   ],
+  "closed_at": "2026-04-28T06:43:29Z",
   "created": "2026-01-13T22:40:58.151320274+01:00",
   "description": "Use FUSE-T (https://www.fuse-t.org/) to create a transparent composition layer for the repository.\n\n## Vision\n\nInstead of managing dependency cells as symlinked Nix store paths that need explicit refresh, expose them through a FUSE filesystem that can transparently update when dependencies change.\n\n## Key Benefits\n\n1. **Transparent updates** - Dependencies appear as regular local files but are backed by Nix derivations. Changes propagate automatically without needing `nix develop` re-entry or cell symlink updates.\n\n2. **Build system agnostic** - The FUSE layer can present different directory layouts for different build systems:\n   - Buck2 layout (current cell-based approach)\n   - Bazel layout (WORKSPACE, external/, etc.)\n   - Other build systems as needed\n\n3. **Better developer experience** - No more \"stale cell\" issues. The filesystem always reflects the current state of dependencies.\n\n4. **Unified dependency management** - Nix remains the source of truth for fetching and building dependencies, but the presentation layer becomes flexible.\n\n## Architecture Sketch\n\n```\n                    ┌─────────────────────────────────────┐\n                    │         FUSE-T Filesystem           │\n                    │  (presents deps as local files)     │\n                    └─────────────────────────────────────┘\n                                     │\n                    ┌────────────────┼────────────────┐\n                    │                │                │\n                    ▼                ▼                ▼\n            Buck2 Layout      Bazel Layout      Other Layout\n            .turnkey/         external/         ...\n            godeps/           @go_deps//\n            rustdeps/         @rust_deps//\n\n                    └────────────────┬────────────────┘\n                                     │\n                    ┌─────────────────────────────────────┐\n                    │         Nix Store Backend           │\n                    │  (actual dependency derivations)    │\n                    └─────────────────────────────────────┘\n```\n\n## Implementation Considerations\n\n- FUSE-T is macOS-specific; need Linux FUSE equivalent for cross-platform\n- Daemon process to manage the FUSE mount\n- Integration with `tk` CLI for mount/unmount lifecycle\n- Watch mode for automatic dependency updates\n- Caching strategy for performance\n\n## Phases\n\n1. **Research** - Evaluate FUSE-T capabilities, performance characteristics\n2. **Prototype** - Basic FUSE mount exposing godeps cell\n3. **Buck2 integration** - Replace current symlink approach\n4. **Bazel support** - Add Bazel-compatible layout generation\n5. **Polish** - Developer tooling, error handling, documentation\n\n## Related\n\n- Current cell symlink approach in `nix/devenv/turnkey/buck2.nix`\n- Dependency cell builders in `nix/lib/deps-cell/`",
   "id": "turnkey-x8l5",
   "labels": [],
   "priority": 4,
-  "status": "open",
+  "status": "closed",
   "title": "FUSE-based repository composition layer",
   "type": "epic",
-  "updated_at": "2026-03-17T17:25:27Z"
+  "updated_at": "2026-04-28T06:43:29Z"
 }
