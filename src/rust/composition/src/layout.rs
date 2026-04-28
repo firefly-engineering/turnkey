@@ -395,10 +395,6 @@ impl Buck2Layout {
         content.push_str("[build]\n");
         content.push_str("    execution_platforms = prelude//platforms:default\n");
 
-        // Set isolation_dir to keep build artifacts outside the (read-only) FUSE mount.
-        // Points to the "build" output mount which must be configured with --output build:<path>.
-        content.push_str("    isolation_dir = build\n");
-
         ConfigFile::new(".buckconfig", content)
     }
 }
