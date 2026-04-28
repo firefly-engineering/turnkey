@@ -3,7 +3,9 @@
   "blocked_by": [
     "turnkey-x8l5.3.1"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-x8l5.3.4"
+  ],
   "created": "2026-04-28T06:09:50Z",
   "description": "When a mount point is under / on macOS (e.g. /firefly/turnkey), detect that a synthetic firmlink is needed in /etc/synthetic.conf. Manage the entry and run 'sudo apfs.util -t' to activate without reboot. Handle privilege escalation gracefully.",
   "id": "turnkey-x8l5.3.3",
