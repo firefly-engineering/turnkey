@@ -3,7 +3,9 @@
   "blocked_by": [
     "turnkey-c03.1"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-c03.4"
+  ],
   "created": "2026-04-28T08:01:34Z",
   "description": "Relocate buck-out and cargo target outside the source tree but expose them as virtual directories in the FUSE mount. Config: outputs section with real_path and mount_as. Generated .buckconfig sets isolation_dir. FsCore gets a new OutputMount resolved path type for pass-through to the real output directory.",
   "id": "turnkey-c03.2",
@@ -13,5 +15,5 @@
   "status": "open",
   "title": "Build output virtual mounts",
   "type": "task",
-  "updated_at": "2026-04-28T08:01:40Z"
+  "updated_at": "2026-04-28T08:01:41Z"
 }
