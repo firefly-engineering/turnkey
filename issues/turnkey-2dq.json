@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-04-28T11:56:42Z",
+  "description": "Full buck2 build (1000+ actions) causes broken pipe errors through FUSE-T. The single-threaded fuse_loop can't keep up with Buck2's concurrent I/O. Need to either use fuse_loop_mt (multi-threaded) or optimize the FUSE callbacks. Small builds (docs) work fine.",
+  "id": "turnkey-2dq",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "FUSE performance: support concurrent operations for full builds",
+  "type": "task",
+  "updated_at": "2026-04-28T11:56:42Z"
+}
