@@ -231,6 +231,15 @@ fn run_serve(config_path: &Path) -> Result<()> {
             entry.backend
         );
 
+        // Ensure mount point exists (creates synthetic firmlinks on macOS if needed)
+        #[cfg(target_os = "macos")]
+        composition::synthetic::ensure_mount_point(&entry.mount_point)
+            .map_err(|e| anyhow::anyhow!("Failed to prepare mount point {:?}: {}", entry.mount_point, e))?;
+
+        #[cfg(not(target_os = "macos"))]
+        std::fs::create_dir_all(&entry.mount_point)
+            .with_context(|| format!("Failed to create mount point {:?}", entry.mount_point))?;
+
         // Discover and build cells
         let nix = CliNixClient::new(&entry.repo);
         let composition_config = discover::build_and_configure(&nix, &entry.mount_point, &entry.repo)
