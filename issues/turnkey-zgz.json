@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-04-28T09:27:03Z",
+  "description": "Output mounts (build/, cargo-target/) need to be writable for Buck2 and Cargo to write build artifacts. Currently the FUSE mount is read-only. Options: remove RO flag and add per-path write-through logic, or use a separate writable overlay for output directories.",
+  "id": "turnkey-zgz",
+  "labels": [],
+  "priority": 1,
+  "status": "open",
+  "title": "Writable output mounts in FUSE view",
+  "type": "task",
+  "updated_at": "2026-04-28T09:27:03Z"
+}
