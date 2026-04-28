@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-04-28T08:01:34Z",
+  "description": "Config-driven file/directory exclusion in FsCore. Add 'exclude' list to serve_config and compose_config. FsCore::resolve_path returns NotFound for excluded paths. readdir filters excluded names. CLI: --exclude flag on start/serve commands.",
+  "id": "turnkey-c03.1",
+  "labels": [],
+  "parent": "turnkey-c03",
+  "priority": 2,
+  "status": "open",
+  "title": "View exclusion rules",
+  "type": "task",
+  "updated_at": "2026-04-28T08:01:34Z"
+}
