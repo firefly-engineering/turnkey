@@ -196,6 +196,7 @@ unsafe extern "C" fn fuse_getattr(
             let ino = match file {
                 VirtualFile::BuckConfig => 4,
                 VirtualFile::BuckRoot => 5,
+                VirtualFile::Envrc => 6,
             };
             let content = core.get_virtual_file_content(file);
             fill_virtual_file_stat(stbuf, ino, content.len() as u64, core.uid, core.gid);
@@ -247,6 +248,7 @@ unsafe extern "C" fn fuse_readdir(
             fill(&core.config.cell_prefix);
             fill(".buckconfig");
             fill(".buckroot");
+            fill(".envrc");
             for om in &core.config.output_mounts {
                 fill(&om.mount_as);
             }
