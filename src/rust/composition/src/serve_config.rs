@@ -27,6 +27,10 @@ pub struct ServeConfig {
     /// List of repositories to mount
     #[serde(rename = "mounts")]
     pub mounts: Vec<MountEntry>,
+
+    /// VCS tools to wrap with transparent redirect
+    #[serde(default)]
+    pub vcs_wrap: Vec<String>,
 }
 
 /// A single mount entry

@@ -409,6 +409,29 @@ fn run_serve(config_path: &Path) -> Result<()> {
         handles.push((entry.mount_point.display().to_string(), handle));
     }
 
+    // Generate VCS wrappers if configured
+    if !config.vcs_wrap.is_empty() {
+        let mount_map: std::collections::HashMap<PathBuf, PathBuf> = config
+            .mounts
+            .iter()
+            .map(|m| (m.mount_point.clone(), m.repo.clone()))
+            .collect();
+        match composition::vcs_wrappers::generate_wrappers(
+            &config.vcs_wrap,
+            &mount_map,
+            "root", // source_dir_name
+        ) {
+            Ok(dir) => {
+                info!(
+                    "Generated VCS wrappers in {}. Add to PATH: export PATH=\"{}:$PATH\"",
+                    dir.display(),
+                    dir.display()
+                );
+            }
+            Err(e) => warn!("Failed to generate VCS wrappers: {}", e),
+        }
+    }
+
     info!("All mounts ready. Watching config file for changes...");
 
     // Track mount state for hot-reload diffing
@@ -518,6 +541,11 @@ fn run_serve(config_path: &Path) -> Result<()> {
         if let Err(_) = handle.join() {
             error!("Watcher thread for {} panicked", label);
         }
+    }
+
+    // Clean up VCS wrappers
+    if !config.vcs_wrap.is_empty() {
+        composition::vcs_wrappers::remove_wrappers(&config.vcs_wrap);
     }
 
     info!("All mounts stopped");

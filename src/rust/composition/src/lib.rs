@@ -57,6 +57,7 @@ mod error;
 pub mod serve_config;
 pub mod service;
 pub mod synthetic;
+pub mod vcs_wrappers;
 pub mod layout;
 pub mod performance;
 pub mod policy;
