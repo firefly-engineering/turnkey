@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-04-28T11:56:42Z",
+  "description": "When turnkey-composed restarts, buck2's daemon holds stale file descriptors to the old mount. Users must manually run 'buck2 kill' after every daemon restart. The daemon should detect and kill stale buck2 processes when mounting.",
+  "id": "turnkey-1td",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "Auto-kill stale buck2 daemon on FUSE mount restart",
+  "type": "task",
+  "updated_at": "2026-04-28T11:56:42Z"
+}
