@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-04-28T08:01:34Z",
+  "description": "All view features must be controllable from the command line for troubleshooting: --exclude patterns, --output buck:path:mount_as, --vcs-wrap jj,git. These override config file values.",
+  "id": "turnkey-c03.4",
+  "labels": [],
+  "parent": "turnkey-c03",
+  "priority": 2,
+  "status": "open",
+  "title": "CLI overrides for all view options",
+  "type": "task",
+  "updated_at": "2026-04-28T08:01:34Z"
+}
