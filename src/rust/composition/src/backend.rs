@@ -142,6 +142,7 @@ pub trait CompositionBackend: Send + Sync {
     }
 }
 
+#[allow(dead_code)]
 /// Extension trait for backend-specific operations
 ///
 /// Some operations are only available on specific backends. This trait

@@ -185,10 +185,11 @@ cd "$WORK_DIR"
     for artifact in dep_artifacts:
         test_cmd.add(artifact)
 
-    # Add soldeps cell path from toolchain for auto-remapping
-    if toolchain.soldeps_path:
+    # Add soldeps cell path for auto-remapping (resolved from .buckconfig)
+    soldeps_cell_path = read_root_config("cells", "soldeps", None)
+    if soldeps_cell_path:
         test_cmd.add("--soldeps-cell")
-        test_cmd.add(toolchain.soldeps_path)
+        test_cmd.add(soldeps_cell_path)
 
     # Create run info for test execution
     run_info = RunInfo(args = test_cmd)

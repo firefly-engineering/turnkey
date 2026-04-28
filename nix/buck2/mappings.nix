@@ -239,7 +239,6 @@
           cast_path = "${registry.foundry}/bin/cast";
           anvil_path = "${registry.foundry}/bin/anvil";
           jq_path = "${registry.jq}/bin/jq";
-          soldeps_path = ".turnkey/soldeps";
         };
       }
     ];
@@ -387,7 +386,6 @@
           cast_path = "${registry.foundry}/bin/cast";
           anvil_path = "${registry.foundry}/bin/anvil";
           jq_path = "${registry.jq}/bin/jq";
-          soldeps_path = ".turnkey/soldeps";
         };
       }
     ];

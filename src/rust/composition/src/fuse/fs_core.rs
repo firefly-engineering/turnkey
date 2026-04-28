@@ -10,13 +10,15 @@
 //! types so that it has **zero dependency on the `fuser` crate**. Each backend
 //! is responsible for converting between `FsCore` types and its own FUSE types.
 
+// Many types and methods are designed for a future Linux fuser backend (inode-based)
+// but only the path-based API is used on macOS currently.
+#![allow(dead_code)]
+
 use log::{debug, warn};
 use std::collections::HashMap;
-use std::ffi::OsStr;
-use std::fs::{self, File};
-use std::io::Read;
+use std::fs;
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -58,6 +60,7 @@ pub(crate) enum VirtualFile {
 
 /// Represents the underlying path for an inode
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) enum InodePath {
     /// Virtual root directory of the mount
     Root,
@@ -75,6 +78,7 @@ pub(crate) enum InodePath {
 
 /// Platform-neutral file type (no fuser dependency)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub(crate) enum FsFileType {
     Directory,
     RegularFile,
@@ -113,9 +117,9 @@ pub(crate) enum ResolvedPath {
     CellChild { cell_name: String, real_path: PathBuf },
     VirtualFile { file: VirtualFile },
     /// An output directory mounted at the root (e.g., "build" → /tmp/buck-out)
-    OutputMount { real_path: PathBuf },
+    OutputMount { real_path: PathBuf, symlink: bool },
     /// A child path within an output mount
-    OutputChild { real_path: PathBuf },
+    OutputChild { real_path: PathBuf, symlink: bool },
     NotFound,
 }
 
@@ -264,6 +268,7 @@ impl FsCore {
                 config.output_mounts.push(crate::config::OutputMount {
                     mount_as: "bin".to_string(),
                     real_path: bin_path,
+                    symlink: true,
                 });
             }
         }
@@ -761,15 +766,18 @@ impl FsCore {
             }
         }
 
+
         // --- output mount branch ---
         for om in &self.config.output_mounts {
             if first == om.mount_as {
                 return match rest {
                     None => ResolvedPath::OutputMount {
                         real_path: om.real_path.clone(),
+                        symlink: om.symlink,
                     },
                     Some(remainder) => ResolvedPath::OutputChild {
                         real_path: om.real_path.join(remainder),
+                        symlink: om.symlink,
                     },
                 };
             }
@@ -960,10 +968,18 @@ mod tests {
     fn test_resolve_path_virtual_buckconfig() {
         let config = CompositionConfig::new("/mnt", "/repo");
         let core = test_core(config, PathBuf::from("/repo"));
+        // /.buckconfig is at mount root
+        assert!(matches!(
+            core.resolve_path("/.buckconfig"),
+            ResolvedPath::VirtualFile {
+                file: VirtualFile::BuckConfig
+            }
+        ));
+        // /root/.buckconfig is the root cell's .buckconfig
         assert!(matches!(
             core.resolve_path("/root/.buckconfig"),
             ResolvedPath::VirtualFile {
-                file: VirtualFile::BuckConfig
+                file: VirtualFile::RootCellBuckConfig
             }
         ));
     }
@@ -972,8 +988,9 @@ mod tests {
     fn test_resolve_path_virtual_buckroot() {
         let config = CompositionConfig::new("/mnt", "/repo");
         let core = test_core(config, PathBuf::from("/repo"));
+        // .buckroot is at mount root, not inside root/
         assert!(matches!(
-            core.resolve_path("/root/.buckroot"),
+            core.resolve_path("/.buckroot"),
             ResolvedPath::VirtualFile {
                 file: VirtualFile::BuckRoot
             }

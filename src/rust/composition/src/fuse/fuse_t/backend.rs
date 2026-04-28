@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 
 use super::bindings;
 use super::operations;
@@ -115,9 +115,12 @@ impl CompositionBackend for FuseTBackend {
             operations::set_core(&core as *const FsCore);
 
             // Build fuse_args: argv[0] = program name, then mount options
+            // noappledouble: prevent ._ AppleDouble files in output dirs
+            // noapplexattr: prevent Apple xattr translation files
             let arg0 = CString::new("turnkey-composed").unwrap();
             let arg_ro = CString::new("-o").unwrap();
-            let arg_ro_val = CString::new("fsname=turnkey").unwrap();
+            let arg_ro_val =
+                CString::new("fsname=turnkey,noappledouble,noapplexattr").unwrap();
             let mut argv: Vec<*mut i8> = vec![
                 arg0.as_ptr() as *mut i8,
                 arg_ro.as_ptr() as *mut i8,

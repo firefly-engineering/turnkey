@@ -6,4 +6,5 @@
 
 pub mod bindings;
 pub mod backend;
+pub mod metrics;
 pub mod operations;

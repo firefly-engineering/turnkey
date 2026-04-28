@@ -18,7 +18,31 @@ pub enum fuse {}
 pub enum fuse_pollhandle {}
 pub enum fuse_bufvec {}
 pub enum fuse_conn_info {}
-pub enum fuse_config {}
+
+/// FUSE configuration, passed to init callback.
+/// Field layout must match fuse3/fuse.h exactly.
+#[repr(C)]
+pub struct fuse_config {
+    pub set_gid: c_int,
+    pub gid: libc::c_uint,
+    pub set_uid: c_int,
+    pub uid: libc::c_uint,
+    pub set_mode: c_int,
+    pub umask: libc::c_uint,
+    pub entry_timeout: f64,
+    pub negative_timeout: f64,
+    pub attr_timeout: f64,
+    pub intr: c_int,
+    pub intr_signal: c_int,
+    pub remember: c_int,
+    pub hard_remove: c_int,
+    pub use_ino: c_int,
+    pub readdir_ino: c_int,
+    pub direct_io: c_int,
+    pub kernel_cache: c_int,
+    pub auto_cache: c_int,
+    pub no_rofd_flush: c_int,
+}
 pub enum fuse_loop_config {}
 
 /// libfuse version struct, passed to fuse_new_30

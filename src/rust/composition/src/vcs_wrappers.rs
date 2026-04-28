@@ -9,7 +9,7 @@
 //! 3. Runs the real tool from the repo directory
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use log::info;
 

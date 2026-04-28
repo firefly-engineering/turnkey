@@ -149,10 +149,11 @@ done
     for src in ctx.attrs.srcs:
         compile_cmd.add(src)
 
-    # Add soldeps cell path from toolchain for auto-remapping
-    if toolchain.soldeps_path:
+    # Add soldeps cell path for auto-remapping (resolved from .buckconfig)
+    soldeps_cell_path = read_root_config("cells", "soldeps", None)
+    if soldeps_cell_path:
         compile_cmd.add("--soldeps-cell")
-        compile_cmd.add(toolchain.soldeps_path)
+        compile_cmd.add(soldeps_cell_path)
 
     # Add explicit remappings (these should be path-based, not Buck targets)
     if all_remappings:

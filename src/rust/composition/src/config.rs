@@ -91,6 +91,9 @@ pub struct OutputMount {
     pub mount_as: String,
     /// Real directory on disk (e.g., "/tmp/turnkey-out/buck")
     pub real_path: PathBuf,
+    /// If true, expose as a symlink to real_path (bypasses FUSE for reads).
+    /// Use for read-only mounts like toolchain bin/ from the Nix store.
+    pub symlink: bool,
 }
 
 impl CompositionConfig {
@@ -142,6 +145,7 @@ impl CompositionConfig {
         self.output_mounts.push(OutputMount {
             mount_as: mount_as.into(),
             real_path: real_path.into(),
+            symlink: false,
         });
         self
     }

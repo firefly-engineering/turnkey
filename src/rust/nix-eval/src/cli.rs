@@ -4,7 +4,7 @@
 //! that gets replaced when a proper Nix client library is available.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 use log::{debug, info};

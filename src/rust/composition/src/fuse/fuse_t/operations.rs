@@ -4,6 +4,7 @@
 //! converts C paths to Rust, delegates to FsCore, and converts results back.
 
 #![cfg(target_os = "macos")]
+#![allow(unsafe_op_in_unsafe_fn)]
 
 use std::ffi::{c_void, CStr, CString};
 use std::fs;
@@ -11,8 +12,10 @@ use std::io::{Read, Seek, SeekFrom};
 use std::os::raw::{c_char, c_int};
 use std::os::unix::fs::MetadataExt;
 use std::ptr;
+use std::time::Instant;
 
 use super::bindings;
+use super::metrics;
 use crate::fuse::fs_core::{FsCore, ResolvedPath, VirtualFile};
 
 /// Global pointer to the FsCore instance.
@@ -24,7 +27,7 @@ static CORE_PTR: std::sync::atomic::AtomicPtr<FsCore> =
     std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
 
 /// Set the global FsCore pointer. Must be called before fuse_loop.
-pub fn set_core(core: *const FsCore) {
+pub(crate) fn set_core(core: *const FsCore) {
     CORE_PTR.store(core as *mut FsCore, std::sync::atomic::Ordering::Release);
 }
 
@@ -105,70 +108,35 @@ unsafe fn fill_stat_from_metadata(stbuf: *mut libc::stat, meta: &fs::Metadata) {
     (*stbuf).st_ctime = meta.ctime() as libc::time_t;
 }
 
-/// Call the filler function with a directory entry name and stat.
-unsafe fn call_filler_with_stat(
-    buf: *mut c_void,
-    filler: bindings::fuse_fill_dir_t,
-    name: &str,
-    stbuf: *const libc::stat,
-) -> c_int {
-    let Ok(cname) = CString::new(name) else {
-        return -libc::EIO;
-    };
-    filler.unwrap()(buf, cname.as_ptr(), stbuf, 0, 0);
-    0
-}
-
-/// Call filler for a directory entry.
-unsafe fn filler_dir(
-    buf: *mut c_void,
-    filler: bindings::fuse_fill_dir_t,
-    name: &str,
-    ino: u64,
-    uid: u32,
-    gid: u32,
-) -> c_int {
-    let mut st: libc::stat = std::mem::zeroed();
-    fill_dir_stat(&mut st, ino, uid, gid);
-    call_filler_with_stat(buf, filler, name, &st)
-}
-
-/// Call filler for a regular file entry.
-unsafe fn filler_file(
-    buf: *mut c_void,
-    filler: bindings::fuse_fill_dir_t,
-    name: &str,
-    ino: u64,
-    size: u64,
-    uid: u32,
-    gid: u32,
-) -> c_int {
-    let mut st: libc::stat = std::mem::zeroed();
-    fill_virtual_file_stat(&mut st, ino, size, uid, gid);
-    call_filler_with_stat(buf, filler, name, &st)
-}
-
-/// Call filler for a real filesystem entry.
-unsafe fn filler_real(
-    buf: *mut c_void,
-    filler: bindings::fuse_fill_dir_t,
-    name: &str,
-    meta: &fs::Metadata,
-) -> c_int {
-    let mut st: libc::stat = std::mem::zeroed();
-    fill_stat_from_metadata(&mut st, meta);
-    call_filler_with_stat(buf, filler, name, &st)
-}
 
 // ---------------------------------------------------------------------------
 // Callbacks
 // ---------------------------------------------------------------------------
+
+/// Scope guard that records timing on drop.
+struct TimedOp {
+    start: Instant,
+    op: fn(Instant),
+}
+
+impl Drop for TimedOp {
+    fn drop(&mut self) {
+        (self.op)(self.start);
+    }
+}
+
+macro_rules! timed {
+    ($op:ident) => {
+        let _timer = TimedOp { start: Instant::now(), op: metrics::$op };
+    };
+}
 
 unsafe extern "C" fn fuse_getattr(
     path: *const c_char,
     stbuf: *mut libc::stat,
     _fi: *mut bindings::fuse_file_info,
 ) -> c_int {
+    timed!(getattr);
     let core = get_core();
     let path = match path_str(path) {
         Ok(p) => p,
@@ -203,10 +171,10 @@ unsafe extern "C" fn fuse_getattr(
             fill_virtual_file_stat(stbuf, ino, content.len() as u64, core.uid, core.gid);
             0
         }
-        ResolvedPath::OutputMount { real_path } => {
-            // Output mounts appear as symlinks to the real directory.
-            // This ensures Buck2 follows the symlink and writes to the
-            // real filesystem directly, bypassing FUSE for all I/O.
+        ResolvedPath::Cell { real_path, .. } => {
+            // Expose cells as symlinks to their real Nix store paths.
+            // This allows the kernel to follow the symlink and read cell
+            // contents directly from the store, bypassing FUSE entirely.
             let target = real_path.to_string_lossy();
             let now = now_secs();
             (*stbuf).st_ino = 100; // arbitrary
@@ -215,16 +183,31 @@ unsafe extern "C" fn fuse_getattr(
             (*stbuf).st_size = target.len() as libc::off_t;
             (*stbuf).st_uid = core.uid;
             (*stbuf).st_gid = core.gid;
-            (*stbuf).st_blksize = 4096;
+            (*stbuf).st_atime = now;
+            (*stbuf).st_mtime = now;
+            (*stbuf).st_ctime = now;
+            0
+        }
+        ResolvedPath::OutputMount { real_path, symlink: true }
+        | ResolvedPath::OutputChild { real_path, symlink: true } => {
+            // Symlink output mounts (e.g., bin/) bypass FUSE
+            let target = real_path.to_string_lossy();
+            let now = now_secs();
+            (*stbuf).st_ino = 101;
+            (*stbuf).st_mode = libc::S_IFLNK | 0o777;
+            (*stbuf).st_nlink = 1;
+            (*stbuf).st_size = target.len() as libc::off_t;
+            (*stbuf).st_uid = core.uid;
+            (*stbuf).st_gid = core.gid;
             (*stbuf).st_atime = now;
             (*stbuf).st_mtime = now;
             (*stbuf).st_ctime = now;
             0
         }
         ResolvedPath::SourceChild { real_path }
-        | ResolvedPath::Cell { real_path, .. }
         | ResolvedPath::CellChild { real_path, .. }
-        | ResolvedPath::OutputChild { real_path } => {
+        | ResolvedPath::OutputMount { real_path, .. }
+        | ResolvedPath::OutputChild { real_path, .. } => {
             match fs::symlink_metadata(&real_path) {
                 Ok(meta) => {
                     fill_stat_from_metadata(stbuf, &meta);
@@ -245,6 +228,7 @@ unsafe extern "C" fn fuse_readdir(
     _fi: *mut bindings::fuse_file_info,
     _flags: bindings::fuse_readdir_flags,
 ) -> c_int {
+    timed!(readdir);
     let core = get_core();
     let path = match path_str(path) {
         Ok(p) => p,
@@ -303,8 +287,8 @@ unsafe extern "C" fn fuse_readdir(
         ResolvedPath::SourceChild { real_path }
         | ResolvedPath::Cell { real_path, .. }
         | ResolvedPath::CellChild { real_path, .. }
-        | ResolvedPath::OutputMount { real_path }
-        | ResolvedPath::OutputChild { real_path } => {
+        | ResolvedPath::OutputMount { real_path, .. }
+        | ResolvedPath::OutputChild { real_path, .. } => {
             match fs::read_dir(&real_path) {
                 Ok(entries) => {
                     for entry in entries.flatten() {
@@ -326,6 +310,7 @@ unsafe extern "C" fn fuse_open(
     _path: *const c_char,
     _fi: *mut bindings::fuse_file_info,
 ) -> c_int {
+    timed!(open);
     0
 }
 
@@ -333,6 +318,7 @@ unsafe extern "C" fn fuse_opendir(
     _path: *const c_char,
     _fi: *mut bindings::fuse_file_info,
 ) -> c_int {
+    timed!(opendir);
     0
 }
 
@@ -340,6 +326,7 @@ unsafe extern "C" fn fuse_releasedir(
     _path: *const c_char,
     _fi: *mut bindings::fuse_file_info,
 ) -> c_int {
+    timed!(releasedir);
     0
 }
 
@@ -350,6 +337,7 @@ unsafe extern "C" fn fuse_read(
     offset: libc::off_t,
     _fi: *mut bindings::fuse_file_info,
 ) -> c_int {
+    timed!(read);
     let core = get_core();
     let path = match path_str(path) {
         Ok(p) => p,
@@ -371,7 +359,7 @@ unsafe extern "C" fn fuse_read(
         }
         ResolvedPath::SourceChild { real_path }
         | ResolvedPath::CellChild { real_path, .. }
-        | ResolvedPath::OutputChild { real_path } => {
+        | ResolvedPath::OutputChild { real_path, .. } => {
             let mut file = match std::fs::File::open(&real_path) {
                 Ok(f) => f,
                 Err(e) => return -(e.raw_os_error().unwrap_or(libc::EIO)),
@@ -399,43 +387,47 @@ unsafe extern "C" fn fuse_readlink(
     buf: *mut c_char,
     size: libc::size_t,
 ) -> c_int {
+    timed!(readlink);
     let core = get_core();
     let path = match path_str(path) {
         Ok(p) => p,
         Err(e) => return e,
     };
 
-    let resolved = core.resolve_path(path);
-
-    // Output mounts are symlinks — return the target path directly
-    if let ResolvedPath::OutputMount { ref real_path } = resolved {
-        let target = real_path.to_string_lossy();
-        let bytes = target.as_bytes();
-        let to_copy = std::cmp::min(bytes.len(), size - 1);
-        std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf as *mut u8, to_copy);
-        *buf.add(to_copy) = 0; // null terminate
-        return 0;
-    }
-
-    let real_path = match resolved {
-        ResolvedPath::SourceChild { real_path }
-        | ResolvedPath::Cell { real_path, .. }
-        | ResolvedPath::CellChild { real_path, .. }
-        | ResolvedPath::OutputChild { real_path } => real_path,
-        ResolvedPath::NotFound => return -libc::ENOENT,
-        _ => return -libc::EINVAL,
-    };
-
-    match fs::read_link(&real_path) {
-        Ok(target) => {
-            let target_bytes = target.as_os_str().as_encoded_bytes();
+    match core.resolve_path(path) {
+        ResolvedPath::Cell { real_path, .. } => {
+            // Cell is exposed as a symlink to the Nix store path
+            let target_bytes = real_path.as_os_str().as_encoded_bytes();
             let to_copy = target_bytes.len().min(size - 1);
             ptr::copy_nonoverlapping(target_bytes.as_ptr(), buf as *mut u8, to_copy);
-            // Null-terminate
             *buf.add(to_copy) = 0;
             0
         }
-        Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+        ResolvedPath::OutputMount { real_path, symlink: true }
+        | ResolvedPath::OutputChild { real_path, symlink: true } => {
+            // Symlink output mount — return the real path as target
+            let target_bytes = real_path.as_os_str().as_encoded_bytes();
+            let to_copy = target_bytes.len().min(size - 1);
+            ptr::copy_nonoverlapping(target_bytes.as_ptr(), buf as *mut u8, to_copy);
+            *buf.add(to_copy) = 0;
+            0
+        }
+        ResolvedPath::SourceChild { real_path }
+        | ResolvedPath::CellChild { real_path, .. }
+        | ResolvedPath::OutputChild { real_path, .. } => {
+            match fs::read_link(&real_path) {
+                Ok(target) => {
+                    let target_bytes = target.as_os_str().as_encoded_bytes();
+                    let to_copy = target_bytes.len().min(size - 1);
+                    ptr::copy_nonoverlapping(target_bytes.as_ptr(), buf as *mut u8, to_copy);
+                    *buf.add(to_copy) = 0;
+                    0
+                }
+                Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+            }
+        }
+        ResolvedPath::NotFound => -libc::ENOENT,
+        _ => -libc::EINVAL,
     }
 }
 
@@ -443,6 +435,7 @@ unsafe extern "C" fn fuse_statfs(
     _path: *const c_char,
     stbuf: *mut libc::statvfs,
 ) -> c_int {
+    timed!(statfs);
     ptr::write_bytes(stbuf, 0, 1);
     (*stbuf).f_bsize = 512;
     (*stbuf).f_frsize = 512;
@@ -458,36 +451,41 @@ unsafe extern "C" fn fuse_statfs(
 
 unsafe extern "C" fn fuse_init(
     _conn: *mut bindings::fuse_conn_info,
-    _cfg: *mut bindings::fuse_config,
+    cfg: *mut bindings::fuse_config,
 ) -> *mut c_void {
-    // Return private_data as-is so it stays available in subsequent callbacks
+    // Set kernel cache timeouts to reduce NFS round-trips.
+    // Source files and virtual configs don't change during a build,
+    // so aggressive caching is safe.
+    if !cfg.is_null() {
+        (*cfg).entry_timeout = 300.0;    // cache name lookups for 5 min
+        (*cfg).attr_timeout = 300.0;     // cache file attributes for 5 min
+        (*cfg).negative_timeout = 5.0;   // cache "not found" for 5 sec
+        (*cfg).kernel_cache = 1;         // allow kernel to cache file contents
+        (*cfg).auto_cache = 1;           // invalidate cache when mtime changes
+    }
+
     let ctx = bindings::fuse_get_context();
     (*ctx).private_data
 }
 
 unsafe extern "C" fn fuse_destroy(_private_data: *mut c_void) {
-    // no-op: FsCore lifetime is managed by the caller
-}
-
-/// Check if a resolved path is writable (only output mounts are writable)
-fn is_writable(resolved: &ResolvedPath) -> bool {
-    matches!(resolved, ResolvedPath::OutputMount { .. } | ResolvedPath::OutputChild { .. })
+    metrics::report();
 }
 
 /// Get the real path for a writable resolved path, or return EROFS
 fn writable_real_path(resolved: &ResolvedPath) -> Result<&std::path::Path, c_int> {
     match resolved {
-        ResolvedPath::OutputMount { real_path } | ResolvedPath::OutputChild { real_path } => {
-            Ok(real_path)
-        }
+        ResolvedPath::OutputMount { real_path, symlink: false }
+        | ResolvedPath::OutputChild { real_path, symlink: false } => Ok(real_path),
         _ => Err(-libc::EROFS),
     }
 }
 
 unsafe extern "C" fn fuse_mkdir(
     path: *const c_char,
-    mode: libc::mode_t,
+    _mode: libc::mode_t,
 ) -> c_int {
+    timed!(mkdir);
     let core = get_core();
     let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
     let resolved = core.resolve_path(path);
@@ -499,6 +497,7 @@ unsafe extern "C" fn fuse_mkdir(
 }
 
 unsafe extern "C" fn fuse_unlink(path: *const c_char) -> c_int {
+    timed!(unlink);
     let core = get_core();
     let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
     let resolved = core.resolve_path(path);
@@ -510,12 +509,31 @@ unsafe extern "C" fn fuse_unlink(path: *const c_char) -> c_int {
 }
 
 unsafe extern "C" fn fuse_rmdir(path: *const c_char) -> c_int {
+    timed!(rmdir);
     let core = get_core();
     let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
     let resolved = core.resolve_path(path);
     let real = match writable_real_path(&resolved) { Ok(p) => p, Err(e) => return e };
     match std::fs::remove_dir(real) {
         Ok(()) => 0,
+        Err(e) if e.raw_os_error() == Some(libc::ENOTEMPTY) => {
+            // FUSE-T NFS caching can leave stale entries (e.g., .DS_Store,
+            // ._ AppleDouble files). Clean them up and retry.
+            if let Ok(entries) = std::fs::read_dir(real) {
+                for entry in entries.flatten() {
+                    let p = entry.path();
+                    if p.is_dir() {
+                        std::fs::remove_dir_all(&p).ok();
+                    } else {
+                        std::fs::remove_file(&p).ok();
+                    }
+                }
+            }
+            match std::fs::remove_dir(real) {
+                Ok(()) => 0,
+                Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+            }
+        }
         Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
     }
 }
@@ -525,6 +543,7 @@ unsafe extern "C" fn fuse_create(
     mode: libc::mode_t,
     _fi: *mut bindings::fuse_file_info,
 ) -> c_int {
+    timed!(create);
     let core = get_core();
     let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
     let resolved = core.resolve_path(path);
@@ -551,6 +570,7 @@ unsafe extern "C" fn fuse_write(
     offset: libc::off_t,
     _fi: *mut bindings::fuse_file_info,
 ) -> c_int {
+    timed!(write);
     let core = get_core();
     let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
     let resolved = core.resolve_path(path);
@@ -576,6 +596,7 @@ unsafe extern "C" fn fuse_truncate(
     size: libc::off_t,
     _fi: *mut bindings::fuse_file_info,
 ) -> c_int {
+    timed!(truncate);
     let core = get_core();
     let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
     let resolved = core.resolve_path(path);
@@ -594,6 +615,7 @@ unsafe extern "C" fn fuse_chmod(
     mode: libc::mode_t,
     _fi: *mut bindings::fuse_file_info,
 ) -> c_int {
+    timed!(chmod);
     let core = get_core();
     let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
     let resolved = core.resolve_path(path);
@@ -616,6 +638,7 @@ unsafe extern "C" fn fuse_rename(
     to: *const c_char,
     _flags: libc::c_uint,
 ) -> c_int {
+    timed!(rename);
     let core = get_core();
     let from_path = match path_str(from) { Ok(p) => p, Err(e) => return e };
     let to_path = match path_str(to) { Ok(p) => p, Err(e) => return e };
@@ -633,6 +656,7 @@ unsafe extern "C" fn fuse_symlink(
     from: *const c_char,
     to: *const c_char,
 ) -> c_int {
+    timed!(symlink);
     let core = get_core();
     let to_path = match path_str(to) { Ok(p) => p, Err(e) => return e };
     let to_resolved = core.resolve_path(to_path);
@@ -652,6 +676,7 @@ unsafe extern "C" fn fuse_access(
     _path: *const c_char,
     _mask: c_int,
 ) -> c_int {
+    timed!(access);
     0 // Allow all access
 }
 
