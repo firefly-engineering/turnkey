@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-04-29T07:43:27Z",
+  "description": "Run buck2 build root//... from the FUSE mount using macFUSE's FSKit backend (instead of FUSE-T NFS). Compare with metrics: (1) total build time vs native ~1min, (2) FUSE callback metrics (getattr calls, readdir time, etc.), (3) overall overhead ratio. The hypothesis: FSKit eliminates the NFS round-trip overhead that accounts for 8x slowdown. Success criteria: overhead under 2x of native build time.",
+  "id": "turnkey-4vl.4",
+  "labels": [],
+  "parent": "turnkey-4vl",
+  "priority": 1,
+  "status": "open",
+  "title": "Benchmark macFUSE FSKit vs FUSE-T NFS performance",
+  "type": "task",
+  "updated_at": "2026-04-29T07:43:27Z"
+}
