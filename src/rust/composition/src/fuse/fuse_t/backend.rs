@@ -93,14 +93,17 @@ impl CompositionBackend for FuseTBackend {
         // indefinitely on a System Settings GUI prompt when no backend is
         // active. Fail fast with activation guidance instead.
         match detect_macfuse_backend() {
-            MacFuseBackend::FSKit { ref version, .. } => {
+            ref backend @ MacFuseBackend::FSKit { ref vendor, ref version, ref bundle_id } => {
                 info!(
-                    "macFUSE FSKit extension active{}",
+                    "{} active: {}{}",
+                    backend.label(),
+                    bundle_id,
                     version
                         .as_ref()
                         .map(|v| format!(" ({})", v))
                         .unwrap_or_default()
                 );
+                let _ = vendor; // logged via label()
             }
             MacFuseBackend::Kext { ref bundle_id } => {
                 info!("macFUSE legacy kext loaded ({})", bundle_id);
@@ -149,6 +152,13 @@ impl CompositionBackend for FuseTBackend {
 
             // Build fuse_args: argv[0] = program name, then mount options.
             //
+            // backend=fskit:     opt into macFUSE 5.2's FSKit dispatcher
+            //                    (https://github.com/macfuse/macfuse/wiki/FUSE-Backends).
+            //                    Without this, macFUSE falls back to the
+            //                    kext-based mount_macfuse helper, which is
+            //                    blocked by syspolicyd on Apple Silicon Tahoe
+            //                    unless the user enables Reduced Security mode
+            //                    in Recovery. FUSE-T ignores the option.
             // fsname=turnkey:    name shown in `mount`, df, Disk Utility.
             // local:             tag the volume as local (not network). Without
             //                    this, macFUSE volumes appear under Finder's
@@ -166,7 +176,8 @@ impl CompositionBackend for FuseTBackend {
             let arg0 = CString::new("turnkey-composed").unwrap();
             let arg_ro = CString::new("-o").unwrap();
             let arg_ro_val =
-                CString::new("fsname=turnkey,local,noappledouble,noapplexattr").unwrap();
+                CString::new("backend=fskit,fsname=turnkey,local,noappledouble,noapplexattr")
+                    .unwrap();
             let mut argv: Vec<*mut i8> = vec![
                 arg0.as_ptr() as *mut i8,
                 arg_ro.as_ptr() as *mut i8,

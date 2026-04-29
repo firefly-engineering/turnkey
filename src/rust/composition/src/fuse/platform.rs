@@ -170,7 +170,16 @@ mod macfuse_paths {
     pub const LOAD_MACFUSE: &str = "/Library/Filesystems/macfuse.fs/Contents/Resources/load_macfuse";
 }
 
-/// Which macFUSE backend, if any, is currently usable.
+/// FUSE-T paths. FUSE-T 1.2+ ships an FSKit `fsmodule` extension alongside
+/// the older NFS-based `libfuse-t.dylib`. Either path is reachable via the
+/// libfuse3 ABI exposed at `<fuse-t lib dir>/libfuse3.4.dylib`.
+#[cfg(target_os = "macos")]
+mod fuse_t_paths {
+    pub const LIBFUSE3: &str = "/Library/Application Support/fuse-t/lib/libfuse3.4.dylib";
+    pub const FSKIT_BUNDLE_ID: &str = "org.fuset.fskit-srv.module";
+}
+
+/// Which macOS FUSE backend, if any, is currently usable.
 ///
 /// Returned by [`detect_macfuse_backend`] and consumed by the FUSE backend
 /// before calling `fuse_mount`. Pre-checking is required because libfuse3's
@@ -180,25 +189,39 @@ mod macfuse_paths {
 #[cfg(target_os = "macos")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MacFuseBackend {
-    /// macFUSE FSKit file-system extension is registered AND enabled in
-    /// System Settings. Mounts will use the FSKit backend.
+    /// An FSKit file-system extension (`com.apple.fskit.fsmodule`) is
+    /// registered with `pluginkit`. The variant identifies which vendor's
+    /// extension was found — macFUSE proper or FUSE-T's FskitSrvModule.
     FSKit {
+        vendor: FuseVendor,
         bundle_id: String,
-        /// Version string from `systemextensionsctl list`, e.g. "1.6/7".
+        /// Version string from pluginkit, e.g. "1.6" or "0.1.3".
         version: Option<String>,
     },
-    /// Legacy kernel extension is currently loaded.
+    /// Legacy kernel extension is currently loaded (kmutil reports it).
     Kext { bundle_id: String },
-    /// macFUSE is installed but neither backend is active. `fuse_mount` would
-    /// hang on a System Settings approval prompt.
+    /// FUSE is installed but no backend is active. `fuse_mount` would either
+    /// hang on a System Settings approval prompt (macFUSE) or fail on the
+    /// kext-load fallback (macFUSE on Apple Silicon Tahoe).
     NotActivated {
-        /// FSKit `appex` bundle is on disk.
+        /// macFUSE FSKit `appex` bundle is on disk.
         fskit_bundle_present: bool,
-        /// At least one kext bundle is on disk.
+        /// At least one macFUSE kext bundle is on disk.
         kext_bundle_present: bool,
     },
-    /// macFUSE is not installed (neither bundle nor libfuse3.4.dylib present).
+    /// No FUSE library found (neither macFUSE nor FUSE-T).
     NotInstalled,
+}
+
+/// Identifies which userspace FUSE implementation provides a backend.
+#[cfg(target_os = "macos")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FuseVendor {
+    /// macFUSE 5.x — `io.macfuse.app.fsmodule.macfuse`.
+    MacFuse,
+    /// FUSE-T 1.2+ — `org.fuset.fskit-srv.module`. Currently the working
+    /// FSKit path on Apple Silicon Tahoe.
+    FuseT,
 }
 
 #[cfg(target_os = "macos")]
@@ -206,7 +229,8 @@ impl MacFuseBackend {
     /// Short label suitable for log lines.
     pub fn label(&self) -> &'static str {
         match self {
-            MacFuseBackend::FSKit { .. } => "macFUSE FSKit",
+            MacFuseBackend::FSKit { vendor: FuseVendor::MacFuse, .. } => "macFUSE FSKit",
+            MacFuseBackend::FSKit { vendor: FuseVendor::FuseT, .. } => "FUSE-T FSKit",
             MacFuseBackend::Kext { .. } => "macFUSE kext",
             MacFuseBackend::NotActivated { .. } => "macFUSE not activated",
             MacFuseBackend::NotInstalled => "macFUSE not installed",
@@ -258,32 +282,57 @@ impl MacFuseBackend {
 
 /// Detect which macFUSE backend (FSKit or kext) is currently usable.
 ///
-/// Examines `systemextensionsctl list` for the FSKit `appex` and
-/// `kmutil showloaded` for the legacy kext. Returns the first backend found,
-/// preferring FSKit, or `NotActivated` / `NotInstalled` describing why a
-/// mount would fail. Cheap (two short subprocess calls); intended to be
-/// called once before `fuse_mount`.
+/// macFUSE's FSKit `fsmodule` extension uses the `EXExtensionPoint =
+/// com.apple.fskit.fsmodule` extension point, which is enumerated by
+/// `pluginkit`, *not* `systemextensionsctl` (that tool only covers
+/// `OSSystemExtension` categories like network/cmio/driver). The legacy
+/// kext is enumerated by `kmutil showloaded`.
+///
+/// Returns the first backend found, preferring FSKit, or
+/// `NotActivated` / `NotInstalled` describing why a mount would fail.
+/// Cheap (two short subprocess calls); intended to be called once before
+/// `fuse_mount`.
+///
+/// Note: pluginkit reports *registered* extensions, not whether the user
+/// has enabled them in System Settings — there's no CLI hook for the
+/// election state. A registered-but-disabled extension may still cause
+/// `fuse_mount` to surface an error from `MFMount.framework`, but it will
+/// not block indefinitely on a GUI-registration prompt; that's the hang
+/// this pre-flight check exists to prevent.
 #[cfg(target_os = "macos")]
 pub fn detect_macfuse_backend() -> MacFuseBackend {
-    use macfuse_paths::*;
+    let macfuse_present = Path::new(macfuse_paths::BUNDLE).exists()
+        || Path::new("/usr/local/lib/libfuse3.4.dylib").exists();
+    let fuse_t_present = Path::new(fuse_t_paths::LIBFUSE3).exists();
 
-    if !Path::new(BUNDLE).exists() && !Path::new("/usr/local/lib/libfuse3.4.dylib").exists() {
+    if !macfuse_present && !fuse_t_present {
         return MacFuseBackend::NotInstalled;
     }
 
-    if let Some(version) = systemextensions_fskit_active(FSKIT_BUNDLE_ID) {
+    // Prefer macFUSE's FSKit module — that's what the binary links against
+    // and what the `backend=fskit` mount option targets.
+    if let Some(version) = pluginkit_fsmodule_registered(macfuse_paths::FSKIT_BUNDLE_ID) {
         return MacFuseBackend::FSKit {
-            bundle_id: FSKIT_BUNDLE_ID.to_string(),
+            vendor: FuseVendor::MacFuse,
+            bundle_id: macfuse_paths::FSKIT_BUNDLE_ID.to_string(),
             version: if version.is_empty() { None } else { Some(version) },
         };
     }
 
-    if let Some(bundle_id) = kmutil_loaded_macfuse_kext(KEXT_BUNDLE_ID_PREFIX) {
+    if let Some(version) = pluginkit_fsmodule_registered(fuse_t_paths::FSKIT_BUNDLE_ID) {
+        return MacFuseBackend::FSKit {
+            vendor: FuseVendor::FuseT,
+            bundle_id: fuse_t_paths::FSKIT_BUNDLE_ID.to_string(),
+            version: if version.is_empty() { None } else { Some(version) },
+        };
+    }
+
+    if let Some(bundle_id) = kmutil_loaded_macfuse_kext(macfuse_paths::KEXT_BUNDLE_ID_PREFIX) {
         return MacFuseBackend::Kext { bundle_id };
     }
 
-    let fskit_bundle_present = Path::new(MACFUSE_APP_BIN).exists();
-    let kext_bundle_present = Path::new(LOAD_MACFUSE).exists()
+    let fskit_bundle_present = Path::new(macfuse_paths::MACFUSE_APP_BIN).exists();
+    let kext_bundle_present = Path::new(macfuse_paths::LOAD_MACFUSE).exists()
         && std::fs::read_dir("/Library/Filesystems/macfuse.fs/Contents/Extensions")
             .map(|it| it.flatten().any(|e| e.path().join("macfuse.kext").exists()))
             .unwrap_or(false);
@@ -294,37 +343,51 @@ pub fn detect_macfuse_backend() -> MacFuseBackend {
     }
 }
 
-/// If `bundle_id` appears in `systemextensionsctl list` with state
-/// `[activated enabled]`, return its version string.
+/// If `bundle_id` is a registered FSKit `fsmodule` extension, return its
+/// version string from `pluginkit`. Returns `Some("")` when the extension
+/// is registered but has no parsable version.
 #[cfg(target_os = "macos")]
-fn systemextensions_fskit_active(bundle_id: &str) -> Option<String> {
-    let output = Command::new("systemextensionsctl").arg("list").output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    parse_systemextensions_active(&String::from_utf8_lossy(&output.stdout), bundle_id)
+fn pluginkit_fsmodule_registered(bundle_id: &str) -> Option<String> {
+    let output = Command::new("pluginkit")
+        .args([
+            "-m",
+            "-p",
+            "com.apple.fskit.fsmodule",
+            "-i",
+            bundle_id,
+        ])
+        .output()
+        .ok()?;
+    // pluginkit always returns 0; the only signal is non-empty stdout
+    // listing the bundle.
+    parse_pluginkit_match(&String::from_utf8_lossy(&output.stdout), bundle_id)
 }
 
-/// Pure parser for `systemextensionsctl list` output.
+/// Pure parser for `pluginkit -m -p ... -i <bundle_id>` output.
 ///
-/// Returns the version string from the parentheses after `bundle_id` when the
-/// matching line also contains `[activated enabled]`, or `None` otherwise.
+/// Format per match (one or more lines, each with a leading election char
+/// like `-`, `+`, or space):
+///   `-    io.macfuse.app.fsmodule.macfuse(1.6)`
+/// Returns the version inside the parentheses (or empty string if none),
+/// or `None` if no line contains the bundle ID.
 #[cfg(target_os = "macos")]
-fn parse_systemextensions_active(stdout: &str, bundle_id: &str) -> Option<String> {
+fn parse_pluginkit_match(stdout: &str, bundle_id: &str) -> Option<String> {
     for line in stdout.lines() {
-        // Format: "<en>\t<act>\t<teamID>\t<bundleID> (<version>)\t<name>\t[<state>]"
-        if !line.contains(bundle_id) || !line.contains("[activated enabled]") {
+        if !line.contains(bundle_id) {
             continue;
         }
-        let after_bid = line.split(bundle_id).nth(1)?;
-        return Some(
-            after_bid
-                .trim_start()
-                .strip_prefix('(')
-                .and_then(|s| s.split(')').next())
-                .map(|s| s.to_string())
-                .unwrap_or_default(),
-        );
+        // After the bundle ID we expect "(version)" or "((null))".
+        let after_bid = line.split(bundle_id).nth(1)?.trim_start();
+        // Built-in plugins serialize as `bundleID((null))` — treat as empty.
+        if after_bid.starts_with("((null))") {
+            return Some(String::new());
+        }
+        let version = after_bid
+            .strip_prefix('(')
+            .and_then(|s| s.split(')').next())
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        return Some(version);
     }
     None
 }
@@ -576,39 +639,49 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn test_parse_systemextensions_active_finds_enabled() {
-        let sample = "\
-3 extension(s)
---- com.apple.system_extension.fskit.fsmodule (Go to ...)
-enabled\tactive\tteamID\tbundleID (version)\tname\t[state]
-*\t*\t3T5GSNBU6W\tio.macfuse.app.fsmodule.macfuse (1.6/7)\tmacFUSE\t[activated enabled]
-";
-        let v = parse_systemextensions_active(sample, "io.macfuse.app.fsmodule.macfuse");
-        assert_eq!(v.as_deref(), Some("1.6/7"));
-    }
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn test_parse_systemextensions_active_skips_pending_approval() {
-        // A registered-but-not-yet-enabled extension shows up but with a
-        // different state — must NOT be reported as active.
-        let sample = "\
-*\t \t3T5GSNBU6W\tio.macfuse.app.fsmodule.macfuse (1.6/7)\tmacFUSE\t[activated waiting for user]
-";
+    fn test_parse_pluginkit_match_with_version() {
+        let sample = "     io.macfuse.app.fsmodule.macfuse(1.6)\n";
         assert_eq!(
-            parse_systemextensions_active(sample, "io.macfuse.app.fsmodule.macfuse"),
-            None
+            parse_pluginkit_match(sample, "io.macfuse.app.fsmodule.macfuse").as_deref(),
+            Some("1.6")
         );
     }
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn test_parse_systemextensions_active_unrelated_bundle() {
-        let sample = "\
-*\t*\tW5364U7YZB\tio.tailscale.ipn.macsys.network-extension (1.96.5/101.96.5)\tTailscale\t[activated enabled]
-";
+    fn test_parse_pluginkit_match_with_election_prefix() {
+        // pluginkit -mv prefixes lines with the election state char.
+        let sample = "-    io.macfuse.app.fsmodule.macfuse(1.6)\tUUID\ttimestamp\tpath\n (1 plug-in)\n";
         assert_eq!(
-            parse_systemextensions_active(sample, "io.macfuse.app.fsmodule.macfuse"),
+            parse_pluginkit_match(sample, "io.macfuse.app.fsmodule.macfuse").as_deref(),
+            Some("1.6")
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_parse_pluginkit_match_null_version() {
+        // Built-in plugins have "(null)" as their version; treat as empty.
+        let sample = "     com.apple.fskit.exfat((null))\n";
+        assert_eq!(
+            parse_pluginkit_match(sample, "com.apple.fskit.exfat").as_deref(),
+            Some("")
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_parse_pluginkit_match_absent() {
+        // pluginkit produces empty stdout when the bundle ID isn't registered.
+        assert_eq!(parse_pluginkit_match("", "io.macfuse.app.fsmodule.macfuse"), None);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_parse_pluginkit_match_unrelated_bundle() {
+        let sample = "     com.apple.fskit.exfat((null))\n";
+        assert_eq!(
+            parse_pluginkit_match(sample, "io.macfuse.app.fsmodule.macfuse"),
             None
         );
     }
@@ -642,12 +715,20 @@ No variant specified, falling back to release
     #[cfg(target_os = "macos")]
     #[test]
     fn test_macfuse_backend_label_and_instructions() {
-        let active = MacFuseBackend::FSKit {
+        let active_macfuse = MacFuseBackend::FSKit {
+            vendor: FuseVendor::MacFuse,
             bundle_id: "x".to_string(),
             version: None,
         };
-        assert_eq!(active.label(), "macFUSE FSKit");
-        assert!(active.activation_instructions().is_empty());
+        assert_eq!(active_macfuse.label(), "macFUSE FSKit");
+        assert!(active_macfuse.activation_instructions().is_empty());
+
+        let active_fuse_t = MacFuseBackend::FSKit {
+            vendor: FuseVendor::FuseT,
+            bundle_id: "y".to_string(),
+            version: Some("1.0".to_string()),
+        };
+        assert_eq!(active_fuse_t.label(), "FUSE-T FSKit");
 
         let na = MacFuseBackend::NotActivated {
             fskit_bundle_present: true,

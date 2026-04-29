@@ -1,9 +1,12 @@
 # turnkey-composed Nix package
 #
 # Builds the FUSE composition daemon.
-# On macOS, links against macFUSE's libfuse3 at /usr/local/lib/libfuse3.4.dylib
-# (install name `/usr/local/lib/libfuse3.4.dylib`, depends on
-# /Library/Filesystems/macfuse.fs/.../MFMount.framework).
+#
+# On macOS, links against macFUSE's libfuse3 at
+# `/usr/local/lib/libfuse3.4.dylib`. The FSKit dispatch is selected at mount
+# time via `-o backend=fskit` (see src/rust/composition/src/fuse/fuse_t/backend.rs);
+# without that option, macFUSE falls back to the kext-based mount_macfuse
+# helper which is blocked by syspolicyd on Apple Silicon Tahoe.
 { pkgs, lib }:
 
 let
@@ -38,9 +41,7 @@ pkgs.rustPlatform.buildRustPackage ({
     mainProgram = "turnkey-composed";
   };
 } // lib.optionalAttrs isDarwin {
-  # macOS Nix builds have access to system paths. macFUSE installs libfuse3
-  # to /usr/local/lib regardless of CPU arch, so this works on both Intel and
-  # Apple Silicon. Cargo's build.rs (composition/build.rs) also adds the same
-  # path via cargo:rustc-link-search.
+  # macFUSE installs libfuse3 to /usr/local/lib regardless of arch.
+  # composition/build.rs sets the same path via cargo:rustc-link-search.
   LIBRARY_PATH = "/usr/local/lib";
 })

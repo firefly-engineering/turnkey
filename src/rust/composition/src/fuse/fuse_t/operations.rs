@@ -235,9 +235,15 @@ unsafe extern "C" fn fuse_readdir(
         Err(e) => return e,
     };
 
+    // macFUSE's FSKit dispatcher can invoke readdir with a null filler
+    // (the libfuse signature is `Option<fn>`). Bail out cleanly rather than
+    // panicking on unwrap.
+    let Some(filler_fn) = filler else {
+        return 0;
+    };
     let fill = |name: &str| {
         if let Ok(cname) = CString::new(name) {
-            filler.unwrap()(buf, cname.as_ptr(), ptr::null(), 0, 0);
+            filler_fn(buf, cname.as_ptr(), ptr::null(), 0, 0);
         }
     };
 
