@@ -12,8 +12,8 @@
   "labels": [],
   "parent": "turnkey-4vl",
   "priority": 1,
-  "status": "open",
+  "status": "in_progress",
   "title": "Handle macFUSE FSKit extension activation",
   "type": "task",
-  "updated_at": "2026-04-29T07:43:48Z"
+  "updated_at": "2026-04-29T08:26:11Z"
 }
