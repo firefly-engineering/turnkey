@@ -3,7 +3,9 @@
   "blocked_by": [
     "turnkey-4vl.1"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-4vl.4"
+  ],
   "created": "2026-04-29T07:43:15Z",
   "description": "macFUSE's FSKit extensions (io.macfuse.app.fsmodule.macfuse.appex, io.macfuse.app.fsmodule.macfuse-local.appex) exist at /Library/Filesystems/macfuse.fs/Contents/Resources/macfuse.app/Contents/Extensions/ but aren't registered as system extensions yet. Determine: does first mount trigger activation? Does user need to enable in System Settings \u003e Extensions? Should turnkey-composed detect and guide the user? Add runtime detection of FSKit vs kext backend.",
   "id": "turnkey-4vl.2",
