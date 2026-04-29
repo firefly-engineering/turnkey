@@ -1,10 +1,10 @@
 fn main() {
-    // On macOS with fuse-t feature, tell the linker where to find libfuse3
+    // On macOS with the libfuse3 backend, tell the linker where to find libfuse3.
+    // macFUSE installs libfuse3.4.dylib to /usr/local/lib on both Intel and Apple Silicon.
     #[cfg(all(target_os = "macos", feature = "fuse-t"))]
     {
-        // FUSE-T installs libraries here via Homebrew
         println!("cargo:rustc-link-search=/usr/local/lib");
-        // Also check Homebrew on Apple Silicon
+        // Apple Silicon Homebrew prefix, kept as a fallback for non-macFUSE setups.
         println!("cargo:rustc-link-search=/opt/homebrew/lib");
     }
 }

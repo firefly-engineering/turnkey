@@ -1,12 +1,15 @@
-//! Hand-written FFI bindings to libfuse3 (FUSE-T on macOS)
+//! Hand-written FFI bindings to libfuse3 (macOS userspace libfuse3 ABI)
 //!
 //! Minimal bindings covering the high-level FUSE API:
 //! - `fuse_operations` struct (callback table)
 //! - Session lifecycle: `fuse_new_30`, `fuse_mount`, `fuse_loop`, `fuse_unmount`, `fuse_destroy`
 //! - Context: `fuse_get_context` for accessing private_data in callbacks
 //!
-//! These bind directly to FUSE-T's libfuse3.dylib, which handles the NFS translation
-//! internally via its own session loop.
+//! On macOS these resolve via the standard libfuse3.4.dylib install path
+//! (/usr/local/lib/libfuse3.4.dylib). macFUSE 5.x and FUSE-T both expose the same
+//! libfuse3.16 ABI, so the same bindings work against either backend; the runtime
+//! choice is determined by which library is installed at /usr/local/lib at link time.
+//! On Linux the link resolves against the upstream libfuse3.
 
 #![allow(non_camel_case_types, dead_code)]
 
@@ -361,7 +364,7 @@ impl fuse_operations {
     }
 }
 
-// Link against FUSE-T's libfuse3
+// Link against libfuse3 (macFUSE on macOS, libfuse3 on Linux).
 #[link(name = "fuse3")]
 unsafe extern "C" {
     /// Create a new FUSE filesystem instance.
