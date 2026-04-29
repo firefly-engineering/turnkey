@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "turnkey-4vl.4"
+  ],
   "created": "2026-04-29T12:55:17Z",
   "description": "With `-o backend=fskit` and macFUSE 5.2.0 on macOS 26.4.1, the mount succeeds (mount table shows the `fskit` flag) but the daemon segfaults on the first directory access.\n\nCrash (~/Library/Logs/DiagnosticReports/turnkey-composed-2026-04-29-14*.ips):\n  EXC_BAD_ACCESS, KERN_INVALID_ADDRESS at 0x00000000000120a8\n  Faulting thread: composition::fuse::fuse_t::operations::fuse_readdir\n    -\u003e calling addr 0x120a8 (unmapped)\n  Stack: fuse_session_loop_mt -\u003e fuse_session_process_buf_internal -\u003e fuse_readdir\n\nDiagnosis: macFUSE FSKit's libfuse announces 'FUSE library version: 3.18.2' but our hand-written bindings target 3.16 (FUSE_MAJOR=3 / FUSE_MINOR=16 in bindings.rs). The readdir filler argument under FSKit is non-null but is NOT a function pointer (probably an opaque handle / index). Rust's Option\u003cfn\u003e just discriminates null vs non-null, so my earlier 'if Some, call it' guard sees Some(0x120a8) and tries to call it -\u003e segfault.\n\nSole blocker for a working FSKit mount on Tahoe. The mount path itself (fuse_mount, opendir, lookup, getattr, mkdir-EROFS) all work; only readdir crashes.\n\nWorkarounds to evaluate:\n  1. Skip ops.readdir under FSKit (detect via detect_macfuse_backend) and rely on LOOKUP-per-entry for enumeration.\n  2. Update bindings to libfuse 3.18 fuse_operations layout - re-check struct size and per-callback signatures, especially fuse_fill_dir_t.\n  3. Switch from the high-level fuse_operations API to the low-level fuse_lowlevel.h API, which may be more directly mapped to FSKit semantics.",
   "id": "turnkey-4vl.6",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "fuse_readdir segfaults under macFUSE FSKit (libfuse3.18 ABI mismatch)",
   "type": "bug",
-  "updated_at": "2026-04-29T12:55:17Z"
+  "updated_at": "2026-04-29T12:55:32Z"
 }
