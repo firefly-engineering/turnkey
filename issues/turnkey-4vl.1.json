@@ -3,7 +3,8 @@
   "blocked_by": [],
   "blocks": [
     "turnkey-4vl.2",
-    "turnkey-4vl.4"
+    "turnkey-4vl.4",
+    "turnkey-4vl.5"
   ],
   "created": "2026-04-29T07:43:08Z",
   "description": "Our bindings.rs uses #[link(name=\"fuse3\")] which now resolves to macFUSE's libfuse3.4.dylib. Verify the symbols match (fuse_new_31, fuse_mount, fuse_loop_mt_31, fuse_get_context, fuse_destroy). The headers in /usr/local/include/fuse3 still symlink to FUSE-T — may need to update or not use them (we have hand-written bindings). Update nix/packages/turnkey-composed.nix LIBRARY_PATH to find macFUSE lib. Test that the binary links correctly.",
@@ -14,5 +15,5 @@
   "status": "open",
   "title": "Link against macFUSE libfuse3 instead of FUSE-T",
   "type": "task",
-  "updated_at": "2026-04-29T07:43:48Z"
+  "updated_at": "2026-04-29T07:43:49Z"
 }
