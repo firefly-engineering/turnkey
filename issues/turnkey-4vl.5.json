@@ -6,14 +6,16 @@
   "blocks": [
     "turnkey-4vl.4"
   ],
+  "closed_at": "2026-04-29T08:35:20Z",
+  "close_reason": "Added 'local' to mount options (was: fsname=turnkey,noappledouble,noapplexattr → now: fsname=turnkey,local,noappledouble,noapplexattr) so macFUSE volumes are tagged as local rather than network, avoiding Finder 'Shared' display and Spotlight network-indexing rules. All four options confirmed present in /usr/local/lib/libfuse3.4.dylib. Existing fuse_config setup (entry_timeout=300, attr_timeout=300, kernel_cache=1, auto_cache=1, negative_timeout=5 in fuse_init) is part of standard libfuse3.16 ABI and works with macFUSE — verified by passing fuse_operations layout tests. Deliberately deferred default_permissions / iosize= / daemon_timeout=: should be revisited after the 4vl.4 benchmark gives a baseline.",
   "created": "2026-04-29T07:43:43Z",
   "description": "macFUSE has different/additional mount options vs FUSE-T: local (mark as local volume), negative_vncache, noreadahead, noubc, novncache, daemon_timeout, iosize, direct_io, default_permissions, sparse. Review which options benefit our use case. The noappledouble/noapplexattr options should still work. Consider: local (reduces NFS-like behavior), default_permissions (let kernel handle perms), iosize (tune I/O buffer). Also verify fuse_config fields (entry_timeout, attr_timeout, kernel_cache) work with macFUSE.",
   "id": "turnkey-4vl.5",
   "labels": [],
   "parent": "turnkey-4vl",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Update mount options for macFUSE",
   "type": "task",
-  "updated_at": "2026-04-29T08:34:12Z"
+  "updated_at": "2026-04-29T08:35:20Z"
 }
