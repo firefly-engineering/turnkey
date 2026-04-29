@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "turnkey-4vl.4"
+  ],
   "created": "2026-04-29T17:25:14Z",
   "description": "Reproducible: with our daemon mounted via -o backend=fskit on macOS 26.4.1 + macFUSE 5.2.0, running 'buck2 build root//src/rust/composition:composition' from inside the mount kills the daemon within ~2.2 seconds. The crash is __stack_chk_fail inside libfuse3.4.dylib at offset 0xcb60 (a function ending around there with 'bl ___stack_chk_fail' at 0xcb5c), called from 0x195b0, called from fuse_session_process_buf_internal (0x177d0). 15 worker threads running concurrently when it triggers.\n\nDaemon-side metrics just before the crash: ~2900 GETATTR, ~1900 LOOKUP, ~1000 STATFS, ~630 MKDIR, ~540 SETATTR, ~410 RELEASE, ~290 OPEN, ~280 FORGET, ~250 SYMLINK, ~150 READDIR, ~150 CREATE, ~110 WRITE — so it processes thousands of ops correctly before something overruns a stack buffer in libfuse's worker thread.\n\nLikely candidates for the overflow:\n\n  * One of our callbacks writes more bytes into a libfuse-allocated stack\n    buffer than the buffer is sized. Suspects: fuse_statfs (we write\n    sizeof(libc::statvfs)=64 into what macFUSE expects to be a 2168-byte\n    struct statfs — under-write, not over-write, so probably not), or\n    some Darwin-extended struct we haven't mirrored yet.\n  * libfuse 3.18 ABI mismatch we haven't hit yet — e.g. fuse_darwin_attr\n    might be smaller in macFUSE's compiled lib than what we declare.\n  * A real concurrency bug in macFUSE/libfuse that only surfaces with\n    fuse_loop_mt + many parallel ops.\n\nInvestigation steps to try next:\n\n  * Build a minimal C program that reproduces the workload (mkdir+symlink\n    spam) directly via libfuse and see if it crashes too. Isolates whether\n    bug is in our Rust callbacks or in libfuse.\n  * Patch fuse_statfs to write libc::statfs (the bigger struct macFUSE\n    expects on Darwin) and see if the crash moves.\n  * Reduce concurrency by limiting threads via fuse_loop_cfg_set_max_threads.\n\nOnce fixed, this unblocks the proper turnkey-4vl.4 benchmark (cold buck2\nbuild through FSKit vs native baseline).",
   "id": "turnkey-4vl.7",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "macFUSE FSKit libfuse stack overflow under concurrent load (heavy buck2)",
   "type": "bug",
-  "updated_at": "2026-04-29T17:25:14Z"
+  "updated_at": "2026-04-29T17:25:27Z"
 }
