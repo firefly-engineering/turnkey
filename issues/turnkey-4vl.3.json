@@ -2,14 +2,16 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-04-29T08:38:57Z",
+  "close_reason": "Policy decision: macFUSE primary, FUSE-T compatible (same libfuse3 ABI). Cleaned up user-visible strings: log messages now say 'macFUSE' or 'FUSE' (was 'FUSE-T'); install instructions in recovery.rs and fuse/mod.rs point to 'brew install --cask macfuse' first; CLI help text updated; integration test header updated. Internal names (FuseTBackend, fuse_t module, feature='fuse-t') retained — they're implementation details not worth churn-renaming, and a comment in fuse/mod.rs and bindings.rs explains the historical name. Runtime detection of FSKit vs kext vs not-activated already done by detect_macfuse_backend() in 4vl.2.",
   "created": "2026-04-29T07:43:20Z",
   "description": "Both FUSE-T and macFUSE are currently installed. /usr/local/include/fuse3 symlinks to FUSE-T headers. libfuse3.dylib now points to macFUSE. Need to: (1) decide if we support both or only macFUSE going forward, (2) update Nix packaging to depend on macFUSE instead of/in addition to FUSE-T, (3) handle the case where only one is installed, (4) potentially remove FUSE-T dependency entirely. Consider runtime detection: check which libfuse3 is loaded and log it.",
   "id": "turnkey-4vl.3",
   "labels": [],
   "parent": "turnkey-4vl",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Clean up FUSE-T / macFUSE coexistence",
   "type": "task",
-  "updated_at": "2026-04-29T08:35:47Z"
+  "updated_at": "2026-04-29T08:38:57Z"
 }
