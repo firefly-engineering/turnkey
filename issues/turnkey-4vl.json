@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-04-29T07:43:01Z",
+  "description": "macFUSE 5.2.0 uses FSKit on macOS 26+, eliminating the NFS translation layer that causes 8-9x performance overhead. Our libfuse3 FFI code is API-compatible — same fuse_new_31, fuse_mount, fuse_loop_mt_31 symbols. Need to switch linking, handle library detection, resolve header conflicts with FUSE-T, and activate the FSKit system extension.",
+  "id": "turnkey-4vl",
+  "labels": [],
+  "priority": 1,
+  "status": "open",
+  "title": "Switch FUSE backend from FUSE-T to macFUSE (FSKit)",
+  "type": "epic",
+  "updated_at": "2026-04-29T07:43:01Z"
+}
