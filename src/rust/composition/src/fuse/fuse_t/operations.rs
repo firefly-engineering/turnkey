@@ -481,7 +481,15 @@ unsafe extern "C" fn fuse_init(
     if !cfg.is_null() {
         (*cfg).entry_timeout = 300.0;    // cache name lookups for 5 min
         (*cfg).attr_timeout = 300.0;     // cache file attributes for 5 min
-        (*cfg).negative_timeout = 5.0;   // cache "not found" for 5 sec
+        // negative_timeout MUST be 0 on macFUSE FSKit. With a non-zero
+        // value, libfuse converts ENOENT lookups into "negative entry"
+        // replies with ino=0 (a Linux kernel convention for caching
+        // negative dentries — see fuse_lib_lookup$DARWIN in macFUSE's
+        // fuse.c around line 3255). FSKit doesn't honor that convention:
+        // it treats ino=0 as a real node and follows up with a GETATTR
+        // for nodeid=0, which makes libfuse's get_node() abort with
+        // "fuse internal error: node 0 not found".
+        (*cfg).negative_timeout = 0.0;
         (*cfg).kernel_cache = 1;         // allow kernel to cache file contents
         (*cfg).auto_cache = 1;           // invalidate cache when mtime changes
     }

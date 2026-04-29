@@ -65,13 +65,44 @@ pub struct fuse_config {
 }
 pub enum fuse_loop_config {}
 
-/// libfuse version struct, passed to fuse_new_30
+/// libfuse version struct, passed to fuse_new_31.
+///
+/// On Apple, the fourth word is a bitfield in macFUSE's
+/// `<fuse_common.h>` (around line 1075): bit 0 is
+/// `darwin_extensions_enabled` and bits 1..31 are `padding`. Setting bit 0
+/// is what tells macFUSE that our `fuse_operations` callbacks use the
+/// Darwin-flavored signatures (e.g. `getattr` takes `*fuse_darwin_attr`,
+/// not POSIX `*struct stat`). Without it, macFUSE picks the vanilla
+/// dispatch path (`fuse_lib_getattr`, not `fuse_lib_getattr$DARWIN`),
+/// allocates a `struct stat` for the call, and our 192-byte
+/// fuse_darwin_attr write overruns the 144-byte `stat` buffer — corrupts
+/// stack memory, only uid/gid happen to land in the right slots.
+///
+/// Use [`Self::darwin_extensions()`] to construct the version with the
+/// bit set; do NOT just initialise `padding: 0` on macOS.
 #[repr(C)]
 pub struct libfuse_version {
     pub major: u32,
     pub minor: u32,
     pub hotfix: u32,
+    /// On Apple this carries the `darwin_extensions_enabled` bit at bit 0.
+    /// On Linux it's straight reserved padding.
     pub padding: u32,
+}
+
+impl libfuse_version {
+    /// Build a version struct that opts into macFUSE's Darwin-flavored
+    /// `fuse_operations` signatures. On Linux this is identical to
+    /// initialising `padding: 0` — Linux libfuse ignores the bit.
+    pub const fn darwin_extensions(major: u32, minor: u32, hotfix: u32) -> Self {
+        Self {
+            major,
+            minor,
+            hotfix,
+            // bit 0 = darwin_extensions_enabled; bits 1..31 = padding.
+            padding: if cfg!(target_os = "macos") { 1 } else { 0 },
+        }
+    }
 }
 
 /// Two-word time spec used inside `fuse_darwin_attr`. Matches Darwin's
@@ -483,9 +514,18 @@ impl fuse_operations {
 #[link(name = "fuse3")]
 unsafe extern "C" {
     /// Create a new FUSE filesystem instance.
-    /// We call the versioned symbol directly since fuse_new() is an inline wrapper.
-    /// Use _fuse_new_31 which supports the fuse3 readdir with flags parameter.
-    #[link_name = "fuse_new_31"]
+    ///
+    /// `_fuse_new_31` (underscore prefix) is the real entry point that
+    /// honours the `version` arg — including the macFUSE-specific
+    /// `darwin_extensions_enabled` bit. The unprefixed `fuse_new_31`
+    /// symbol exported by libfuse is a legacy ABI compat shim with
+    /// signature `(args, op, op_size, user_data)` that internally
+    /// constructs `version = { 0 }` and discards anything we passed.
+    /// Linking the wrong symbol means the version struct never reaches
+    /// libfuse, the Darwin code path is never selected, and our
+    /// `fuse_darwin_attr` writes overrun the smaller `struct stat`
+    /// buffer — only uid/gid happened to land at right offsets.
+    #[link_name = "_fuse_new_31"]
     pub fn fuse_new(
         args: *mut fuse_args,
         op: *const fuse_operations,

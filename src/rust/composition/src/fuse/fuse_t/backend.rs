@@ -21,7 +21,7 @@ use log::{debug, error, info};
 use super::bindings;
 use super::operations;
 use crate::fuse::fs_core::FsCore;
-use crate::fuse::platform::{self, detect_macfuse_backend, FuseVendor, MacFuseBackend, Platform};
+use crate::fuse::platform::{self, detect_macfuse_backend, MacFuseBackend, Platform};
 use crate::state::ConsistencyStateMachine;
 use crate::{BackendStatus, CellMapping, CompositionBackend, CompositionConfig, Error, Result};
 
@@ -92,16 +92,9 @@ impl CompositionBackend for FuseTBackend {
         // Pre-flight: macFUSE's `fuse_mount` (via MFMount.framework) blocks
         // indefinitely on a System Settings GUI prompt when no backend is
         // active. Fail fast with activation guidance instead.
-        //
-        // We also infer whether to register the readdir callback here:
-        // under macFUSE FSKit the filler argument arrives as an opaque
-        // token rather than a function pointer, so registering readdir
-        // makes the daemon segfault on first directory access
-        // (turnkey-4vl.6). Leaving readdir null forces FSKit to enumerate
-        // via LOOKUP-per-entry, which our cache TTLs amortize.
         let backend = detect_macfuse_backend();
-        let register_readdir = match &backend {
-            MacFuseBackend::FSKit { vendor, version, bundle_id } => {
+        match &backend {
+            MacFuseBackend::FSKit { version, bundle_id, .. } => {
                 info!(
                     "{} active: {}{}",
                     backend.label(),
@@ -111,11 +104,9 @@ impl CompositionBackend for FuseTBackend {
                         .map(|v| format!(" ({})", v))
                         .unwrap_or_default()
                 );
-                !matches!(vendor, FuseVendor::MacFuse)
             }
             MacFuseBackend::Kext { bundle_id } => {
                 info!("macFUSE legacy kext loaded ({})", bundle_id);
-                true
             }
             MacFuseBackend::NotActivated { .. } | MacFuseBackend::NotInstalled => {
                 let msg = format!(
@@ -127,6 +118,10 @@ impl CompositionBackend for FuseTBackend {
                 return Err(Error::FuseUnavailable(msg));
             }
         };
+        // Always register readdir: with darwin_extensions_enabled the
+        // filler is a real fuse_darwin_fill_dir_t function pointer, not
+        // the opaque-token corruption we saw before that bit was set.
+        let register_readdir = true;
 
         self.ensure_mount_point()?;
         self.should_stop.store(false, Ordering::SeqCst);
@@ -202,13 +197,16 @@ impl CompositionBackend for FuseTBackend {
             // — see register_readdir computation above.
             let ops = operations::build_operations(register_readdir);
 
-            // Create FUSE instance
-            let mut version = bindings::libfuse_version {
-                major: bindings::FUSE_MAJOR_VERSION,
-                minor: bindings::FUSE_MINOR_VERSION,
-                hotfix: 0,
-                padding: 0,
-            };
+            // Create FUSE instance. On macOS, opt into macFUSE's Darwin
+            // signatures via the bit in `padding` — this is what tells
+            // macFUSE to use `fuse_lib_getattr$DARWIN` and pass our op a
+            // `*fuse_darwin_attr` rather than `*struct stat`. Without it
+            // our struct write overruns the smaller stat buffer.
+            let mut version = bindings::libfuse_version::darwin_extensions(
+                bindings::FUSE_MAJOR_VERSION,
+                bindings::FUSE_MINOR_VERSION,
+                0,
+            );
 
             let fuse = unsafe {
                 bindings::fuse_new(
