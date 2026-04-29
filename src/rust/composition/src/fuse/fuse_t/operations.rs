@@ -404,6 +404,23 @@ unsafe extern "C" fn fuse_read(
     }
 }
 
+/// Copy a symlink target into libfuse's caller buffer, NUL-terminating.
+/// Returns the FUSE callback's int result (0 on success).
+///
+/// Saturates to the buffer's last byte so we never overrun. `size == 0`
+/// is treated as a no-op success (libfuse should never pass it, but a
+/// underflow on `size - 1` would otherwise trip the kernel stack canary
+/// inside libfuse's PATH_MAX-sized linkname buffer).
+unsafe fn copy_link_target(buf: *mut c_char, size: libc::size_t, target: &[u8]) -> c_int {
+    if size == 0 {
+        return 0;
+    }
+    let to_copy = target.len().min(size - 1);
+    ptr::copy_nonoverlapping(target.as_ptr(), buf as *mut u8, to_copy);
+    *buf.add(to_copy) = 0;
+    0
+}
+
 unsafe extern "C" fn fuse_readlink(
     path: *const c_char,
     buf: *mut c_char,
@@ -418,33 +435,17 @@ unsafe extern "C" fn fuse_readlink(
 
     match core.resolve_path(path) {
         ResolvedPath::Cell { real_path, .. } => {
-            // Cell is exposed as a symlink to the Nix store path
-            let target_bytes = real_path.as_os_str().as_encoded_bytes();
-            let to_copy = target_bytes.len().min(size - 1);
-            ptr::copy_nonoverlapping(target_bytes.as_ptr(), buf as *mut u8, to_copy);
-            *buf.add(to_copy) = 0;
-            0
+            copy_link_target(buf, size, real_path.as_os_str().as_encoded_bytes())
         }
         ResolvedPath::OutputMount { real_path, symlink: true }
         | ResolvedPath::OutputChild { real_path, symlink: true } => {
-            // Symlink output mount — return the real path as target
-            let target_bytes = real_path.as_os_str().as_encoded_bytes();
-            let to_copy = target_bytes.len().min(size - 1);
-            ptr::copy_nonoverlapping(target_bytes.as_ptr(), buf as *mut u8, to_copy);
-            *buf.add(to_copy) = 0;
-            0
+            copy_link_target(buf, size, real_path.as_os_str().as_encoded_bytes())
         }
         ResolvedPath::SourceChild { real_path }
         | ResolvedPath::CellChild { real_path, .. }
         | ResolvedPath::OutputChild { real_path, .. } => {
             match fs::read_link(&real_path) {
-                Ok(target) => {
-                    let target_bytes = target.as_os_str().as_encoded_bytes();
-                    let to_copy = target_bytes.len().min(size - 1);
-                    ptr::copy_nonoverlapping(target_bytes.as_ptr(), buf as *mut u8, to_copy);
-                    *buf.add(to_copy) = 0;
-                    0
-                }
+                Ok(target) => copy_link_target(buf, size, target.as_os_str().as_encoded_bytes()),
                 Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
             }
         }

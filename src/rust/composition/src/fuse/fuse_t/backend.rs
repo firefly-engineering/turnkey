@@ -164,14 +164,19 @@ impl CompositionBackend for FuseTBackend {
             //                    unless the user enables Reduced Security mode
             //                    in Recovery. FUSE-T ignores the option.
             // fsname=turnkey:    name shown in `mount`, df, Disk Utility.
-            // local:             tag the volume as local (not network). Without
-            //                    this, macFUSE volumes appear under Finder's
-            //                    "Shared" section and Spotlight applies network
-            //                    indexing rules, which both produce visible
-            //                    delays and surprising behavior. The flag is a
-            //                    macFUSE/FUSE-T extension (no-op on Linux).
             // noappledouble:     suppress ._ AppleDouble files in build output.
             // noapplexattr:      suppress Apple xattr translation files.
+            //
+            // Note: we deliberately do NOT pass the macFUSE `local` option.
+            // Empirically, on macOS 26.4.1 with FSKit, `local` causes the
+            // kernel to cache "directory has only the previously enumerated
+            // entries" so aggressively that direct path stats (like Buck2's
+            // `stat .buckconfig` without prior readdir) return ENOENT for
+            // entries our daemon would happily serve via LOOKUP. Dropping
+            // `local` makes the volume report network-mounted (which means
+            // Finder shows it under "Shared", Spotlight skips indexing —
+            // both fine for our build use case), and individual LOOKUPs
+            // reach our daemon as expected.
             //
             // We deliberately do NOT set noubc / novncache / direct_io / noreadahead:
             // those disable kernel caching, which is exactly what makes the build
@@ -180,7 +185,7 @@ impl CompositionBackend for FuseTBackend {
             let arg0 = CString::new("turnkey-composed").unwrap();
             let arg_ro = CString::new("-o").unwrap();
             let arg_ro_val =
-                CString::new("backend=fskit,fsname=turnkey,local,noappledouble,noapplexattr")
+                CString::new("backend=fskit,fsname=turnkey,noappledouble,noapplexattr")
                     .unwrap();
             let mut argv: Vec<*mut i8> = vec![
                 arg0.as_ptr() as *mut i8,
