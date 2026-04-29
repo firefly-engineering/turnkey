@@ -7,8 +7,8 @@
   "id": "turnkey-4vl",
   "labels": [],
   "priority": 1,
-  "status": "open",
+  "status": "in_progress",
   "title": "Switch FUSE backend from FUSE-T to macFUSE (FSKit)",
   "type": "epic",
-  "updated_at": "2026-04-29T07:43:01Z"
+  "updated_at": "2026-04-29T07:49:08Z"
 }
