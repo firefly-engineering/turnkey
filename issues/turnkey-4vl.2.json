@@ -6,14 +6,16 @@
   "blocks": [
     "turnkey-4vl.4"
   ],
+  "closed_at": "2026-04-29T08:33:44Z",
+  "close_reason": "Added detect_macfuse_backend() in fuse/platform.rs that distinguishes FSKit (active/registered), kext (loaded), NotActivated, NotInstalled. FuseTBackend::mount now pre-checks before fuse_mount and returns FuseUnavailable with multi-line activation guidance instead of letting MFMount.framework block on a System Settings GUI prompt. Verified empirically: prior build hung indefinitely; new build exits in \u003c1s with actionable instructions for both FSKit (preferred) and kext (legacy) activation paths. 6 unit tests cover the parsers (systemextensionsctl + kmutil) and the user-facing label/instructions.",
   "created": "2026-04-29T07:43:15Z",
   "description": "macFUSE's FSKit extensions (io.macfuse.app.fsmodule.macfuse.appex, io.macfuse.app.fsmodule.macfuse-local.appex) exist at /Library/Filesystems/macfuse.fs/Contents/Resources/macfuse.app/Contents/Extensions/ but aren't registered as system extensions yet. Determine: does first mount trigger activation? Does user need to enable in System Settings \u003e Extensions? Should turnkey-composed detect and guide the user? Add runtime detection of FSKit vs kext backend.",
   "id": "turnkey-4vl.2",
   "labels": [],
   "parent": "turnkey-4vl",
   "priority": 1,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Handle macFUSE FSKit extension activation",
   "type": "task",
-  "updated_at": "2026-04-29T08:26:11Z"
+  "updated_at": "2026-04-29T08:33:44Z"
 }
