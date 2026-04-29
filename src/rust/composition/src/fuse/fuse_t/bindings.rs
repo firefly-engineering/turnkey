@@ -22,8 +22,14 @@ pub enum fuse_pollhandle {}
 pub enum fuse_bufvec {}
 pub enum fuse_conn_info {}
 
-/// FUSE configuration, passed to init callback.
-/// Field layout must match fuse3/fuse.h exactly.
+/// FUSE configuration, passed to the `init` callback. Layout matches
+/// libfuse 3.18's `struct fuse_config` from fuse.h.
+///
+/// Fields between `auto_cache` and `no_rofd_flush` were added in 3.17/3.18
+/// and were missing from our prior 3.16-style bindings — `no_rofd_flush`
+/// in particular sat at the wrong offset, so any future read/write would
+/// have hit `ac_attr_timeout_set` instead. The `reserved` tail is part of
+/// the public ABI and must be preserved at the right size.
 #[repr(C)]
 pub struct fuse_config {
     pub set_gid: c_int,
@@ -44,7 +50,18 @@ pub struct fuse_config {
     pub direct_io: c_int,
     pub kernel_cache: c_int,
     pub auto_cache: c_int,
+    pub ac_attr_timeout_set: c_int,
+    pub ac_attr_timeout: f64,
+    pub nullpath_ok: c_int,
+    pub show_help: c_int,
+    pub modules: *mut c_char,
+    pub debug: c_int,
+    pub fmask: libc::c_uint,
+    pub dmask: libc::c_uint,
     pub no_rofd_flush: c_int,
+    pub parallel_direct_writes: c_int,
+    pub flags: libc::c_uint,
+    pub reserved: [u64; 48],
 }
 pub enum fuse_loop_config {}
 
@@ -57,16 +74,29 @@ pub struct libfuse_version {
     pub padding: u32,
 }
 
-/// FUSE file info, passed to most callbacks
+/// FUSE file info, passed to most callbacks. Layout follows libfuse 3.18's
+/// `struct fuse_file_info` from fuse_common.h.
+///
+/// The bitfields in C (`writepage`, `direct_io`, `keep_cache`, `flush`,
+/// `nonseekable`, `flock_release`, `cache_readdir`, `noflush`,
+/// `parallel_direct_writes`, plus 23 bits of padding) are packed into a
+/// single `u32` here, accessed via the bit-helper methods below. The two
+/// `padding2`/`padding3` words are part of the public ABI and must be
+/// preserved; in 3.16 they didn't exist, so a 3.16-compiled struct's `fh`
+/// landed at offset 8 — this layout puts it at offset 16 (the 3.18 ABI),
+/// which is what macFUSE 5.2 (libfuse 3.18.2) expects.
 #[repr(C)]
 pub struct fuse_file_info {
     pub flags: i32,
-    // Bitfields in C — represented as a u32 with manual bit access
     pub bitfields: u32,
+    pub padding2: u32,
+    pub padding3: u32,
     pub fh: u64,
     pub lock_owner: u64,
     pub poll_events: u32,
-    _padding: u32,
+    pub backing_id: i32,
+    pub compat_flags: u64,
+    pub reserved: [u64; 2],
 }
 
 /// FUSE context, returned by fuse_get_context()
@@ -353,7 +383,6 @@ pub struct fuse_operations {
             fi: *mut fuse_file_info,
         ) -> c_int,
     >,
-    pub syncfs: Option<unsafe extern "C" fn(path: *const c_char) -> c_int>,
 }
 
 impl fuse_operations {
@@ -414,8 +443,9 @@ unsafe extern "C" {
 
 /// FUSE major version (3)
 pub const FUSE_MAJOR_VERSION: u32 = 3;
-/// FUSE minor version
-pub const FUSE_MINOR_VERSION: u32 = 16;
+/// FUSE minor version (matches macFUSE 5.2.0's libfuse 3.18.2; FUSE-T's
+/// libfuse3 also implements the 3.18 ABI).
+pub const FUSE_MINOR_VERSION: u32 = 18;
 
 #[cfg(test)]
 mod tests {
@@ -432,18 +462,19 @@ mod tests {
 
     #[test]
     fn test_fuse_operations_size() {
-        // Must match C: sizeof(struct fuse_operations) = 352 on arm64 macOS
+        // libfuse 3.18 fuse_operations is 43 function pointers = 344 bytes on
+        // 64-bit. (Pre-3.17 versions had 44 fields with a `syncfs` tail; that
+        // field never made it upstream and was carried in our older 3.16-style
+        // bindings by accident.)
         let rust_size = std::mem::size_of::<fuse_operations>();
-        // The C struct has 44 function pointer fields = 44 * 8 = 352 bytes on 64-bit
-        assert_eq!(rust_size, 352, "fuse_operations size mismatch: Rust={rust_size} expected=352");
+        assert_eq!(rust_size, 344, "fuse_operations size mismatch: Rust={rust_size} expected=344");
     }
 
     #[test]
     fn test_fuse_operations_field_offsets() {
-        use std::mem;
         let base = std::ptr::null::<fuse_operations>();
         unsafe {
-            // Key field offsets must match the C struct
+            // Field offsets must match libfuse 3.18's struct fuse_operations.
             assert_eq!(std::ptr::addr_of!((*base).getattr) as usize, 0, "getattr offset");
             assert_eq!(std::ptr::addr_of!((*base).readlink) as usize, 8, "readlink offset");
             assert_eq!(std::ptr::addr_of!((*base).open) as usize, 96, "open offset");
@@ -454,6 +485,45 @@ mod tests {
             assert_eq!(std::ptr::addr_of!((*base).releasedir) as usize, 200, "releasedir offset");
             assert_eq!(std::ptr::addr_of!((*base).init) as usize, 216, "init offset");
             assert_eq!(std::ptr::addr_of!((*base).destroy) as usize, 224, "destroy offset");
+            // statx is the last field, at offset 42 * 8 = 336.
+            assert_eq!(std::ptr::addr_of!((*base).statx) as usize, 336, "statx offset");
+        }
+    }
+
+    #[test]
+    fn test_fuse_file_info_layout() {
+        // libfuse 3.18 layout: flags(4) bitfields(4) padding2(4) padding3(4)
+        // fh(8) lock_owner(8) poll_events(4) backing_id(4) compat_flags(8)
+        // reserved[2](16) = 64 bytes total.
+        assert_eq!(std::mem::size_of::<fuse_file_info>(), 64);
+        let base = std::ptr::null::<fuse_file_info>();
+        unsafe {
+            assert_eq!(std::ptr::addr_of!((*base).flags) as usize, 0);
+            assert_eq!(std::ptr::addr_of!((*base).bitfields) as usize, 4);
+            assert_eq!(std::ptr::addr_of!((*base).fh) as usize, 16, "fh must be at 16, not 8");
+            assert_eq!(std::ptr::addr_of!((*base).lock_owner) as usize, 24);
+            assert_eq!(std::ptr::addr_of!((*base).poll_events) as usize, 32);
+            assert_eq!(std::ptr::addr_of!((*base).backing_id) as usize, 36);
+            assert_eq!(std::ptr::addr_of!((*base).compat_flags) as usize, 40);
+        }
+    }
+
+    #[test]
+    fn test_fuse_config_critical_offsets() {
+        // libfuse 3.18 fuse_config: key fields we read/write in fuse_init
+        // must land at the right C offsets. These were correct in 3.16 too,
+        // but verify we didn't perturb them while extending the tail.
+        let base = std::ptr::null::<fuse_config>();
+        unsafe {
+            assert_eq!(std::ptr::addr_of!((*base).entry_timeout) as usize, 24);
+            assert_eq!(std::ptr::addr_of!((*base).negative_timeout) as usize, 32);
+            assert_eq!(std::ptr::addr_of!((*base).attr_timeout) as usize, 40);
+            assert_eq!(std::ptr::addr_of!((*base).kernel_cache) as usize, 76);
+            assert_eq!(std::ptr::addr_of!((*base).auto_cache) as usize, 80);
+            // Fields below were absent / wrong in our 3.16 layout.
+            assert_eq!(std::ptr::addr_of!((*base).ac_attr_timeout_set) as usize, 84);
+            assert_eq!(std::ptr::addr_of!((*base).ac_attr_timeout) as usize, 88);
+            assert_eq!(std::ptr::addr_of!((*base).no_rofd_flush) as usize, 124);
         }
     }
 }
