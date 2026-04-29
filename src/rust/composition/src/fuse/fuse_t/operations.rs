@@ -687,10 +687,20 @@ unsafe extern "C" fn fuse_access(
 }
 
 /// Build a `fuse_operations` struct populated with the implemented callbacks.
-pub fn build_operations() -> bindings::fuse_operations {
+///
+/// `register_readdir = false` leaves the readdir slot null, forcing libfuse
+/// (and its FSKit shim) to enumerate directories via LOOKUP-per-entry plus
+/// our `getattr`. This is the workaround for the macFUSE-FSKit `readdir`
+/// crash tracked in turnkey-4vl.6: under FSKit the filler argument arrives
+/// as an opaque token rather than a function pointer, so calling it
+/// segfaults regardless of signature. Cache TTLs in `fuse_init`
+/// (entry_timeout=300, attr_timeout=300) keep the LOOKUP cost amortized.
+pub fn build_operations(register_readdir: bool) -> bindings::fuse_operations {
     let mut ops = bindings::fuse_operations::zeroed();
     ops.getattr = Some(fuse_getattr);
-    ops.readdir = Some(fuse_readdir);
+    if register_readdir {
+        ops.readdir = Some(fuse_readdir);
+    }
     ops.open = Some(fuse_open);
     ops.opendir = Some(fuse_opendir);
     ops.releasedir = Some(fuse_releasedir);

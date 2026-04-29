@@ -140,12 +140,32 @@ pub type fuse_fill_dir_t = Option<
 ///
 /// Field order MUST match the C struct in fuse3/fuse.h exactly.
 /// Unused fields are set to None (null function pointer).
+///
+/// On macOS this struct includes four Apple-only fields that aren't part
+/// of upstream libfuse: `setattr` after `getattr`, plus `chflags` /
+/// `setvolname` / `monitor` between `lseek` and `statx`. macFUSE's headers
+/// add these via `#ifdef __APPLE__`, so any binary linking against
+/// macFUSE's libfuse3 must match this layout — otherwise every callback
+/// past `getattr` is at the wrong offset and libfuse mis-dispatches (e.g.
+/// `OPEN` ends up calling our `read`). The fields stay null because we
+/// don't implement them. The `fuse_t` module is already macOS-only at the
+/// parent (`#[cfg(target_os = "macos")] pub mod fuse_t;`), so no per-field
+/// gating is needed here.
 #[repr(C)]
 pub struct fuse_operations {
     pub getattr: Option<
         unsafe extern "C" fn(
             path: *const c_char,
             stbuf: *mut libc::stat,
+            fi: *mut fuse_file_info,
+        ) -> c_int,
+    >,
+    /// Apple-only: set file attributes. Not implemented; kept for ABI parity.
+    pub setattr: Option<
+        unsafe extern "C" fn(
+            path: *const c_char,
+            attr: *mut libc::stat,
+            to_set: c_int,
             fi: *mut fuse_file_info,
         ) -> c_int,
     >,
@@ -374,6 +394,19 @@ pub struct fuse_operations {
             fi: *mut fuse_file_info,
         ) -> libc::off_t,
     >,
+    /// Apple-only: set BSD file flags. Not implemented; null for ABI parity.
+    pub chflags: Option<
+        unsafe extern "C" fn(
+            path: *const c_char,
+            fi: *mut fuse_file_info,
+            flags: libc::c_uint,
+        ) -> c_int,
+    >,
+    /// Apple-only: rename the mounted volume. Not implemented; null for ABI parity.
+    pub setvolname: Option<unsafe extern "C" fn(name: *const c_char) -> c_int>,
+    /// Apple-only: notify of file watcher count changes (FUSE_MONITOR_BEGIN/END).
+    /// Not implemented; null for ABI parity.
+    pub monitor: Option<unsafe extern "C" fn(path: *const c_char, op: u32)>,
     pub statx: Option<
         unsafe extern "C" fn(
             path: *const c_char,
@@ -462,31 +495,37 @@ mod tests {
 
     #[test]
     fn test_fuse_operations_size() {
-        // libfuse 3.18 fuse_operations is 43 function pointers = 344 bytes on
-        // 64-bit. (Pre-3.17 versions had 44 fields with a `syncfs` tail; that
-        // field never made it upstream and was carried in our older 3.16-style
-        // bindings by accident.)
+        // macFUSE-on-Apple fuse_operations is 47 function pointers = 376 bytes:
+        // upstream's 43 fields plus four Apple-only entries (setattr, chflags,
+        // setvolname, monitor). Vanilla upstream is 344 bytes; matching that
+        // here mis-dispatches every callback past getattr — see the struct
+        // doc-comment for details.
         let rust_size = std::mem::size_of::<fuse_operations>();
-        assert_eq!(rust_size, 344, "fuse_operations size mismatch: Rust={rust_size} expected=344");
+        assert_eq!(rust_size, 376, "fuse_operations size mismatch: Rust={rust_size} expected=376");
     }
 
     #[test]
     fn test_fuse_operations_field_offsets() {
         let base = std::ptr::null::<fuse_operations>();
         unsafe {
-            // Field offsets must match libfuse 3.18's struct fuse_operations.
-            assert_eq!(std::ptr::addr_of!((*base).getattr) as usize, 0, "getattr offset");
-            assert_eq!(std::ptr::addr_of!((*base).readlink) as usize, 8, "readlink offset");
-            assert_eq!(std::ptr::addr_of!((*base).open) as usize, 96, "open offset");
-            assert_eq!(std::ptr::addr_of!((*base).read) as usize, 104, "read offset");
-            assert_eq!(std::ptr::addr_of!((*base).statfs) as usize, 120, "statfs offset");
-            assert_eq!(std::ptr::addr_of!((*base).opendir) as usize, 184, "opendir offset");
-            assert_eq!(std::ptr::addr_of!((*base).readdir) as usize, 192, "readdir offset");
-            assert_eq!(std::ptr::addr_of!((*base).releasedir) as usize, 200, "releasedir offset");
-            assert_eq!(std::ptr::addr_of!((*base).init) as usize, 216, "init offset");
-            assert_eq!(std::ptr::addr_of!((*base).destroy) as usize, 224, "destroy offset");
-            // statx is the last field, at offset 42 * 8 = 336.
-            assert_eq!(std::ptr::addr_of!((*base).statx) as usize, 336, "statx offset");
+            // macFUSE-on-Apple offsets. setattr inserted at slot 1 shifts every
+            // subsequent field by 8 bytes vs. upstream; chflags/setvolname/monitor
+            // before statx push statx from 336 to 360.
+            assert_eq!(std::ptr::addr_of!((*base).getattr) as usize, 0, "getattr");
+            assert_eq!(std::ptr::addr_of!((*base).setattr) as usize, 8, "setattr (Apple)");
+            assert_eq!(std::ptr::addr_of!((*base).readlink) as usize, 16, "readlink");
+            assert_eq!(std::ptr::addr_of!((*base).open) as usize, 104, "open");
+            assert_eq!(std::ptr::addr_of!((*base).read) as usize, 112, "read");
+            assert_eq!(std::ptr::addr_of!((*base).statfs) as usize, 128, "statfs");
+            assert_eq!(std::ptr::addr_of!((*base).opendir) as usize, 192, "opendir");
+            assert_eq!(std::ptr::addr_of!((*base).readdir) as usize, 200, "readdir");
+            assert_eq!(std::ptr::addr_of!((*base).releasedir) as usize, 208, "releasedir");
+            assert_eq!(std::ptr::addr_of!((*base).init) as usize, 224, "init");
+            assert_eq!(std::ptr::addr_of!((*base).destroy) as usize, 232, "destroy");
+            assert_eq!(std::ptr::addr_of!((*base).chflags) as usize, 344, "chflags (Apple)");
+            assert_eq!(std::ptr::addr_of!((*base).setvolname) as usize, 352, "setvolname (Apple)");
+            assert_eq!(std::ptr::addr_of!((*base).monitor) as usize, 360, "monitor (Apple)");
+            assert_eq!(std::ptr::addr_of!((*base).statx) as usize, 368, "statx");
         }
     }
 

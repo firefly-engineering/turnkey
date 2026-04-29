@@ -21,7 +21,7 @@ use log::{debug, error, info};
 use super::bindings;
 use super::operations;
 use crate::fuse::fs_core::FsCore;
-use crate::fuse::platform::{self, detect_macfuse_backend, MacFuseBackend, Platform};
+use crate::fuse::platform::{self, detect_macfuse_backend, FuseVendor, MacFuseBackend, Platform};
 use crate::state::ConsistencyStateMachine;
 use crate::{BackendStatus, CellMapping, CompositionBackend, CompositionConfig, Error, Result};
 
@@ -92,8 +92,16 @@ impl CompositionBackend for FuseTBackend {
         // Pre-flight: macFUSE's `fuse_mount` (via MFMount.framework) blocks
         // indefinitely on a System Settings GUI prompt when no backend is
         // active. Fail fast with activation guidance instead.
-        match detect_macfuse_backend() {
-            ref backend @ MacFuseBackend::FSKit { ref vendor, ref version, ref bundle_id } => {
+        //
+        // We also infer whether to register the readdir callback here:
+        // under macFUSE FSKit the filler argument arrives as an opaque
+        // token rather than a function pointer, so registering readdir
+        // makes the daemon segfault on first directory access
+        // (turnkey-4vl.6). Leaving readdir null forces FSKit to enumerate
+        // via LOOKUP-per-entry, which our cache TTLs amortize.
+        let backend = detect_macfuse_backend();
+        let register_readdir = match &backend {
+            MacFuseBackend::FSKit { vendor, version, bundle_id } => {
                 info!(
                     "{} active: {}{}",
                     backend.label(),
@@ -103,12 +111,13 @@ impl CompositionBackend for FuseTBackend {
                         .map(|v| format!(" ({})", v))
                         .unwrap_or_default()
                 );
-                let _ = vendor; // logged via label()
+                !matches!(vendor, FuseVendor::MacFuse)
             }
-            MacFuseBackend::Kext { ref bundle_id } => {
+            MacFuseBackend::Kext { bundle_id } => {
                 info!("macFUSE legacy kext loaded ({})", bundle_id);
+                true
             }
-            backend @ (MacFuseBackend::NotActivated { .. } | MacFuseBackend::NotInstalled) => {
+            MacFuseBackend::NotActivated { .. } | MacFuseBackend::NotInstalled => {
                 let msg = format!(
                     "{}\n\n{}",
                     backend.label(),
@@ -117,7 +126,7 @@ impl CompositionBackend for FuseTBackend {
                 error!("Cannot mount: {}", msg);
                 return Err(Error::FuseUnavailable(msg));
             }
-        }
+        };
 
         self.ensure_mount_point()?;
         self.should_stop.store(false, Ordering::SeqCst);
@@ -189,8 +198,9 @@ impl CompositionBackend for FuseTBackend {
                 allocated: 0,
             };
 
-            // Build the operations table
-            let ops = operations::build_operations();
+            // Build the operations table. Skip readdir under macFUSE FSKit
+            // — see register_readdir computation above.
+            let ops = operations::build_operations(register_readdir);
 
             // Create FUSE instance
             let mut version = bindings::libfuse_version {
