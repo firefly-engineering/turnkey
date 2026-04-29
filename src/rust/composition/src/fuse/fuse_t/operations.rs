@@ -710,6 +710,27 @@ unsafe extern "C" fn fuse_access(
     0 // Allow all access
 }
 
+/// Permissive setattr: lets clients (e.g. Buck2) issue chmod/utimens on
+/// writable output paths without us forcing libfuse to break the request
+/// into individual handlers.
+///
+/// macFUSE's `fuse_lib_setattr$DARWIN` (fuse.c:3501) tries `op.setattr`
+/// first, falls back to per-attr handlers (chmod / chown / truncate /
+/// utimens / chflags) on -ENOSYS. We only implement chmod, so a setattr
+/// that bundles e.g. mode+utimens crashes the chain at utimens with
+/// ENOSYS — which then surfaces to userspace and fails things like
+/// Buck2's CACHEDIR.TAG creation. Returning 0 here ("setattr handled it")
+/// causes libfuse to skip the per-attr fan-out; libfuse re-reads attrs
+/// via getattr afterwards.
+unsafe extern "C" fn fuse_setattr(
+    _path: *const c_char,
+    _attr: *mut bindings::fuse_darwin_attr,
+    _to_set: c_int,
+    _fi: *mut bindings::fuse_file_info,
+) -> c_int {
+    0
+}
+
 /// Build a `fuse_operations` struct populated with the implemented callbacks.
 ///
 /// `register_readdir = false` leaves the readdir slot null, forcing libfuse
@@ -722,6 +743,7 @@ unsafe extern "C" fn fuse_access(
 pub fn build_operations(register_readdir: bool) -> bindings::fuse_operations {
     let mut ops = bindings::fuse_operations::zeroed();
     ops.getattr = Some(fuse_getattr);
+    ops.setattr = Some(fuse_setattr);
     if register_readdir {
         ops.readdir = Some(fuse_readdir);
     }
