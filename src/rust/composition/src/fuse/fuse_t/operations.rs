@@ -60,52 +60,86 @@ fn now_secs() -> libc::time_t {
         .unwrap_or(0)
 }
 
-/// Fill a `libc::stat` buffer with directory attributes.
-unsafe fn fill_dir_stat(stbuf: *mut libc::stat, ino: u64, uid: u32, gid: u32) {
-    let now = now_secs();
-    (*stbuf).st_ino = ino as libc::ino_t;
-    (*stbuf).st_mode = libc::S_IFDIR | 0o755;
-    (*stbuf).st_nlink = 2;
-    (*stbuf).st_size = 4096;
-    (*stbuf).st_uid = uid;
-    (*stbuf).st_gid = gid;
-    (*stbuf).st_blksize = 4096;
-    (*stbuf).st_blocks = 8;
-    (*stbuf).st_atime = now;
-    (*stbuf).st_mtime = now;
-    (*stbuf).st_ctime = now;
+/// Build a `fuse_darwin_timespec` from a Unix epoch second value.
+fn ts(secs: libc::time_t) -> bindings::fuse_darwin_timespec {
+    bindings::fuse_darwin_timespec {
+        tv_sec: secs as i64,
+        tv_nsec: 0,
+    }
 }
 
-/// Fill a `libc::stat` buffer with virtual-file attributes.
-unsafe fn fill_virtual_file_stat(stbuf: *mut libc::stat, ino: u64, size: u64, uid: u32, gid: u32) {
+/// Fill a `fuse_darwin_attr` buffer with directory attributes.
+unsafe fn fill_dir_stat(stbuf: *mut bindings::fuse_darwin_attr, ino: u64, uid: u32, gid: u32) {
     let now = now_secs();
-    (*stbuf).st_ino = ino as libc::ino_t;
-    (*stbuf).st_mode = libc::S_IFREG | 0o444;
-    (*stbuf).st_nlink = 1;
-    (*stbuf).st_size = size as libc::off_t;
-    (*stbuf).st_uid = uid;
-    (*stbuf).st_gid = gid;
-    (*stbuf).st_blksize = 4096;
-    (*stbuf).st_atime = now;
-    (*stbuf).st_mtime = now;
-    (*stbuf).st_ctime = now;
+    (*stbuf).ino = ino;
+    (*stbuf).mode = libc::S_IFDIR | 0o755;
+    (*stbuf).nlink = 2;
+    (*stbuf).size = 4096;
+    (*stbuf).uid = uid;
+    (*stbuf).gid = gid;
+    (*stbuf).blksize = 4096;
+    (*stbuf).blocks = 8;
+    (*stbuf).atimespec = ts(now);
+    (*stbuf).mtimespec = ts(now);
+    (*stbuf).ctimespec = ts(now);
 }
 
-/// Fill a `libc::stat` buffer from `fs::Metadata`.
-unsafe fn fill_stat_from_metadata(stbuf: *mut libc::stat, meta: &fs::Metadata) {
-    (*stbuf).st_dev = meta.dev() as libc::dev_t;
-    (*stbuf).st_ino = meta.ino() as libc::ino_t;
-    (*stbuf).st_mode = meta.mode() as libc::mode_t;
-    (*stbuf).st_nlink = meta.nlink() as libc::nlink_t;
-    (*stbuf).st_uid = meta.uid();
-    (*stbuf).st_gid = meta.gid();
-    (*stbuf).st_rdev = meta.rdev() as libc::dev_t;
-    (*stbuf).st_size = meta.size() as libc::off_t;
-    (*stbuf).st_blksize = meta.blksize() as i32;
-    (*stbuf).st_blocks = meta.blocks() as libc::blkcnt_t;
-    (*stbuf).st_atime = meta.atime() as libc::time_t;
-    (*stbuf).st_mtime = meta.mtime() as libc::time_t;
-    (*stbuf).st_ctime = meta.ctime() as libc::time_t;
+/// Fill a `fuse_darwin_attr` buffer with virtual-file attributes.
+unsafe fn fill_virtual_file_stat(
+    stbuf: *mut bindings::fuse_darwin_attr,
+    ino: u64,
+    size: u64,
+    uid: u32,
+    gid: u32,
+) {
+    let now = now_secs();
+    (*stbuf).ino = ino;
+    (*stbuf).mode = libc::S_IFREG | 0o444;
+    (*stbuf).nlink = 1;
+    (*stbuf).size = size as libc::off_t;
+    (*stbuf).uid = uid;
+    (*stbuf).gid = gid;
+    (*stbuf).blksize = 4096;
+    (*stbuf).atimespec = ts(now);
+    (*stbuf).mtimespec = ts(now);
+    (*stbuf).ctimespec = ts(now);
+}
+
+/// Fill a `fuse_darwin_attr` buffer with symlink attributes.
+unsafe fn fill_symlink_stat(
+    stbuf: *mut bindings::fuse_darwin_attr,
+    ino: u64,
+    target_len: usize,
+    uid: u32,
+    gid: u32,
+) {
+    let now = now_secs();
+    (*stbuf).ino = ino;
+    (*stbuf).mode = libc::S_IFLNK | 0o777;
+    (*stbuf).nlink = 1;
+    (*stbuf).size = target_len as libc::off_t;
+    (*stbuf).uid = uid;
+    (*stbuf).gid = gid;
+    (*stbuf).atimespec = ts(now);
+    (*stbuf).mtimespec = ts(now);
+    (*stbuf).ctimespec = ts(now);
+}
+
+/// Fill a `fuse_darwin_attr` buffer from `fs::Metadata`. Note macFUSE's
+/// attr struct has no `dev` field (only `rdev`); we drop the device id.
+unsafe fn fill_stat_from_metadata(stbuf: *mut bindings::fuse_darwin_attr, meta: &fs::Metadata) {
+    (*stbuf).ino = meta.ino();
+    (*stbuf).mode = meta.mode() as libc::mode_t;
+    (*stbuf).nlink = meta.nlink() as libc::nlink_t;
+    (*stbuf).uid = meta.uid();
+    (*stbuf).gid = meta.gid();
+    (*stbuf).rdev = meta.rdev() as libc::dev_t;
+    (*stbuf).size = meta.size() as libc::off_t;
+    (*stbuf).blksize = meta.blksize() as libc::blksize_t;
+    (*stbuf).blocks = meta.blocks() as libc::blkcnt_t;
+    (*stbuf).atimespec = ts(meta.atime() as libc::time_t);
+    (*stbuf).mtimespec = ts(meta.mtime() as libc::time_t);
+    (*stbuf).ctimespec = ts(meta.ctime() as libc::time_t);
 }
 
 
@@ -133,7 +167,7 @@ macro_rules! timed {
 
 unsafe extern "C" fn fuse_getattr(
     path: *const c_char,
-    stbuf: *mut libc::stat,
+    stbuf: *mut bindings::fuse_darwin_attr,
     _fi: *mut bindings::fuse_file_info,
 ) -> c_int {
     timed!(getattr);
@@ -176,32 +210,14 @@ unsafe extern "C" fn fuse_getattr(
             // This allows the kernel to follow the symlink and read cell
             // contents directly from the store, bypassing FUSE entirely.
             let target = real_path.to_string_lossy();
-            let now = now_secs();
-            (*stbuf).st_ino = 100; // arbitrary
-            (*stbuf).st_mode = libc::S_IFLNK | 0o777;
-            (*stbuf).st_nlink = 1;
-            (*stbuf).st_size = target.len() as libc::off_t;
-            (*stbuf).st_uid = core.uid;
-            (*stbuf).st_gid = core.gid;
-            (*stbuf).st_atime = now;
-            (*stbuf).st_mtime = now;
-            (*stbuf).st_ctime = now;
+            fill_symlink_stat(stbuf, 100, target.len(), core.uid, core.gid);
             0
         }
         ResolvedPath::OutputMount { real_path, symlink: true }
         | ResolvedPath::OutputChild { real_path, symlink: true } => {
             // Symlink output mounts (e.g., bin/) bypass FUSE
             let target = real_path.to_string_lossy();
-            let now = now_secs();
-            (*stbuf).st_ino = 101;
-            (*stbuf).st_mode = libc::S_IFLNK | 0o777;
-            (*stbuf).st_nlink = 1;
-            (*stbuf).st_size = target.len() as libc::off_t;
-            (*stbuf).st_uid = core.uid;
-            (*stbuf).st_gid = core.gid;
-            (*stbuf).st_atime = now;
-            (*stbuf).st_mtime = now;
-            (*stbuf).st_ctime = now;
+            fill_symlink_stat(stbuf, 101, target.len(), core.uid, core.gid);
             0
         }
         ResolvedPath::SourceChild { real_path }

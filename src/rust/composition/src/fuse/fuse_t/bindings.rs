@@ -74,6 +74,55 @@ pub struct libfuse_version {
     pub padding: u32,
 }
 
+/// Two-word time spec used inside `fuse_darwin_attr`. Matches Darwin's
+/// `struct timespec { __darwin_time_t tv_sec; long tv_nsec; }` where both
+/// fields are 64-bit on 64-bit platforms.
+#[repr(C)]
+#[derive(Copy, Clone, Default)]
+pub struct fuse_darwin_timespec {
+    pub tv_sec: i64,
+    pub tv_nsec: i64,
+}
+
+/// macFUSE's stat replacement passed to the Darwin-flavored `getattr`,
+/// `setattr`, and `readdir` filler callbacks. Defined in
+/// `/usr/local/include/fuse3/fuse_common.h`. Layout differs from POSIX
+/// `struct stat` — most notably `ino` is at offset 0 (not 8), there is no
+/// `dev` field, and times are full `timespec` rather than `time_t`.
+///
+/// Total size: 192 bytes (verified by layout test).
+#[repr(C)]
+pub struct fuse_darwin_attr {
+    pub ino: u64,
+    pub mode: libc::mode_t,
+    pub nlink: libc::nlink_t,
+    pub uid: libc::uid_t,
+    pub gid: libc::gid_t,
+    pub rdev: libc::dev_t,
+    // Rust's #[repr(C)] inserts 4 bytes of trailing padding here so that
+    // atimespec (alignment 8) lands at offset 24 — matching C.
+    pub atimespec: fuse_darwin_timespec,
+    pub mtimespec: fuse_darwin_timespec,
+    pub ctimespec: fuse_darwin_timespec,
+    /// Birth time (file creation).
+    pub btimespec: fuse_darwin_timespec,
+    /// Last backup time.
+    pub bkuptimespec: fuse_darwin_timespec,
+    pub size: libc::off_t,
+    pub blocks: libc::blkcnt_t,
+    pub blksize: libc::blksize_t,
+    pub flags: libc::c_uint,
+    pub reserved: [u64; 8],
+}
+
+impl fuse_darwin_attr {
+    /// Zero-initialize a fuse_darwin_attr (all fields 0 / default).
+    pub fn zeroed() -> Self {
+        // Safety: POD struct, all-zeros is a valid representation.
+        unsafe { std::mem::zeroed() }
+    }
+}
+
 /// FUSE file info, passed to most callbacks. Layout follows libfuse 3.18's
 /// `struct fuse_file_info` from fuse_common.h.
 ///
@@ -153,10 +202,14 @@ pub type fuse_fill_dir_t = Option<
 /// gating is needed here.
 #[repr(C)]
 pub struct fuse_operations {
+    /// On macFUSE the second argument is `*mut fuse_darwin_attr`, NOT POSIX
+    /// `*mut libc::stat` — the layouts differ (notably `ino` is at offset 0
+    /// here, vs `st_ino` at 8 in libc::stat). Filling a stat into this slot
+    /// produces nonsensical attrs to libfuse and fails LOOKUP/GETATTR.
     pub getattr: Option<
         unsafe extern "C" fn(
             path: *const c_char,
-            stbuf: *mut libc::stat,
+            stbuf: *mut fuse_darwin_attr,
             fi: *mut fuse_file_info,
         ) -> c_int,
     >,
@@ -164,7 +217,7 @@ pub struct fuse_operations {
     pub setattr: Option<
         unsafe extern "C" fn(
             path: *const c_char,
-            attr: *mut libc::stat,
+            attr: *mut fuse_darwin_attr,
             to_set: c_int,
             fi: *mut fuse_file_info,
         ) -> c_int,
@@ -544,6 +597,35 @@ mod tests {
             assert_eq!(std::ptr::addr_of!((*base).poll_events) as usize, 32);
             assert_eq!(std::ptr::addr_of!((*base).backing_id) as usize, 36);
             assert_eq!(std::ptr::addr_of!((*base).compat_flags) as usize, 40);
+        }
+    }
+
+    #[test]
+    fn test_fuse_darwin_attr_layout() {
+        // Layout per /usr/local/include/fuse3/fuse_common.h.
+        // Total size: 192 bytes. Critical: ino@0 (vs stat's st_ino@8) and
+        // no st_dev — the divergence from libc::stat is what made our
+        // pre-port LOOKUP responses unintelligible to macFUSE.
+        assert_eq!(std::mem::size_of::<fuse_darwin_attr>(), 192);
+        let base = std::ptr::null::<fuse_darwin_attr>();
+        unsafe {
+            assert_eq!(std::ptr::addr_of!((*base).ino) as usize, 0);
+            assert_eq!(std::ptr::addr_of!((*base).mode) as usize, 8);
+            assert_eq!(std::ptr::addr_of!((*base).nlink) as usize, 10);
+            assert_eq!(std::ptr::addr_of!((*base).uid) as usize, 12);
+            assert_eq!(std::ptr::addr_of!((*base).gid) as usize, 16);
+            assert_eq!(std::ptr::addr_of!((*base).rdev) as usize, 20);
+            // 4 bytes of padding here to align timespec
+            assert_eq!(std::ptr::addr_of!((*base).atimespec) as usize, 24);
+            assert_eq!(std::ptr::addr_of!((*base).mtimespec) as usize, 40);
+            assert_eq!(std::ptr::addr_of!((*base).ctimespec) as usize, 56);
+            assert_eq!(std::ptr::addr_of!((*base).btimespec) as usize, 72);
+            assert_eq!(std::ptr::addr_of!((*base).bkuptimespec) as usize, 88);
+            assert_eq!(std::ptr::addr_of!((*base).size) as usize, 104);
+            assert_eq!(std::ptr::addr_of!((*base).blocks) as usize, 112);
+            assert_eq!(std::ptr::addr_of!((*base).blksize) as usize, 120);
+            assert_eq!(std::ptr::addr_of!((*base).flags) as usize, 124);
+            assert_eq!(std::ptr::addr_of!((*base).reserved) as usize, 128);
         }
     }
 
