@@ -73,7 +73,7 @@ enum Commands {
         /// Backend type: auto, fuse, or symlink
         ///
         /// - auto: Automatically select best available backend (default)
-        /// - fuse: Use FUSE filesystem (requires FUSE/FUSE-T installation)
+        /// - fuse: Use FUSE filesystem (Linux: fuse3; macOS: macFUSE)
         /// - symlink: Use symlinks (always available, no daemon needed)
         #[arg(long, default_value = "auto")]
         backend: String,

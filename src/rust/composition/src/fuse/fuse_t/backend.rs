@@ -1,8 +1,11 @@
-//! FUSE-T backend implementation for macOS
+//! macOS libfuse3 backend (macFUSE primary, FUSE-T compatible)
 //!
-//! Uses direct FFI to libfuse3 (FUSE-T) instead of the `fuser` crate.
-//! The key difference: we call `fuse_loop()` which uses FUSE-T's internal
-//! NFS-based session loop, rather than reading the fd directly.
+//! Uses direct FFI to libfuse3 instead of the `fuser` crate, calling
+//! `fuse_loop_mt` to drive the high-level session loop. The same FFI works
+//! against macFUSE (FSKit on macOS 26+, kext on older releases) and FUSE-T,
+//! since both expose the libfuse3.16 ABI; macFUSE is the targeted backend.
+//! Module/struct names retain the legacy `fuse_t` prefix from before macFUSE
+//! support was added.
 
 #![cfg(target_os = "macos")]
 
@@ -18,11 +21,11 @@ use log::{debug, error, info};
 use super::bindings;
 use super::operations;
 use crate::fuse::fs_core::FsCore;
-use crate::fuse::platform::{self, Platform};
+use crate::fuse::platform::{self, detect_macfuse_backend, MacFuseBackend, Platform};
 use crate::state::ConsistencyStateMachine;
 use crate::{BackendStatus, CellMapping, CompositionBackend, CompositionConfig, Error, Result};
 
-/// FUSE-T-based composition backend for macOS
+/// macOS libfuse3 composition backend (targets macFUSE; works with FUSE-T too).
 pub struct FuseTBackend {
     config: CompositionConfig,
     status: Arc<Mutex<BackendStatus>>,
@@ -85,6 +88,34 @@ impl CompositionBackend for FuseTBackend {
         if self.is_mount_point_busy() {
             return Err(Error::AlreadyMounted(self.config.mount_point.clone()));
         }
+
+        // Pre-flight: macFUSE's `fuse_mount` (via MFMount.framework) blocks
+        // indefinitely on a System Settings GUI prompt when no backend is
+        // active. Fail fast with activation guidance instead.
+        match detect_macfuse_backend() {
+            MacFuseBackend::FSKit { ref version, .. } => {
+                info!(
+                    "macFUSE FSKit extension active{}",
+                    version
+                        .as_ref()
+                        .map(|v| format!(" ({})", v))
+                        .unwrap_or_default()
+                );
+            }
+            MacFuseBackend::Kext { ref bundle_id } => {
+                info!("macFUSE legacy kext loaded ({})", bundle_id);
+            }
+            backend @ (MacFuseBackend::NotActivated { .. } | MacFuseBackend::NotInstalled) => {
+                let msg = format!(
+                    "{}\n\n{}",
+                    backend.label(),
+                    backend.activation_instructions()
+                );
+                error!("Cannot mount: {}", msg);
+                return Err(Error::FuseUnavailable(msg));
+            }
+        }
+
         self.ensure_mount_point()?;
         self.should_stop.store(false, Ordering::SeqCst);
 
@@ -92,7 +123,7 @@ impl CompositionBackend for FuseTBackend {
             let mut status = self.status.lock().unwrap();
             *status = BackendStatus::Building {
                 affected_paths: vec![self.config.mount_point.clone()],
-                message: Some("mounting FUSE-T filesystem".into()),
+                message: Some("mounting FUSE filesystem".into()),
             };
         }
 
@@ -103,24 +134,39 @@ impl CompositionBackend for FuseTBackend {
         let should_stop = Arc::clone(&self.should_stop);
         let state_machine = Arc::clone(&self.state_machine);
 
-        info!("Mounting FUSE-T filesystem at {:?}", mount_point);
+        info!("Mounting FUSE filesystem at {:?}", mount_point);
 
         let handle = thread::spawn(move || {
             // Create the filesystem core
             let core = FsCore::new(config, repo_root, state_machine);
             let core_ptr = &core as *const FsCore as *mut c_void;
 
-            // Set the global pointer so callbacks can access FsCore
-            // (FUSE-T's private_data doesn't reliably pass our user_data through)
+            // Set the global pointer so callbacks can access FsCore.
+            // libfuse3's high-level API doesn't reliably pass our user_data
+            // through to callbacks (true on both macFUSE and FUSE-T), so we
+            // route via a process-global instead.
             operations::set_core(&core as *const FsCore);
 
-            // Build fuse_args: argv[0] = program name, then mount options
-            // noappledouble: prevent ._ AppleDouble files in output dirs
-            // noapplexattr: prevent Apple xattr translation files
+            // Build fuse_args: argv[0] = program name, then mount options.
+            //
+            // fsname=turnkey:    name shown in `mount`, df, Disk Utility.
+            // local:             tag the volume as local (not network). Without
+            //                    this, macFUSE volumes appear under Finder's
+            //                    "Shared" section and Spotlight applies network
+            //                    indexing rules, which both produce visible
+            //                    delays and surprising behavior. The flag is a
+            //                    macFUSE/FUSE-T extension (no-op on Linux).
+            // noappledouble:     suppress ._ AppleDouble files in build output.
+            // noapplexattr:      suppress Apple xattr translation files.
+            //
+            // We deliberately do NOT set noubc / novncache / direct_io / noreadahead:
+            // those disable kernel caching, which is exactly what makes the build
+            // workload fast. Aggressive cache TTLs are configured in fuse_init via
+            // entry_timeout / attr_timeout / kernel_cache.
             let arg0 = CString::new("turnkey-composed").unwrap();
             let arg_ro = CString::new("-o").unwrap();
             let arg_ro_val =
-                CString::new("fsname=turnkey,noappledouble,noapplexattr").unwrap();
+                CString::new("fsname=turnkey,local,noappledouble,noapplexattr").unwrap();
             let mut argv: Vec<*mut i8> = vec![
                 arg0.as_ptr() as *mut i8,
                 arg_ro.as_ptr() as *mut i8,
@@ -183,7 +229,7 @@ impl CompositionBackend for FuseTBackend {
                 *s = BackendStatus::Ready;
             }
 
-            info!("FUSE-T filesystem mounted and ready");
+            info!("FUSE filesystem mounted and ready");
 
             // Try multi-threaded loop first, fall back to single-threaded
             let ret = unsafe {
@@ -233,7 +279,7 @@ impl CompositionBackend for FuseTBackend {
         }
 
         info!(
-            "Unmounting FUSE-T filesystem at {:?} (platform: {})",
+            "Unmounting FUSE filesystem at {:?} (platform: {})",
             self.config.mount_point,
             Platform::detect().name()
         );
@@ -325,7 +371,7 @@ impl Drop for FuseTBackend {
     fn drop(&mut self) {
         if self.is_mounted() {
             if let Err(e) = self.unmount() {
-                error!("Failed to unmount FUSE-T filesystem on drop: {}", e);
+                error!("Failed to unmount FUSE filesystem on drop: {}", e);
             }
         }
     }

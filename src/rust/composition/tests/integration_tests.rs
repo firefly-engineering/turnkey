@@ -18,7 +18,8 @@
 //! # Platform Support
 //!
 //! - Linux: Native FUSE via /dev/fuse
-//! - macOS: FUSE-T (recommended) or macFUSE
+//! - macOS: macFUSE 5.2+ (FSKit on macOS 26+) — FUSE-T also works at the
+//!   libfuse3 ABI level but is no longer the project's default.
 
 use std::fs::{self, File};
 use std::io::{Read, Write};

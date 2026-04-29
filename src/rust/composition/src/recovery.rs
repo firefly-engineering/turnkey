@@ -318,7 +318,8 @@ pub fn recovery_suggestion(error: &Error) -> Option<String> {
              Options:\n\
              • Install FUSE for your platform:\n\
                - Linux: sudo apt install fuse3 (or fuse)\n\
-               - macOS: brew install macfuse or fuse-t\n\
+               - macOS: brew install --cask macfuse, then activate the\n\
+                 FSKit extension via the macFUSE app and System Settings.\n\
              • Use symlink backend instead: --backend=symlink\n\
              • Check /dev/fuse permissions",
             msg

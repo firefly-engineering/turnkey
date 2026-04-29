@@ -2,7 +2,7 @@
 //!
 //! This module provides automatic backend selection based on:
 //! - Platform detection (Linux, macOS)
-//! - FUSE availability (native FUSE, FUSE-T, or none)
+//! - FUSE availability (Linux native FUSE / macOS macFUSE, or none)
 //! - User preferences (explicit backend override)
 //!
 //! # Selection Priority

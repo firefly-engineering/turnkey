@@ -1,12 +1,7 @@
-//! FUSE backend implementation
+//! Linux FUSE backend (via the `fuser` crate).
 //!
-//! This module provides the `FuseBackend` struct that implements the
-//! `CompositionBackend` trait using a FUSE filesystem.
-//!
-//! # Platform Support
-//!
-//! - **Linux**: Native FUSE support
-//! - **macOS**: FUSE-T support (NFS-based, no kernel extension)
+//! macOS uses a different code path (`super::fuse_t`) that calls into
+//! libfuse3 directly against macFUSE.
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
