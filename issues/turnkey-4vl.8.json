@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "turnkey-4vl.4"
+  ],
   "created": "2026-04-30T15:41:15Z",
   "description": "After fixing the libfuse stack overrun via 4vl.7's patches, our daemon survives ~10,000-12,000 FUSE ops during a buck2 build without crashing. But FSKit then force-unmounts the volume mid-build: fuse_loop returns cleanly (DESTROY received), our daemon shuts down via fuse_destroy, mount disappears. Buck2 sees EIO on whatever op it was issuing at the moment of unmount.\n\nDaemon-side counters at unmount (one representative run):\n  GETATTR  7322\n  LOOKUP   ~6000\n  STATFS   1226\n  MKDIR     634\n  CREATE    193\n  WRITE     140\n  SYMLINK   278\n  FORGET    728  \u003c-- only 728 FORGETs vs ~13K LOOKUP+GETATTR\n\nThat FORGET ratio means the daemon (and the FSKit appex it backs) is holding on to ~12K active nodeids in its tables. If macFUSE's FSKit appex has a per-volume nodeid table with a fixed cap or a memory budget, that's the most likely cause. /var/log shows nothing diagnostic.\n\nSuspicions / things to try:\n\n  1. Cap nodeid allocation aggressively — return high entry_timeout\n     so the kernel can drop entries faster. Already at 300s; try 0 or 1\n     for transient buck-out paths.\n  2. Implement a more aggressive fuse_lowlevel_notify_inval_entry from\n     our daemon when files are removed, to encourage FORGET.\n  3. Build a minimal C repro (no Rust, no Buck2 — just a script that\n     does mkdir/symlink/unlink in a loop) and see how many ops trigger\n     the unmount. If it's reproducible cleanly, file upstream.\n  4. Inspect the FSKit appex code (we can sip-strip it from the .appex\n     bundle) to see if there's a hard limit.\n  5. Try the macfuse-local appex variant instead of macfuse.",
   "id": "turnkey-4vl.8",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "macFUSE FSKit unmounts daemon after ~10K ops during buck2 build",
   "type": "bug",
-  "updated_at": "2026-04-30T15:41:15Z"
+  "updated_at": "2026-04-30T15:41:27Z"
 }
