@@ -545,6 +545,12 @@ unsafe extern "C" {
     #[link_name = "fuse_loop_mt_31"]
     pub fn fuse_loop_mt(f: *mut fuse, clone_fd: c_int) -> c_int;
 
+    /// Run the multi-threaded FUSE event loop, taking a config struct
+    /// (libfuse 3.12+ API). The config is created via
+    /// `fuse_loop_cfg_create` and lets us bound max threads etc.
+    #[link_name = "fuse_loop_mt_312"]
+    pub fn fuse_loop_mt_312(f: *mut fuse, cfg: *mut fuse_loop_config) -> c_int;
+
     /// Create a FUSE loop configuration.
     pub fn fuse_loop_cfg_create() -> *mut fuse_loop_config;
 
