@@ -1,0 +1,81 @@
+diff --git i/lib/fuse.c w/lib/fuse.c
+index 31a234fd..a3141528 100644
+--- i/lib/fuse.c
++++ w/lib/fuse.c
+@@ -2795,7 +2795,6 @@ static int is_open(struct fuse *f, fuse_ino_t dir, const char *name)
+ static char *hidden_name(struct fuse *f, fuse_ino_t dir, const char *oldname,
+ 			 char *newname, size_t bufsize)
+ {
+-	struct stat buf;
+ 	struct node *node;
+ 	struct node *newnode;
+ 	char *newpath;
+@@ -2821,8 +2820,21 @@ static char *hidden_name(struct fuse *f, fuse_ino_t dir, const char *oldname,
+ 		if (res)
+ 			break;
+ 
+-		memset(&buf, 0, sizeof(buf));
+-		res = fuse_fs_getattr(f->fs, newpath, &buf, NULL);
++#ifdef __APPLE__
++		/* See open_auto_cache: when Darwin-flavored ops are
++		 * registered, calling vanilla fuse_fs_getattr with a 144B
++		 * struct stat lets the FS overrun by 48 bytes. */
++		if (fuse_fs_darwin_extensions_enabled(f->fs)) {
++			struct fuse_darwin_attr abuf;
++			memset(&abuf, 0, sizeof(abuf));
++			res = fuse_fs_getattr$DARWIN(f->fs, newpath, &abuf, NULL);
++		} else
++#endif
++		{
++			struct stat buf;
++			memset(&buf, 0, sizeof(buf));
++			res = fuse_fs_getattr(f->fs, newpath, &buf, NULL);
++		}
+ 		if (res == -ENOENT)
+ 			break;
+ 		free(newpath);
+@@ -4106,15 +4118,36 @@ static void open_auto_cache(struct fuse *f, fuse_ino_t ino, const char *path,
+ 		curr_time(&now);
+ 		if (diff_timespec(&now, &node->stat_updated) >
+ 		    f->conf.ac_attr_timeout) {
+-			struct stat stbuf;
+ 			int err;
+-			pthread_mutex_unlock(&f->lock);
+-			err = fuse_fs_getattr(f->fs, path, &stbuf, fi);
+-			pthread_mutex_lock(&f->lock);
+-			if (!err)
+-				update_stat(node, &stbuf);
+-			else
+-				node->cache_valid = 0;
++#ifdef __APPLE__
++			/* When the FS registered Darwin-flavored ops
++			 * (fuse_darwin_attr / 192B), calling the vanilla
++			 * fuse_fs_getattr with a struct stat buffer (144B)
++			 * lets the FS overrun the stack buffer by 48 bytes
++			 * — __stack_chk_fail under load. Use the matching
++			 * variant. */
++			if (fuse_fs_darwin_extensions_enabled(f->fs)) {
++				struct fuse_darwin_attr abuf;
++				pthread_mutex_unlock(&f->lock);
++				err = fuse_fs_getattr$DARWIN(f->fs, path,
++							     &abuf, fi);
++				pthread_mutex_lock(&f->lock);
++				if (!err)
++					update_stat$DARWIN(node, &abuf);
++				else
++					node->cache_valid = 0;
++			} else
++#endif
++			{
++				struct stat stbuf;
++				pthread_mutex_unlock(&f->lock);
++				err = fuse_fs_getattr(f->fs, path, &stbuf, fi);
++				pthread_mutex_lock(&f->lock);
++				if (!err)
++					update_stat(node, &stbuf);
++				else
++					node->cache_valid = 0;
++			}
+ 		}
+ 	}
+ 	if (node->cache_valid)
