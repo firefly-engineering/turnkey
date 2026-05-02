@@ -20,7 +20,7 @@ Turnkey is a polyglot development environment and build system designed for seam
 
 3.  Initialize the issue tracker:
     ```bash
-    bd onboard
+    bw onboard
     ```
 
 ## Tools
@@ -48,10 +48,10 @@ Turnkey provides two main CLI tools to streamline development:
 
 ## Workflow
 
-This project uses **beads** (`bd`) for distributed issue tracking.
+This project uses **beadwork** (`bw`) for distributed issue tracking.
 
-- **Find work**: `bd ready`
-- **Claim work**: `bd update <id> --status in_progress`
-- **Submit work**: `bd close <id>` then `git push`
+- **Find work**: `bw ready`
+- **Claim work**: `bw start <id>`
+- **Submit work**: `bw close <id>` then `git push`
 
 See `AGENTS.md` for detailed workflow instructions.
