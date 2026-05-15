@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-05-15T07:57:46Z",
+  "description": "Migrate Python from single-root pyproject.toml to a uv workspace, parallel to the Cargo workspace pattern.\n\nGoals:\n- Each Python package in src/python/{cargo,buck,buildsystem,cfg} becomes a real uv workspace member with its own pyproject.toml.\n- Examples src/examples/python-hello and python-hello-deps also become members so users can demo the parallel uv track.\n- Imports move from python.\u003cname\u003e to turnkey.\u003cname\u003e (PEP 420 namespace package).\n- uv sync produces a working venv with all members editable + externals resolved.\n- Buck2 build path unchanged: pydeps cell still built from pylock.toml via pydeps-gen.\n- Downstream monorepos can adopt the same pattern with their own namespace (acme.\u003cname\u003e, etc.).\n\nDecisions locked in (conversation 2026-05-15):\n- Namespace: turnkey.\u003cname\u003e (PEP 420 namespace package; no turnkey/__init__.py anywhere).\n- Build backend: hatchling, with [tool.hatch.build.targets.wheel.force-include] '.' = 'turnkey/\u003cname\u003e' to remap source without physically restructuring src/python/*.\n- Root pyproject.toml: stays a [project] with dev optional-deps; gains [tool.uv.workspace].\n- Examples are workspace members (not excluded).\n\nImplementation risk to verify when starting child 1: hatchling force-include behavior in editable installs (uv installs members editable). Fallback is hatch sources+packages or an editables shim — solvable, just may not be one line.",
+  "id": "turnkey-991",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "Adopt uv workspaces for Python with turnkey.* namespace",
+  "type": "epic",
+  "updated_at": "2026-05-15T07:57:46Z"
+}
