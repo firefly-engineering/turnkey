@@ -8,11 +8,12 @@
 let
   root = ../..;
 
-  # Source files needed for the package
+  # Source files needed for the package. Each workspace member contributes
+  # to the shared turnkey.* PEP 420 namespace package, so PYTHONPATH must
+  # list each member root explicitly.
   pythonSrc = lib.fileset.toSource {
     inherit root;
     fileset = lib.fileset.unions [
-      ../../src/python/__init__.py
       ../../src/python/cfg
       ../../src/python/cargo
       ../../src/cmd/compute-unified-features
@@ -26,7 +27,7 @@ pkgs.writeShellApplication {
   runtimeInputs = [ pkgs.python3 ];
 
   text = ''
-    export PYTHONPATH="${pythonSrc}/src"
+    export PYTHONPATH="${pythonSrc}/src/python/cargo:${pythonSrc}/src/python/cfg"
     exec python3 "${pythonSrc}/src/cmd/compute-unified-features/__main__.py" "$@"
   '';
 

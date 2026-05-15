@@ -175,6 +175,7 @@
               python = {
                 enable = true;
                 depsFile = ./python-deps.toml; # Python package dependencies
+                lockFile = "pylock.toml";      # PEP 751 lock exported from uv
               };
 
               # JavaScript/TypeScript dependencies
