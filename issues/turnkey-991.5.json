@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-05-15T07:58:19Z",
+  "description": "Two docs touched:\n\n1. Update CLAUDE.md 'Monorepo Dependency Management → Python' section:\n   - Replace 'All Python code uses the root pyproject.toml. No nested pyproject files.' with the uv workspace pattern.\n   - Note: single uv.lock is the single-resolution-point; per-member pyprojects own their declarations (parallel to Cargo's [workspace.dependencies] is approximate, not exact — call this out).\n   - Mention the turnkey.\u003cname\u003e namespace convention.\n\n2. Create docs/user-manual/src/workflows/python-workspace.md covering:\n   - Why uv workspaces (explicit parallel to Cargo workspaces)\n   - The turnkey.\u003cname\u003e namespace convention; downstream monorepos pick their own (e.g., acme.\u003cname\u003e)\n   - hatchling force-include pattern for source remap (members don't physically restructure)\n   - How uv export → pydeps-gen → pydeps cell composes with the Buck2 track\n   - Cross-member deps via [tool.uv.sources] { workspace = true }\n   - Add link from docs/user-manual/src/SUMMARY.md",
+  "id": "turnkey-991.5",
+  "labels": [],
+  "parent": "turnkey-991",
+  "priority": 2,
+  "status": "open",
+  "title": "Document Python workspace convention for downstream consumers",
+  "type": "docs",
+  "updated_at": "2026-05-15T07:58:19Z"
+}
