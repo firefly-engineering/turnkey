@@ -140,7 +140,7 @@ let
       if _turnkey_needs_regen "python" "python-deps.toml" pyproject.toml; then
         echo "turnkey: Regenerating python-deps.toml..."
         if "${uv}/bin/uv" lock && \
-           "${uv}/bin/uv" export --format pylock.toml -o pylock.toml && \
+           "${uv}/bin/uv" export --all-packages --no-dev --format pylock.toml -o pylock.toml && \
            "${pydepsGen}/bin/pydeps-gen" --lock pylock.toml -o python-deps.toml; then
           _turnkey_set_cached_hash "python" "$(_turnkey_hash_files pyproject.toml)"
           echo "turnkey: Updated python-deps.toml (remember to commit pylock.toml, uv.lock, python-deps.toml)"

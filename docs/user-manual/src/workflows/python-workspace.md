@@ -129,7 +129,8 @@ dependencies = [
     "turnkey-example-python-hello-deps",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
+# Dev tooling — auto-installed by 'uv sync' so 'uv run pytest' Just Works.
 dev = ["pytest>=7.0"]
 
 [tool.uv.workspace]
@@ -193,10 +194,12 @@ $EDITOR src/python/cargo/pyproject.toml      # add to [project] dependencies
 uv lock
 
 # 3. Refresh editable installs (optional but recommended)
-uv sync --extra dev
+uv sync
 
 # 4. Export to PEP 751 lock for the Buck2 pipeline
-uv export --all-packages --format pylock.toml -o pylock.toml
+#    --all-packages: include externals from every member
+#    --no-dev:       exclude dev tooling (pytest etc.) from the pydeps cell
+uv export --all-packages --no-dev --format pylock.toml -o pylock.toml
 
 # 5. Refresh python-deps.toml for the pydeps cell
 #    (tk sync picks this up automatically when pylock.toml is newer)

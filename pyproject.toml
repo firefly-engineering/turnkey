@@ -8,7 +8,7 @@
 # After modifying dependencies in any member, regenerate the Buck2/Nix
 # dependency file:
 #   uv lock
-#   uv export --format pylock.toml -o pylock.toml
+#   uv export --all-packages --no-dev --format pylock.toml -o pylock.toml
 #   pydeps-gen --lock pylock.toml -o python-deps.toml
 
 [project]
@@ -28,7 +28,11 @@ dependencies = [
     "turnkey-example-python-hello-deps",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
+# Auto-installed by 'uv sync' / 'uv run' (PEP 735). Keep dev tooling here
+# rather than [project.optional-dependencies] so the bare 'uv run pytest'
+# flow doesn't fall through to a system pytest that can't see the venv's
+# editable workspace installs.
 dev = [
     "pytest>=7.0",
 ]

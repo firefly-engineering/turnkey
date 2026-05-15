@@ -96,14 +96,13 @@ dependencies = [
     { name = "turnkey-example-python-hello-deps" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "turnkey-buck", editable = "src/python/buck" },
     { name = "turnkey-buildsystem", editable = "src/python/buildsystem" },
     { name = "turnkey-cargo", editable = "src/python/cargo" },
@@ -111,7 +110,9 @@ requires-dist = [
     { name = "turnkey-example-python-hello", virtual = "src/examples/python-hello" },
     { name = "turnkey-example-python-hello-deps", virtual = "src/examples/python-hello-deps" },
 ]
-provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=7.0" }]
 
 [[package]]
 name = "turnkey-buck"

@@ -105,10 +105,14 @@ let
       enableTypescript = cfg.javascript.enable;
       enableSolidity = cfg.solidity.enable;
     };
+    # Shim that routes `pytest` through `uv run pytest`, so workspace
+    # editable installs are visible to the test runner.
+    pytestShim = import ../../packages/pytest-uv-shim.nix { inherit pkgs lib; };
   in
     lib.optional cfg.go.enable godepsGen
     ++ lib.optional cfg.rust.enable rustdepsGen
     ++ lib.optional cfg.python.enable pydepsGen
+    ++ lib.optional cfg.python.enable pytestShim
     ++ lib.optional cfg.javascript.enable jsdepsGen
     ++ lib.optional cfg.solidity.enable soldepsGen
     # Always include deps-extract (used by tk rules sync for all non-Go languages)
