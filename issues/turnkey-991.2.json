@@ -7,14 +7,16 @@
   "blocks": [
     "turnkey-991.6"
   ],
+  "closed_at": "2026-05-15T08:34:30Z",
+  "close_reason": "All 'from python.X' / 'import python.X' rewritten to 'turnkey.X' across src/python/**, src/cmd/{compute-unified-features,gen-rust-buck}/__main__.py, and rules.star base_module strings. src/python/__init__.py deleted. pythonpath=['src'] removed from root pytest config (uv sync installs members editable so pytest finds them via the venv).",
   "created": "2026-05-15T07:58:18Z",
   "description": "Rewrite python.\u003cname\u003e → turnkey.\u003cname\u003e:\n\n- src/python/**/*.py (all cross-member imports, including __init__.py re-exports)\n- src/cmd/compute-unified-features/__main__.py\n- src/python/*/rules.star: base_module = 'python.\u003cname\u003e' → 'turnkey.\u003cname\u003e'\n- Delete src/python/__init__.py (artifact that made python.cargo importable via pythonpath=['src']).\n- Remove pythonpath = ['src'] from root pyproject.toml [tool.pytest.ini_options] — uv sync installs members editable, so pytest finds them via the venv.\n\nRequires children 1 and 3 to have landed (members must be installable and uv.lock must exist) for the renamed imports to actually resolve.\n\nVerify: 'uv run pytest' and 'tk build //src/python/...'. After this, 'grep -rn \"from python\\.\\|import python\\.\" src/' should return nothing.",
   "id": "turnkey-991.2",
   "labels": [],
   "parent": "turnkey-991",
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "Rename python.* imports to turnkey.* across tree",
   "type": "task",
-  "updated_at": "2026-05-15T07:58:25Z"
+  "updated_at": "2026-05-15T08:34:30Z"
 }
