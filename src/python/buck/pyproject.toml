@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "turnkey-buck"
+version = "0.1.0"
+description = "Buck2 rules.star generator for Rust crates"
+requires-python = ">=3.11"
+dependencies = [
+    "turnkey-buildsystem",
+    "turnkey-cargo",
+    "turnkey-cfg",
+]
+
+[tool.uv.sources]
+turnkey-buildsystem = { workspace = true }
+turnkey-cargo = { workspace = true }
+turnkey-cfg = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["turnkey"]

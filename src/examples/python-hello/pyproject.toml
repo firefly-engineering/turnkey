@@ -1,0 +1,8 @@
+[project]
+name = "turnkey-example-python-hello"
+version = "0.1.0"
+description = "Minimal Python example for Buck2/Nix integration"
+requires-python = ">=3.11"
+
+[tool.uv]
+package = false

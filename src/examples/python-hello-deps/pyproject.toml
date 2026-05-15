@@ -1,0 +1,11 @@
+[project]
+name = "turnkey-example-python-hello-deps"
+version = "0.1.0"
+description = "Python example demonstrating external dependency resolution"
+requires-python = ">=3.11"
+dependencies = [
+    "six>=1.16.0",
+]
+
+[tool.uv]
+package = false

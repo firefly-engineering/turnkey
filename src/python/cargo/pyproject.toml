@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "turnkey-cargo"
+version = "0.1.0"
+description = "Cargo manifest and feature-graph utilities"
+requires-python = ">=3.11"
+dependencies = [
+    "turnkey-cfg",
+]
+
+[tool.uv.sources]
+turnkey-cfg = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["turnkey"]
