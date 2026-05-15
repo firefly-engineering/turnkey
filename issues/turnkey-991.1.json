@@ -5,14 +5,16 @@
     "turnkey-991.2",
     "turnkey-991.3"
   ],
+  "closed_at": "2026-05-15T08:34:30Z",
+  "close_reason": "Per-member pyproject.toml files added with hatchling backend. Physical restructure into turnkey/\u003cname\u003e/ subdirs (force-include remap copied instead of linking in editable mode, so we restructured). Verified 'uv pip install -e' produces real editable installs pointing at live source.",
   "created": "2026-05-15T07:58:18Z",
   "description": "For each of src/python/{cargo,buck,buildsystem,cfg} and src/examples/python-hello{,-deps}, add a pyproject.toml that:\n\n- Declares [project] name = 'turnkey-\u003cdir\u003e' (e.g., turnkey-cargo).\n- Declares [build-system] requires = ['hatchling'], build-backend = 'hatchling.build'.\n- Remaps source files into turnkey/\u003cname\u003e/ via hatchling force-include:\n    [tool.hatch.build.targets.wheel.force-include]\n    '.' = 'turnkey/\u003cname\u003e'\n- Lists external deps that this member actually uses (six probably belongs to whichever member imports it).\n- Lists cross-member deps via dependencies = ['turnkey-cfg'] etc., wired with [tool.uv.sources] { workspace = true }.\n\nCross-member dep map (mirroring rules.star):\n- turnkey-buck   → turnkey-buildsystem, turnkey-cargo, turnkey-cfg\n- turnkey-cargo  → turnkey-cfg\n\nNo imports renamed yet, no workspace wired yet. After this ticket the new pyprojects exist but uv doesn't know about them.\n\nSpot-check: 'uv pip install -e src/python/cfg/' in a throwaway venv and confirm 'from turnkey.cfg import ...' resolves. If hatchling force-include misbehaves in editable mode, fall back to hatch sources+packages or an editables shim before declaring this done.",
   "id": "turnkey-991.1",
   "labels": [],
   "parent": "turnkey-991",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Add per-member pyproject.toml with hatchling remap",
   "type": "task",
-  "updated_at": "2026-05-15T08:04:21Z"
+  "updated_at": "2026-05-15T08:34:30Z"
 }
