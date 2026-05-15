@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-05-15T07:58:19Z",
+  "description": "Update root pyproject.toml:\n- Add [tool.uv.workspace] members = ['src/python/cargo', 'src/python/buck', 'src/python/buildsystem', 'src/python/cfg', 'src/examples/python-hello', 'src/examples/python-hello-deps'].\n- Remove externals that moved down to members (six likely).\n- Keep [project.optional-dependencies] dev = ['pytest\u003e=7.0'].\n\nRegenerate:\n- uv lock                                       (rewrites uv.lock against the workspace)\n- uv export --format pylock.toml -o pylock.toml\n- pydeps-gen --lock pylock.toml -o python-deps.toml\n\nConfirm the pydeps cell still resolves cleanly (rebuild .turnkey/pydeps via the existing path; no Nix-side changes expected).",
+  "id": "turnkey-991.3",
+  "labels": [],
+  "parent": "turnkey-991",
+  "priority": 2,
+  "status": "open",
+  "title": "Wire [tool.uv.workspace] in root, regenerate uv.lock and pylock.toml",
+  "type": "task",
+  "updated_at": "2026-05-15T07:58:19Z"
+}
