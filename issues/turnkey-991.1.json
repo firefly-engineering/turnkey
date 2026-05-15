@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [],
   "blocks": [
     "turnkey-991.2",
@@ -11,8 +11,8 @@
   "labels": [],
   "parent": "turnkey-991",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Add per-member pyproject.toml with hatchling remap",
   "type": "task",
-  "updated_at": "2026-05-15T07:58:24Z"
+  "updated_at": "2026-05-15T08:04:21Z"
 }
