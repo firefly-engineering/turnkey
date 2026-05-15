@@ -7,14 +7,16 @@
     "turnkey-991.2",
     "turnkey-991.4"
   ],
+  "closed_at": "2026-05-15T08:34:38Z",
+  "close_reason": "Root pyproject.toml now declares [tool.uv.workspace] with 6 members (4 src/python libs + 2 example demos) and lists them as project dependencies so default 'uv sync' installs everything editable in one shot. uv.lock, pylock.toml, python-deps.toml regenerated. pydeps-gen extended to tolerate workspace-member entries in pylock (editable directories with no version/sdist).",
   "created": "2026-05-15T07:58:19Z",
   "description": "Update root pyproject.toml:\n- Add [tool.uv.workspace] members = ['src/python/cargo', 'src/python/buck', 'src/python/buildsystem', 'src/python/cfg', 'src/examples/python-hello', 'src/examples/python-hello-deps'].\n- Remove externals that moved down to members (six likely).\n- Keep [project.optional-dependencies] dev = ['pytest\u003e=7.0'].\n\nRegenerate:\n- uv lock                                       (rewrites uv.lock against the workspace)\n- uv export --format pylock.toml -o pylock.toml\n- pydeps-gen --lock pylock.toml -o python-deps.toml\n\nConfirm the pydeps cell still resolves cleanly (rebuild .turnkey/pydeps via the existing path; no Nix-side changes expected).",
   "id": "turnkey-991.3",
   "labels": [],
   "parent": "turnkey-991",
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "Wire [tool.uv.workspace] in root, regenerate uv.lock and pylock.toml",
   "type": "task",
-  "updated_at": "2026-05-15T07:58:24Z"
+  "updated_at": "2026-05-15T08:34:38Z"
 }
