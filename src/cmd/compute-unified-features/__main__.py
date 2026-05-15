@@ -5,10 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-try:
-    from cargo import compute_unified_features, load_overrides
-except ImportError:
-    from python.cargo import compute_unified_features, load_overrides
+from turnkey.cargo import compute_unified_features, load_overrides
 
 
 def main():

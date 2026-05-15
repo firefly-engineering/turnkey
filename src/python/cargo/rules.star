@@ -3,11 +3,11 @@ load("@prelude//:rules.bzl", "python_library", "python_test")
 python_library(
     name = "cargo",
     srcs = [
-        "__init__.py",
-        "features.py",
-        "toml.py",
+        "turnkey/cargo/__init__.py",
+        "turnkey/cargo/features.py",
+        "turnkey/cargo/toml.py",
     ],
-    base_module = "python.cargo",
+    base_module = "",
     deps = [
         "//src/python/cfg:cfg",
     ],
@@ -16,12 +16,14 @@ python_library(
 
 python_test(
     name = "test_toml",
-    srcs = ["test_toml.py"],
+    srcs = ["tests/test_toml.py"],
+    base_module = "tests",
     deps = [":cargo"],
 )
 
 python_test(
     name = "test_features",
-    srcs = ["test_features.py"],
+    srcs = ["tests/test_features.py"],
+    base_module = "tests",
     deps = [":cargo"],
 )

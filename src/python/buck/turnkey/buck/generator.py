@@ -2,20 +2,20 @@
 
 from dataclasses import dataclass, field
 
-from python.cargo.toml import (
+from turnkey.cargo.toml import (
     normalize_crate_name,
     dep_is_available,
     get_version_req,
     get_optional_deps,
     feature_enables_unavailable_dep,
 )
-from python.buildsystem.native_library import NativeLibrarySpec
-from python.buildsystem.buck2 import buck2_generator
+from turnkey.buildsystem.native_library import NativeLibrarySpec
+from turnkey.buildsystem.buck2 import buck2_generator
 
 try:
     from cfg import classify_target_platforms, SUPPORTED_PLATFORMS
 except ImportError:
-    from python.cfg import classify_target_platforms, SUPPORTED_PLATFORMS
+    from turnkey.cfg import classify_target_platforms, SUPPORTED_PLATFORMS
 
 
 ALL_PLATFORM_KEYS = set(SUPPORTED_PLATFORMS.keys())

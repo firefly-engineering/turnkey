@@ -8,12 +8,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from python.cargo.features import (
+from turnkey.cargo.features import (
     parse_feature_forwarding,
     expand_features,
     load_overrides,
 )
-from python.cargo.toml import dep_is_available, feature_enables_unavailable_dep
+from turnkey.cargo.toml import dep_is_available, feature_enables_unavailable_dep
 
 
 class TestParseFeatureForwarding(unittest.TestCase):

@@ -9,9 +9,9 @@ for various platform-specific dependency expressions from Cargo.toml files.
 
 import unittest
 
-from python.cfg.parser import CfgParser, CfgKey, CfgKeyValue, CfgAll, CfgAny, CfgNot
-from python.cfg.evaluator import TargetSpec, evaluate_cfg
-from python.cfg.target import is_linux_compatible_target, classify_target_platforms
+from turnkey.cfg.parser import CfgParser, CfgKey, CfgKeyValue, CfgAll, CfgAny, CfgNot
+from turnkey.cfg.evaluator import TargetSpec, evaluate_cfg
+from turnkey.cfg.target import is_linux_compatible_target, classify_target_platforms
 
 
 class TestCfgParser(unittest.TestCase):

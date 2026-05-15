@@ -23,7 +23,7 @@ from .toml import (
 try:
     from cfg import is_linux_compatible_target
 except ImportError:
-    from python.cfg import is_linux_compatible_target
+    from turnkey.cfg import is_linux_compatible_target
 
 
 def parse_feature_forwarding(feature_item: str) -> tuple[str, str] | None:

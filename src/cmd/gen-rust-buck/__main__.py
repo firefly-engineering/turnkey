@@ -5,38 +5,21 @@ import json
 import sys
 from pathlib import Path
 
-try:
-    from cargo import (
-        parse_cargo_toml,
-        get_crate_name,
-        get_edition,
-        get_lib_path,
-        is_proc_macro,
-        get_default_features,
-        get_cargo_env,
-    )
-    from buck import (
-        get_dependencies,
-        get_build_script_cfg_flags,
-        generate_buck_file,
-        filter_features_for_availability,
-    )
-except ImportError:
-    from python.cargo import (
-        parse_cargo_toml,
-        get_crate_name,
-        get_edition,
-        get_lib_path,
-        is_proc_macro,
-        get_default_features,
-        get_cargo_env,
-    )
-    from python.buck import (
-        get_dependencies,
-        get_build_script_cfg_flags,
-        generate_buck_file,
-        filter_features_for_availability,
-    )
+from turnkey.cargo import (
+    parse_cargo_toml,
+    get_crate_name,
+    get_edition,
+    get_lib_path,
+    is_proc_macro,
+    get_default_features,
+    get_cargo_env,
+)
+from turnkey.buck import (
+    get_dependencies,
+    get_build_script_cfg_flags,
+    generate_buck_file,
+    filter_features_for_availability,
+)
 
 
 def main():

@@ -3,10 +3,10 @@ load("@prelude//:rules.bzl", "python_library")
 python_library(
     name = "buck",
     srcs = [
-        "__init__.py",
-        "generator.py",
+        "turnkey/buck/__init__.py",
+        "turnkey/buck/generator.py",
     ],
-    base_module = "python.buck",
+    base_module = "",
     deps = [
         "//src/python/buildsystem:buildsystem",
         "//src/python/cargo:cargo",
