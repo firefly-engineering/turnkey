@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-991.2"
+  ],
   "blocks": [],
   "created": "2026-05-15T07:58:19Z",
   "description": "End-to-end verification gate before closing the epic:\n\n- 'uv sync' at root completes cleanly.\n- 'uv run pytest' passes all tests across members.\n- 'uv run python -c \"from turnkey.cargo.toml import dep_is_available; from turnkey.buck.generator import generate_buck_file\"' works.\n- 'tk build //src/python/...' builds all internal Python targets.\n- 'tk test //src/python/...' runs Buck2-side python_test targets.\n- 'tk build //src/examples/python-hello-deps:python-hello-deps' builds; six resolves through pydeps cell.\n- 'tk run //src/examples/python-hello-deps:python-hello-deps' prints expected output.\n- 'nix build' of the whole flake still succeeds (no regressions in cell building).\n- 'grep -rn \"from python\\.\\|import python\\.\" src/' returns nothing.",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Verify uv workspace end-to-end",
   "type": "task",
-  "updated_at": "2026-05-15T07:58:19Z"
+  "updated_at": "2026-05-15T07:58:25Z"
 }
