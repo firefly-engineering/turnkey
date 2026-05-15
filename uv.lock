@@ -2,6 +2,17 @@ version = 1
 revision = 3
 requires-python = ">=3.11"
 
+[manifest]
+members = [
+    "turnkey",
+    "turnkey-buck",
+    "turnkey-buildsystem",
+    "turnkey-cargo",
+    "turnkey-cfg",
+    "turnkey-example-python-hello",
+    "turnkey-example-python-hello-deps",
+]
+
 [[package]]
 name = "colorama"
 version = "0.4.6"
@@ -77,7 +88,12 @@ name = "turnkey"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "six" },
+    { name = "turnkey-buck" },
+    { name = "turnkey-buildsystem" },
+    { name = "turnkey-cargo" },
+    { name = "turnkey-cfg" },
+    { name = "turnkey-example-python-hello" },
+    { name = "turnkey-example-python-hello-deps" },
 ]
 
 [package.optional-dependencies]
@@ -88,6 +104,65 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
-    { name = "six", specifier = ">=1.16.0" },
+    { name = "turnkey-buck", editable = "src/python/buck" },
+    { name = "turnkey-buildsystem", editable = "src/python/buildsystem" },
+    { name = "turnkey-cargo", editable = "src/python/cargo" },
+    { name = "turnkey-cfg", editable = "src/python/cfg" },
+    { name = "turnkey-example-python-hello", virtual = "src/examples/python-hello" },
+    { name = "turnkey-example-python-hello-deps", virtual = "src/examples/python-hello-deps" },
 ]
 provides-extras = ["dev"]
+
+[[package]]
+name = "turnkey-buck"
+version = "0.1.0"
+source = { editable = "src/python/buck" }
+dependencies = [
+    { name = "turnkey-buildsystem" },
+    { name = "turnkey-cargo" },
+    { name = "turnkey-cfg" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "turnkey-buildsystem", editable = "src/python/buildsystem" },
+    { name = "turnkey-cargo", editable = "src/python/cargo" },
+    { name = "turnkey-cfg", editable = "src/python/cfg" },
+]
+
+[[package]]
+name = "turnkey-buildsystem"
+version = "0.1.0"
+source = { editable = "src/python/buildsystem" }
+
+[[package]]
+name = "turnkey-cargo"
+version = "0.1.0"
+source = { editable = "src/python/cargo" }
+dependencies = [
+    { name = "turnkey-cfg" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "turnkey-cfg", editable = "src/python/cfg" }]
+
+[[package]]
+name = "turnkey-cfg"
+version = "0.1.0"
+source = { editable = "src/python/cfg" }
+
+[[package]]
+name = "turnkey-example-python-hello"
+version = "0.1.0"
+source = { virtual = "src/examples/python-hello" }
+
+[[package]]
+name = "turnkey-example-python-hello-deps"
+version = "0.1.0"
+source = { virtual = "src/examples/python-hello-deps" }
+dependencies = [
+    { name = "six" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "six", specifier = ">=1.16.0" }]

@@ -1,26 +1,60 @@
-# Turnkey Python workspace
+# Turnkey Python workspace root
 #
-# This is a monorepo that declares Python dependencies for Buck2 builds.
-# Run `pydeps-gen --pyproject pyproject.toml -o python-deps.toml` to regenerate
-# the dependency file after modifying this file.
+# This pyproject.toml declares the uv workspace that aggregates all Python
+# packages in the monorepo. Members each have their own pyproject.toml; this
+# root file pins workspace membership, shared dev tooling, and the resolution
+# entry point for `uv sync` / `uv lock`.
+#
+# After modifying dependencies in any member, regenerate the Buck2/Nix
+# dependency file:
+#   uv lock
+#   uv export --format pylock.toml -o pylock.toml
+#   pydeps-gen --lock pylock.toml -o python-deps.toml
 
 [project]
 name = "turnkey"
 version = "0.1.0"
 description = "Turnkey toolchain management for Nix flakes"
 requires-python = ">=3.11"
-
-# Dependencies used by Python code in this monorepo
+# Listing workspace members as dependencies makes the default `uv sync`
+# install all of them (editable). Non-packaged example members are pulled
+# in for dependency resolution only.
 dependencies = [
-    "six>=1.16.0",
+    "turnkey-buck",
+    "turnkey-buildsystem",
+    "turnkey-cargo",
+    "turnkey-cfg",
+    "turnkey-example-python-hello",
+    "turnkey-example-python-hello-deps",
 ]
 
 [project.optional-dependencies]
-# Development dependencies
 dev = [
     "pytest>=7.0",
 ]
 
+[tool.uv.workspace]
+members = [
+    "src/python/cargo",
+    "src/python/buck",
+    "src/python/buildsystem",
+    "src/python/cfg",
+    "src/examples/python-hello",
+    "src/examples/python-hello-deps",
+]
+
+[tool.uv.sources]
+turnkey-buck = { workspace = true }
+turnkey-buildsystem = { workspace = true }
+turnkey-cargo = { workspace = true }
+turnkey-cfg = { workspace = true }
+turnkey-example-python-hello = { workspace = true }
+turnkey-example-python-hello-deps = { workspace = true }
+
+[tool.uv]
+# The workspace root itself isn't a packaged project — it exists only to
+# anchor the workspace and the shared lockfile.
+package = false
+
 [tool.pytest.ini_options]
-pythonpath = ["src"]
 testpaths = ["src/python"]

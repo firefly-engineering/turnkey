@@ -107,12 +107,17 @@ struct PyLock {
 #[allow(dead_code)]
 struct PyLockPackage {
     name: String,
-    version: String,
+    // Optional: workspace-member entries (e.g., editable directories) omit
+    // version, sdist, and wheels — they have only `name` and `directory`.
+    #[serde(default)]
+    version: Option<String>,
     #[serde(default)]
     index: Option<String>,
     sdist: Option<PyLockSdist>,
     #[serde(default)]
     wheels: Vec<PyLockWheel>,
+    #[serde(default)]
+    directory: Option<toml::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -403,12 +408,26 @@ fn parse_pylock(path: &PathBuf, no_prefetch: bool) -> Result<Vec<PythonDep>> {
     let mut resolved = Vec::new();
 
     for (i, pkg) in pylock.packages.iter().enumerate() {
+        // Skip workspace-member entries (editable directory installs); they
+        // have no archive to fetch and shouldn't appear in the Nix cell.
+        if pkg.directory.is_some() {
+            continue;
+        }
+
+        let version = match &pkg.version {
+            Some(v) => v.clone(),
+            None => {
+                eprintln!("  Warning: No version for {}, skipping", pkg.name);
+                continue;
+            }
+        };
+
         eprintln!(
             "[{}/{}] Processing {} {}",
             i + 1,
             pylock.packages.len(),
             pkg.name,
-            pkg.version
+            version
         );
 
         // Prefer sdist (source distribution) for Nix builds
@@ -439,7 +458,7 @@ fn parse_pylock(path: &PathBuf, no_prefetch: bool) -> Result<Vec<PythonDep>> {
 
         resolved.push(PythonDep {
             name: pkg.name.clone(),
-            version: pkg.version.clone(),
+            version,
             url,
             hash,
         });
