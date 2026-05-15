@@ -3,7 +3,9 @@
   "blocked_by": [
     "turnkey-991.3"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-991.6"
+  ],
   "created": "2026-05-15T07:58:19Z",
   "description": "Current rule:\n  sources = ['pyproject.toml']\n  generator = ['pydeps-gen', '--pyproject', 'pyproject.toml']\n\nTarget rule (so dep changes in any member trigger regen):\n  sources  = ['pyproject.toml', 'src/python/*/pyproject.toml', 'src/examples/python-*/pyproject.toml', 'uv.lock']\n  generator = needs to run 'uv lock \u0026\u0026 uv export --format pylock.toml -o pylock.toml \u0026\u0026 pydeps-gen --lock pylock.toml'\n\nCheck first whether any existing generator in sync.toml is multi-step. If not, options are:\n- Add a small shell wrapper script in nix/packages/ (e.g., 'uv-pydeps-sync.sh') invoked as the generator.\n- Extend the sync runner to support multi-command generators.\n\nPick whichever fits the codebase pattern.",
   "id": "turnkey-991.4",
@@ -13,5 +15,5 @@
   "status": "open",
   "title": "Update .turnkey/sync.toml for uv workspace pipeline",
   "type": "task",
-  "updated_at": "2026-05-15T07:58:24Z"
+  "updated_at": "2026-05-15T07:58:25Z"
 }
