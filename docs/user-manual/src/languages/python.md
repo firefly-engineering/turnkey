@@ -2,6 +2,8 @@
 
 Turnkey provides Python support with Buck2 integration.
 
+> Python source in this repo is laid out as a [uv workspace](../workflows/python-workspace.md), with each package owning its own `pyproject.toml` and contributing to a shared `turnkey.*` PEP 420 namespace. This page covers the Buck2 build rules; read the workspace workflow guide first for the overall layout and the uv/Buck2 dual-track model.
+
 ## Setup
 
 Add to `toolchain.toml`:

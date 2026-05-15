@@ -260,19 +260,26 @@ my-dep.workspace = true       # ✅ Correct
 
 ### Python
 
-**Root file**: `pyproject.toml` at repo root
+**Layout**: uv workspace. The root `pyproject.toml` aggregates members; each Python package owns its own `pyproject.toml` with its own dependencies. A single `uv.lock` at the root resolves everything together.
 
 ```
 /turnkey/
-├── pyproject.toml            # [project.dependencies] declares all deps
-├── uv.lock                   # Lockfile (managed by uv)
-├── python-deps.toml          # Generated for Nix/Buck2
-└── python/mypackage/         # NO pyproject.toml here
+├── pyproject.toml                       # [tool.uv.workspace] + members as deps
+├── uv.lock                              # Single resolved lockfile
+├── pylock.toml                          # PEP 751 export from uv.lock
+├── python-deps.toml                     # Generated for Nix/Buck2 from pylock.toml
+├── src/python/<member>/
+│   ├── pyproject.toml                   # Real package, hatchling backend
+│   └── turnkey/<member>/                # Source under shared turnkey.* namespace
+└── src/examples/python-<name>/
+    └── pyproject.toml                   # Non-packaged ([tool.uv] package = false)
 ```
 
-- All Python code uses the root pyproject.toml
-- Use `uv add` from repo root to add dependencies
-- Sub-packages are part of the root project
+- All Python source lives under the shared `turnkey.*` PEP 420 namespace package. Members never define a `turnkey/__init__.py`.
+- Cross-member deps are declared with `[tool.uv.sources]` workspace markers, mirroring `Cargo.toml`'s `workspace = true` pattern.
+- Externals are declared in the member that consumes them. The lockfile reconciles versions across the workspace.
+- Adding/removing deps: edit the member's `pyproject.toml`, then `uv lock && uv export --all-packages --format pylock.toml -o pylock.toml`. `tk sync` regenerates `python-deps.toml` from `pylock.toml`.
+- Downstream monorepos that adopt this framework pick their own namespace (e.g. `acme.<name>`); see `docs/user-manual/src/workflows/python-workspace.md`.
 
 ### TypeScript/JavaScript
 

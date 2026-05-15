@@ -28,6 +28,7 @@
 - [Building Projects](./workflows/building.md)
 - [Running Tests](./workflows/testing.md)
 - [Managing Dependencies](./workflows/dependencies.md)
+- [Python Workspaces](./workflows/python-workspace.md)
 
 # Language Support
 
