@@ -37,6 +37,27 @@
       ...
     }:
     flake-parts.lib.mkFlake { inherit inputs; } {
+      # Reusable helpers exposed at the flake's lib output. Surfacing
+      # these makes the teller+toolbox setup that turnkey bundles
+      # available to consumers outside the flake-parts module — useful
+      # for one-off Nix expressions, NixOS modules, or downstream test
+      # harnesses that need the same registry construction.
+      #
+      # defaultTellerLib is system-agnostic; defaultTellerRegistry is a
+      # function-of-system because nixpkgs evaluation is per-system and
+      # flake.lib stays system-agnostic by convention.
+      flake.lib = {
+        defaultTellerLib = inputs.teller.lib;
+        defaultTellerRegistry = system:
+          (import inputs.nixpkgs {
+            inherit system;
+            overlays = [
+              inputs.teller.overlays.default
+              inputs.toolbox.overlays.default
+            ];
+          }).turnkeyRegistry;
+      };
+
       # Export the turnkey flake-parts module
       flake.flakeModules = {
         turnkey = ./nix/flake-parts/turnkey;
