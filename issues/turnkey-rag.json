@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-05-15T07:36:19Z",
@@ -9,8 +9,8 @@
     "beadwork-upgrade"
   ],
   "priority": 1,
-  "status": "open",
+  "status": "in_progress",
   "title": "Upgrade bw to 0.13.0",
   "type": "task",
-  "updated_at": "2026-05-15T07:36:19Z"
+  "updated_at": "2026-05-16T06:06:54Z"
 }
