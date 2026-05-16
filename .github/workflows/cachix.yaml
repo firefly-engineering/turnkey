@@ -44,5 +44,5 @@ jobs:
                 flake = builtins.getFlake (toString ./.);
                 pkgs = flake.packages.${{ matrix.system }};
               in
-              map (n: pkgs.${n}) (flake.lib.publicPackages "${{ matrix.system }}")
+              map (n: pkgs.${n}) flake.lib.publicPackages
             ' | cachix push firefly-turnkey

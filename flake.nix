@@ -67,17 +67,18 @@
           }).turnkeyRegistry;
 
         # Single source of truth for the packages worth caching/publishing.
-        # Consumed by .github/workflows/cachix.yaml. Project-specific
-        # outputs (per-language *-cell derivations and the toolchain-profile
-        # buildEnv that the flake-parts module generates from a consumer's
-        # toolchain.toml) are deliberately excluded — downstream consumers
-        # build their own from their own config.
-        #
-        # Function-of-system because some packages are platform-specific
-        # (turnkey-composed only builds on darwin where macFUSE is
-        # available); requesting them on the wrong system would fail the
-        # whole batch and prevent every other output from being pushed.
-        publicPackages = system: [
+        # Consumed by .github/workflows/cachix.yaml. Two categories are
+        # deliberately excluded:
+        #   - Project-specific outputs (per-language *-cell derivations and
+        #     the toolchain-profile buildEnv) — downstream consumers build
+        #     their own from their own toolchain.toml.
+        #   - turnkey-composed — a macFUSE daemon that needs the kext
+        #     installed at build time. Linux runners lack pkg-config + the
+        #     libfuse dev libs; macOS runners can't install macFUSE
+        #     (system-extension prompts can't be answered in CI). Users who
+        #     actually run the daemon install macFUSE locally and build it
+        #     once on their own machine.
+        publicPackages = [
           # Deps generators
           "godeps-gen"
           "pydeps-gen"
@@ -104,9 +105,6 @@
           "check-rust-edition-rs"
           "check-source-coverage-rs"
           "e2e-runner"
-        ] ++ inputs.nixpkgs.lib.optionals (inputs.nixpkgs.lib.hasSuffix "darwin" system) [
-          # Daemon / composition — macFUSE-only, see nix/packages/turnkey-composed.nix
-          "turnkey-composed"
         ];
       };
 
