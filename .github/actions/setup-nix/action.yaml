@@ -12,8 +12,8 @@ runs:
       uses: DeterminateSystems/nix-installer-action@v16
       with:
         extra-conf: |
-          extra-substituters = https://firefly-toolbox.cachix.org
-          extra-trusted-public-keys = firefly-toolbox.cachix.org-1:4RgCoc0+CS7QhRarG109VmWlnlYi+rQ5JYrCsRP5aK8=
+          extra-substituters = https://firefly-toolbox.cachix.org https://firefly-turnkey.cachix.org
+          extra-trusted-public-keys = firefly-toolbox.cachix.org-1:4RgCoc0+CS7QhRarG109VmWlnlYi+rQ5JYrCsRP5aK8= firefly-turnkey.cachix.org-1:zuJsRFMBLYuz9IyQQ+XId96P3DCuBkHvuQlI4gggXNE=
 
     - name: Setup Nix cache
       uses: DeterminateSystems/magic-nix-cache-action@v8
