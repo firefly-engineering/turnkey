@@ -131,35 +131,18 @@
           # Expose turnkey-prelude for CI builds
           packages.turnkey-prelude =
             let
-              overlaidPkgs = import inputs.nixpkgs {
-                inherit system;
-                overlays = [
-                  inputs.teller.overlays.default
-                  inputs.toolbox.overlays.default
-                ];
-              };
-              registry = overlaidPkgs.turnkeyRegistry;
-              upstreamPrelude = inputs.teller.lib.resolveTool registry "buck2-prelude" {};
+              registry = self.lib.defaultTellerRegistry system;
+              upstreamPrelude = self.lib.defaultTellerLib.resolveTool registry "buck2-prelude" {};
             in
             import ./nix/buck2/prelude.nix { inherit pkgs lib upstreamPrelude; };
 
-          # Configure turnkey to use our local toolchain files
-          # Each file creates a corresponding shell
+          # Configure turnkey to use our local toolchain files. tellerLib
+          # and tellerRegistry default to self.lib.defaultTellerLib /
+          # self.lib.defaultTellerRegistry system via the flake-parts
+          # module, so we only declare the project-specific bits here.
+          # Each declarationFile creates a corresponding shell.
           turnkey.toolchains = {
             enable = true;
-            tellerLib = inputs.teller.lib;
-            # Compose registries via overlays, as designed
-            tellerRegistry =
-              let
-                overlaidPkgs = import inputs.nixpkgs {
-                  inherit system;
-                  overlays = [
-                    inputs.teller.overlays.default   # Base: standard nixpkgs toolchains
-                    inputs.toolbox.overlays.default   # Adds beads, jj, etc. (versions merge)
-                  ];
-                };
-              in
-              overlaidPkgs.turnkeyRegistry;
             declarationFiles = {
               default = ./toolchain.toml; # Creates devShells.default with buck2 + nix + beads + go
               docs = ./docs/toolchain.toml; # Lightweight shell for building documentation
