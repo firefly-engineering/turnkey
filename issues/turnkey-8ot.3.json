@@ -6,14 +6,16 @@
   "blocks": [
     "turnkey-8ot.6"
   ],
+  "closed_at": "2026-05-16T05:38:32Z",
+  "close_reason": "Dropped the 10-line tellerLib + inlined-overlay block from turnkey's own turnkey.toolchains config (now defaulted by the module). packages.turnkey-prelude now reuses self.lib.defaultTellerRegistry / .defaultTellerLib instead of inlining the same overlaidPkgs construction. flake.nix net: 24 lines removed, 7 added.",
   "created": "2026-05-16T05:33:11Z",
   "description": "After C2 lands, drop the tellerLib + inlined tellerRegistry block from turnkey's own 'turnkey.toolchains = { ... }' configuration in flake.nix. The block becomes:\n\n  turnkey.toolchains = {\n    enable = true;\n    declarationFiles = {\n      default = ./toolchain.toml;\n      docs = ./docs/toolchain.toml;\n    };\n    registryExtensions = ...; # keep — turnkey-specific tools\n    buck2 = ...;              # keep\n  };\n\nAlso check whether the packages.turnkey-prelude block at flake.nix:103 can reuse self.lib.defaultTellerRegistry (it currently inlines the same overlaidPkgs construction). Probably yes — and would close another duplication.\n\nVerify: 'nix develop' still produces the same dev shell; tk build //src/python/... still works.",
   "id": "turnkey-8ot.3",
   "labels": [],
   "parent": "turnkey-8ot",
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "Collapse turnkey's own flake.nix consumer to use module defaults",
   "type": "task",
-  "updated_at": "2026-05-16T05:33:20Z"
+  "updated_at": "2026-05-16T05:38:32Z"
 }
