@@ -4,14 +4,16 @@
   "blocks": [
     "turnkey-8ot.6"
   ],
+  "closed_at": "2026-05-16T05:38:32Z",
+  "close_reason": "docs/developer-manual/src/architecture/registry.md gained a 'Default Sourcing' section covering: defaulted tellerLib/tellerRegistry, the inputs.turnkey.lib.* helpers for standalone use, the minimal consumer pattern, and the two override scenarios (private registry overlay + alternate teller revision). CLAUDE.md/README needed no edits (didn't mention the boilerplate).",
   "created": "2026-05-16T05:33:12Z",
   "description": "Two doc touchpoints:\n\n1. docs/user-manual/src/configuration/ (or whichever page documents the module API): add a short section explaining that tellerLib and tellerRegistry default to the bundled teller+toolbox setup, and the two scenarios for overriding them (private registry overlay; alternate teller revision). Link to inputs.turnkey.lib.defaultTellerLib / .defaultTellerRegistry as the standalone helpers.\n\n2. docs/user-manual/src/getting-started/ (or the project-setup page): update the example to use the collapsed consumer pattern (drop tellerLib + tellerRegistry from the example block).\n\nIf CLAUDE.md mentions the boilerplate anywhere, update it too.",
   "id": "turnkey-8ot.5",
   "labels": [],
   "parent": "turnkey-8ot",
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "Document the new defaults + override points",
   "type": "docs",
-  "updated_at": "2026-05-16T05:33:20Z"
+  "updated_at": "2026-05-16T05:38:32Z"
 }
