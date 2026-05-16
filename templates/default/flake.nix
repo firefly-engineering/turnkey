@@ -22,42 +22,35 @@
         "aarch64-darwin"
       ];
 
-      perSystem = { pkgs, config, ... }: {
-        # Enable turnkey toolchain management
+      perSystem = { pkgs, ... }: {
         turnkey.toolchains = {
           enable = true;
           declarationFiles.default = ./toolchain.toml;
 
-          # The default registry from turnkey provides buck2, nix, godeps-gen.
-          # Extend it with additional tools:
-          registry = {
-            # Base tools (from nixpkgs)
-            buck2 = pkgs.buck2;
-            nix = pkgs.nix;
-            go = pkgs.go;
+          # The default registry — provided by the turnkey flake-parts
+          # module — ships with toolbox: buck2, nix, go, python, clang,
+          # rust, uv, and more (all version-pinned). 'tk' is included as
+          # a built-in extension. Add project-specific tools here:
+          #
+          # registryExtensions = {
+          #   my-tool = {
+          #     versions = { "default" = inputs.my-tool.packages.${pkgs.system}.default; };
+          #     default = "default";
+          #   };
+          # };
 
-            # Required by Buck2 toolchains (go needs python + cxx)
-            python = pkgs.python3;
-            clang = pkgs.llvmPackages.clang;
-            lld = pkgs.llvmPackages.lld;
-
-            # Turnkey tools
-            godeps-gen = inputs.turnkey.packages.${pkgs.system}.godeps-gen;
-            tk = inputs.turnkey.packages.${pkgs.system}.tk;
-          };
-
-          # Enable Buck2 integration
+          # Enable Buck2 integration. Each language flag wires the
+          # corresponding deps-gen tool into PATH and registers the deps
+          # cell with Buck2 — no need to list it in toolchain.toml.
           buck2 = {
             enable = true;
             prelude.strategy = "bundled";
 
-            # Go dependencies (auto-generated from go.mod/go.sum)
             go = {
               enable = true;
               depsFile = ./go-deps.toml;
             };
 
-            # Uncomment to enable other languages:
             # rust = {
             #   enable = true;
             #   depsFile = ./rust-deps.toml;
@@ -65,6 +58,7 @@
             # python = {
             #   enable = true;
             #   depsFile = ./python-deps.toml;
+            #   lockFile = ./pylock.toml;
             # };
           };
         };

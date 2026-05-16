@@ -1,13 +1,15 @@
 # Turnkey toolchain declaration
-# Add toolchains you need for your project
+# Add toolchains you need for your project. Each entry resolves through
+# the versioned registry provided by the turnkey flake-parts module
+# (toolbox-backed by default).
+#
+# 'tk' is automatically available — it's a built-in extension. Per-language
+# deps-gen tools (godeps-gen, pydeps-gen, rustdeps-gen, ...) are also
+# added to PATH automatically whenever the corresponding buck2.<lang>.enable
+# flag is set in flake.nix, so there's no need to list them here either.
 
 [toolchains]
-# Go toolchain for Buck2 Go builds
 go = {}
-
-# Turnkey tools (for deps generation and syncing)
-godeps-gen = {}
-tk = {}
 
 # Uncomment to add more toolchains:
 # rust = {}
