@@ -1,0 +1,48 @@
+name: Push to Cachix
+
+on:
+  push:
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  push:
+    strategy:
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          extra-conf: |
+            extra-substituters = https://firefly-toolbox.cachix.org
+            extra-trusted-public-keys = firefly-toolbox.cachix.org-1:4RgCoc0+CS7QhRarG109VmWlnlYi+rQ5JYrCsRP5aK8=
+
+      - uses: cachix/cachix-action@v16
+        with:
+          name: firefly-turnkey
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Build and push public packages
+        # The set of packages worth caching lives in flake.lib.publicPackages
+        # — adding a new entry there flows it into the cache automatically.
+        # Project-specific outputs (per-language *-cell derivations and the
+        # toolchain-profile buildEnv that the flake-parts module generates
+        # from turnkey's own toolchain.toml) are intentionally excluded
+        # because downstream consumers build their own from their own
+        # configuration.
+        run: |
+          nix build --no-link --print-out-paths --impure \
+            --expr '
+              let
+                flake = builtins.getFlake (toString ./.);
+                pkgs = flake.packages.${{ matrix.system }};
+              in
+              map (n: pkgs.${n}) flake.lib.publicPackages
+            ' | cachix push firefly-turnkey
