@@ -65,6 +65,43 @@
               inputs.toolbox.overlays.default
             ];
           }).turnkeyRegistry;
+
+        # Single source of truth for the packages worth caching/publishing.
+        # Consumed by .github/workflows/cachix.yaml. Project-specific
+        # outputs (per-language *-cell derivations and the toolchain-profile
+        # buildEnv that the flake-parts module generates from a consumer's
+        # toolchain.toml) are deliberately excluded — downstream consumers
+        # build their own from their own config.
+        publicPackages = [
+          # Deps generators
+          "godeps-gen"
+          "pydeps-gen"
+          "rustdeps-gen"
+          "jsdeps-gen"
+          "soldeps-gen"
+          # Turnkey CLIs
+          "tk"
+          "tw"
+          # Native-tool wrappers (tw-driven)
+          "tw-go"
+          "tw-cargo"
+          "tw-uv"
+          # Buck2 prelude + build helpers
+          "turnkey-prelude"
+          "deps-extract"
+          "buckgen"
+          "cargo-prune-workspace"
+          "compute-unified-features"
+          "gen-rust-buck"
+          # Daemon / composition
+          "turnkey-composed"
+          # Misc
+          "nix-prefetch-cached"
+          "pytest-uv-shim"
+          "check-rust-edition-rs"
+          "check-source-coverage-rs"
+          "e2e-runner"
+        ];
       };
 
       # Export the turnkey flake-parts module. We import it with
@@ -140,6 +177,28 @@
           packages.soldeps-gen = import ./nix/packages/soldeps-gen.nix { inherit pkgs lib; };
           packages.deps-extract = import ./nix/packages/deps-extract.nix { inherit pkgs lib; };
           packages.turnkey-composed = import ./nix/packages/turnkey-composed.nix { inherit pkgs lib; };
+
+          # Internal-but-cross-project derivations: invoked by the
+          # flake-parts module or rust-deps-cell builder rather than by
+          # name, so they need to be at packages.* for the cachix
+          # workflow to publish them under stable names.
+          packages.compute-unified-features = import ./nix/packages/compute-unified-features.nix { inherit pkgs lib; };
+          packages.gen-rust-buck = import ./nix/packages/gen-rust-buck.nix { inherit pkgs lib; };
+          packages.pytest-uv-shim = import ./nix/packages/pytest-uv-shim.nix { inherit pkgs lib; };
+          packages.check-rust-edition-rs = import ./nix/packages/check-rust-edition-rs.nix { inherit pkgs lib; };
+          packages.check-source-coverage-rs = import ./nix/packages/check-source-coverage-rs.nix { inherit pkgs lib; };
+          packages.tw-go = (import ./nix/packages/tw-wrappers.nix {
+            inherit pkgs lib;
+            tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
+          }).tw-go;
+          packages.tw-cargo = (import ./nix/packages/tw-wrappers.nix {
+            inherit pkgs lib;
+            tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
+          }).tw-cargo;
+          packages.tw-uv = (import ./nix/packages/tw-wrappers.nix {
+            inherit pkgs lib;
+            tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
+          }).tw-uv;
 
           # Expose turnkey-prelude for CI builds
           packages.turnkey-prelude =
