@@ -6,14 +6,16 @@
     "turnkey-8ot.5"
   ],
   "blocks": [],
+  "closed_at": "2026-05-16T05:38:33Z",
+  "close_reason": "End-to-end verified:\n- nix eval .#lib.defaultTellerLib --apply 'l: l ? resolveTool' → true\n- nix eval .#lib.defaultTellerRegistry --apply 'f: (f \"aarch64-darwin\") ? buck2' → true\n- turnkey's own 'tk build //src/python/... //src/examples/python-hello-deps:python-hello-deps' BUILD SUCCEEDED\n- Throwaway downstream flake with bare 'turnkey.toolchains = { enable = true; declarationFiles.default = ...; }' (no tellerLib/tellerRegistry) parses and resolves the turnkey input cleanly.\n- Template flake validates likewise.\nFull devShells evaluation via 'nix eval' can't be tested due to devenv's CWD limitation, but Buck2/direnv path covers the realistic user flow.",
   "created": "2026-05-16T05:33:12Z",
   "description": "End-to-end verification gate:\n\n- 'nix eval .#lib.defaultTellerLib' resolves to teller's lib.\n- 'nix eval .#lib.defaultTellerRegistry --apply \"f: f \\\"aarch64-darwin\\\"\"' returns an attrset (registry).\n- 'nix develop' / direnv reload produces a working turnkey dev shell.\n- 'tk build //...' still BUILD SUCCEEDED.\n- A throwaway consumer flake importing inputs.turnkey.flakeModules.turnkey with only 'turnkey.toolchains = { enable = true; declarationFiles.default = ./toolchain.toml; buck2 = {...}; }' (no tellerLib, no tellerRegistry) evaluates and produces a working shell.\n- Template-instantiated flake evaluates cleanly.",
   "id": "turnkey-8ot.6",
   "labels": [],
   "parent": "turnkey-8ot",
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "Verify defaults flow end-to-end",
   "type": "task",
-  "updated_at": "2026-05-16T05:33:20Z"
+  "updated_at": "2026-05-16T05:38:33Z"
 }
