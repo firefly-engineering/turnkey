@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-8ot.2"
+  ],
   "blocks": [],
   "created": "2026-05-16T05:33:12Z",
   "description": "Rewrite templates/default/flake.nix:\n\n- Drop teller + toolbox from inputs (no longer needed).\n- Drop the 'registry = { buck2 = pkgs.buck2; nix = pkgs.nix; ... }' flat-attrset fallback. The module defaults now provide the versioned registry, so consumers get buck2/nix/etc. via toolchain.toml without listing them in registry.\n- Keep registryExtensions for any genuinely project-specific tools (the comment showing the example is fine).\n- Reduce the perSystem block to ~10 lines focused on turnkey.toolchains + buck2.\n\nVerify: 'nix flake new -t github:firefly-engineering/turnkey/\u003cbranch\u003e demo' (or equivalent local invocation) produces a flake that 'nix flake check' validates and 'nix develop' enters cleanly.",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Update template to use module defaults + versioned registry",
   "type": "task",
-  "updated_at": "2026-05-16T05:33:12Z"
+  "updated_at": "2026-05-16T05:33:19Z"
 }

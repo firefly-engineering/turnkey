@@ -4,7 +4,8 @@
     "turnkey-8ot.1"
   ],
   "blocks": [
-    "turnkey-8ot.3"
+    "turnkey-8ot.3",
+    "turnkey-8ot.4"
   ],
   "created": "2026-05-16T05:33:11Z",
   "description": "Two coordinated edits:\n\n1. Wrap the module export at the flake level so it can see turnkey's own self.lib:\n\n   # flake.nix\n   flake.flakeModules.turnkey = import ./nix/flake-parts/turnkey {\n     turnkeyLib = self.lib;\n   };\n\n2. Change nix/flake-parts/turnkey/default.nix signature to receive turnkeyLib:\n\n   { turnkeyLib }:\n   { lib, flake-parts-lib, ... }: { ... }\n\n   And default the options:\n\n     tellerLib = mkOption {\n       type = types.anything;\n       default = turnkeyLib.defaultTellerLib;\n       defaultText = lib.literalExpression \"inputs.turnkey.lib.defaultTellerLib\";\n       description = ''\n         Teller library instance. Defaults to the teller flake input bundled\n         with turnkey. Override only when using a non-default teller revision.\n       '';\n     };\n\n     tellerRegistry = mkOption {\n       type = types.lazyAttrsOf types.anything;\n       default = turnkeyLib.defaultTellerRegistry system;\n       defaultText = lib.literalExpression \"inputs.turnkey.lib.defaultTellerRegistry system\";\n       description = ''\n         Versioned registry. Defaults to the toolbox-backed registry bundled\n         with turnkey. Override to point at a private registry overlay.\n       '';\n       # internal = true REMOVED — this is now a documented override point.\n     };\n\nVerify: turnkey's own devshells must still evaluate (the inlined block in turnkey's own consumer remains and explicitly overrides — collapsing that consumer happens in the next ticket).",
