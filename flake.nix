@@ -27,6 +27,15 @@
     };
 
     devenv.follows = "toolbox/devenv";
+
+    # Placeholder input that downstream CI can override to inject the
+    # working directory at flake-eval time (devenv needs a concrete
+    # project root to evaluate devShells outside of `nix develop`).
+    # Override with: --override-input devenv-root file+file://$PWD/.devenv-root
+    devenv-root = {
+      url = "file+file:///dev/null";
+      flake = false;
+    };
   };
 
   outputs =
@@ -66,6 +75,7 @@
       flake.flakeModules = {
         turnkey = import ./nix/flake-parts/turnkey {
           turnkeyLib = self.lib;
+          devenvRoot = inputs.devenv-root;
         };
       };
 
@@ -92,7 +102,10 @@
       # (same closure consumers receive).
       imports = [
         inputs.devenv.flakeModule
-        (import ./nix/flake-parts/turnkey { turnkeyLib = self.lib; })
+        (import ./nix/flake-parts/turnkey {
+          turnkeyLib = self.lib;
+          devenvRoot = inputs.devenv-root;
+        })
       ];
 
       systems = [

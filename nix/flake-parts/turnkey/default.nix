@@ -1,4 +1,4 @@
-{ turnkeyLib }:
+{ turnkeyLib, devenvRoot }:
 
 {
   lib,
@@ -860,6 +860,16 @@ in
         in
         {
         imports = [ ../../devenv/turnkey ];
+
+        # Read the devenv-root override (if set) so that CI can evaluate
+        # devShells without an interactive shell. Empty content (the
+        # default /dev/null placeholder) leaves devenv.root unset and
+        # falls back to its usual direnv-driven resolution.
+        devenv.root =
+          let
+            content = builtins.readFile devenvRoot.outPath;
+          in
+          lib.mkIf (content != "") content;
 
         turnkey = {
           registry = lib.mkDefault registry;

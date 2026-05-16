@@ -145,6 +145,18 @@
         "url": "file:///dev/null"
       }
     },
+    "devenv-root_2": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-d6xi4mKdjkX2JFicDIv5niSzpyI0m/Hnm8GGAIU04kY=",
+        "type": "file",
+        "url": "file:///dev/null"
+      },
+      "original": {
+        "type": "file",
+        "url": "file:///dev/null"
+      }
+    },
     "devshell": {
       "inputs": {
         "nixpkgs": [
@@ -616,6 +628,7 @@
           "toolbox",
           "devenv"
         ],
+        "devenv-root": "devenv-root",
         "flake-parts": [
           "nix-pins",
           "flake-parts"
@@ -734,7 +747,7 @@
     "toolbox": {
       "inputs": {
         "devenv": "devenv",
-        "devenv-root": "devenv-root",
+        "devenv-root": "devenv-root_2",
         "nix-pins": [
           "nix-pins"
         ],
