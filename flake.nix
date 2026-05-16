@@ -72,7 +72,12 @@
         # buildEnv that the flake-parts module generates from a consumer's
         # toolchain.toml) are deliberately excluded — downstream consumers
         # build their own from their own config.
-        publicPackages = [
+        #
+        # Function-of-system because some packages are platform-specific
+        # (turnkey-composed only builds on darwin where macFUSE is
+        # available); requesting them on the wrong system would fail the
+        # whole batch and prevent every other output from being pushed.
+        publicPackages = system: [
           # Deps generators
           "godeps-gen"
           "pydeps-gen"
@@ -93,14 +98,15 @@
           "cargo-prune-workspace"
           "compute-unified-features"
           "gen-rust-buck"
-          # Daemon / composition
-          "turnkey-composed"
           # Misc
           "nix-prefetch-cached"
           "pytest-uv-shim"
           "check-rust-edition-rs"
           "check-source-coverage-rs"
           "e2e-runner"
+        ] ++ inputs.nixpkgs.lib.optionals (inputs.nixpkgs.lib.hasSuffix "darwin" system) [
+          # Daemon / composition — macFUSE-only, see nix/packages/turnkey-composed.nix
+          "turnkey-composed"
         ];
       };
 
