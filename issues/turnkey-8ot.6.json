@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-05-16T05:33:12Z",
+  "description": "End-to-end verification gate:\n\n- 'nix eval .#lib.defaultTellerLib' resolves to teller's lib.\n- 'nix eval .#lib.defaultTellerRegistry --apply \"f: f \\\"aarch64-darwin\\\"\"' returns an attrset (registry).\n- 'nix develop' / direnv reload produces a working turnkey dev shell.\n- 'tk build //...' still BUILD SUCCEEDED.\n- A throwaway consumer flake importing inputs.turnkey.flakeModules.turnkey with only 'turnkey.toolchains = { enable = true; declarationFiles.default = ./toolchain.toml; buck2 = {...}; }' (no tellerLib, no tellerRegistry) evaluates and produces a working shell.\n- Template-instantiated flake evaluates cleanly.",
+  "id": "turnkey-8ot.6",
+  "labels": [],
+  "parent": "turnkey-8ot",
+  "priority": 2,
+  "status": "open",
+  "title": "Verify defaults flow end-to-end",
+  "type": "task",
+  "updated_at": "2026-05-16T05:33:12Z"
+}
