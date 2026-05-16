@@ -117,6 +117,58 @@ rust = {
 };
 ```
 
+## Default Sourcing
+
+The `turnkey.toolchains` flake-parts module options `tellerLib` and `tellerRegistry` default to the teller + toolbox setup that turnkey bundles, so consumers don't have to wire them up unless they need a private registry or an alternate teller revision.
+
+The defaults are also exposed as standalone helpers on turnkey's `lib` output, reachable from any downstream flake:
+
+```nix
+# inputs.turnkey.lib.defaultTellerLib       : teller.lib (system-agnostic)
+# inputs.turnkey.lib.defaultTellerRegistry  : system → registry attrset
+```
+
+So a typical consumer flake reduces to:
+
+```nix
+turnkey.toolchains = {
+  enable = true;
+  declarationFiles.default = ./toolchain.toml;
+  buck2 = { ... };
+};
+```
+
+Override scenarios:
+
+- **Private registry overlay** — extend the toolbox-backed default with extra overlays:
+
+  ```nix
+  turnkey.toolchains.tellerRegistry =
+    (import inputs.nixpkgs {
+      inherit system;
+      overlays = [
+        inputs.teller.overlays.default
+        inputs.toolbox.overlays.default
+        inputs.my-org-overlay.overlays.default
+      ];
+    }).turnkeyRegistry;
+  ```
+
+- **Alternate teller revision** — pin a fork or a specific teller commit:
+
+  ```nix
+  turnkey.toolchains.tellerLib = inputs.my-teller-fork.lib;
+  ```
+
+Or reach the defaults directly for ad-hoc composition outside the module:
+
+```nix
+let
+  registry = inputs.turnkey.lib.defaultTellerRegistry system;
+  resolvedBuck2 = inputs.turnkey.lib.defaultTellerLib.resolveTool registry "buck2" {};
+in ...
+```
+
 ## How It's Used
 
 The flake-parts module injects `tellerLib` into the devenv module:
