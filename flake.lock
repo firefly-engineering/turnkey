@@ -748,11 +748,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1777306222,
-        "narHash": "sha256-XzHh+nWAo2teR5wT2Wsh73cR2uW/th0foAxFEtJhq+4=",
+        "lastModified": 1778830376,
+        "narHash": "sha256-hw4rY1nCeMhWcejbFkqQZUMHT0YVmh+T9cPeLIqDAFE=",
         "owner": "firefly-engineering",
         "repo": "toolbox",
-        "rev": "394377767c73d59d80a3a994248bfb40b0d57305",
+        "rev": "9b190de95aa36df3215cfc239c44668f5ec47109",
         "type": "github"
       },
       "original": {
