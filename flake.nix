@@ -58,9 +58,15 @@
           }).turnkeyRegistry;
       };
 
-      # Export the turnkey flake-parts module
+      # Export the turnkey flake-parts module. We import it with
+      # turnkeyLib = self.lib so the module can reach the bundled teller
+      # and toolbox helpers without re-importing turnkey's own flake.
+      # Consumers don't need to do anything different — flakeModules.turnkey
+      # is still the same value to import in their flake-parts setup.
       flake.flakeModules = {
-        turnkey = ./nix/flake-parts/turnkey;
+        turnkey = import ./nix/flake-parts/turnkey {
+          turnkeyLib = self.lib;
+        };
       };
 
       # Export the turnkey devenv module separately
@@ -81,10 +87,12 @@
         };
       };
 
-      # Use the module ourselves as a working example
+      # Use the module ourselves as a working example. Import via the
+      # wrapped flakeModule export above so we eat our own dog food
+      # (same closure consumers receive).
       imports = [
         inputs.devenv.flakeModule
-        ./nix/flake-parts/turnkey
+        (import ./nix/flake-parts/turnkey { turnkeyLib = self.lib; })
       ];
 
       systems = [

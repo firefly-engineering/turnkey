@@ -1,3 +1,5 @@
+{ turnkeyLib }:
+
 {
   lib,
   flake-parts-lib,
@@ -73,14 +75,25 @@ in
 
         tellerLib = mkOption {
           type = types.anything;
-          description = "Teller library instance (teller.lib). Required.";
+          default = turnkeyLib.defaultTellerLib;
+          defaultText = lib.literalExpression "inputs.turnkey.lib.defaultTellerLib";
+          description = ''
+            Teller library instance. Defaults to the teller flake input
+            bundled with turnkey. Override only when using a non-default
+            teller revision (e.g. a fork or a pinned commit).
+          '';
         };
 
         tellerRegistry = mkOption {
           type = types.lazyAttrsOf types.anything;
-          default = { };
-          internal = true;
-          description = "Default registry from teller. Set via teller's overlay or import.";
+          default = turnkeyLib.defaultTellerRegistry system;
+          defaultText = lib.literalExpression "inputs.turnkey.lib.defaultTellerRegistry system";
+          description = ''
+            Versioned toolchain registry. Defaults to the toolbox-backed
+            registry bundled with turnkey (nixpkgs + teller overlay +
+            toolbox overlay). Override to point at a private registry
+            overlay or an alternate toolbox revision.
+          '';
         };
 
         wrapNativeTools = mkOption {
