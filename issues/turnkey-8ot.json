@@ -2,13 +2,15 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-05-16T05:38:33Z",
+  "close_reason": "Issue #13 Option B landed across 5 jj changes. Defaults via flake.lib.defaultTellerLib / defaultTellerRegistry; module options keep override semantics; turnkey's own consumer + template collapse to the minimal form; docs cover the new override points. Children 8ot.1-8ot.6 all closed.",
   "created": "2026-05-16T05:33:11Z",
   "description": "Eliminate the boilerplate that forces every flake-parts module consumer to pass tellerLib and tellerRegistry. Adopt issue #13 Option B: expose the defaults as turnkey flake outputs (flake.lib.defaultTellerLib + flake.lib.defaultTellerRegistry), wrap the flake-parts module to inject them as option defaults, and let consumers reach the same values directly via inputs.turnkey.lib if they want to compose them.\n\nDecisions locked in (conversation 2026-05-15):\n- Option B over A: expose defaults via flake.lib so they're reusable outside the module (one-off Nix expressions, NixOS modules, downstream test harnesses).\n- defaultTellerLib is a value, defaultTellerRegistry is a function-of-system (flake.lib stays system-agnostic by convention; nixpkgs eval is per-system anyway).\n- Wrap the module export at flake.flakeModules.turnkey = import ./nix/flake-parts/turnkey { turnkeyLib = self.lib; }; module signature becomes { turnkeyLib }: { lib, flake-parts-lib, ... }: ...\n- Module options keep tellerLib/tellerRegistry overridable; tellerRegistry drops 'internal = true'.\n- Migration is backwards compatible — explicit values in consumer flakes still override the module defaults via standard NixOS merge.\n\nSide benefits:\n- turnkey's own flake.nix collapses (drops the inlined 10-line tellerRegistry block).\n- Template flips from the flat 'registry = { ... }' fallback to the versioned API and ships with version pinning by default.\n- Consumers can drop teller + toolbox from their top-level flake inputs (still reachable as inputs.turnkey.inputs.teller if needed).",
   "id": "turnkey-8ot",
   "labels": [],
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "Default tellerLib/tellerRegistry via flake.lib (issue #13, Option B)",
   "type": "epic",
-  "updated_at": "2026-05-16T05:33:11Z"
+  "updated_at": "2026-05-16T05:38:33Z"
 }
