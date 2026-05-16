@@ -6,14 +6,16 @@
   "blocks": [
     "turnkey-8ot.6"
   ],
+  "closed_at": "2026-05-16T05:38:32Z",
+  "close_reason": "Template flake.nix rewritten: dropped teller + toolbox inputs, dropped flat 'registry = { ... }' override (toolbox-backed default now provides buck2/nix/go/python/clang/lld with version pinning), dropped explicit tk + godeps-gen (tk is built-in extension; godeps-gen rides internalPackages when buck2.go.enable). toolchain.toml trimmed to just 'go = {}' with comments explaining the implicit additions. Verified the template parses, evaluates, and resolves the local turnkey input cleanly.",
   "created": "2026-05-16T05:33:12Z",
   "description": "Rewrite templates/default/flake.nix:\n\n- Drop teller + toolbox from inputs (no longer needed).\n- Drop the 'registry = { buck2 = pkgs.buck2; nix = pkgs.nix; ... }' flat-attrset fallback. The module defaults now provide the versioned registry, so consumers get buck2/nix/etc. via toolchain.toml without listing them in registry.\n- Keep registryExtensions for any genuinely project-specific tools (the comment showing the example is fine).\n- Reduce the perSystem block to ~10 lines focused on turnkey.toolchains + buck2.\n\nVerify: 'nix flake new -t github:firefly-engineering/turnkey/\u003cbranch\u003e demo' (or equivalent local invocation) produces a flake that 'nix flake check' validates and 'nix develop' enters cleanly.",
   "id": "turnkey-8ot.4",
   "labels": [],
   "parent": "turnkey-8ot",
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "Update template to use module defaults + versioned registry",
   "type": "task",
-  "updated_at": "2026-05-16T05:33:20Z"
+  "updated_at": "2026-05-16T05:38:32Z"
 }
