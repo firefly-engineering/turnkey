@@ -4,14 +4,16 @@
   "blocks": [
     "turnkey-8ot.2"
   ],
+  "closed_at": "2026-05-16T05:38:31Z",
+  "close_reason": "Added flake.lib.defaultTellerLib (inputs.teller.lib) and flake.lib.defaultTellerRegistry (system → toolbox-overlaid turnkeyRegistry). Verified via 'nix eval .#lib.defaultTellerLib' and 'nix eval .#lib.defaultTellerRegistry'. Purely additive; no consumer behavior changes yet.",
   "created": "2026-05-16T05:33:11Z",
   "description": "Add to turnkey's flake.nix:\n\n  flake.lib = {\n    defaultTellerLib = inputs.teller.lib;\n    defaultTellerRegistry = system:\n      (import inputs.nixpkgs {\n        inherit system;\n        overlays = [ inputs.teller.overlays.default inputs.toolbox.overlays.default ];\n      }).turnkeyRegistry;\n  };\n\nAdditive change — no consumer or module behavior changes yet. After this, 'nix eval .#lib' surfaces both outputs and they're reachable as inputs.turnkey.lib.defaultTellerLib / inputs.turnkey.lib.defaultTellerRegistry from any downstream flake.\n\nSpot-check: nix eval .#lib --apply 'lib: lib.defaultTellerLib != null' should return true.",
   "id": "turnkey-8ot.1",
   "labels": [],
   "parent": "turnkey-8ot",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Expose flake.lib.defaultTellerLib + defaultTellerRegistry",
   "type": "task",
-  "updated_at": "2026-05-16T05:33:42Z"
+  "updated_at": "2026-05-16T05:38:31Z"
 }
