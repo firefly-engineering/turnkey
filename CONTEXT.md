@@ -4,6 +4,12 @@ Turnkey is a toolchain-as-code framework for Nix flakes. It turns declarative to
 
 ## Language
 
+### Buck2
+
+**Pinned buck2 release**:
+The one buck2 release a turnkey revision ships: the binary, the prelude built with it, and the buck2 source revision they come from, always moved together. Consumers get it by choosing a turnkey revision, never by declaring buck2 themselves.
+_Avoid_: buck2 version (as a consumer setting), declared buck2, supported buck2 versions
+
 ### Testing
 
 **Test result caching**:
