@@ -6,6 +6,8 @@
   "blocks": [
     "turnkey-vnm.25"
   ],
+  "closed_at": "2026-09-25T12:48:59Z",
+  "close_reason": "HTTP/2 preface probe; fast failure on startup exit; port-held case: 0.5s, one warning, uncached, exit 0; probe overhead negligible.",
   "created": "2026-09-25T10:54:21Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nBefore handing over to buck2, tk probes the server with a sub-second timeout. If the server is unreachable and can't be started, the run goes ahead uncached (runner mode `off`) with a one-line warning. buck2's ~45s-then-fail behaviour never happens (spec §6).\n\n## Acceptance criteria\n\n- [ ] With the port held by something else, or the server unable to start, `tk test` runs uncached, prints one warning line, and doesn't slow down noticeably\n- [ ] No test is reported failed because of the cache\n- [ ] The probe adds well under a second to `tk test` when the server is up\n\n## Blocked by\n\n- turnkey-vnm.7\n",
   "id": "turnkey-vnm.8",
@@ -14,8 +16,8 @@
   ],
   "parent": "turnkey-vnm",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "tk test falls back to uncached when the cache is unreachable",
   "type": "task",
-  "updated_at": "2026-09-25T12:47:33Z"
+  "updated_at": "2026-09-25T12:48:59Z"
 }
