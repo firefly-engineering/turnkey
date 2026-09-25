@@ -17,11 +17,15 @@
     {
       "text": "Resolution. Findings are in docs/research/buck2-pinned-test-caching.md on local jj bookmark research/buck2-pinned-caching (commit c3bcb214; workspace turnkey-research-buck2-pinned-caching).\n\nThe pin is facebook/buck2@7600cb80070a88b88be67aa5d20d6a93cffa0223 (tag 2026-04-15), a prebuilt release binary from toolbox.\n\n- Tests can opt in with ExternalRunnerTestInfo(supports_test_execution_caching = True). Stable test output paths are the default (91c4d7d109).\n- Lookups go ONLY to the RE action cache. They need: the target opted in, a runner that doesn't send disable_test_execution_caching, and an executor with remote_cache_enabled = True set explicitly (in OSS it defaults to remote_enabled) plus [buck2_re_client] addresses.\n- Local test runs are never uploaded (orchestrator.rs L1302-1315, unchanged on main). So without RE workers, buck2 alone never produces a test cache hit.\n- turnkey today uses prelude//platforms:default: local-only, no remote cache, so there are no lookups at all.\n- Rust, Go, Python and C++ prelude test rules don't set the flag. Only Java, Android and Kotlin do.\n- Build actions CAN upload local results when the executor has allow_cache_uploads plus remote cache, and the action allows upload (or buck2.default_allow_cache_upload). Only successful runs are uploaded.\n- sqlite_dep_file_state is absent. It first ships in 2026-08-22.\n- A runner sees hits as cache_hit: true / ACTION_CACHE.\n- quokka's test.proto is byte-identical to the pinned one.\n- Patching buck2 means a from-source build (nightly-2026-01-18, self-generated Cargo.lock) plus a new buck2-toolchain version through registryExtensions.\n- Upgrading past the pin removes network_access from ExternalRunnerTestInfo.\n- The turnkey prelude matches release 2026-03-15, not 2026-04-15. Bump them together.",
       "timestamp": "2026-09-25T07:49:50Z"
+    },
+    {
+      "text": "Research branch pushed: research/buck2-pinned-caching. Permalink: https://github.com/firefly-engineering/turnkey/blob/c3bcb21462a91dc02825ec29d1baa78d25fce27a/docs/research/buck2-pinned-test-caching.md",
+      "timestamp": "2026-09-25T08:08:41Z"
     }
   ],
   "priority": 2,
   "status": "closed",
   "title": "What test-caching support does our pinned buck2 have?",
   "type": "task",
-  "updated_at": "2026-09-25T07:49:51Z"
+  "updated_at": "2026-09-25T08:08:41Z"
 }
