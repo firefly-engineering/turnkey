@@ -13,9 +13,15 @@
     "wayfinder:grilling"
   ],
   "parent": "turnkey-w55",
+  "comments": [
+    {
+      "text": "Resolution (grilled 2026-09-25).\n\nFacts: tk is a built-in extension of the turnkey module; tw and turnkey-composed go through registryExtensions; turnkey-composed also has a home-manager module. Consumers configure through buck2.\u003cfeature\u003e module options, and .buckconfig is generated in nix/devenv/turnkey/buck2.nix. buck2 comes from toolbox at the buck2-toolchain version the consumer picks in toolchain.toml.\n\nDecisions:\n1. The runner, plus a pinned bazel-remote referenced by store path, ships automatically with the turnkey buck2 integration (like tk and deps-extract). No toolchain.toml entry, nothing on PATH.\n2. buck2-version coupling: turnkey keeps a table from buck2 version to buck2 source revision and builds the runner (protos) for the consumer's selected buck2 version. An entry is added only after the parity suite passes for that version. With an unsupported buck2 version the runner isn't configured: tests run under buck2's own runner, uncached, and entering the shell prints a one-line notice.\n3. Configuration: the devenv/flake-parts option group buck2.testCache = { enable (default true), endpoint (default: the turnkey-managed local server) }. Per-machine settings (store size, port override) come from user-level config or env, never the repo. No per-language switches; the no-test-cache label and enable = false cover opting out.\n4. Remote: setting buck2.testCache.endpoint to a remote REAPI address writes it into [buck2_re_client], and tk stops managing and probing a local server. Nothing else changes. Until shared-cache handover (map fog) is decided, the runner records nothing when the endpoint isn't local.\n5. Generated .buckconfig: [buck2_re_client] engine, action-cache and CAS addresses set to the endpoint (tls = false for the local one), and [test] v2_test_executor set to the runner's store path. The cache-reading executor comes from the rule helper (turnkey-w55.8), not the buckconfig. With enable = false, neither section is emitted.",
+      "timestamp": "2026-09-25T10:44:55Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "How does the caching tool ship to consumer repos and get configured?",
   "type": "task",
-  "updated_at": "2026-09-25T10:42:36Z"
+  "updated_at": "2026-09-25T10:44:55Z"
 }
