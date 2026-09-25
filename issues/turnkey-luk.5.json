@@ -18,11 +18,15 @@
     {
       "text": "From turnkey-luk.1: pin buck2 and buck2-prelude by date (2026-09-15, never \"default\"), add preludeRev = 4d101dce3482c35b32f9f1e7072b354ae789d256 to the pinned record and assert the resolved prelude's passthru.preludeRev matches at eval. Missing/wrong prelude entries get fixed in toolbox, not overridden here.",
       "timestamp": "2026-09-25T15:16:13Z"
+    },
+    {
+      "text": "Resolution: commit 13740c55 (on top of main, not pushed). buck2-source.nix is one pinned record (version 2026-09-15, rev, protosHash, preludeRev) with buck2/upstreamPrelude/protos resolved from turnkey's own registry (turnkeyFlakeLib.defaultTellerRegistry; the flake-parts module's turnkeyLib is rebound to the teller lib in perSystem, which broke evaluation mid-change). The preludeRev check and missing-entry errors are exercised. Verified no behaviour change: turnkey-prelude, turnkey-test-runner and protocol drvs identical to main; the default shell is identical modulo checkout path; buck2 --version in the shell reports the pinned rev 6507dd15. All CI gates pass. Left for turnkey-luk.6: the buck2 binary on PATH and shellNeedsBuck2 still read toolchain.toml; buck2Source.buck2 is ready for it.",
+      "timestamp": "2026-09-25T15:58:18Z"
     }
   ],
   "priority": 2,
   "status": "in_progress",
   "title": "Collapse buck2-source.nix to a single pinned buck2 release",
   "type": "task",
-  "updated_at": "2026-09-25T15:37:15Z"
+  "updated_at": "2026-09-25T15:58:18Z"
 }
