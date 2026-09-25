@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-efx.1"
+  ],
   "blocks": [],
   "created": "2026-09-25T17:24:08Z",
   "description": "Shell and toolchain-profile share one resolver that rejects declared buck2; lint hook uses the pinned binary.",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "One toolchain-resolution module enforcing ADR 0002",
   "type": "task",
-  "updated_at": "2026-09-25T17:24:08Z"
+  "updated_at": "2026-09-25T17:24:09Z"
 }
