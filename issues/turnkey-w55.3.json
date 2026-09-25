@@ -12,9 +12,15 @@
     "wayfinder:research"
   ],
   "parent": "turnkey-w55",
+  "comments": [
+    {
+      "text": "Resolution. Findings are in docs/research/test-undeclared-inputs.md on local jj bookmark research/test-undeclared-inputs (commit 01bc5ebf124e; workspace turnkey-research-test-undeclared-inputs). This was static analysis of all 28 test targets against the pinned prelude and buck2 2026-04-15.\n\n- Cross-checkout reuse is impossible for go_test and python_test (16 targets). The prelude sets use_project_relative_paths/run_from_project_root = (re_executor != None), which is always False here, so absolute checkout paths end up in the key (go_test.bzl:163-165, compute_providers.bzl:56-57). Fix: prelude patch, or forcing both on. Rust, Solidity and Jsonnet keys are project-relative.\n- The test env is scrubbed to PATH, USER, LOGNAME, HOME, TMPDIR and XDG_RUNTIME_DIR, captured once per daemon and not in the digest. FOUNDRY_*, JSONNET_PATH and PYTHONPYCACHEPREFIX never reach tests.\n- Wrong hit: the python interpreter is the bare string \"python3\" resolved via PATH, so a toolchain bump leaves the key unchanged.\n- Wrong hit (worst): solidity_test's forge auto-selects or downloads solc via svm under $HOME instead of the Nix solc 0.8.34, merges ~/.foundry/foundry.toml if present, and fuzzes unseeded.\n- Wrong hit: the soldeps cell is passed as the string \".turnkey/soldeps\", so the OpenZeppelin sources read by token_test are not in its key.\n- Stale cells: the daemon doesn't notice cell symlink retargets. tk's cellfresh kills it, plain buck2 doesn't, so caching is only sound under tk.\n- Latent: jsonnet_test's \"-J .\" makes undeclared imports resolve from the checkout (none today).\n- Vacuous passes: godeps_test integration cases always skip (fixtures not declared), and the check-*-rs test targets contain no tests.\n- Not verified: which solc forge picks, the runtime PATH, and whether Go test binaries carry no checkout path (inferred from -trimpath).",
+      "timestamp": "2026-09-25T07:50:55Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "What do turnkey's test targets read beyond their declared inputs?",
   "type": "task",
-  "updated_at": "2026-09-25T07:32:00Z"
+  "updated_at": "2026-09-25T07:50:55Z"
 }
