@@ -6,6 +6,8 @@
     "turnkey-vnm.5"
   ],
   "blocks": [],
+  "closed_at": "2026-09-25T13:11:11Z",
+  "close_reason": "go_test prelude patch via helper (relative paths, pinned env); 13/13 pass and hit; cross-checkout hit verified.",
   "created": "2026-09-25T10:54:27Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\ngo_test calls the shared helper through a prelude patch. That includes project-relative paths (hazard G1), so Go hits work across checkouts (spec §4).\n\n## Acceptance criteria\n\n- [ ] An unchanged go_test is a hit on the second run\n- [ ] The hit is also served in a second checkout of the same revision\n- [ ] godeps integration cases actually run (the fixtures bug is fixed)\n\n## Blocked by\n\n- turnkey-vnm.5\n- turnkey-vnm.18\n- turnkey-2gk\n",
   "id": "turnkey-vnm.19",
@@ -14,8 +16,8 @@
   ],
   "parent": "turnkey-vnm",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Go tests are cached",
   "type": "task",
-  "updated_at": "2026-09-25T13:08:35Z"
+  "updated_at": "2026-09-25T13:11:11Z"
 }
