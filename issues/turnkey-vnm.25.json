@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [
     "turnkey-vnm.3",
     "turnkey-vnm.8"
@@ -16,8 +16,8 @@
   ],
   "parent": "turnkey-vnm",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Consumer repos get test result caching for supported buck2 versions",
   "type": "task",
-  "updated_at": "2026-09-25T10:54:34Z"
+  "updated_at": "2026-09-25T13:27:20Z"
 }
