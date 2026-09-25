@@ -17,11 +17,15 @@
     {
       "text": "Answer: the suite is fast, and it does not need FUSE. It cannot run in today's GitHub Actions CI. With the dev shell already built, it takes about 3 min cold (fresh buck-out and daemon, warm nix store; 171s on an M5 Max) and 6-17 s warm. It runs 6 buck2 test //... calls; all 3 scenarios match on 30 targets. It needs the full dev shell (buck2, tk, python3, the rust/go/python/ts/solidity toolchains), nix-store cells, and a buck2 daemon that starts itself. It needs the network only to fill a cold store. No FUSE, turnkey-composed or macFUSE: cells are nix-store symlinks, and test targets compile composition without the fuse features. Blockers for CI: (1) CI removed every job that enters the full dev shell because of disk and time limits (b64b124: jj built from source, 40+ min, out of disk); (2) turnkey-composed is in toolchain.toml, and its nix package cannot build on ubuntu (no pkg-config/fuse3 for fuser's libfuse feature) or on macOS runners (needs macFUSE); (3) about 5.1 GB of closure plus uncached cells plus 2.5 GB of buck-out against the runner's 14 GB SSD. To make it a gate: a slim CI shell without turnkey-composed, jj, mdbook or beadwork; cells in Cachix; a path-filtered job on ubuntu-latest. Otherwise it stays the manual step that the buck2-source.nix header already prescribes. Findings on local bookmark research/parity-suite-ci-gate, docs/research/parity-suite-ci-gate.md",
       "timestamp": "2026-09-25T15:19:07Z"
+    },
+    {
+      "text": "Findings landed on main in 827682bc (docs/research/); the research/* bookmark was deleted.",
+      "timestamp": "2026-09-25T15:33:41Z"
     }
   ],
   "priority": 2,
   "status": "closed",
   "title": "Is the test-runner parity suite fast and self-contained enough to be a CI gate?",
   "type": "task",
-  "updated_at": "2026-09-25T15:19:23Z"
+  "updated_at": "2026-09-25T15:33:41Z"
 }
