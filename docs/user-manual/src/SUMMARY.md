@@ -27,6 +27,7 @@
 
 - [Building Projects](./workflows/building.md)
 - [Running Tests](./workflows/testing.md)
+- [Test Result Caching](./workflows/test-result-caching.md)
 - [Managing Dependencies](./workflows/dependencies.md)
 - [Python Workspaces](./workflows/python-workspace.md)
 

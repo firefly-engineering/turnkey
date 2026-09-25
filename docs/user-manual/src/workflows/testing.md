@@ -15,6 +15,10 @@ tk test //...
 tk test //src/examples/...
 ```
 
+`tk test` reuses the recorded result of a test whose inputs haven't changed
+instead of running it again; see [Test Result Caching](./test-result-caching.md).
+Use `tk --no-test-cache test` to run everything.
+
 ## Language-Specific Tests
 
 ### Go Tests
