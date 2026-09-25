@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T19:18:09Z",
+  "description": "Only Linux packages reach Cachix today and magic-nix-cache depends on the fragile GitHub Actions cache. CI cold start is dominated by Nix realisation; an action-cache hit is useless after 20 min of cell builds. Add aarch64-darwin if a macOS job exists. See docs/research/remote-execution-and-caching.md (commit adc3619d) §5.",
+  "id": "turnkey-lbe.10",
+  "labels": [],
+  "parent": "turnkey-lbe",
+  "priority": 2,
+  "status": "open",
+  "title": "Push CI shell closure (cells, toolchains cell, prelude) to Cachix (G9)",
+  "type": "task",
+  "updated_at": "2026-09-25T19:18:09Z"
+}
