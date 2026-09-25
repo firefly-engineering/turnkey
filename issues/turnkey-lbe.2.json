@@ -2,7 +2,8 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [
-    "turnkey-lbe.11"
+    "turnkey-lbe.11",
+    "turnkey-lbe.8"
   ],
   "created": "2026-09-25T19:18:07Z",
   "description": "rustc/rustdoc/clippy-driver come from PATH, so the toolchain version is not in the action key: wrong hits across rust-toolchain bumps, RE impossible. Options: turnkey system_rust_toolchain variant, or prelude patch adding a compiler attr. See docs/research/remote-execution-and-caching.md (commit adc3619d) §5.",
@@ -13,5 +14,5 @@
   "status": "open",
   "title": "Rust toolchain: give buck2 a store-path rustc instead of PATH (G1)",
   "type": "task",
-  "updated_at": "2026-09-25T19:18:10Z"
+  "updated_at": "2026-09-25T19:18:11Z"
 }
