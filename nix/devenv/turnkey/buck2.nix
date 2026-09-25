@@ -155,23 +155,32 @@ let
     }
   );
 
-  # Generate symlink creation script for all Nix-backed cells
-  nixCellsSymlinkScript = lib.concatStringsSep "\n" (
-    lib.mapAttrsToList (_: cell: ''
-      # Ensure ${cell.path} points to the ${cell.description} cell
-      if [ -L ${cell.path} ]; then
-        if [ "$(readlink ${cell.path})" != "${cell.derivation}" ]; then
-          ln -sfn "${cell.derivation}" ${cell.path}
-          echo "turnkey: Updated ${cell.name} cell symlink"
-        fi
-      elif [ -e ${cell.path} ]; then
-        echo "turnkey: Warning: ${cell.path} exists and is not a symlink"
-      else
-        ln -s "${cell.derivation}" ${cell.path}
-        echo "turnkey: Created ${cell.name} cell symlink"
-      fi
-    '') nixCells
-  );
+  # The symlinks the shell keeps pointing at what it generated
+  # (managed-links.nix)
+  managedLinks = import ./managed-links.nix { inherit lib; };
+  links =
+    [
+      {
+        path = ".buckconfig";
+        target = buckconfig;
+        label = ".buckconfig";
+      }
+      {
+        path = ".turnkey/sync.toml";
+        target = syncConfig;
+        label = "sync.toml";
+      }
+      {
+        path = toolchainsCellPath;
+        target = toolchainsCell;
+        label = "toolchains cell";
+      }
+    ]
+    ++ map (cell: {
+      inherit (cell) path;
+      target = cell.derivation;
+      label = "${cell.name} cell";
+    }) (lib.attrValues nixCells);
 
   # Generate info output for all Nix-backed cells
   nixCellsInfo = lib.concatStringsSep "\n" (
@@ -264,6 +273,14 @@ let
 
 in
 {
+  # Outside turnkey.buck2: set under a condition that reads turnkey.buck2
+  options.turnkey.managedLinks = lib.mkOption {
+    type = lib.types.listOf lib.types.attrs;
+    internal = true;
+    default = [ ];
+    description = "The symlinks the shell maintains, [ { path, target, label } ], for direnv's use_turnkey.";
+  };
+
   options.turnkey.buck2 = lib.mkOption {
     type = lib.types.submoduleWith {
       modules = [
@@ -299,6 +316,8 @@ in
     # - runtimePackages: tools needed in PATH for Buck2 actions (e.g., clang for cxx)
     # - internalPackages: turnkey generators (godeps-gen, etc.) based on enabled languages
     packages = [ cfg.package ] ++ runtimePackages ++ internalPackages;
+
+    turnkey.managedLinks = links;
 
     # Export paths for debugging and inspection
     env = {
@@ -338,59 +357,15 @@ in
         export XDG_DATA_DIRS="''${TURNKEY_TK_SHARE}:''${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
       fi
 
-      # Create .turnkey directory for turnkey-managed symlinks
-      mkdir -p .turnkey
-
-      # Ensure .buckconfig points to the turnkey-generated config
-      if [ -L .buckconfig ]; then
-        # Already a symlink - update it if needed
-        if [ "$(readlink .buckconfig)" != "${buckconfig}" ]; then
-          ln -sf "${buckconfig}" .buckconfig
-          echo "turnkey: Updated .buckconfig symlink"
-        fi
-      elif [ -e .buckconfig ]; then
-        echo "turnkey: Warning: .buckconfig exists and is not a symlink"
-        echo "         Remove it to let turnkey manage Buck2 configuration"
-      else
-        ln -s "${buckconfig}" .buckconfig
-        echo "turnkey: Created .buckconfig symlink"
-      fi
+      # Point .buckconfig, .turnkey/sync.toml and the cells at what this
+      # shell generated
+      ${managedLinks.ensure links}
 
       # Ensure .buckroot exists (marks project boundary for Buck2)
       if [ ! -e .buckroot ]; then
         touch .buckroot
         echo "turnkey: Created .buckroot file"
       fi
-
-      # Ensure .turnkey/sync.toml points to the generated sync config
-      if [ -L .turnkey/sync.toml ]; then
-        if [ "$(readlink .turnkey/sync.toml)" != "${syncConfig}" ]; then
-          ln -sfn "${syncConfig}" .turnkey/sync.toml
-          echo "turnkey: Updated sync.toml symlink"
-        fi
-      elif [ -e .turnkey/sync.toml ]; then
-        echo "turnkey: Warning: .turnkey/sync.toml exists and is not a symlink"
-        echo "         Remove it to let turnkey manage sync configuration"
-      else
-        ln -s "${syncConfig}" .turnkey/sync.toml
-        echo "turnkey: Created sync.toml symlink"
-      fi
-
-      # Ensure .turnkey/toolchains points to the generated toolchains cell
-      if [ -L .turnkey/toolchains ]; then
-        if [ "$(readlink .turnkey/toolchains)" != "${toolchainsCell}" ]; then
-          ln -sfn "${toolchainsCell}" .turnkey/toolchains
-          echo "turnkey: Updated toolchains cell symlink"
-        fi
-      elif [ -e .turnkey/toolchains ]; then
-        echo "turnkey: Warning: .turnkey/toolchains exists and is not a symlink"
-      else
-        ln -s "${toolchainsCell}" .turnkey/toolchains
-        echo "turnkey: Created toolchains cell symlink"
-      fi
-
-      # Create symlinks for all Nix-backed cells
-      ${nixCellsSymlinkScript}
 
       # Welcome message (if configured)
       ${lib.optionalString (cfg.welcomeMessage != null) ''

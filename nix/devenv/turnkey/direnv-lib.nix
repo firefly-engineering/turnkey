@@ -52,37 +52,12 @@ let
     }
   '';
 
-  # Symlink sync function
+  # Symlink sync: the same links, maintained the same way, as enterShell
+  # (managed-links.nix)
   symlinkSyncFunction = ''
     _turnkey_sync_symlinks() {
-      # .buckconfig
-      if [ -n "''${TURNKEY_BUCK2_CONFIG:-}" ]; then
-        if [ "$(readlink .buckconfig 2>/dev/null)" != "$TURNKEY_BUCK2_CONFIG" ]; then
-          ln -sf "$TURNKEY_BUCK2_CONFIG" .buckconfig
-          echo "turnkey: Synced .buckconfig"
-        fi
-      fi
-
-      # Toolchains cell
-      if [ -n "''${TURNKEY_BUCK2_TOOLCHAINS_CELL:-}" ]; then
-        mkdir -p .turnkey
-        if [ "$(readlink .turnkey/toolchains 2>/dev/null)" != "$TURNKEY_BUCK2_TOOLCHAINS_CELL" ]; then
-          ln -sfn "$TURNKEY_BUCK2_TOOLCHAINS_CELL" .turnkey/toolchains
-          echo "turnkey: Synced toolchains cell"
-        fi
-      fi
-
-      # Dynamic cells (TURNKEY_CELL_*)
-      for var in $(env | grep '^TURNKEY_CELL_' | cut -d= -f1); do
-        local value="''${!var}"
-        local cell_path="''${value%%:*}"
-        local cell_deriv="''${value#*:}"
-        if [ "$(readlink "$cell_path" 2>/dev/null)" != "$cell_deriv" ]; then
-          mkdir -p "$(dirname "$cell_path")"
-          ln -sfn "$cell_deriv" "$cell_path"
-          echo "turnkey: Synced $cell_path"
-        fi
-      done
+      :
+      ${(import ./managed-links.nix { inherit lib; }).ensure cfg.managedLinks}
     }
   '';
 
