@@ -17,11 +17,15 @@
     {
       "text": "Resolution. Findings are in docs/research/bazel-test-result-caching.md on local jj bookmark research/bazel-test-caching (commit 36ab738c9f89; workspace turnkey-research-bazel-test-caching). Sources: Bazel 9.2.0 (8220c61), remote-apis adbf4a2, bazel.build docs. Each rule below has an adopt/deviate note for buck2 in the file.\n\nBazel's effective reuse policy:\n1. Unit = one run of one target, per config, shard and run index. The key covers everything the process sees: executable and runfiles, args and --test_arg, the resolved env including inherited values, --test_filter, --run_under, size and timeout, shard and run index, coverage, exec platform and properties. Undeclared reads (host tools, $HOME, network, clock) are outside the key.\n2. Two tiers with separately computed keys: a local \"last result per output path, with verdict\" and a shared content-addressed cache with no history. The keys can drift (#30576: a --test_timeout change still gave a local (cached) PASSED).\n3. Only passes are shared. Failures are never uploaded, and cached failures are treated as misses (the RE API lets servers cache them, so Bazel defends itself). Under auto, local failures are never reused. Infrastructure failures are never reused.\n4. Policy is separate from the key. auto reuses unless the test is external, --runs_per_test \u003e 1, or it last failed. yes reuses unless external. no never reuses.\n5. Refusing reuse also suppresses uploading (Bazel's own code calls this unintended). Only external, --cache_test_results=no and runs_per_test\u003e1 force a rerun; the no-cache tag does not. Read and write opt-outs are separate flags.\n6. Retries happen inside one test action, and flakiness isn't in the key. A pass after retries is uploaded as a plain pass; FLAKY survives only locally (inferred from code).\n7. Hermeticity is assumed, not checked. TZ, PATH, HOME and TEST_TMPDIR are pinned, and inherited env goes into the key, so env leaks cost hits, not correctness.\n8. Hits are visible: \"(cached)\" / \"(k/n cached)\" in the summary, a cached flag in the build event stream, and cached tests excluded from \"Executed N out of M\". Logs come from the original run.",
       "timestamp": "2026-09-25T08:00:35Z"
+    },
+    {
+      "text": "Research branch pushed: research/bazel-test-caching. Permalink: https://github.com/firefly-engineering/turnkey/blob/36ab738c9f894d5f00f91ba4a1514a480133458c/docs/research/bazel-test-result-caching.md",
+      "timestamp": "2026-09-25T08:08:41Z"
     }
   ],
   "priority": 2,
   "status": "closed",
   "title": "How does Bazel decide when a test result is reusable?",
   "type": "task",
-  "updated_at": "2026-09-25T08:00:35Z"
+  "updated_at": "2026-09-25T08:08:41Z"
 }
