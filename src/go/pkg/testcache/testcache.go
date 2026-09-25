@@ -46,6 +46,11 @@ const (
 // entries beyond it.
 const maxSizeGiB = 5
 
+// idleTimeout stops a server nobody has used for this long, so no process is
+// left behind on a machine that stopped running tk test. The next tk test
+// starts it again; recorded results stay in the store.
+const idleTimeout = "24h"
+
 // Config is the local test result cache as the dev shell describes it.
 type Config struct {
 	Server  string // bazel-remote binary
@@ -214,6 +219,7 @@ func (c *Config) start() (<-chan struct{}, error) {
 		// bazel-remote always serves HTTP too; nothing uses it, so take any
 		// free port rather than risk a clash.
 		"--http_address", "127.0.0.1:0",
+		"--idle_timeout", idleTimeout,
 	)
 	cmd.Stdout, cmd.Stderr = logFile, logFile
 	// Detach from tk's session so the server survives tk and the terminal.
