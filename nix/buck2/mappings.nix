@@ -234,9 +234,12 @@
         rule = "system_typescript_toolchain";
         load = "@prelude//typescript:toolchain.bzl";
         visibility = [ "PUBLIC" ];
+        # Tools come from the declared typescript-toolchain meta-package, not
+        # the typescript/nodejs entries' defaults, which move independently
+        # (typescript's default became 7, the native compiler with no tsc.js).
         dynamicAttrs = registry: {
-          node_path = "${registry.nodejs}/bin/node";
-          tsc_path = "${registry.typescript}/lib/node_modules/typescript/bin/tsc";
+          node_path = "${registry.typescript-toolchain}/bin/node";
+          tsc_path = "${registry.typescript-toolchain}/lib/node_modules/typescript/bin/tsc";
         };
       }
     ];

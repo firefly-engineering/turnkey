@@ -164,6 +164,28 @@
           system,
           ...
         }:
+        let
+          # The buck2 release this repo's toolchain.toml declares, and the
+          # upstream prelude paired with it (nix/buck2/buck2-source.nix)
+          declaredBuck2 =
+            let
+              registry = self.lib.defaultTellerRegistry system;
+              resolve = self.lib.defaultTellerLib.resolveTool registry;
+              buck2Source = import ./nix/buck2/buck2-source.nix { inherit pkgs lib; };
+              declared = (builtins.fromTOML (builtins.readFile ./toolchain.toml)).toolchains.buck2-toolchain;
+              buck2Version = buck2Source.versionOf (resolve "buck2-toolchain" declared);
+              prelude = registry."buck2-prelude";
+            in
+            {
+              inherit buck2Version;
+              upstreamPrelude = resolve "buck2-prelude" {
+                version = buck2Source.matchingPreludeVersion {
+                  preludeVersions = builtins.attrNames prelude.versions;
+                  inherit (prelude) default;
+                } buck2Version;
+              };
+            };
+        in
         {
           # Export tools as packages
           packages.godeps-gen = import ./nix/packages/godeps-gen.nix { inherit pkgs lib; };
@@ -205,22 +227,17 @@
           }).tw-uv;
 
           # turnkey-test-runner, built for the buck2 release this repo declares
-          packages.turnkey-test-runner =
-            let
-              registry = self.lib.defaultTellerRegistry system;
-              declared = (builtins.fromTOML (builtins.readFile ./toolchain.toml)).toolchains.buck2-toolchain;
-              buck2Toolchain = self.lib.defaultTellerLib.resolveTool registry "buck2-toolchain" declared;
-              buck2Version = (import ./nix/buck2/buck2-source.nix { inherit pkgs lib; }).versionOf buck2Toolchain;
-            in
-            import ./nix/packages/turnkey-test-runner.nix { inherit pkgs lib buck2Version; };
+          packages.turnkey-test-runner = import ./nix/packages/turnkey-test-runner.nix {
+            inherit pkgs lib;
+            inherit (declaredBuck2) buck2Version;
+          };
 
-          # Expose turnkey-prelude for CI builds
-          packages.turnkey-prelude =
-            let
-              registry = self.lib.defaultTellerRegistry system;
-              upstreamPrelude = self.lib.defaultTellerLib.resolveTool registry "buck2-prelude" {};
-            in
-            import ./nix/buck2/prelude.nix { inherit pkgs lib upstreamPrelude; };
+          # Expose turnkey-prelude for CI builds, paired with the buck2 release
+          # this repo declares (as the dev shell pairs it)
+          packages.turnkey-prelude = import ./nix/buck2/prelude.nix {
+            inherit pkgs lib;
+            inherit (declaredBuck2) upstreamPrelude;
+          };
 
           # Configure turnkey to use our local toolchain files. tellerLib
           # and tellerRegistry default to self.lib.defaultTellerLib /

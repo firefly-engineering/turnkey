@@ -77,7 +77,9 @@ def run(patterns: list[str], config: list[str], runner_args: list[str]) -> Run:
         if "TestResult" in instant:
             test_result = instant["TestResult"]
             result.statuses[test_result["name"]] = test_result["status"]
-        test_end = event.get("SpanEnd", {}).get("data", {}).get("TestEnd")
+        span = event.get("SpanEnd", {}).get("data", {})
+        # buck2 renamed the test span from TestEnd to TestRun (2026-07-01).
+        test_end = span.get("TestRun") or span.get("TestEnd")
         if test_end:
             name = target_name(test_end["suite"]["target_label"]["label"])
             command = test_end["command_report"]["details"]["command_kind"]["command"]
@@ -104,6 +106,10 @@ def compare(bundled: Run, turnkey: Run) -> list[str]:
                 )
     if not bundled.statuses:
         problems.append("no test results recorded: nothing was compared")
+    if not bundled.digests:
+        # The event log's test span wasn't found: a buck2 upgrade may have
+        # renamed it. Without digests the requests weren't compared.
+        problems.append("no action digests found in the event log: requests were not compared")
     return problems
 
 

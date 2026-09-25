@@ -2,28 +2,39 @@
 #
 # This derivation builds a customizable prelude by:
 # 1. Taking an upstream buck2-prelude (from toolbox registry)
-# 2. Applying patches from nix/patches/prelude/ (if any)
+# 2. Applying the patch set for that upstream version, from
+#    nix/patches/prelude/<version>/ (if there is one)
 # 3. Copying extensions from nix/buck2/prelude-extensions/
 #
+# Patches are written against one upstream version: each supported version
+# has its own set, and a version without one gets no patches. turnkey only
+# enables what the patches support (test result caching) for buck2 releases
+# listed in nix/buck2/buck2-source.nix, whose preludes have a set.
+#
 # The result is symlinked to .turnkey/prelude in downstream projects.
-{ pkgs, lib, upstreamPrelude }:
+{
+  pkgs,
+  lib,
+  upstreamPrelude,
+  # toolbox's buck2-prelude packages carry their version (a release date)
+  version ? upstreamPrelude.version or null,
+}:
 
 let
-  # Directory containing patches to apply
-  patchDir = ../patches/prelude;
+  # The patch set for this upstream version
+  patchDir = ../patches/prelude + "/${toString version}";
 
-  # Find all .patch files in the patch directory
+  # All .patch files in it, applied in name order
   patchFiles =
-    if builtins.pathExists patchDir then
+    if version != null && builtins.pathExists patchDir then
       let
-        dirContents = builtins.readDir patchDir;
-        patchNames = builtins.filter
-          (name: lib.hasSuffix ".patch" name)
-          (builtins.attrNames dirContents);
+        patchNames = builtins.filter (name: lib.hasSuffix ".patch" name) (
+          builtins.attrNames (builtins.readDir patchDir)
+        );
       in
-      map (name: patchDir + "/${name}") patchNames
+      map (name: patchDir + "/${name}") (lib.sort (a: b: a < b) patchNames)
     else
-      [];
+      [ ];
 
   # Directory containing custom extensions
   extensionsDir = ./prelude-extensions;

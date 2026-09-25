@@ -12,6 +12,14 @@
 
 let
   releases = {
+    "2026-09-15" = {
+      rev = "6507dd157a6f81a810c48583edf1758dd0c337c5";
+      protosHash = "sha256-xaGN1+FuT8DDiKI/Ww8cGrozx0Shvdyj9deH/ZycAdg=";
+    };
+    "2026-07-01" = {
+      rev = "c88d791e34884e58617b92d5b98c7f71faee823c";
+      protosHash = "sha256-XgPm5HNvqUNbKdWLSQ6YE7Bsbl17jIjzYTJYX34jh8s=";
+    };
     "2026-04-15" = {
       rev = "7600cb80070a88b88be67aa5d20d6a93cffa0223";
       protosHash = "sha256-sWZTQ+79JI6bhxqlLjimAEq2bR/m9b8JGn/9Nvgpwqc=";
@@ -42,6 +50,23 @@ in
         buck2Paths = builtins.filter (p: (parseStoreName p).name == "buck2") (pkg.paths or [ ]);
       in
       if buck2Paths == [ ] then null else (parseStoreName (builtins.head buck2Paths)).version;
+
+  # The buck2-prelude version to pair with a buck2 release: the newest one
+  # that is not newer than the release. Both are named by release date
+  # (YYYY-MM-DD), so they compare as strings. A prelude newer than the binary
+  # may call builtins the binary doesn't have. `preludeVersions` are the
+  # registry's available prelude versions; with no release known, or none old
+  # enough, the registry's default is used.
+  matchingPreludeVersion =
+    {
+      preludeVersions,
+      default,
+    }:
+    buck2Version:
+    let
+      candidates = builtins.filter (v: buck2Version != null && v <= buck2Version) preludeVersions;
+    in
+    if candidates == [ ] then default else lib.last (lib.sort (a: b: a < b) candidates);
 
   # Whether turnkey knows the source revision of this buck2 release.
   isSupported = version: version != null && releases ? ${version};

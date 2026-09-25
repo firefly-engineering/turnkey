@@ -666,6 +666,7 @@ in
       config,
       pkgs,
       system,
+      inputs',
       ...
     }:
     let
@@ -737,13 +738,36 @@ in
           mergeRegistries (mergeRegistries defaultRegistry builtinExtensions) cfg.registryExtensions
       );
 
-      # Resolve buck2-prelude from the registry, then apply turnkey extensions
-      upstreamPrelude =
-        if baseRegistry ? "buck2-prelude" then
-          turnkeyLib.resolveTool baseRegistry "buck2-prelude" {}
+      # Resolve buck2-prelude from the registry, then apply turnkey extensions.
+      # The prelude is paired with the buck2 release a toolchain declaration
+      # pins (the newest prelude not newer than it), so each shell's prelude
+      # matches its buck2 binary.
+      buck2Source = import ../../buck2/buck2-source.nix { inherit pkgs lib; };
+      declaredBuck2Version =
+        decl:
+        let
+          toolchains = decl.toolchains or { };
+        in
+        if toolchains ? buck2-toolchain then
+          buck2Source.versionOf (turnkeyLib.resolveTool baseRegistry "buck2-toolchain" toolchains.buck2-toolchain)
+        else if toolchains ? buck2 then
+          buck2Source.versionOf (turnkeyLib.resolveTool baseRegistry "buck2" toolchains.buck2)
         else
-          builtins.throw "buck2-prelude not found in registry; ensure toolbox overlay is applied";
-      turnkeyPrelude = import ../../buck2/prelude.nix { inherit pkgs lib upstreamPrelude; };
+          null;
+      upstreamPreludeFor =
+        decl:
+        let
+          entry =
+            baseRegistry."buck2-prelude"
+              or (builtins.throw "buck2-prelude not found in registry; ensure toolbox overlay is applied");
+          version = buck2Source.matchingPreludeVersion {
+            preludeVersions = builtins.attrNames entry.versions;
+            inherit (entry) default;
+          } (declaredBuck2Version decl);
+        in
+        turnkeyLib.resolveTool baseRegistry "buck2-prelude" { inherit version; };
+      turnkeyPreludeFor =
+        decl: import ../../buck2/prelude.nix { inherit pkgs lib; upstreamPrelude = upstreamPreludeFor decl; };
 
       # Build tw for wrapping native tools
       tw = import ../../packages/tw.nix { inherit pkgs lib; };
@@ -871,12 +895,13 @@ in
           null;
 
       # Resolve the prelude path based on strategy
-      # - nix: use turnkeyPrelude (or user-specified derivation)
+      # - nix: use the turnkey prelude matching the declared buck2 (or a user-specified derivation)
       # - bundled: use "bundled://"
       # - path/git: use user-specified path
-      resolvedPreludePath =
+      resolvedPreludePathFor =
+        decl:
         if cfg.buck2.prelude.strategy == "nix" then
-          if cfg.buck2.prelude.path != null then cfg.buck2.prelude.path else turnkeyPrelude
+          if cfg.buck2.prelude.path != null then cfg.buck2.prelude.path else turnkeyPreludeFor decl
         else if cfg.buck2.prelude.strategy == "bundled" then
           "bundled://"
         else
@@ -904,6 +929,15 @@ in
           in
           lib.mkIf (content != "") content;
 
+        # devenv builds its task runner from its own locked nixpkgs by
+        # importing a fetched source at evaluation time, which
+        # `nix flake check --no-build` can't do on a clean store. The devenv
+        # flake exports the same runner as a package; use it when the flake
+        # has a `devenv` input, so evaluation needs no build.
+        task.package = lib.mkIf (inputs' ? devenv && inputs'.devenv.packages ? devenv-tasks) (
+          lib.mkDefault inputs'.devenv.packages.devenv-tasks
+        );
+
         turnkey = {
           registry = lib.mkDefault registry;
           declarationFile = declarationFile;
@@ -914,7 +948,7 @@ in
             enable = shellNeedsBuck2;
             prelude = {
               strategy = cfg.buck2.prelude.strategy;
-              path = resolvedPreludePath;
+              path = resolvedPreludePathFor shellDecl;
             };
             # Test result caching
             testCache = {
@@ -1014,7 +1048,13 @@ in
         jsdeps = jsdepsCell;
         soldeps = soldepsCell;
       } // lib.optionalAttrs (cfg.buck2.prelude.strategy == "nix") {
-        prelude = resolvedPreludePath;
+        # The default shell's prelude
+        prelude = resolvedPreludePathFor (
+          if cfg.declarationFiles ? default then
+            builtins.fromTOML (builtins.readFile cfg.declarationFiles.default)
+          else
+            { }
+        );
       });
 
     in
