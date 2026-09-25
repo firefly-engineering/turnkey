@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-pru.7"
+  ],
   "blocks": [],
   "created": "2026-09-25T20:29:53Z",
   "description": "src/go/pkg/prefetchcache copies the Rust prefetch-cache file format as literals (cache.go:25); prefetch fallback logic is copied in godeps, rustdeps-gen and pydeps-gen; no cross-process locking. Generators shell out to nix-prefetch-cached.",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "nix-prefetch-cached is the only way into the prefetch cache",
   "type": "task",
-  "updated_at": "2026-09-25T20:29:53Z"
+  "updated_at": "2026-09-25T20:29:55Z"
 }

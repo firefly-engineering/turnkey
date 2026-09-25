@@ -3,7 +3,9 @@
   "blocked_by": [
     "turnkey-pru.6"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-pru.8"
+  ],
   "created": "2026-09-25T20:29:53Z",
   "description": "syncer (no tests), snapshot (no tests), staleness.IsStale, cellfresh and tk runSync/runCheck repeat the same loop; exec is not injectable (cellfresh KillCommand global). One module owns stale-\u003eregenerate-\u003ereload with exec and fs ports.",
   "id": "turnkey-pru.7",
