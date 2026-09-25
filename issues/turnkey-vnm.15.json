@@ -3,7 +3,9 @@
   "blocked_by": [
     "turnkey-vnm.7"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-vnm.27"
+  ],
   "created": "2026-09-25T10:54:25Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nA tk-level flag before the subcommand makes the runner skip reads but still record fresh passes (runner mode `record-only`) (spec §1).\n\n## Acceptance criteria\n\n- [ ] `tk --no-test-cache test \u003cpatterns\u003e` executes every matched test\n- [ ] Fresh passes are recorded, and a following plain `tk test` hits\n- [ ] There is no env-var or config equivalent\n\n## Blocked by\n\n- turnkey-vnm.7\n",
   "id": "turnkey-vnm.15",
@@ -15,5 +17,5 @@
   "status": "open",
   "title": "`tk --no-test-cache test` forces a re-run",
   "type": "task",
-  "updated_at": "2026-09-25T10:54:26Z"
+  "updated_at": "2026-09-25T10:54:34Z"
 }
