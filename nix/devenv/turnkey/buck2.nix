@@ -21,15 +21,15 @@ let
   # Load the toolchain mappings
   mappings = import ../../buck2/mappings.nix { inherit lib; };
 
-  # Get toolchain names from the declaration file
-  toolchainNames =
+  # Toolchain declarations (name -> spec, e.g. { version = "3"; }) from the declaration file
+  declaredToolchains =
     if turnkeyCfg.declarationFile != null then
-      let
-        decl = builtins.fromTOML (builtins.readFile turnkeyCfg.declarationFile);
-      in
-      if decl ? toolchains then builtins.attrNames decl.toolchains else [ ]
+      (builtins.fromTOML (builtins.readFile turnkeyCfg.declarationFile)).toolchains or { }
     else
-      [ ];
+      { };
+
+  # Get toolchain names from the declaration file
+  toolchainNames = builtins.attrNames declaredToolchains;
 
   # Filter to only Buck2-relevant toolchains (those with mappings and not skipped)
   buck2Toolchains = builtins.filter (
@@ -84,8 +84,10 @@ let
 
   # Create a resolved registry for dynamicAttrs (maps toolchain names to packages)
   # This allows mappings.nix dynamicAttrs functions to use ${registry.clang}/bin/clang
+  # Declared toolchains resolve at their declared version, so a path baked into
+  # the toolchains cell is the same package the dev shell provides.
   resolvedRegistry = builtins.mapAttrs (name: entry:
-    turnkeyLib.resolveTool turnkeyCfg.registry name {}
+    turnkeyLib.resolveTool turnkeyCfg.registry name (declaredToolchains.${name} or { })
   ) turnkeyCfg.registry;
 
   # Internal generator packages (not exposed through registry, added to shell automatically)

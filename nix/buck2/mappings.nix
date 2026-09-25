@@ -68,12 +68,21 @@
         rule = "system_python_bootstrap_toolchain";
         load = "@prelude//toolchains:python.bzl";
         visibility = [ "PUBLIC" ];
+        # A store path, not "python3" from PATH: the interpreter then enters
+        # the key of every Python action and test, and a toolchain bump
+        # changes it.
+        dynamicAttrs = registry: {
+          interpreter = "${registry.python}/bin/python3";
+        };
       }
       {
         name = "python";
         rule = "system_python_toolchain";
         load = "@prelude//toolchains:python.bzl";
         visibility = [ "PUBLIC" ];
+        dynamicAttrs = registry: {
+          interpreter = "${registry.python}/bin/python3";
+        };
       }
     ];
     implicitDependencies = [ ];
@@ -197,12 +206,21 @@
         rule = "system_python_bootstrap_toolchain";
         load = "@prelude//toolchains:python.bzl";
         visibility = [ "PUBLIC" ];
+        # A store path, not "python3" from PATH: the interpreter then enters
+        # the key of every Python action and test, and a toolchain bump
+        # changes it.
+        dynamicAttrs = registry: {
+          interpreter = "${registry.python-toolchain}/bin/python3";
+        };
       }
       {
         name = "python";
         rule = "system_python_toolchain";
         load = "@prelude//toolchains:python.bzl";
         visibility = [ "PUBLIC" ];
+        dynamicAttrs = registry: {
+          interpreter = "${registry.python-toolchain}/bin/python3";
+        };
       }
     ];
     implicitDependencies = [ ];
