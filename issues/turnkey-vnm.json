@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-09-25T10:54:16Z",
@@ -9,8 +9,8 @@
     "ready-for-agent"
   ],
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Implement test result caching",
   "type": "epic",
-  "updated_at": "2026-09-25T10:54:16Z"
+  "updated_at": "2026-09-25T10:57:00Z"
 }
