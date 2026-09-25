@@ -21,11 +21,15 @@
     {
       "text": "Research branch pushed: research/buck2-pinned-caching. Permalink: https://github.com/firefly-engineering/turnkey/blob/c3bcb21462a91dc02825ec29d1baa78d25fce27a/docs/research/buck2-pinned-test-caching.md",
       "timestamp": "2026-09-25T08:08:41Z"
+    },
+    {
+      "text": "Research doc now on main (research branch folded in and deleted). Permalink: https://github.com/firefly-engineering/turnkey/blob/6eed40af892670cf3fd8306dd7f50e4e32eed81a/docs/research/buck2-pinned-test-caching.md",
+      "timestamp": "2026-09-25T08:10:27Z"
     }
   ],
   "priority": 2,
   "status": "closed",
   "title": "What test-caching support does our pinned buck2 have?",
   "type": "task",
-  "updated_at": "2026-09-25T08:08:41Z"
+  "updated_at": "2026-09-25T08:10:27Z"
 }
