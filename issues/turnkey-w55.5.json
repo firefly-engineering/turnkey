@@ -13,9 +13,15 @@
     "wayfinder:grilling"
   ],
   "parent": "turnkey-w55",
+  "comments": [
+    {
+      "text": "Resolution (grilled 2026-09-25). Glossary terms (recorded result, result key, reuse policy) added to CONTEXT.md in commit https://github.com/firefly-engineering/turnkey/commit/fee7c9f0e308.\n\nReuse policy, independent of the mechanism:\n1. Only passes are recorded results. Fail, timeout and fatal always re-run; nothing but passes is ever read or published. The same rule applies locally and remotely.\n2. Default on: once a test rule supports caching, all its targets are cached. How a rule becomes safe to cache belongs to turnkey-w55.8.\n3. One per-target opt-out label, `no-test-cache`: always run, never record. The reason goes in a comment next to it. We rejected quokka's reason-named label set and Bazel's `external`. A separate 'don't publish remotely' label is deferred to the shared-cache handover question.\n4. Forced re-run: `tk --no-test-cache test \u003cpatterns\u003e`. It is a tk-level flag before the subcommand, like --no-sync. It skips reads but still records fresh passes. This deliberately differs from Bazel, where --cache_test_results=no also stops publishing. There is no env-var or config equivalent in v1.\n5. Result key = everything the test process can see (inputs, argv incl. --test-arg and .turnkey/local.toml args, declared env incl. --env, timeout, cwd, platform), plus the buck2 version and the caching tool version as an explicit salt. Filters are argv, so a filtered run gets its own key. The timeout goes in the key on every tier, to avoid Bazel's #30576 local/remote drift.\n6. When correctness and hit rate conflict, a wrong hit is never acceptable: when in doubt, miss. Undeclared ambient reads (PATH, HOME) are keyed, scrubbed or pinned, or the test is opted out; they are never trusted. This is the tie-breaker for later tickets.\n7. Only under tk: a plain `buck2 test` neither reads nor records results, because tk is the entry point that guarantees fresh cells.\n8. The policy stays outside the result key, so changing it never splits recorded results.\nRetries: not applicable. The OSS buck2 test runner has no retries, so there is no 'flaky pass' to decide about.",
+      "timestamp": "2026-09-25T08:42:48Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "When may a recorded test result be reused?",
   "type": "task",
-  "updated_at": "2026-09-25T08:34:08Z"
+  "updated_at": "2026-09-25T08:42:48Z"
 }
