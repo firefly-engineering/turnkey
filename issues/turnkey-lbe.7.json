@@ -4,6 +4,7 @@
     "turnkey-lbe.6"
   ],
   "blocks": [
+    "turnkey-lbe.12",
     "turnkey-lbe.8",
     "turnkey-lbe.9"
   ],
