@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [],
   "blocks": [
     "turnkey-efx.5",
@@ -11,7 +11,7 @@
   "labels": [],
   "parent": "turnkey-efx",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Make the pinned buck2 release one deep module",
   "type": "task",
   "updated_at": "2026-09-25T17:24:09Z"
