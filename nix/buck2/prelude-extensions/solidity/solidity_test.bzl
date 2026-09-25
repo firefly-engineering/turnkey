@@ -90,7 +90,8 @@ def _solidity_test_impl(ctx: AnalysisContext) -> list[Provider]:
 set -euo pipefail
 
 FORGE="$1"
-shift
+SOLC="$2"
+shift 2
 
 # Create temporary forge project structure
 WORK_DIR=$(mktemp -d)
@@ -179,7 +180,9 @@ FOUNDRY
 
 # Run forge test
 cd "$WORK_DIR"
-"$FORGE" test """ + forge_args_str + """
+# --use pins the toolchain's solc and --offline stops forge from resolving
+# or downloading any other compiler, so the compiler is part of the command.
+"$FORGE" test --use "$SOLC" --offline """ + forge_args_str + """
 """
 
     ctx.actions.write(
@@ -191,6 +194,7 @@ cd "$WORK_DIR"
     # Build test command
     test_cmd = cmd_args(test_script)
     test_cmd.add(toolchain.forge.args)
+    test_cmd.add(toolchain.solc.args)
 
     # Add test sources
     test_cmd.add("--test-srcs")

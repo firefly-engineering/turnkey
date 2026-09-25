@@ -251,11 +251,13 @@
         rule = "system_solidity_toolchain";
         load = "@prelude//solidity:toolchain.bzl";
         visibility = [ "PUBLIC" ];
+        # Tools come from the declared solidity-toolchain meta-package, so
+        # the solc and forge Buck2 runs are the ones the dev shell provides.
         dynamicAttrs = registry: {
-          solc_path = "${registry.solc}/bin/solc";
-          forge_path = "${registry.foundry}/bin/forge";
-          cast_path = "${registry.foundry}/bin/cast";
-          anvil_path = "${registry.foundry}/bin/anvil";
+          solc_path = "${registry.solidity-toolchain}/bin/solc";
+          forge_path = "${registry.solidity-toolchain}/bin/forge";
+          cast_path = "${registry.solidity-toolchain}/bin/cast";
+          anvil_path = "${registry.solidity-toolchain}/bin/anvil";
           jq_path = "${registry.jq}/bin/jq";
         };
       }
