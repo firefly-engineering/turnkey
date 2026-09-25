@@ -2,14 +2,16 @@
   "assignee": "unknown",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-09-25T20:10:29Z",
+  "close_reason": "Bundled-runner args/request/result/exit code and Orchestrator port moved into buck2-test-executor; parity 3/3 on 33 targets; clippy -D warnings clean.",
   "created": "2026-09-25T17:24:08Z",
   "description": "Orchestrator port and OSS-equivalent ExecuteRequest2 construction move behind the executor crate's interface.",
   "id": "turnkey-efx.8",
   "labels": [],
   "parent": "turnkey-efx",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Move the protocol mirror into buck2-test-executor",
   "type": "task",
-  "updated_at": "2026-09-25T20:04:00Z"
+  "updated_at": "2026-09-25T20:10:29Z"
 }
