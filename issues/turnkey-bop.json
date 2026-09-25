@@ -12,11 +12,15 @@
     {
       "text": "Fixed in dd8ecda34ff3 (not pushed): mappings.nix registry lookups go through a helper that names the missing entry and where to add it; brownfield-adoption's registry lists python, and the test passes (92s). Dev shell drv unchanged; CI gates pass.",
       "timestamp": "2026-09-25T16:41:08Z"
+    },
+    {
+      "text": "Landed on main as dd8ecda3.",
+      "timestamp": "2026-09-25T16:41:45Z"
     }
   ],
   "priority": 2,
   "status": "closed",
   "title": "[BUG] Go toolchain fails to evaluate when the registry has no python",
   "type": "bug",
-  "updated_at": "2026-09-25T16:41:09Z"
+  "updated_at": "2026-09-25T16:41:45Z"
 }
