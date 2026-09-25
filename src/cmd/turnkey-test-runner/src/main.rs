@@ -39,11 +39,12 @@ async fn run(launch: Launch) -> Result<()> {
     let server = transport::serve(executor_io, executor::Executor::new(spec_sender));
     let orchestrator = TestOrchestratorClient::new(transport::channel(orchestrator_io).await?);
 
-    let recorder = if config.turnkey_test_cache.records() {
-        let address = config
-            .turnkey_test_cache_address
-            .as_deref()
-            .context("--turnkey-test-cache needs --turnkey-test-cache-address")?;
+    let address = config.turnkey_test_cache_address.as_deref();
+    // Results are recorded only in a local cache: who may write to a shared
+    // one isn't decided (docs/specs/test-result-caching.md).
+    let local = address.is_some_and(|a| runner::Origin::of(a) == runner::Origin::Local);
+    let recorder = if config.turnkey_test_cache.records() && local {
+        let address = address.context("--turnkey-test-cache needs --turnkey-test-cache-address")?;
         Some(cache::Recorder::new(
             address,
             config.turnkey_test_cache_instance_name.clone(),

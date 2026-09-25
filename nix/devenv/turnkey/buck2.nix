@@ -375,7 +375,9 @@ ${generateTargets finalToolchains}
   # A user can move it with TURNKEY_TEST_CACHE_PORT, read when the shell is
   # evaluated (turnkey shells evaluate impurely; a pure evaluation keeps the
   # default). tk gets the same address through TURNKEY_TEST_CACHE_ADDRESS.
-  testCacheAddress = "grpc://127.0.0.1:${toString testCachePort}";
+  testCacheLocal = cfg.testCache.endpoint == null;
+  testCacheAddress =
+    if testCacheLocal then "grpc://127.0.0.1:${toString testCachePort}" else cfg.testCache.endpoint;
   testCachePort =
     let
       override = builtins.getEnv "TURNKEY_TEST_CACHE_PORT";
@@ -435,7 +437,7 @@ ${generateTargets finalToolchains}
         engine_address = ${testCacheAddress}
         action_cache_address = ${testCacheAddress}
         cas_address = ${testCacheAddress}
-        tls = false
+        tls = ${lib.boolToString (!testCacheLocal && cfg.testCache.tls)}
   '';
 
   # Buckconfig file derivation
@@ -548,6 +550,25 @@ in
           When false, or when turnkey doesn't support the declared buck2
           release, tests run under buck2's bundled runner.
         '';
+      };
+
+      endpoint = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "grpc://cache.example.com:443";
+        description = ''
+          A remote Remote Execution API cache to reuse test results from,
+          as grpc://host:port. When null (the default), tk manages a local
+          cache on this machine. With a remote endpoint, tk starts no local
+          cache and the runner records nothing: who may write to a shared
+          cache is not decided yet.
+        '';
+      };
+
+      tls = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Whether to connect to a remote `endpoint` over TLS. The local cache never uses TLS.";
       };
     };
 
@@ -1131,8 +1152,11 @@ in
       }
       # The local test result cache tk starts on demand (src/go/pkg/testcache)
       // lib.optionalAttrs (testRunner != null) {
-        TURNKEY_TEST_CACHE_SERVER = "${pkgs.bazel-remote}/bin/bazel-remote";
         TURNKEY_TEST_CACHE_ADDRESS = testCacheAddress;
+      }
+      # Only a local cache has a server for tk to manage
+      // lib.optionalAttrs (testRunner != null && testCacheLocal) {
+        TURNKEY_TEST_CACHE_SERVER = "${pkgs.bazel-remote}/bin/bazel-remote";
       }
       # Store tk's share path for shell completion setup
       // lib.optionalAttrs (turnkeyCfg.registry ? tk) {

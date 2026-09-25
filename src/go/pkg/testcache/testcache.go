@@ -22,7 +22,8 @@ import (
 // Environment variables the turnkey dev shell sets when test result caching
 // is enabled.
 const (
-	// ServerEnv names the bazel-remote binary.
+	// ServerEnv names the bazel-remote binary. It is unset when the shell
+	// uses a remote cache, which tk doesn't manage.
 	ServerEnv = "TURNKEY_TEST_CACHE_SERVER"
 	// AddressEnv is the cache's gRPC address, as in the generated
 	// .buckconfig's [buck2_re_client] section: grpc://127.0.0.1:<port>.
@@ -67,20 +68,25 @@ func MaxSizeGiB() (int, error) {
 // starts it again; recorded results stay in the store.
 const idleTimeout = "24h"
 
-// Config is the local test result cache as the dev shell describes it.
+// Config is the test result cache as the dev shell describes it.
 type Config struct {
-	Server  string // bazel-remote binary
+	Server  string // bazel-remote binary; empty for a remote cache
 	Address string // grpc://host:port
 }
 
 // FromEnv returns the cache configuration, or nil when the dev shell doesn't
 // enable test result caching.
 func FromEnv() *Config {
-	server, address := os.Getenv(ServerEnv), os.Getenv(AddressEnv)
-	if server == "" || address == "" {
+	address := os.Getenv(AddressEnv)
+	if address == "" {
 		return nil
 	}
-	return &Config{Server: server, Address: address}
+	return &Config{Server: os.Getenv(ServerEnv), Address: address}
+}
+
+// Managed reports whether tk runs this cache (a local one) itself.
+func (c *Config) Managed() bool {
+	return c.Server != ""
 }
 
 // hostPort returns the address without its grpc:// scheme.

@@ -558,9 +558,13 @@ func withTestCache(args []string) ([]string, string) {
 		// Skip reads, keep recording: the fresh results replace old ones.
 		mode = testcache.RecordOnly
 	}
-	if err := cache.Ensure(); err != nil {
-		fmt.Fprintf(os.Stderr, "tk: running tests without the test result cache: %v\n", err)
-		mode = testcache.Off
+	// tk starts and probes only the local cache it manages; a remote one is
+	// used as configured.
+	if cache.Managed() {
+		if err := cache.Ensure(); err != nil {
+			fmt.Fprintf(os.Stderr, "tk: running tests without the test result cache: %v\n", err)
+			mode = testcache.Off
+		}
 	}
 	report, err := os.CreateTemp("", "tk-test-report-*")
 	if err != nil {

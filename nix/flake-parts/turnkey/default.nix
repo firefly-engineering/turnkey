@@ -146,6 +146,39 @@ in
             };
           };
 
+          testCache = {
+            enable = mkOption {
+              type = types.bool;
+              default = true;
+              description = ''
+                Run tests through turnkey's test runner, which can reuse
+                recorded results for unchanged tests
+                (docs/specs/test-result-caching.md). When false, or when
+                turnkey doesn't support the declared buck2 release, tests run
+                under buck2's bundled runner.
+              '';
+            };
+
+            endpoint = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+              example = "grpc://cache.example.com:443";
+              description = ''
+                A remote Remote Execution API cache to reuse test results
+                from, as grpc://host:port. When null (the default), tk manages
+                a local cache on this machine. With a remote endpoint, tk
+                starts no local cache and the runner records nothing: who may
+                write to a shared cache is not decided yet.
+              '';
+            };
+
+            tls = mkOption {
+              type = types.bool;
+              default = true;
+              description = "Whether to connect to a remote `endpoint` over TLS. The local cache never uses TLS.";
+            };
+          };
+
           welcomeMessage = mkOption {
             type = types.nullOr types.str;
             default = null;
@@ -882,6 +915,10 @@ in
             prelude = {
               strategy = cfg.buck2.prelude.strategy;
               path = resolvedPreludePath;
+            };
+            # Test result caching
+            testCache = {
+              inherit (cfg.buck2.testCache) enable endpoint tls;
             };
             # Shell entry options
             welcomeMessage = cfg.buck2.welcomeMessage;

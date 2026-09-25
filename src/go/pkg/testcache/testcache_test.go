@@ -10,15 +10,20 @@ import (
 	"time"
 )
 
-func TestFromEnvNeedsServerAndAddress(t *testing.T) {
+func TestFromEnv(t *testing.T) {
 	t.Setenv(ServerEnv, "")
-	t.Setenv(AddressEnv, "grpc://127.0.0.1:1")
+	t.Setenv(AddressEnv, "")
 	if FromEnv() != nil {
-		t.Fatal("expected no config without a server")
+		t.Fatal("expected no config without an address")
+	}
+	t.Setenv(AddressEnv, "grpc://cache.example.com:443")
+	if c := FromEnv(); c == nil || c.Managed() {
+		t.Fatalf("expected an unmanaged remote cache, got %+v", c)
 	}
 	t.Setenv(ServerEnv, "/bin/bazel-remote")
-	if c := FromEnv(); c == nil || c.Address != "grpc://127.0.0.1:1" {
-		t.Fatalf("unexpected config %+v", c)
+	t.Setenv(AddressEnv, "grpc://127.0.0.1:1")
+	if c := FromEnv(); c == nil || !c.Managed() || c.Address != "grpc://127.0.0.1:1" {
+		t.Fatalf("expected a managed local cache, got %+v", c)
 	}
 }
 
