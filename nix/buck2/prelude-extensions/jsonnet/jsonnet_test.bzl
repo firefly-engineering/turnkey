@@ -11,6 +11,7 @@ Supports two test modes:
 2. Golden file mode: Compare the compiled output against an expected JSON file.
 """
 
+load("@prelude//test_caching:test_caching.bzl", "test_caching_kwargs")
 load(":providers.bzl", "JsonnetLibraryInfo", "JsonnetToolchainInfo")
 
 def _jsonnet_test_impl(ctx: AnalysisContext) -> list[Provider]:
@@ -151,10 +152,12 @@ fi
 
     return [
         DefaultInfo(),
-        ExternalRunnerTestInfo(
-            type = "jsonnet",
-            command = [test_cmd],
-        ),
+        # Cacheable: every input reaches jsonnet through the staged sources,
+        # and the script's tools come from the pinned PATH.
+        ExternalRunnerTestInfo(**test_caching_kwargs({
+            "type": "jsonnet",
+            "command": [test_cmd],
+        })),
         run_info,
     ]
 
