@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T20:29:52Z",
+  "description": "buck2.nix (949 lines) mixes toolchain closure, rules.star render, buckconfig+test-cache wiring, sync.toml, enterShell bash and git hooks. Extract pure generators for rules.star/buckconfig/sync.toml with eval checks; one managed-symlink routine shared with direnv-lib; read toolchain.toml only through nix/lib/toolchain-declaration.nix.",
+  "id": "turnkey-pru.3",
+  "labels": [],
+  "parent": "turnkey-pru",
+  "priority": 2,
+  "status": "open",
+  "title": "Split buck2.nix into pure generators behind eval checks",
+  "type": "task",
+  "updated_at": "2026-09-25T20:29:52Z"
+}
