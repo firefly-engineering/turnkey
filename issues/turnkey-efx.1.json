@@ -5,14 +5,16 @@
     "turnkey-efx.5",
     "turnkey-efx.7"
   ],
+  "closed_at": "2026-09-25T17:26:41Z",
+  "close_reason": "Three jj changes: flat patch set, pinnedBuck2Release binds registry and returns the patched prelude, eval-time checks.pinned-buck2-release (proven red on an unpatched shell prelude).",
   "created": "2026-09-25T17:24:06Z",
   "description": "buck2-source.nix binds turnkey's registry once (self.lib.pinnedBuck2Release system), returns buck2/upstreamPrelude/prelude/protos/version; prelude.nix internal; flat nix/patches/prelude/*.patch; check binary passthru.rev when present; eval-only checks.\u003csystem\u003e.pinned-buck2-release.",
   "id": "turnkey-efx.1",
   "labels": [],
   "parent": "turnkey-efx",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Make the pinned buck2 release one deep module",
   "type": "task",
-  "updated_at": "2026-09-25T17:24:09Z"
+  "updated_at": "2026-09-25T17:26:41Z"
 }
