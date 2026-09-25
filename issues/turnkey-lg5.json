@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T11:47:16Z",
+  "description": "compute-unified-features (src/python/cargo/turnkey/cargo/features.py) adds every vendored crate's own default features unconditionally, even when all of its dependents use default-features = false. It only scans vendored crates, not the workspace members' Cargo.toml, so it can't tell which defaults were requested. A default feature that needs an optional dependency Cargo never resolved then breaks the build: seen with futures-util (async-await-macro -\u003e futures-macro) and pulldown-cmark (html -\u003e pulldown-cmark-escape) while adding tonic/prost for turnkey-vnm.1. Worked around with a rust-features.toml override. Fix: include the workspace members' dependency specs as requirers, and add a crate's defaults only when some requirer asks for them (extract_dep_features already records 'default' when default-features isn't false). Changes features for every consumer's vendored crates, so verify against Cargo's resolve (cargo metadata) on turnkey and an example repo.",
+  "id": "turnkey-lg5",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "Rust feature unifier enables default features nobody requested",
+  "type": "bug",
+  "updated_at": "2026-09-25T11:47:16Z"
+}
