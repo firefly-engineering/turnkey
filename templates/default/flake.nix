@@ -46,7 +46,6 @@
           # it in toolchain.toml.
           buck2 = {
             enable = true;
-            prelude.strategy = "bundled";
 
             go = {
               enable = true;

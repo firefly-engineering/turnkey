@@ -79,8 +79,6 @@ cat > flake.nix << EOF
 
           buck2 = {
             enable = true;
-            # Use nix prelude strategy for TypeScript support
-            prelude.strategy = "nix";
 
             go = {
               enable = true;

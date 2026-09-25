@@ -148,35 +148,24 @@ in
             '';
           };
 
-          prelude = {
-            strategy = mkOption {
-              type = types.enum [
-                "bundled"
-                "git"
-                "nix"
-                "path"
-              ];
-              default = "nix";
-              description = ''
-                How to provide the Buck2 prelude cell:
-                - nix: Use turnkey's Nix-backed prelude (default, recommended)
-                - bundled: Use Buck2's built-in bundled prelude
-                - git: Use a git external cell
-                - path: Use an explicit filesystem path
-              '';
-            };
+          # Removed: turnkey always uses its own prelude. Kept, hidden, so that
+          # setting it is an error that says what to do (shellConfigs).
+          prelude.strategy = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            visible = false;
+          };
 
-            path = mkOption {
-              type = types.nullOr (types.either types.path (types.either types.str types.package));
-              default = null;
-              description = ''
-                Path to the prelude cell.
-                - For nix: defaults to turnkey-prelude derivation (can override with custom derivation)
-                - For bundled: use "bundled://" to use Buck2's built-in prelude
-                - For git: the local checkout path
-                - For path: an absolute or relative filesystem path
-              '';
-            };
+          prelude.path = mkOption {
+            type = types.nullOr (types.either types.package types.path);
+            default = null;
+            description = ''
+              A prelude to use instead of turnkey's, as a derivation or a path.
+              Off the supported path: turnkey's prelude is part of the pinned
+              buck2 release (docs/adr/0002-turnkey-owns-the-buck2-version.md),
+              and test result caching is turned off, since turnkey can't know
+              which of this prelude's test rules are cache-safe.
+            '';
           };
 
           testCache = {
@@ -186,9 +175,8 @@ in
               description = ''
                 Run tests through turnkey's test runner, which can reuse
                 recorded results for unchanged tests
-                (docs/specs/test-result-caching.md). When false, or when
-                turnkey doesn't support the declared buck2 release, tests run
-                under buck2's bundled runner.
+                (docs/specs/test-result-caching.md). When false, or with a
+                custom prelude.path, tests run under buck2's bundled runner.
               '';
             };
 
@@ -902,18 +890,6 @@ in
         else
           null;
 
-      # Resolve the prelude path based on strategy
-      # - nix: use the turnkey prelude of the pinned buck2 (or a user-specified derivation)
-      # - bundled: use "bundled://"
-      # - path/git: use user-specified path
-      resolvedPreludePath =
-        if cfg.buck2.prelude.strategy == "nix" then
-          if cfg.buck2.prelude.path != null then cfg.buck2.prelude.path else turnkeyPrelude
-        else if cfg.buck2.prelude.strategy == "bundled" then
-          "bundled://"
-        else
-          cfg.buck2.prelude.path;
-
       # Create a shell configuration for each declaration file
       mkShellConfig = shellName: declarationFile:
         let
@@ -952,8 +928,8 @@ in
             enable = shellNeedsBuck2;
             package = pinnedBuck2;
             prelude = {
-              strategy = cfg.buck2.prelude.strategy;
-              path = resolvedPreludePath;
+              package = turnkeyPrelude;
+              inherit (cfg.buck2.prelude) path;
             };
             # Test result caching
             testCache = {
@@ -1046,22 +1022,22 @@ in
         let
           unknownShells = builtins.filter (name: !(cfg.declarationFiles ? ${name})) cfg.buck2.shells;
         in
-        if cfg.buck2.enable && unknownShells != [ ] then
+        if cfg.buck2.prelude.strategy != null then
+          throw "turnkey: turnkey.toolchains.buck2.prelude.strategy is removed: turnkey always uses its own prelude, part of the pinned buck2 release (docs/adr/0002-turnkey-owns-the-buck2-version.md). Remove it; set turnkey.toolchains.buck2.prelude.path only to use a prelude of your own, which turns test result caching off."
+        else if cfg.buck2.enable && unknownShells != [ ] then
           throw "turnkey: turnkey.toolchains.buck2.shells names ${lib.concatStringsSep ", " unknownShells}, which declarationFiles doesn't define"
         else
           lib.mapAttrs mkShellConfig cfg.declarationFiles;
 
       # Collect all non-null cells into an attrset for exposure
-      # Filter out non-derivation values (e.g., "bundled://" for prelude)
-      allCells = lib.filterAttrs (_: v: v != null && builtins.isPath v || lib.isDerivation v) ({
+      allCells = lib.filterAttrs (_: v: v != null && builtins.isPath v || lib.isDerivation v) {
         godeps = godepsCell;
         rustdeps = rustdepsCell;
         pydeps = pydepsCell;
         jsdeps = jsdepsCell;
         soldeps = soldepsCell;
-      } // lib.optionalAttrs (cfg.buck2.prelude.strategy == "nix") {
-        prelude = resolvedPreludePath;
-      });
+        prelude = if cfg.buck2.prelude.path != null then cfg.buck2.prelude.path else turnkeyPrelude;
+      };
 
     in
     lib.mkIf cfg.enable {

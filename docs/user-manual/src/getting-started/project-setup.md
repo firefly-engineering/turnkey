@@ -128,69 +128,22 @@ When you enter the devenv shell, Turnkey generates:
 | `.buckroot` | Empty file marking project boundary |
 | `.turnkey/toolchains` | Symlink to generated toolchains cell |
 | `.turnkey/godeps` | Symlink to Go dependencies cell (if configured) |
-| `.turnkey/prelude` | Symlink to prelude (if using `nix` strategy) |
+| `.turnkey/prelude` | Symlink to the prelude |
 
-## Prelude Strategies
+## The Prelude
 
-Turnkey supports four strategies for providing the Buck2 prelude:
+The prelude is always turnkey's: the prelude built with turnkey's pinned
+buck2 release, with turnkey's patches and extensions applied. It isn't
+configurable, for the same reason buck2 itself isn't: they are one release
+([ADR 0002](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0002-turnkey-owns-the-buck2-version.md)).
 
-### Bundled (Default)
-
-Uses Buck2's built-in bundled prelude. Simplest option, no configuration needed.
-
-```nix
-devenv.shells.default.turnkey.buck2 = {
-  enable = true;
-  prelude.strategy = "bundled";
-};
-```
-
-### Git
-
-Clones prelude from a git repository. Good for pinning to a specific version.
+If you really need a prelude of your own, `prelude.path` takes a derivation
+or a path. That is off the supported path, and it turns test result caching
+off, since turnkey can't know which of that prelude's test rules are
+cache-safe:
 
 ```nix
-devenv.shells.default.turnkey.buck2 = {
-  enable = true;
-  prelude = {
-    strategy = "git";
-    gitOrigin = "https://github.com/facebook/buck2-prelude.git";
-    commitHash = "abc123...";  # Required
-  };
-};
-```
-
-### Nix
-
-Uses a Nix derivation containing the prelude. Best for reproducibility.
-
-```nix
-devenv.shells.default.turnkey.buck2 = {
-  enable = true;
-  prelude = {
-    strategy = "nix";
-    path = pkgs.fetchFromGitHub {
-      owner = "facebook";
-      repo = "buck2-prelude";
-      rev = "...";
-      hash = "sha256-...";
-    };
-  };
-};
-```
-
-### Path
-
-Uses a local filesystem path. Good for development/testing.
-
-```nix
-devenv.shells.default.turnkey.buck2 = {
-  enable = true;
-  prelude = {
-    strategy = "path";
-    path = "/path/to/local/prelude";
-  };
-};
+turnkey.toolchains.buck2.prelude.path = ./my-prelude;
 ```
 
 ## direnv Integration

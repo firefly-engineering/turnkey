@@ -56,7 +56,7 @@ Wrap `go`, `cargo`, `uv` with auto-sync behavior.
 Nested options for Buck2 integration:
 
 - `enable` - Enable Buck2 cell generation
-- `prelude.strategy` - How to provide prelude ("nix", "bundled", "git", "path")
+- `prelude.path` - A prelude to use instead of turnkey's (off the supported path; turns test result caching off)
 - `go.enable`, `go.depsFile` - Go dependency configuration
 - `rust.enable`, `rust.depsFile` - Rust dependency configuration
 - `python.enable`, `python.depsFile` - Python dependency configuration

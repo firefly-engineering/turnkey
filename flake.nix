@@ -249,8 +249,10 @@
               "pinned buck2 release: upstream prelude is ${release.upstreamPrelude.version}, not ${release.version}";
             assert lib.assertMsg (shellBuck2.package.drvPath == release.buck2.drvPath)
               "pinned buck2 release: the default shell's buck2 is not the pinned binary";
-            assert lib.assertMsg (shellBuck2.prelude.path.drvPath == config.packages.turnkey-prelude.drvPath)
-              "pinned buck2 release: the default shell's prelude is not packages.turnkey-prelude";
+            assert lib.assertMsg (
+              shellBuck2.prelude.path == null
+              && shellBuck2.prelude.package.drvPath == config.packages.turnkey-prelude.drvPath
+            ) "pinned buck2 release: the default shell's prelude is not packages.turnkey-prelude";
             pkgs.runCommand "pinned-buck2-release-check" { } "touch $out";
 
           # Configure turnkey to use our local toolchain files. tellerLib

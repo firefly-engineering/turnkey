@@ -129,7 +129,6 @@ cat > flake.nix << EOF
 
           buck2 = {
             enable = true;
-            prelude.strategy = "bundled";
 
             go = {
               enable = true;

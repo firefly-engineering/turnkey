@@ -211,28 +211,11 @@ ${generateTargets finalToolchains}
     BUCKCONFIG
   '';
 
-  # Generate external_cells section based on prelude strategy
-  externalCellsSection =
-    if cfg.prelude.strategy == "bundled" then ''
-      [external_cells]
-          prelude = bundled
-    ''
-    else if cfg.prelude.strategy == "git" then ''
-      [external_cells]
-          prelude = git
-
-      [external_cell_prelude]
-          git_origin = ${cfg.prelude.gitOrigin}
-          commit_hash = ${cfg.prelude.commitHash}
-    ''
-    else ""; # path and nix strategies use cells section directly
-
-  # Prelude path in cells section
-  preludeCellPath =
-    if cfg.prelude.strategy == "bundled" then "prelude"
-    else if cfg.prelude.strategy == "git" then "prelude"  # git uses external_cells
-    else if cfg.prelude.strategy == "nix" then ".turnkey/prelude"  # symlinked derivation
-    else cfg.prelude.path;  # path strategy uses direct path
+  # turnkey's prelude for the pinned buck2 release, or the consumer's own
+  # (prelude.path), symlinked at .turnkey/prelude
+  preludeCellPath = ".turnkey/prelude";
+  customPrelude = cfg.prelude.path != null;
+  prelude = if customPrelude then cfg.prelude.path else cfg.prelude.package;
 
   # Toolchains cell is accessed via a symlink at .turnkey/toolchains
   toolchainsCellPath = ".turnkey/toolchains";
@@ -283,12 +266,10 @@ ${generateTargets finalToolchains}
       derivation = if cfg.solidity.enable then cfg.solidity.cell else null;
       description = "Solidity deps";
     };
-  } // lib.optionalAttrs (cfg.prelude.strategy == "nix") {
-    # Prelude cell (only when using nix strategy)
     prelude = {
       name = "prelude";
-      path = ".turnkey/prelude";
-      derivation = cfg.prelude.path;
+      path = preludeCellPath;
+      derivation = prelude;
       description = "Prelude";
     };
   });
@@ -345,9 +326,10 @@ ${generateTargets finalToolchains}
   testRunnerProtocol = import ../../packages/test-runner-protocol.nix { inherit pkgs lib; };
 
   # turnkey-test-runner replaces buck2's bundled runner when test result
-  # caching is enabled
+  # caching is enabled. Only turnkey's prelude is known to mark its test rules
+  # cache-safe, so a custom prelude turns caching off.
   testRunner =
-    if cfg.testCache.enable then
+    if cfg.testCache.enable && !customPrelude then
       import ../../packages/turnkey-test-runner.nix { inherit pkgs lib; }
     else
       null;
@@ -384,7 +366,6 @@ ${generateTargets finalToolchains}
     [cells]
         root = .
         toolchains = ${toolchainsCellPath}
-        prelude = ${preludeCellPath}
         none = none
     ${nixCellsConfig}
 
@@ -396,7 +377,6 @@ ${generateTargets finalToolchains}
         fbcode_macros = none
         buck = none
 
-    ${externalCellsSection}
     [parser]
         target_platform_detector_spec = target:root//...->prelude//platforms:default target:toolchains//...->prelude//platforms:default${nixCellsPlatformDetectors}
 
@@ -521,6 +501,23 @@ ${generateTargets finalToolchains}
 
 in
 {
+  imports =
+    let
+      removed =
+        name:
+        lib.mkRemovedOptionModule [ "turnkey" "buck2" "prelude" name ] ''
+          turnkey always uses its own prelude, part of the pinned buck2 release
+          (docs/adr/0002-turnkey-owns-the-buck2-version.md). Remove this
+          setting; set turnkey.buck2.prelude.path only to use a prelude of
+          your own, which turns test result caching off.
+        '';
+    in
+    map removed [
+      "strategy"
+      "gitOrigin"
+      "commitHash"
+    ];
+
   options.turnkey.buck2 = {
     version = lib.mkOption {
       type = lib.types.str;
@@ -585,45 +582,22 @@ in
     };
 
     prelude = {
-      strategy = lib.mkOption {
-        type = lib.types.enum [
-          "bundled"
-          "git"
-          "nix"
-          "path"
-        ];
-        default = "bundled";
-        description = ''
-          How to provide the Buck2 prelude cell:
-          - bundled: Use Buck2's built-in bundled prelude (simplest)
-          - git: Use a git external cell (requires gitOrigin and commitHash)
-          - nix: Use a Nix derivation (requires path to be a derivation)
-          - path: Use an explicit filesystem path
-        '';
+      package = lib.mkOption {
+        type = lib.types.package;
+        internal = true;
+        description = "turnkey's prelude for the pinned buck2 release (injected by the flake-parts module).";
       };
 
       path = lib.mkOption {
-        type = lib.types.either lib.types.path (lib.types.either lib.types.str lib.types.package);
-        default = "bundled://";
-        description = ''
-          Path to the prelude cell.
-          - For bundled: use "bundled://" to use Buck2's built-in prelude
-          - For git: the local checkout path
-          - For nix: a Nix derivation or store path
-          - For path: an absolute or relative filesystem path
-        '';
-      };
-
-      gitOrigin = lib.mkOption {
-        type = lib.types.str;
-        default = "https://github.com/facebook/buck2-prelude.git";
-        description = "Git origin URL for the prelude (when strategy = git)";
-      };
-
-      commitHash = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
+        type = lib.types.nullOr (lib.types.either lib.types.package lib.types.path);
         default = null;
-        description = "Git commit hash for the prelude (required when strategy = git)";
+        description = ''
+          A prelude to use instead of turnkey's, as a derivation or a path.
+          Off the supported path: turnkey's prelude is part of the pinned
+          buck2 release (docs/adr/0002-turnkey-owns-the-buck2-version.md),
+          and test result caching is turned off, since turnkey can't know
+          which of this prelude's test rules are cache-safe.
+        '';
       };
     };
 

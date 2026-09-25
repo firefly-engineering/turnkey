@@ -87,19 +87,14 @@ Located at `.turnkey/toolchains/`, contains toolchain rules for each declared la
 
 The Buck2 prelude is provided via Nix at `.turnkey/prelude/`: the prelude built with turnkey's pinned buck2 release, with turnkey's patches and extensions applied.
 
-## Prelude Strategies
+## A Prelude of Your Own
+
+`prelude.path` replaces turnkey's prelude with a derivation or a path. It is
+off the supported path, and it turns test result caching off:
 
 ```nix
-turnkey.toolchains.buck2.prelude = {
-  strategy = "nix";  # default, recommended
-  # Other options: "bundled", "git", "path"
-};
+turnkey.toolchains.buck2.prelude.path = ./my-prelude;
 ```
-
-- **nix** (default): Uses Turnkey's Nix-backed prelude with custom extensions
-- **bundled**: Uses Buck2's built-in prelude
-- **git**: Uses a git checkout
-- **path**: Uses a local filesystem path
 
 ## Dependency Cells
 
