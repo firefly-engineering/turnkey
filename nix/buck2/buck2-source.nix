@@ -5,7 +5,9 @@
 # code, is generated from buck2's own source at the revision that binary was
 # built from. This table is the single place that maps a release to that
 # revision. A release is added only after turnkey's test runner passes its
-# parity suite against it.
+# parity suite against it: with that release in the dev shell, run
+# `python3 src/cmd/check-test-runner-parity/__main__.py` and require it to
+# report every scenario as matching.
 { pkgs, lib }:
 
 let
