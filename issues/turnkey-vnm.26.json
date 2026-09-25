@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T10:54:33Z",
+  "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nSetting `buck2.testCache.endpoint` to a remote REAPI address writes it into `[buck2_re_client]`. tk stops managing and probing a local server, and the runner records nothing while the endpoint isn't local, until shared-cache handover is decided (spec §7).\n\n## Acceptance criteria\n\n- [ ] With a remote endpoint set, no local server is started or probed\n- [ ] Hits served by the remote endpoint are reported as `recorded, remote`\n- [ ] The runner writes nothing to a non-local endpoint\n\n## Blocked by\n\n- turnkey-vnm.25\n",
+  "id": "turnkey-vnm.26",
+  "labels": [],
+  "parent": "turnkey-vnm",
+  "priority": 2,
+  "status": "open",
+  "title": "Remote endpoint switch for test result caching",
+  "type": "task",
+  "updated_at": "2026-09-25T10:54:33Z"
+}
