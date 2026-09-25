@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [],
   "blocks": [
     "turnkey-w55.7"
@@ -12,8 +12,8 @@
   ],
   "parent": "turnkey-w55",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "What test-caching support does our pinned buck2 have?",
   "type": "task",
-  "updated_at": "2026-09-25T07:31:19Z"
+  "updated_at": "2026-09-25T07:31:59Z"
 }
