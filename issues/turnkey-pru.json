@@ -2,13 +2,15 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-09-25T21:23:28Z",
+  "close_reason": "All nine candidates explored and landed as 24 jj changes (rtmntluo..pvmwqutn). Follow-ups: turnkey-524 (tw wrappers vs meta toolchains), turnkey-8c3 (deferred plug-in restructure).",
   "created": "2026-09-25T20:29:51Z",
   "description": "Nine deepening candidates from the architecture review (report: /private/tmp/architecture-review-20260925-222344.html), tackled in order, one or more granular jj changes each.",
   "id": "turnkey-pru",
   "labels": [],
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "Deepen modules from the 2026-09-25 architecture review",
   "type": "epic",
-  "updated_at": "2026-09-25T20:29:51Z"
+  "updated_at": "2026-09-25T21:23:28Z"
 }
