@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T15:29:21Z",
+  "description": "Build a slim CI dev shell (buck2, tk, python3, language toolchains + cells; no turnkey-composed, jj, beadwork, mdbook), push its cells to Cachix, and add an ubuntu-latest job that runs src/cmd/check-test-runner-parity when nix/buck2/buck2-source.nix or the test runner changes. Facts: docs/research/parity-suite-ci-gate.md on bookmark research/parity-suite-ci-gate (turnkey-luk.2). Ruled out of the buck2-bundling map turnkey-luk by turnkey-luk.8.",
+  "id": "turnkey-kxe",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "CI gate: run the test-runner parity suite in a slim CI shell",
+  "type": "task",
+  "updated_at": "2026-09-25T15:29:21Z"
+}
