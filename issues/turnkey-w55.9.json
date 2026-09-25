@@ -1,6 +1,7 @@
 {
   "assignee": "",
   "blocked_by": [
+    "turnkey-w55.11",
     "turnkey-w55.7"
   ],
   "blocks": [],
@@ -15,5 +16,5 @@
   "status": "open",
   "title": "How does the caching tool ship to consumer repos and get configured?",
   "type": "task",
-  "updated_at": "2026-09-25T07:31:21Z"
+  "updated_at": "2026-09-25T09:56:37Z"
 }
