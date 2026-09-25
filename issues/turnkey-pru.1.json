@@ -4,14 +4,16 @@
   "blocks": [
     "turnkey-pru.2"
   ],
+  "closed_at": "2026-09-25T20:51:30Z",
+  "close_reason": "Landed as 5 jj changes (rtmntluo..rrswtlrn): tk sync takes rule names; nix/buck2/languages.nix owns each language; pylock rule fixes uv add -\u003e python-deps.toml; tw reads wrapper rules from sync.toml (checks.language-records guards them); tk sync is the only regenerator (go.generateOnShellEntry/autoRegenerate removed). Follow-up: turnkey-524.",
   "created": "2026-09-25T20:29:51Z",
   "description": "What each language needs (cell, deps file, generator, sync rule, wrapper rule, watch files) is spread over flake-parts:278-354, buck2.nix:434-487/649-718/764-781, direnv-lib.nix, options.nix, nix/buck2/*-deps-cell.nix and tw's hard-coded map (src/cmd/tw/main.go:41-64). Drift already causes a bug: the uv wrapper watches uv.lock but the python rule regenerates from pylock.toml with no uv export in between. Collapse into one description per language, iterated by every consumer; tw reads wrapper rules from sync.toml.",
   "id": "turnkey-pru.1",
   "labels": [],
   "parent": "turnkey-pru",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "One language module owns 'language X is enabled'",
   "type": "task",
-  "updated_at": "2026-09-25T20:29:59Z"
+  "updated_at": "2026-09-25T20:51:30Z"
 }
