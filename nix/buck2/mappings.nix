@@ -9,9 +9,22 @@
 #   - runtimeDependencies: Packages needed in PATH for Buck2 action execution
 #   - skip: true if this is not a Buck2 toolchain (just a dev tool)
 #   - alwaysInclude: true if this toolchain should always be generated
+#
+# dynamicAttrs read packages from the registry through `tool`, so a registry
+# without one fails with a message naming it. A toolchain pulled in as an
+# implicit dependency needs its registry entries too (go needs python and
+# clang), even though nothing declares it.
 
 { lib }:
 
+let
+  tool =
+    registry: name:
+    registry.${name} or (throw ''
+      turnkey: the Buck2 toolchains need `${name}` from the registry, but it has no `${name}` entry.
+      A toolchain can need it without declaring it: go, for example, implicitly depends on python and cxx (clang).
+      Add `${name}` to turnkey.toolchains.registryExtensions, or to your registry if you replace it.'');
+in
 {
   # ==========================================================================
   # Language Toolchains
@@ -72,7 +85,7 @@
         # the key of every Python action and test, and a toolchain bump
         # changes it.
         dynamicAttrs = registry: {
-          interpreter = "${registry.python}/bin/python3";
+          interpreter = "${tool registry "python"}/bin/python3";
         };
       }
       {
@@ -81,7 +94,7 @@
         load = "@prelude//toolchains:python.bzl";
         visibility = [ "PUBLIC" ];
         dynamicAttrs = registry: {
-          interpreter = "${registry.python}/bin/python3";
+          interpreter = "${tool registry "python"}/bin/python3";
         };
       }
     ];
@@ -99,9 +112,9 @@
         # Dynamic attrs resolved at build time from registry
         # Uses absolute paths so Buck2 can find compilers without PATH
         dynamicAttrs = registry: {
-          compiler = "${registry.clang}/bin/clang";
-          cxx_compiler = "${registry.clang}/bin/clang++";
-          linker = "${registry.clang}/bin/clang++";
+          compiler = "${tool registry "clang"}/bin/clang";
+          cxx_compiler = "${tool registry "clang"}/bin/clang++";
+          linker = "${tool registry "clang"}/bin/clang++";
         };
       }
     ];
@@ -210,7 +223,7 @@
         # the key of every Python action and test, and a toolchain bump
         # changes it.
         dynamicAttrs = registry: {
-          interpreter = "${registry.python-toolchain}/bin/python3";
+          interpreter = "${tool registry "python-toolchain"}/bin/python3";
         };
       }
       {
@@ -219,7 +232,7 @@
         load = "@prelude//toolchains:python.bzl";
         visibility = [ "PUBLIC" ];
         dynamicAttrs = registry: {
-          interpreter = "${registry.python-toolchain}/bin/python3";
+          interpreter = "${tool registry "python-toolchain"}/bin/python3";
         };
       }
     ];
@@ -238,8 +251,8 @@
         # the typescript/nodejs entries' defaults, which move independently
         # (typescript's default became 7, the native compiler with no tsc.js).
         dynamicAttrs = registry: {
-          node_path = "${registry.typescript-toolchain}/bin/node";
-          tsc_path = "${registry.typescript-toolchain}/lib/node_modules/typescript/bin/tsc";
+          node_path = "${tool registry "typescript-toolchain"}/bin/node";
+          tsc_path = "${tool registry "typescript-toolchain"}/lib/node_modules/typescript/bin/tsc";
         };
       }
     ];
@@ -257,11 +270,11 @@
         # Tools come from the declared solidity-toolchain meta-package, so
         # the solc and forge Buck2 runs are the ones the dev shell provides.
         dynamicAttrs = registry: {
-          solc_path = "${registry.solidity-toolchain}/bin/solc";
-          forge_path = "${registry.solidity-toolchain}/bin/forge";
-          cast_path = "${registry.solidity-toolchain}/bin/cast";
-          anvil_path = "${registry.solidity-toolchain}/bin/anvil";
-          jq_path = "${registry.jq}/bin/jq";
+          solc_path = "${tool registry "solidity-toolchain"}/bin/solc";
+          forge_path = "${tool registry "solidity-toolchain"}/bin/forge";
+          cast_path = "${tool registry "solidity-toolchain"}/bin/cast";
+          anvil_path = "${tool registry "solidity-toolchain"}/bin/anvil";
+          jq_path = "${tool registry "jq"}/bin/jq";
         };
       }
     ];
@@ -372,8 +385,8 @@
         visibility = [ "PUBLIC" ];
         # Dynamic attrs resolved at build time from registry
         dynamicAttrs = registry: {
-          node_path = "${registry.nodejs}/bin/node";
-          tsc_path = "${registry.typescript}/lib/node_modules/typescript/bin/tsc";
+          node_path = "${tool registry "nodejs"}/bin/node";
+          tsc_path = "${tool registry "typescript"}/lib/node_modules/typescript/bin/tsc";
         };
       }
     ];
@@ -393,11 +406,11 @@
         visibility = [ "PUBLIC" ];
         # Dynamic attrs resolved at build time from registry
         dynamicAttrs = registry: {
-          solc_path = "${registry.solc}/bin/solc";
-          forge_path = "${registry.foundry}/bin/forge";
-          cast_path = "${registry.foundry}/bin/cast";
-          anvil_path = "${registry.foundry}/bin/anvil";
-          jq_path = "${registry.jq}/bin/jq";
+          solc_path = "${tool registry "solc"}/bin/solc";
+          forge_path = "${tool registry "foundry"}/bin/forge";
+          cast_path = "${tool registry "foundry"}/bin/cast";
+          anvil_path = "${tool registry "foundry"}/bin/anvil";
+          jq_path = "${tool registry "jq"}/bin/jq";
         };
       }
     ];
@@ -424,8 +437,8 @@
         visibility = [ "PUBLIC" ];
         # Dynamic attrs resolved at build time from registry
         dynamicAttrs = registry: {
-          mdbook_path = "${registry.mdbook}/bin/mdbook";
-          python_path = "${registry.python}/bin/python3";
+          mdbook_path = "${tool registry "mdbook"}/bin/mdbook";
+          python_path = "${tool registry "python"}/bin/python3";
           # Output served books to .turnkey/books/ to keep source tree clean
           serve_output_dir = ".turnkey/books";
         };
@@ -446,8 +459,8 @@
         load = "@prelude//mdbook:toolchain.bzl";
         visibility = [ "PUBLIC" ];
         dynamicAttrs = registry: {
-          mdbook_path = "${registry.mdbook-toolchain}/bin/mdbook";
-          python_path = "${registry.python}/bin/python3";
+          mdbook_path = "${tool registry "mdbook-toolchain"}/bin/mdbook";
+          python_path = "${tool registry "python"}/bin/python3";
           serve_output_dir = ".turnkey/books";
         };
       }
@@ -468,7 +481,7 @@
         load = "@prelude//jsonnet:toolchain.bzl";
         visibility = [ "PUBLIC" ];
         dynamicAttrs = registry: {
-          jsonnet_path = "${registry.jrsonnet}/bin/jrsonnet";
+          jsonnet_path = "${tool registry "jrsonnet"}/bin/jrsonnet";
         };
       }
     ];

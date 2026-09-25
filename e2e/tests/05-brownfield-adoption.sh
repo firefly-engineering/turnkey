@@ -119,6 +119,8 @@ cat > flake.nix << EOF
           registry = {
             nix = pkgs.nix;
             go = pkgs.go;
+            # go implicitly depends on python (bootstrap) and cxx (clang)
+            python = pkgs.python3;
             clang = pkgs.llvmPackages.clang;
             lld = pkgs.llvmPackages.lld;
             godeps-gen = inputs.turnkey.packages.\${pkgs.system}.godeps-gen;
