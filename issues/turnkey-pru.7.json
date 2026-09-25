@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-pru.6"
+  ],
   "blocks": [],
   "created": "2026-09-25T20:29:53Z",
   "description": "syncer (no tests), snapshot (no tests), staleness.IsStale, cellfresh and tk runSync/runCheck repeat the same loop; exec is not injectable (cellfresh KillCommand global). One module owns stale-\u003eregenerate-\u003ereload with exec and fs ports.",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "One freshness module for sync, check and cell reload",
   "type": "task",
-  "updated_at": "2026-09-25T20:29:53Z"
+  "updated_at": "2026-09-25T20:29:55Z"
 }

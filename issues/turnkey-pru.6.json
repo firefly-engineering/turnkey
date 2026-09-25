@@ -3,7 +3,9 @@
   "blocked_by": [
     "turnkey-pru.5"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-pru.7"
+  ],
   "created": "2026-09-25T20:29:53Z",
   "description": "Cache endpoint config reaches buckconfig, tk and runner through separate channels (TURNKEY_TEST_CACHE_ADDRESS, TURNKEY_TEST_CACHE_SERVER presence, TLS only in buckconfig). tk's probe rejects anything but grpc:// so a TLS remote reads as unusable. One descriptor emitted by Nix, checked contract at the Nix/tk seam.",
   "id": "turnkey-pru.6",
