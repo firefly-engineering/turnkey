@@ -10,8 +10,11 @@ let
   turnkeyLib = cfg.tellerLib;
 in
 {
-  # Import the Buck2 generation sub-module
-  imports = [ ./buck2.nix ];
+  # Import the Buck2 generation sub-module and its pre-commit hooks
+  imports = [
+    ./buck2.nix
+    ./git-hooks.nix
+  ];
   options.turnkey = {
     enable = lib.mkOption {
       type = lib.types.bool;

@@ -260,7 +260,11 @@ See [Prelude Extensions](../extending/prelude-extensions.md) for adding custom r
 |------|---------|
 | `nix/buck2/mappings.nix` | Toolchain-to-Buck2 rule mappings |
 | `nix/buck2/prelude.nix` | Prelude derivation with patches/extensions |
-| `nix/buck2/toolchains-cell.nix` | Toolchains cell generator |
+| `nix/buck2/toolchains-cell.nix` | Toolchains cell content (which toolchains, their BUCK file) |
+| `nix/buck2/buckconfig.nix` | The generated `.buckconfig` |
+| `nix/buck2/sync-config.nix` | The generated `.turnkey/sync.toml` (deps and wrapper rules) |
 | `nix/buck2/languages.nix` | One record per language: its deps cell, generator and sync rules |
 | `nix/lib/deps-cell/` | Dependency cell builders, one adapter per language |
-| `nix/devenv/turnkey/buck2.nix` | Devenv integration module |
+| `nix/devenv/turnkey/buck2.nix` | Devenv integration module: writes the generated files, keeps their symlinks |
+| `nix/devenv/turnkey/managed-links.nix` | The symlinks turnkey maintains, for enterShell and direnv |
+| `nix/devenv/turnkey/git-hooks.nix` | Pre-commit hooks for Buck2 shells |
