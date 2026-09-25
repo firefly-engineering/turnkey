@@ -5,7 +5,9 @@
   "created": "2026-09-25T10:54:16Z",
   "description": "Implement [the test result caching spec](https://github.com/firefly-engineering/turnkey/blob/5c64cfb91815/docs/specs/test-result-caching.md) (mechanism: [ADR 0001](https://github.com/firefly-engineering/turnkey/blob/5c64cfb91815/docs/adr/0001-runner-recorded-native-test-caching.md)). `tk test` reuses a recorded result for any test whose result key is unchanged: across daemon restarts, `buck2 clean` and checkouts, on darwin and Linux. It must be able to switch to a remote REAPI endpoint without a redesign.\n\nChildren are tracer-bullet slices. Language rollout priority: Rust, Jsonnet, Go, Python, Solidity. That order is a priority, not a dependency.",
   "id": "turnkey-vnm",
-  "labels": [],
+  "labels": [
+    "ready-for-agent"
+  ],
   "priority": 2,
   "status": "open",
   "title": "Implement test result caching",
