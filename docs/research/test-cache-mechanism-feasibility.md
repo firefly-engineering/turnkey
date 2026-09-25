@@ -325,3 +325,30 @@ No proto change is needed: the runner already sees hits (E4).
 - Nothing was executed. In particular, bazel-remote's acceptance of an `UpdateActionResult` whose Action blob is absent from CAS, and buck2's behaviour on a connection to bazel-remote as `engine_address`, are read from source only.
 - The exact failure surface when the RE client's first connect fails (the cached `Err` in `AsyncOnceCell`) was not traced through config reloads.
 - Line counts for the option D patch are estimates. No patch was written.
+
+## Verification run (turnkey-w55.10, 2026-09-25)
+
+The mechanism was run end to end once, on aarch64-darwin, with the pinned buck2 (`2026-04-14-7600cb80…`) and bazel-remote 2.6.2 from nixpkgs. Setup:
+
+- a throwaway buck2 project with an empty prelude;
+- a rule emitting `ExternalRunnerTestInfo(supports_test_execution_caching = True, use_project_relative_paths = True, run_from_project_root = True, default_executor = CommandExecutorConfig(local_enabled = True, remote_enabled = False, remote_cache_enabled = True))`;
+- `[buck2_re_client]` with the engine, action cache and CAS addresses all set to `grpc://127.0.0.1:9092` and `tls = false`;
+- buck2's bundled OSS runner.
+
+Each test script appended to a side log when it really executed. That log is how "ran" was told apart from "hit". The "runner writes the result" step was played by hand: an `ActionResult` was PUT to bazel-remote's HTTP `/ac/<hash>`, under the digest buck2 reported in the event log.
+
+| Item | Result |
+|---|---|
+| `engine_address` pointed at bazel-remote, with no Execution service (E6) | **Confirmed.** buck2 connects (`GRPC GETCAPABILITIES`) and does an AC lookup (`GRPC AC GET <digest> NOT FOUND`) for the opted-in test. The execution platform stays local-only, so build actions do no lookups. |
+| A hand-written `ActionResult` for a pass is served as a hit | **Confirmed.** The test did not execute, and its recorded stdout was printed. The console showed `✓ Pass (42.0s)`, the original duration taken from `execution_metadata`. `buck2 log what-ran` shows executor `cache`. |
+| bazel-remote's AC validation accepts the entry | **Confirmed** for an entry with inline `stdout_raw` and no CAS references, with HTTP AC validation on. Entries that reference CAS blobs were not tried. |
+| Hit survives the same daemon, a daemon restart (`buck2 kill`, the pid confirmed gone), `buck2 clean`, and a second copy of the project at another absolute path | **Confirmed**, with project-relative paths. |
+| A recorded failure (`exit_code = 1`) | **Replayed as `✗ Fail` without executing.** This confirms that only passes may ever be written. |
+| An entry without `execution_metadata` is reported as a failure (E3) | **Refuted.** It was served as `✓ Pass (0.0s)`. Metadata is still needed for the original duration, but a missing one doesn't fail the test. |
+| Cache server down, fresh daemon | buck2 retries the connection with growing back-off for about **45 s**, then reports the test as **`✗ Fail` (exit 32)**, with `Remote Execution Error on REClientBuilder` in the details. The test does not execute. |
+| Cache server killed under a daemon that had connected | Same result: about 45 s, then `✗ Fail`. |
+| A failed connect stays failed for the daemon's life (E6) | **Refuted.** After the server came back, the same daemon hit normally on the next command. |
+| Reads skipped (`--no-remote-cache`) while the server is down | The test **executes locally and passes**, with no connection attempt, and buck2 still reports the **identical action digest**. So "run uncached" is a working fallback, and "force a re-run, still record" has the digest it needs. The runner's per-request `disable_test_execution_caching` is expected to behave the same (E5); the OSS runner can't set it, so it wasn't tried directly. |
+| A missing output is silently left out (E3) | **Not tested.** The OSS runner requests no outputs. |
+
+Consequence for the design: an unreachable cache turns every opted-in test into a slow failure. The runner, or `tk`, therefore has to check that the cache is reachable **before** a run, and send `disable_test_execution_caching` (or pass `--no-remote-cache`) when it isn't.

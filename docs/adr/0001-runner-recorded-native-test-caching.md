@@ -20,7 +20,7 @@ buck2 can serve a test's result from a remote-execution action cache, but it nev
 ## Consequences
 
 - **The runner speaks buck2's test-runner protocol,** so it is pinned to the exact buck2 version turnkey ships. It must match everything the OSS runner does (`--env`, `--timeout`, `--test-arg`, stdout and stderr in the result details, exit code 32 on failure). The timeout it sends is part of the digest, so it has to be derived deterministically.
-- **Recorded entries must be well formed.** They are written only for passes, always carry `execution_metadata` (buck2 reports a malformed entry or a cache error as a test *failure*), use buck2's `instance_name`, and name outputs by project-relative path.
+- **Recorded entries must be well formed.** They are written only for passes, always carry `execution_metadata` (buck2 takes a hit's duration from it), use buck2's `instance_name`, and name outputs by project-relative path.
 - **The cache-reading executor goes on the test provider's `default_executor`, not the execution platform.** Build actions therefore never touch the cache.
-- **The runner is off unless `tk test` turns it on.** A plain `buck2 test` neither reads nor records. If the local server is unreachable, tests run uncached rather than fail.
+- **The runner is off unless `tk test` turns it on.** A plain `buck2 test` neither reads nor records. An unreachable cache server makes buck2 retry for about 45 s and then report every opted-in test as failed, without running it (verified in `turnkey-w55.10`). So the cache's reachability is checked before a run, and when it's down the tests run uncached rather than fail.
 - **Cross-checkout hits need project-relative test commands.** The executor does not change how buck2 renders paths.
