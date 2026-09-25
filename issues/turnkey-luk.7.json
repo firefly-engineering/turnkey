@@ -5,7 +5,9 @@
   "created": "2026-09-25T15:11:18Z",
   "description": "## Question\n\nUpdate the user manual (project-setup, toolchain-toml config reference, test result caching's unsupported-buck2 note), developer manual (architecture/buck2, prelude-extensions), e2e fixtures and the templates to the bundled model, and write the migration note the evaluation error points at.",
   "id": "turnkey-luk.7",
-  "labels": [],
+  "labels": [
+    "wayfinder:task"
+  ],
   "parent": "turnkey-luk",
   "priority": 2,
   "status": "open",
