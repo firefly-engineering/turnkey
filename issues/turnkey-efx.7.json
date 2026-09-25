@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [
     "turnkey-efx.1"
   ],
@@ -10,8 +10,8 @@
   "labels": [],
   "parent": "turnkey-efx",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "One toolchain-resolution module enforcing ADR 0002",
   "type": "task",
-  "updated_at": "2026-09-25T17:24:09Z"
+  "updated_at": "2026-09-25T19:57:35Z"
 }
