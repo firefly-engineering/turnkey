@@ -360,6 +360,20 @@ ${generateTargets finalToolchains}
     else
       null;
 
+  # The local test result cache listens on a fixed loopback port. buck2's RE
+  # client can't use Unix sockets, and the address must not be passed with -c,
+  # which would change the daemon's startup config.
+  testCacheAddress = "grpc://127.0.0.1:${toString testCachePort}";
+  testCachePort = 47301;
+
+  # PATH for cached tests: Nix store paths only, so every tool a test can run
+  # is part of its result key (test_caching.bzl).
+  testPath = lib.makeBinPath [
+    pkgs.bash
+    pkgs.coreutils
+    pkgs.diffutils
+  ];
+
   # Generate buckconfig content
   # Note: isolation_dir is set via BUCK_ISOLATION_DIR env var, not here
   # (Buck2 ignores the config file setting for isolation_dir)
@@ -395,9 +409,17 @@ ${generateTargets finalToolchains}
     [turnkey]
         test_runner_protocol = ${testRunnerProtocol}
   '' + lib.optionalString (testRunner != null) ''
+        test_cache = true
+        test_path = ${testPath}
 
     [test]
         v2_test_executor = ${testRunner}/bin/turnkey-test-runner
+
+    [buck2_re_client]
+        engine_address = ${testCacheAddress}
+        action_cache_address = ${testCacheAddress}
+        cas_address = ${testCacheAddress}
+        tls = false
   '';
 
   # Buckconfig file derivation

@@ -1,0 +1,45 @@
+rust_test: opt into turnkey's test result caching.
+
+Routes rust_test's ExternalRunnerTestInfo arguments through
+test_caching_kwargs (nix/buck2/prelude-extensions/test_caching), which, when
+the repo enables test result caching, declares the test cacheable, gives it
+the cache-reading executor and pins PATH and HOME. When caching is off the
+arguments are unchanged. See docs/specs/test-result-caching.md.
+
+--- a/rust/rust_binary.bzl
++++ b/rust/rust_binary.bzl
+@@ -6,6 +6,7 @@
+ # of this source tree. You may select, at your option, one of the
+ # above-listed licenses.
+ 
++load("@prelude//test_caching:test_caching.bzl", "test_caching_kwargs")
+ load(
+     "@prelude//:artifact_tset.bzl",
+     "project_artifacts",
+@@ -542,15 +543,15 @@
+ 
+     return inject_test_run_info(
+         ctx,
+-        ExternalRunnerTestInfo(
+-            type = "rust",
+-            command = [args],
+-            env = ctx.attrs.env | ctx.attrs.run_env,
+-            labels = ctx.attrs.labels,
+-            contacts = ctx.attrs.contacts,
+-            default_executor = re_executor,
+-            executor_overrides = executor_overrides,
+-            run_from_project_root = True,
+-            use_project_relative_paths = True,
+-        ),
++        ExternalRunnerTestInfo(**test_caching_kwargs({
++            "type": "rust",
++            "command": [args],
++            "env": ctx.attrs.env | ctx.attrs.run_env,
++            "labels": ctx.attrs.labels,
++            "contacts": ctx.attrs.contacts,
++            "default_executor": re_executor,
++            "executor_overrides": executor_overrides,
++            "run_from_project_root": True,
++            "use_project_relative_paths": True,
++        })),
+     ) + providers
