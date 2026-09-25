@@ -1,0 +1,49 @@
+{
+  "description": "What tk test passes turnkey-test-runner after `--`, and the report the runner writes back. tk's side (src/go/pkg/testcache) must produce exactly these args and read this report; the runner's side (src/cmd/turnkey-test-runner) must parse these args and write this report. Change both sides together.",
+  "address": "grpc://127.0.0.1:47301",
+  "report": "/tmp/tk-test-report",
+  "plans": [
+    {
+      "mode": "on",
+      "origin": "local",
+      "args": [
+        "--turnkey-test-cache=on",
+        "--turnkey-test-cache-address=grpc://127.0.0.1:47301",
+        "--turnkey-test-cache-origin=local",
+        "--turnkey-test-cache-report=/tmp/tk-test-report"
+      ]
+    },
+    {
+      "mode": "record-only",
+      "origin": "local",
+      "args": [
+        "--turnkey-test-cache=record-only",
+        "--turnkey-test-cache-address=grpc://127.0.0.1:47301",
+        "--turnkey-test-cache-origin=local",
+        "--turnkey-test-cache-report=/tmp/tk-test-report"
+      ]
+    },
+    {
+      "mode": "read-only",
+      "origin": "remote",
+      "args": [
+        "--turnkey-test-cache=read-only",
+        "--turnkey-test-cache-address=grpc://127.0.0.1:47301",
+        "--turnkey-test-cache-origin=remote",
+        "--turnkey-test-cache-report=/tmp/tk-test-report"
+      ]
+    },
+    {
+      "mode": "off",
+      "origin": "remote",
+      "args": [
+        "--turnkey-test-cache=off",
+        "--turnkey-test-cache-address=grpc://127.0.0.1:47301",
+        "--turnkey-test-cache-origin=remote",
+        "--turnkey-test-cache-report=/tmp/tk-test-report"
+      ]
+    }
+  ],
+  "hits": 3,
+  "hits_report": "3\n"
+}

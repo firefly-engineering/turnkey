@@ -76,6 +76,56 @@ impl FromStr for EnvValue {
 mod tests {
     use super::*;
 
+    /// What `tk test` passes and reads back, shared with tk's tests. buck2
+    /// hands the file to the test (rules.star); a Cargo build finds it in
+    /// the source tree.
+    fn runner_contract() -> serde_json::Value {
+        let path = std::env::var("TURNKEY_RUNNER_CONTRACT").unwrap_or_else(|_| {
+            let manifest_dir = option_env!("CARGO_MANIFEST_DIR")
+                .expect("TURNKEY_RUNNER_CONTRACT is unset outside a Cargo build");
+            format!("{manifest_dir}/../../go/pkg/testcache/testdata/runner-contract.json")
+        });
+        let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
+        serde_json::from_str(&text).unwrap()
+    }
+
+    #[test]
+    fn parses_what_tk_passes() {
+        use clap::ValueEnum;
+        let contract = runner_contract();
+        for plan in contract["plans"].as_array().unwrap() {
+            let args = plan["args"].as_array().unwrap().iter();
+            let config = Config::try_parse_from(
+                ["ignored", "--buck-test-info", "ignored"]
+                    .into_iter()
+                    .chain(args.map(|arg| arg.as_str().unwrap())),
+            )
+            .unwrap();
+            let mode = config.turnkey_test_cache.to_possible_value().unwrap();
+            let origin = config
+                .turnkey_test_cache_origin
+                .to_possible_value()
+                .unwrap();
+            assert_eq!(mode.get_name(), plan["mode"]);
+            assert_eq!(origin.get_name(), plan["origin"]);
+            assert_eq!(
+                config.turnkey_test_cache_address.as_deref(),
+                contract["address"].as_str()
+            );
+            assert_eq!(
+                config.turnkey_test_cache_report.as_deref(),
+                contract["report"].as_str().map(std::path::Path::new)
+            );
+        }
+    }
+
+    #[test]
+    fn writes_the_report_tk_reads() {
+        let contract = runner_contract();
+        let hits = contract["hits"].as_u64().unwrap() as usize;
+        assert_eq!(crate::runner::hits_report(hits), contract["hits_report"]);
+    }
+
     #[test]
     fn runner_args_as_buck2_sends_them() {
         let config =

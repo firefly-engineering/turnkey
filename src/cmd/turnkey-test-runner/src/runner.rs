@@ -114,7 +114,7 @@ impl<O: Orchestrator> Runner<O> {
         let exit_code = if all_passed { 0 } else { FAILURE_EXIT_CODE };
         if let Some(report) = &self.config.turnkey_test_cache_report {
             let hits = self.hits.load(Ordering::Relaxed);
-            std::fs::write(report, format!("{hits}\n"))
+            std::fs::write(report, hits_report(hits))
                 .with_context(|| format!("writing {}", report.display()))?;
         }
         self.orchestrator.end(exit_code).await
@@ -258,6 +258,12 @@ async fn record_if_pass(recorder: &Recorder, name: &str, result: &ExecutionResul
     if let Err(e) = recorder.record(pass).await {
         eprintln!("turnkey-test-runner: not recording {name}: {e:#}");
     }
+}
+
+/// The report `tk test` reads the number of hits from
+/// (src/go/pkg/testcache/testdata/runner-contract.json).
+pub fn hits_report(hits: usize) -> String {
+    format!("{hits}\n")
 }
 
 /// Where the test result cache in use lives.

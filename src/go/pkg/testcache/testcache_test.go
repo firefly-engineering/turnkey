@@ -1,6 +1,8 @@
 package testcache
 
 import (
+	_ "embed"
+	"encoding/json"
 	"errors"
 	"io"
 	"net"
@@ -182,17 +184,39 @@ func TestUnreachableRemoteCacheIsUnusable(t *testing.T) {
 	}
 }
 
-func TestRunnerArgs(t *testing.T) {
-	plan := Plan{Mode: On, Origin: Local, Address: "grpc://127.0.0.1:47301"}
-	got := plan.RunnerArgs("/tmp/report")
-	want := []string{
-		"--turnkey-test-cache=on",
-		"--turnkey-test-cache-address=grpc://127.0.0.1:47301",
-		"--turnkey-test-cache-origin=local",
-		"--turnkey-test-cache-report=/tmp/report",
+// runnerContract is what tk passes turnkey-test-runner and reads back from
+// it. The runner's tests check their side against the same file.
+//
+//go:embed testdata/runner-contract.json
+var runnerContract []byte
+
+func TestRunnerContract(t *testing.T) {
+	var contract struct {
+		Address string
+		Report  string
+		Plans   []struct {
+			Mode   Mode
+			Origin Origin
+			Args   []string
+		}
+		Hits       int
+		HitsReport string `json:"hits_report"`
 	}
-	if !slices.Equal(got, want) {
-		t.Fatalf("got %v, want %v", got, want)
+	if err := json.Unmarshal(runnerContract, &contract); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range contract.Plans {
+		plan := Plan{Mode: want.Mode, Origin: want.Origin, Address: contract.Address}
+		if got := plan.RunnerArgs(contract.Report); !slices.Equal(got, want.Args) {
+			t.Errorf("%s/%s: got %v, want %v", want.Mode, want.Origin, got, want.Args)
+		}
+	}
+	report := filepath.Join(t.TempDir(), "report")
+	if err := os.WriteFile(report, []byte(contract.HitsReport), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if hits, ok := ReadReport(report); !ok || hits != contract.Hits {
+		t.Errorf("ReadReport(%q) = %d, %v; want %d", contract.HitsReport, hits, ok, contract.Hits)
 	}
 }
 

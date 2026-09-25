@@ -27,4 +27,6 @@ rust_test(
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
     deps = _DEPS,
+    # What tk passes the runner, shared with tk's tests
+    env = {"TURNKEY_RUNNER_CONTRACT": "$(location //src/go/pkg/testcache:runner-contract)"},
 )
