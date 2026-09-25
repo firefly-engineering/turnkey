@@ -4,6 +4,8 @@
   "blocks": [
     "turnkey-vnm.2"
   ],
+  "closed_at": "2026-09-25T11:55:36Z",
+  "close_reason": "Protos generated from buck2 source at the binary's revision (buck2-source.nix table) + pinned remote-apis/googleapis; codegen in Nix; runner builds via nix build and tk build; nothing hand-copied.",
   "created": "2026-09-25T10:54:17Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nThe new Rust test runner crate builds through both Nix and Buck2. Its buck2 test-runner protocol code (test.proto, plus the data.proto messages it needs) is generated at build time from buck2's own source, at the same revision as the buck2 binary turnkey ships. Its REAPI code comes from bazelbuild/remote-apis at a pinned revision. Nothing is hand-copied (spec §5).\n\n## Acceptance criteria\n\n- [ ] One Nix expression holds the buck2 source revision; the buck2 binary and the proto generation both read it\n- [ ] REAPI protos come from a pinned remote-apis revision\n- [ ] The crate builds with `nix build` and with `tk build`\n- [ ] No .proto file or generated code is committed to the repo\n\n## Blocked by\n\nNone — can start immediately.\n",
   "id": "turnkey-vnm.1",
@@ -12,8 +14,8 @@
   ],
   "parent": "turnkey-vnm",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Test runner protocol code is generated from pinned upstream sources",
   "type": "task",
-  "updated_at": "2026-09-25T11:17:50Z"
+  "updated_at": "2026-09-25T11:55:36Z"
 }
