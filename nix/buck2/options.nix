@@ -374,6 +374,19 @@ in
           If null, pyproject.toml is used as the source.
         '';
       };
+
+      uvLockFile = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        example = "uv.lock";
+        description = ''
+          Relative path to the uv lock that `lockFile` is exported from.
+          When set, `tk sync` first re-exports `lockFile` (a PEP 751
+          pylock.toml) with `uv export --all-packages --no-dev` whenever
+          the uv lock or pyproject.toml changes, then regenerates the deps
+          file from it. Requires `lockFile`.
+        '';
+      };
     };
 
     # ==========================================================================

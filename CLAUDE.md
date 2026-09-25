@@ -278,7 +278,7 @@ my-dep.workspace = true       # ✅ Correct
 - All Python source lives under the shared `turnkey.*` PEP 420 namespace package. Members never define a `turnkey/__init__.py`.
 - Cross-member deps are declared with `[tool.uv.sources]` workspace markers, mirroring `Cargo.toml`'s `workspace = true` pattern.
 - Externals are declared in the member that consumes them. The lockfile reconciles versions across the workspace.
-- Adding/removing deps: edit the member's `pyproject.toml`, then `uv lock && uv export --all-packages --format pylock.toml -o pylock.toml`. `tk sync` regenerates `python-deps.toml` from `pylock.toml`.
+- Adding/removing deps: `uv add`/`uv remove`, or edit the member's `pyproject.toml` and run `tk sync`. `tk sync` re-exports `pylock.toml` from `uv.lock` (`uv export --all-packages --no-dev`), then regenerates `python-deps.toml` from it.
 - Downstream monorepos that adopt this framework pick their own namespace (e.g. `acme.<name>`); see `docs/user-manual/src/workflows/python-workspace.md`.
 
 ### TypeScript/JavaScript

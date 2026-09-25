@@ -190,23 +190,28 @@ python_test(
 # 1. Edit the member that needs the dep
 $EDITOR src/python/cargo/pyproject.toml      # add to [project] dependencies
 
-# 2. Regenerate the lock
-uv lock
-
-# 3. Refresh editable installs (optional but recommended)
+# 2. Refresh editable installs (optional but recommended)
 uv sync
 
-# 4. Export to PEP 751 lock for the Buck2 pipeline
-#    --all-packages: include externals from every member
-#    --no-dev:       exclude dev tooling (pytest etc.) from the pydeps cell
-uv export --all-packages --no-dev --format pylock.toml -o pylock.toml
-
-# 5. Refresh python-deps.toml for the pydeps cell
-#    (tk sync picks this up automatically when pylock.toml is newer)
+# 3. Refresh the Buck2 pipeline
 tk sync
 ```
 
-Steps 2–4 are manual today; future work can fold them into `tk sync` as a pre-step.
+`uv add` and `uv remove` do the same in one step: the `uv` wrapper runs
+`tk sync` itself when they change `uv.lock`.
+
+`tk sync` runs two rules, in order:
+
+1. **pylock** re-exports `pylock.toml` from `uv.lock` when `uv.lock` or
+   `pyproject.toml` is newer, relocking first if `pyproject.toml` changed:
+   `uv export --all-packages --no-dev --format pylock.toml`.
+   `--all-packages` includes externals from every member, and `--no-dev`
+   keeps dev tooling (pytest etc.) out of the pydeps cell.
+2. **python** regenerates `python-deps.toml` from `pylock.toml`.
+
+The pylock rule exists when the flake sets `buck2.python.uvLockFile`
+(turnkey's own flake sets it to `uv.lock`) along with
+`buck2.python.lockFile`.
 
 ## Running Code
 

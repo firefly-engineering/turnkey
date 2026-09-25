@@ -342,6 +342,7 @@
                 enable = true;
                 depsFile = ./python-deps.toml; # Python package dependencies
                 lockFile = "pylock.toml";      # PEP 751 lock exported from uv
+                uvLockFile = "uv.lock";        # tk sync re-exports pylock.toml from it
               };
 
               # JavaScript/TypeScript dependencies

@@ -119,9 +119,32 @@ in
         inherit (langCfg) depsFile;
         inherit userPatchesDir;
       };
+    # With a uv lock, pylock.toml is exported from it first, so a `uv add`
+    # reaches python-deps.toml in one tk sync.
     syncRules =
       langCfg:
-      lib.optional (hasCell langCfg) (
+      lib.optional (hasCell langCfg && langCfg.uvLockFile != null) {
+        name = "pylock";
+        sources = [
+          langCfg.pyprojectFile
+          langCfg.uvLockFile
+        ];
+        target =
+          if langCfg.lockFile != null then
+            langCfg.lockFile
+          else
+            throw "turnkey: buck2.python.uvLockFile needs buck2.python.lockFile, the pylock.toml to export it to";
+        generator = [
+          "uv"
+          "export"
+          "--all-packages"
+          "--no-dev"
+          "--format"
+          "pylock.toml"
+          "--quiet"
+        ];
+      }
+      ++ lib.optional (hasCell langCfg) (
         if langCfg.lockFile != null then
           {
             name = "python";
