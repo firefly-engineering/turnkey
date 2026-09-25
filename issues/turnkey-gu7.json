@@ -4,13 +4,15 @@
   "blocks": [
     "turnkey-vnm.24"
   ],
+  "closed_at": "2026-09-25T11:17:27Z",
+  "close_reason": "forge --use \u003ctoolchain solc\u003e --offline; mapping takes solc/forge from the declared solidity-toolchain; verified Solc 0.8.34 in test output.",
   "created": "2026-09-25T07:51:11Z",
   "description": "Found during test-input research (docs/research/test-undeclared-inputs.md on jj bookmark research/test-undeclared-inputs (from turnkey-w55.3)), not yet verified at runtime. forge appears to auto-detect or download solc via svm under $HOME instead of using the toolchain's solc 0.8.34. It also merges ~/.foundry/foundry.toml if present, and fuzzes without a fixed seed. Verify which solc forge actually selects, and pin it (e.g. --use / --offline, FOUNDRY_* via the rule) so results depend only on declared inputs.",
   "id": "turnkey-gu7",
   "labels": [],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "solidity_test may not use the Nix-provided solc",
   "type": "bug",
-  "updated_at": "2026-09-25T11:14:20Z"
+  "updated_at": "2026-09-25T11:17:27Z"
 }
