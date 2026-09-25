@@ -1,7 +1,8 @@
 {
   "assignee": "",
   "blocked_by": [
-    "turnkey-w55.1"
+    "turnkey-w55.1",
+    "turnkey-w55.2"
   ],
   "blocks": [],
   "created": "2026-09-25T07:31:10Z",
@@ -15,5 +16,5 @@
   "status": "open",
   "title": "Which mechanism makes test results cacheable locally and remotely?",
   "type": "task",
-  "updated_at": "2026-09-25T07:31:19Z"
+  "updated_at": "2026-09-25T07:31:20Z"
 }

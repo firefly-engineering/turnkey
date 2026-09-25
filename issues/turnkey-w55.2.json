@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "turnkey-w55.7"
+  ],
   "created": "2026-09-25T07:30:57Z",
   "description": "## Question\n\nWe need a server speaking the Bazel remote-execution API (the API buck2 uses) that can run on every developer machine, darwin and Linux, as a per-user service. Survey NativeLink, bazel-remote, buildbarn, BuildBuddy and anything else credible. For each:\n\n1. Can it run as a **cache only** (action cache + CAS, no workers)? Can it run **with local workers** that execute actions on the same machine? Do those workers work on darwin?\n2. Has it been used with buck2 (buck2 docs, `examples/remote_execution/` in the buck2 repo)? What `[buck2_re_client]` configuration does it need?\n3. Packaging in nixpkgs (package name and version), footprint (memory, disk, startup), storage limits and eviction.\n4. Sandboxing and hermeticity on workers: are only declared inputs visible to an action?\n5. Can the same server later be pointed at, or replaced by, a shared remote-execution backend without changing cache keys?",
   "id": "turnkey-w55.2",
@@ -13,5 +15,5 @@
   "status": "open",
   "title": "Which remote-execution-API servers can run on a developer machine?",
   "type": "task",
-  "updated_at": "2026-09-25T07:30:57Z"
+  "updated_at": "2026-09-25T07:31:20Z"
 }
