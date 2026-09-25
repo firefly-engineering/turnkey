@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-kxe"
+  ],
   "blocks": [],
   "created": "2026-09-25T19:18:06Z",
   "description": "CI doesn't run buck2 at all, so there is nothing to speed up and no trusted cache writer. Needs the slim CI shell and cells in Cachix; turnkey-kxe covers the parity-suite subset. See docs/research/remote-execution-and-caching.md (commit adc3619d) §5.",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "CI runs tk build //... and tk test //... in a slim CI shell (G0)",
   "type": "task",
-  "updated_at": "2026-09-25T19:18:06Z"
+  "updated_at": "2026-09-25T19:18:09Z"
 }
