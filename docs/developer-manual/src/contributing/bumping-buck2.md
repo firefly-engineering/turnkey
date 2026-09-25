@@ -54,14 +54,10 @@ evaluation fails and names both commits. Fix the toolbox entry.
 
 ## 3. Port the prelude patches
 
-Follow `nix/patches/prelude/README.md`:
-
-1. Create `nix/patches/prelude/<new version>/`.
-2. Carry every patch of the current set over, redoing the ones that no
-   longer apply.
-3. Delete the old version's directory. `nix/buck2/prelude.nix` fails if the
-   pinned prelude has no patch set, so a forgotten port can't ship
-   unpatched.
+Follow `nix/patches/prelude/README.md`: dry-run each patch against the new
+upstream prelude, and redo in place the ones that no longer apply. There is
+one patch set, for the pinned release only; `nix build .#turnkey-prelude`
+fails if any patch doesn't apply, so a forgotten port can't ship unpatched.
 
 Read upstream prelude changes that touch the patched code, not just the
 hunks that fail to apply. In 2026-07-01 the new preludes gave tests without

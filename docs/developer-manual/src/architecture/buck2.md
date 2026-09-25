@@ -236,7 +236,7 @@ Buck2 supports external cells (bundled or git-based):
 The prelude is built by `nix/buck2/prelude.nix`:
 
 1. Take the upstream buck2-prelude of the pinned buck2 release, from toolbox
-2. Apply the patch set for its version, from `nix/patches/prelude/<version>/`
+2. Apply turnkey's patch set, `nix/patches/prelude/*.patch`
 3. Copy extensions from `nix/buck2/prelude-extensions/`
 
 See [Prelude Extensions](../extending/prelude-extensions.md) for adding custom rules.

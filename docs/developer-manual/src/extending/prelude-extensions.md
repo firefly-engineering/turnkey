@@ -320,7 +320,7 @@ the release was built with, taken from the release's `prelude_hash` asset.
 Evaluation fails if toolbox's prelude for that date is a different commit, so a
 mismatched pair can't be built. Fix a wrong entry in toolbox, not in turnkey.
 
-The binary, the prelude and turnkey's patches for it (`nix/patches/prelude/<version>/`)
+The binary, the prelude and turnkey's patches for it (`nix/patches/prelude/*.patch`)
 move together, in the change that bumps the pin.
 
 ## Existing Extensions
