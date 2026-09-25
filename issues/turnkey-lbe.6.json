@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "turnkey-lbe.4"
+  ],
   "created": "2026-09-25T19:18:08Z",
   "description": "Prelude extension reading turnkey.remote_cache / turnkey.cache_writer from buckconfig, carrying the G3 salt. Keeps a no-cache default. Prerequisite for any cache or RE setup. See docs/research/remote-execution-and-caching.md (commit adc3619d) §5.",
   "id": "turnkey-lbe.6",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Turnkey-owned execution platform replacing prelude//platforms:default (G5)",
   "type": "task",
-  "updated_at": "2026-09-25T19:18:08Z"
+  "updated_at": "2026-09-25T19:18:10Z"
 }
