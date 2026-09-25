@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-luk.6"
+  ],
   "blocks": [],
   "created": "2026-09-25T15:11:18Z",
   "description": "## Question\n\nUpdate the user manual (project-setup, toolchain-toml config reference, test result caching's unsupported-buck2 note), developer manual (architecture/buck2, prelude-extensions), e2e fixtures and the templates to the bundled model, and write the migration note the evaluation error points at.",
@@ -13,5 +15,5 @@
   "status": "open",
   "title": "Update docs, e2e and the migration note for the bundled buck2",
   "type": "task",
-  "updated_at": "2026-09-25T15:11:18Z"
+  "updated_at": "2026-09-25T15:11:23Z"
 }
