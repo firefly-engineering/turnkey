@@ -6,14 +6,16 @@
   "blocks": [
     "turnkey-pru.4"
   ],
+  "closed_at": "2026-09-25T20:58:29Z",
+  "close_reason": "Landed as 5 jj changes (ntywvutv..tyzntwyk): toolchain.toml read only via toolchain-declaration.nix; toolchains cell, buckconfig and sync.toml are pure functions with checks.buck2-generators; one managed-links routine for enterShell and direnv; git hooks in their own module. buck2.nix 949 -\u003e 407 lines.",
   "created": "2026-09-25T20:29:52Z",
   "description": "buck2.nix (949 lines) mixes toolchain closure, rules.star render, buckconfig+test-cache wiring, sync.toml, enterShell bash and git hooks. Extract pure generators for rules.star/buckconfig/sync.toml with eval checks; one managed-symlink routine shared with direnv-lib; read toolchain.toml only through nix/lib/toolchain-declaration.nix.",
   "id": "turnkey-pru.3",
   "labels": [],
   "parent": "turnkey-pru",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Split buck2.nix into pure generators behind eval checks",
   "type": "task",
-  "updated_at": "2026-09-25T20:53:09Z"
+  "updated_at": "2026-09-25T20:58:29Z"
 }
