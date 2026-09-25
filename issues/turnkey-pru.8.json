@@ -6,14 +6,16 @@
   "blocks": [
     "turnkey-pru.9"
   ],
+  "closed_at": "2026-09-25T21:16:14Z",
+  "close_reason": "Landed as qrzurkql (fix: godeps-gen hashed github/golang.org/x/gopkg.in/go.uber.org modules as GitHub archives while the cell fetches proxy zips - fresh regeneration broke the godeps cell; now proxy-only via nix-prefetch-cached; deleted src/go/pkg/prefetchcache; verified fresh regeneration reproduces committed go-deps.toml) and wzuvkoml (rustdeps-gen/pydeps-gen nix-prefetch-cached only).",
   "created": "2026-09-25T20:29:53Z",
   "description": "src/go/pkg/prefetchcache copies the Rust prefetch-cache file format as literals (cache.go:25); prefetch fallback logic is copied in godeps, rustdeps-gen and pydeps-gen; no cross-process locking. Generators shell out to nix-prefetch-cached.",
   "id": "turnkey-pru.8",
   "labels": [],
   "parent": "turnkey-pru",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "nix-prefetch-cached is the only way into the prefetch cache",
   "type": "task",
-  "updated_at": "2026-09-25T21:11:49Z"
+  "updated_at": "2026-09-25T21:16:14Z"
 }
