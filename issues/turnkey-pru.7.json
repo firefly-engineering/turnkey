@@ -6,14 +6,16 @@
   "blocks": [
     "turnkey-pru.8"
   ],
+  "closed_at": "2026-09-25T21:11:48Z",
+  "close_reason": "Landed as urmkqwrk (fix: rule with no sources skipped - tk sync/build failed in any project with default go.enable and no go.mod; one freshness decision via staleness.Check) and lrmmuyly (syncer.Load; tk sync/check one function; tw uses Load). Exec port not added: single adapter, tests use real echo.",
   "created": "2026-09-25T20:29:53Z",
   "description": "syncer (no tests), snapshot (no tests), staleness.IsStale, cellfresh and tk runSync/runCheck repeat the same loop; exec is not injectable (cellfresh KillCommand global). One module owns stale-\u003eregenerate-\u003ereload with exec and fs ports.",
   "id": "turnkey-pru.7",
   "labels": [],
   "parent": "turnkey-pru",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "One freshness module for sync, check and cell reload",
   "type": "task",
-  "updated_at": "2026-09-25T21:09:42Z"
+  "updated_at": "2026-09-25T21:11:48Z"
 }
