@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-09-25T07:30:33Z",
@@ -9,8 +9,8 @@
     "wayfinder:map"
   ],
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Test result caching for turnkey's buck2 tests",
   "type": "epic",
-  "updated_at": "2026-09-25T07:30:34Z"
+  "updated_at": "2026-09-25T07:31:29Z"
 }
