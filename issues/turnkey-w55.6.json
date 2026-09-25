@@ -15,11 +15,15 @@
     {
       "text": "Input from turnkey-w55.3: caching is only sound when tests run through tk. The buck2 daemon doesn't notice cell symlink retargets; tk's cellfresh kills it, plain buck2 doesn't. This bears on whether plain 'buck2 test' should behave like 'tk test'.",
       "timestamp": "2026-09-25T07:51:11Z"
+    },
+    {
+      "text": "Resolution (grilled 2026-09-25). 'Hit' added to CONTEXT.md in commit https://github.com/firefly-engineering/turnkey/commit/bc72756b6e89.\n\nFacts (buck2 7600cb80): the console per-test line and the 'Tests finished' summary are identical for a hit and a fresh run, because the TestResult event has no execution kind. Only the TestRunEnd command_report in the event log and 'buck2 log what-ran' show a cache hit. The OSS runner prints stdout/stderr for every test, passes included. On an RE hit the stored output is fetched and printed, and nothing is written to buck-out. OSS has no structured test report: --build-report has no test fields and --xml is ignored. Exit codes are 0 for all-pass, 32 for any test failure, and 2 or 3 for a build failure. tk hands the process over to buck2 (syscall.Exec) and never touches its output.\n\nDecisions:\n1. A hit is visible in every surface. Each hit is recognisable per test target in the console output of tk test, marked with the word 'recorded' ('recorded, remote' when it came from a remote store).\n2. The summary separates hits within the pass count, e.g. 'Pass 40 (38 recorded)'.\n3. Exit codes and everything else scripts rely on are identical for a hit and a fresh pass.\n4. The original run's output is replayed inline like a fresh pass's output (buck2 prints pass output). 'On demand' means the event log (buck2 log show). There is no separate log store and nothing in buck-out.\n5. Provenance lives in structured output only: hit or not, local vs remote, and the original duration. The recording host and time are deferred to the shared-cache trust question.\n6. The duration of a hit is the original run's duration in structured output. The console shows no duration for hits.\n7. Placement is left to the mechanism. The requirement is the result, not where it appears: in buck2's own lines (buck2 patch or a runner we own) or in lines tk adds (which means tk stops handing the process over to buck2). The marker must not exist only in buck2 log.\n8. The event log is the v1 structured surface. For each test result it must show whether it was a hit, local vs remote, and the original duration. No new report format (e.g. --report=json) in v1.\n9. Plain buck2 test: already decided by the reuse policy (neither reads nor records).",
+      "timestamp": "2026-09-25T09:16:59Z"
     }
   ],
   "priority": 2,
   "status": "in_progress",
   "title": "What does a cache hit look like to someone running tk test?",
   "type": "task",
-  "updated_at": "2026-09-25T09:03:32Z"
+  "updated_at": "2026-09-25T09:16:59Z"
 }
