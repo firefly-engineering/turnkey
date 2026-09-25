@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T10:54:23Z",
+  "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nFor the `test` subcommand only, tk runs buck2 as a child process, not handing over the process. After buck2's summary it prints `N recorded`, from a count the runner leaves behind. Every other subcommand still hands over the process (spec §2).\n\n## Acceptance criteria\n\n- [ ] `tk test` prints `N recorded` after the summary\n- [ ] The exit code is exactly buck2's\n- [ ] Signals (Ctrl-C) reach buck2 as before\n- [ ] Other subcommands still hand over the process\n\n## Blocked by\n\n- turnkey-vnm.6\n",
+  "id": "turnkey-vnm.12",
+  "labels": [],
+  "parent": "turnkey-vnm",
+  "priority": 2,
+  "status": "open",
+  "title": "tk test prints the recorded count",
+  "type": "task",
+  "updated_at": "2026-09-25T10:54:23Z"
+}
