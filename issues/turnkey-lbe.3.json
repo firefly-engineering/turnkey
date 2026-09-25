@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "turnkey-lbe.11"
+  ],
   "created": "2026-09-25T19:18:07Z",
   "description": "go_copy_goroot only runs 'go env GOROOT', so its key doesn't identify the Go version; inferred (not traced) that darwin and Linux can share a key. Options: cell symlink goroot -\u003e store path, or store path in copy_goroot argv. See docs/research/remote-execution-and-caching.md (commit adc3619d) §5.",
   "id": "turnkey-lbe.3",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Go toolchain: make GOROOT a keyed input instead of PATH (G2)",
   "type": "task",
-  "updated_at": "2026-09-25T19:18:07Z"
+  "updated_at": "2026-09-25T19:18:11Z"
 }

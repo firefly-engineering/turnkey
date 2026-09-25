@@ -1,7 +1,8 @@
 {
   "assignee": "",
   "blocked_by": [
-    "turnkey-lbe.2"
+    "turnkey-lbe.2",
+    "turnkey-lbe.3"
   ],
   "blocks": [],
   "created": "2026-09-25T19:18:09Z",
@@ -13,5 +14,5 @@
   "status": "open",
   "title": "Verify action keys match across machines (G10)",
   "type": "task",
-  "updated_at": "2026-09-25T19:18:10Z"
+  "updated_at": "2026-09-25T19:18:11Z"
 }
