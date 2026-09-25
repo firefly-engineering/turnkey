@@ -23,6 +23,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/buck2args"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/cellfresh"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/localconfig"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
@@ -90,12 +91,14 @@ func main() {
 		os.Exit(exitCode)
 	}
 
-	// Determine if this command needs sync first
-	needsSync := shouldSync(subcommand)
+	// Determine if this command needs sync first, from buck2's subcommand
+	// (past its universal options)
+	buck2Subcommand, _ := buck2args.Subcommand(args)
+	needsSync := shouldSync(buck2Subcommand)
 
 	if needsSync && !noSync {
 		if verbose {
-			fmt.Fprintf(os.Stderr, "tk: syncing before %s...\n", subcommand)
+			fmt.Fprintf(os.Stderr, "tk: syncing before %s...\n", buck2Subcommand)
 		}
 		if exitCode := runSync(); exitCode != 0 {
 			os.Exit(exitCode)
@@ -543,7 +546,7 @@ func delegateToBuck2(args []string) {
 	// last, so the flags land first after `--`: the runner's --test-arg
 	// consumes every argument after it.
 	report := ""
-	if len(args) > 0 && args[0] == "test" {
+	if subcommand, _ := buck2args.Subcommand(args); subcommand == "test" {
 		args, report = withTestCache(args)
 	}
 
@@ -660,8 +663,8 @@ func applyLocalOverrides(args []string) []string {
 		return args
 	}
 
-	// Get the subcommand (first arg)
-	subcommand := args[0]
+	// The subcommand, past buck2's universal options
+	subcommand, index := buck2args.Subcommand(args)
 
 	// Only apply to run, build, test
 	if subcommand != "run" && subcommand != "build" && subcommand != "test" {
@@ -670,7 +673,7 @@ func applyLocalOverrides(args []string) []string {
 
 	// Find the target (first arg starting with //)
 	target := ""
-	for _, arg := range args[1:] {
+	for _, arg := range args[index+1:] {
 		if strings.HasPrefix(arg, "//") {
 			target = arg
 			break

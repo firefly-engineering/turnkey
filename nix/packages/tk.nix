@@ -29,6 +29,7 @@ pkgs.buildGoModule {
       (root + "/go.mod")
       (root + "/go.sum")
       (root + "/src/cmd/tk")
+      (root + "/src/go/pkg/buck2args")
       (root + "/src/go/pkg/localconfig")
       (root + "/src/go/pkg/syncconfig")
       (root + "/src/go/pkg/syncer")
