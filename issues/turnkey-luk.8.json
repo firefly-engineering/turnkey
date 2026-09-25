@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [
     "turnkey-luk.2"
   ],
@@ -14,8 +14,8 @@
   ],
   "parent": "turnkey-luk",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Should the parity suite be a CI gate for buck2 pin bumps?",
   "type": "task",
-  "updated_at": "2026-09-25T15:11:24Z"
+  "updated_at": "2026-09-25T15:23:59Z"
 }
