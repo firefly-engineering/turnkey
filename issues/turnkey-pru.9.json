@@ -4,14 +4,16 @@
     "turnkey-pru.8"
   ],
   "blocks": [],
+  "closed_at": "2026-09-25T21:21:19Z",
+  "close_reason": "Landed as qssrurlm (fix: rules sync dropped deps written outside the turnkey markers and all but one label per line; markers now read from AST comments) and pvmwqutn (go.mod module path via modfile). Per-language plug-in restructure of mapper/rulessync not done: rules sync is disabled in this repo, so there is no signal to validate it against - see follow-up ticket.",
   "created": "2026-09-25T20:29:53Z",
   "description": "mapper.go repeats seven functions per language; rulessync switches on language three times; go.mod parsed in three places; starlark/parser.go:224-293 re-scans deps text after AST parse and may drop deps outside the markers.",
   "id": "turnkey-pru.9",
   "labels": [],
   "parent": "turnkey-pru",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Per-language plug-in for rules sync; markers on the AST",
   "type": "task",
-  "updated_at": "2026-09-25T21:16:14Z"
+  "updated_at": "2026-09-25T21:21:19Z"
 }
