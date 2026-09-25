@@ -18,11 +18,15 @@
     {
       "text": "Implement the interface settled in turnkey-luk.4 (see its resolution comment): buck2.shells list + master buck2.enable, read-only buck2.version in both modules, standalone devenv module resolves the pin itself.",
       "timestamp": "2026-09-25T15:23:58Z"
+    },
+    {
+      "text": "Resolution: commit 385c53d0 (not pushed). buck2.shells (default [\"default\"]) under buck2.enable; read-only buck2.version in both modules; the pinned buck2 (same store path as buck2-toolchain 5) is on PATH of listed shells; welcome message shows 'buck2 2026-09-15'; declaring buck2/buck2-toolchain throws with a link to docs/user-manual/src/configuration/buck2-integration.md#the-buck2-version (turnkey-luk.7 must write that section with that heading); unknown names in buck2.shells throw. Deviation from turnkey-luk.4 Q5: the devenv module gets the pinned binary injected by the flake-parts module as an internal option (turnkey.buck2.package), like tellerLib, since it has no standalone path without that injection anyway. mappings.nix buck2 skip entries removed (resolves that fog patch). Verified: flake check + builds, fresh shell, docs shell has no buck2, both errors fire, tk build + test with a recorded hit.",
+      "timestamp": "2026-09-25T16:12:00Z"
     }
   ],
   "priority": 2,
   "status": "in_progress",
   "title": "Replace toolchain.toml buck2 declarations with the per-shell option",
   "type": "task",
-  "updated_at": "2026-09-25T15:58:36Z"
+  "updated_at": "2026-09-25T16:12:00Z"
 }
