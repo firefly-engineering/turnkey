@@ -5,7 +5,9 @@
   "created": "2026-09-25T11:13:10Z",
   "description": "Found while fixing turnkey-vnm.22. solidity_library's compile action still reads soldeps through the literal cell path (read_root_config cells.soldeps + remappings.txt), so OpenZeppelin/forge-std sources are not inputs of the build action: changing a soldeps package doesn't rebuild dependents. solidity_test now depends on soldeps//:bundle instead; solidity_library should do the same (the bundle target and the macro pattern already exist in the solidity prelude extension).",
   "id": "turnkey-acd",
-  "labels": [],
+  "labels": [
+    "ready-for-agent"
+  ],
   "priority": 3,
   "status": "open",
   "title": "solidity_library compiles soldeps sources it doesn't declare",
