@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [
     "turnkey-luk.4",
     "turnkey-luk.5"
@@ -21,8 +21,8 @@
     }
   ],
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Replace toolchain.toml buck2 declarations with the per-shell option",
   "type": "task",
-  "updated_at": "2026-09-25T15:23:58Z"
+  "updated_at": "2026-09-25T15:58:36Z"
 }
