@@ -1,7 +1,8 @@
 {
   "assignee": "",
   "blocked_by": [
-    "turnkey-kxe"
+    "turnkey-kxe",
+    "turnkey-lbe.10"
   ],
   "blocks": [],
   "created": "2026-09-25T19:18:06Z",
@@ -13,5 +14,5 @@
   "status": "open",
   "title": "CI runs tk build //... and tk test //... in a slim CI shell (G0)",
   "type": "task",
-  "updated_at": "2026-09-25T19:18:09Z"
+  "updated_at": "2026-09-25T19:18:10Z"
 }
