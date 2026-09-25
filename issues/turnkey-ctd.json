@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T07:51:10Z",
+  "description": "Found during test-input research (docs/research/test-undeclared-inputs.md on jj bookmark research/test-undeclared-inputs (from turnkey-w55.3)). The rust_test targets for the check-*-rs tools compile but contain no test functions, so they pass vacuously. Either add tests or drop the targets.",
+  "id": "turnkey-ctd",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "check-*-rs rust_test targets contain no tests",
+  "type": "bug",
+  "updated_at": "2026-09-25T07:51:10Z"
+}
