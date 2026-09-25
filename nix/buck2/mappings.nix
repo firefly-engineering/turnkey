@@ -15,9 +15,25 @@
 # implicit dependency needs its registry entries too (go needs python and
 # clang), even though nothing declares it.
 
-{ lib }:
+{
+  lib,
+  # Packages whose bin/ mdbook runs preprocessors from (buck2.mdbook.preprocessors)
+  mdbookPreprocessors ? [ ],
+}:
 
 let
+  # Where mdbook finds its preprocessors: the configured packages, and
+  # mdbook-toolchain's bin/ when the registry has it (it bundles them)
+  mdbookPreprocessorAttrs =
+    registry:
+    let
+      paths = lib.unique (
+        map (p: "${p}/bin") mdbookPreprocessors
+        ++ lib.optional (registry ? "mdbook-toolchain") "${registry.mdbook-toolchain}/bin"
+      );
+    in
+    lib.optionalAttrs (paths != [ ]) { preprocessor_paths = paths; };
+
   tool =
     registry: name:
     registry.${name} or (throw ''
@@ -441,7 +457,8 @@ in
           python_path = "${tool registry "python"}/bin/python3";
           # Output served books to .turnkey/books/ to keep source tree clean
           serve_output_dir = ".turnkey/books";
-        };
+        }
+        // mdbookPreprocessorAttrs registry;
       }
     ];
     implicitDependencies = [ ];
@@ -462,7 +479,8 @@ in
           mdbook_path = "${tool registry "mdbook-toolchain"}/bin/mdbook";
           python_path = "${tool registry "python"}/bin/python3";
           serve_output_dir = ".turnkey/books";
-        };
+        }
+        // mdbookPreprocessorAttrs registry;
       }
     ];
     implicitDependencies = [ ];

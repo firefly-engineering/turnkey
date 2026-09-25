@@ -19,7 +19,10 @@ let
   checkRustEditionRs = import ../../packages/check-rust-edition-rs.nix { inherit pkgs lib; };
 
   # Load the toolchain mappings
-  mappings = import ../../buck2/mappings.nix { inherit lib; };
+  mappings = import ../../buck2/mappings.nix {
+    inherit lib;
+    mdbookPreprocessors = cfg.mdbook.preprocessors;
+  };
 
   # Toolchain declarations (name -> spec, e.g. { version = "3"; }) from the declaration file
   declaredToolchains =
@@ -28,47 +31,12 @@ let
     else
       { };
 
-  # Get toolchain names from the declaration file
-  toolchainNames = builtins.attrNames declaredToolchains;
-
-  # Filter to only Buck2-relevant toolchains (those with mappings and not skipped)
-  buck2Toolchains = builtins.filter (
-    name: mappings ? ${name} && !(mappings.${name}.skip or false)
-  ) toolchainNames;
-
-  # Collect all implicit dependencies transitively
-  collectDeps =
-    toolchains:
-    let
-      directDeps = builtins.concatMap (
-        name: mappings.${name}.implicitDependencies or [ ]
-      ) toolchains;
-      # Only include deps that have mappings and aren't skipped
-      validDeps = builtins.filter (
-        name: mappings ? ${name} && !(mappings.${name}.skip or false)
-      ) directDeps;
-      allDeps = lib.unique (toolchains ++ validDeps);
-    in
-    # Recurse until stable (handle transitive deps)
-    if allDeps == toolchains then toolchains else collectDeps allDeps;
-
-  # All toolchains including implicit dependencies
-  allToolchains = collectDeps buck2Toolchains;
-
-  # Add always-include toolchains (like genrule)
-  alwaysIncluded = builtins.filter (name: mappings.${name}.alwaysInclude or false) (
-    builtins.attrNames mappings
-  );
-
-  finalToolchains = lib.unique (allToolchains ++ alwaysIncluded);
-
-  # Collect runtime dependencies from all active toolchains
-  # These are packages that must be in PATH for Buck2 actions (e.g., clang for cxx)
-  runtimeDeps = lib.unique (
-    builtins.concatMap (
-      name: mappings.${name}.runtimeDependencies or [ ]
-    ) finalToolchains
-  );
+  # What the toolchains cell holds (nix/buck2/toolchains-cell.nix)
+  toolchainsCellContent = import ../../buck2/toolchains-cell.nix { inherit lib; } {
+    inherit mappings declaredToolchains resolvedRegistry;
+  };
+  finalToolchains = toolchainsCellContent.toolchains;
+  inherit (toolchainsCellContent) runtimeDeps;
 
   # Teller lib for registry resolution (injected via flake-parts module)
   turnkeyLib = turnkeyCfg.tellerLib;
@@ -115,87 +83,13 @@ let
     # Always include deps-extract (used by tk rules sync for all non-Go languages)
     ++ [ depsExtract ];
 
-  # Generate load statements for rules.star file
-  generateLoads =
-    toolchains:
-    let
-      # Collect all unique load statements
-      loads = lib.unique (
-        builtins.concatMap (
-          name:
-          map (t: {
-            path = t.load;
-            rule = t.rule;
-          }) (mappings.${name}.targets or [ ])
-        ) toolchains
-      );
-      # Group by load path for cleaner output
-      byPath = lib.groupBy (l: l.path) loads;
-      loadStmts = lib.mapAttrsToList (
-        path: rules: ''load("${path}", ${lib.concatMapStringsSep ", " (r: ''"${r.rule}"'') rules})''
-      ) byPath;
-    in
-    lib.concatStringsSep "\n" loadStmts;
-
-  # Generate target instantiations for rules.star file
-  generateTargets =
-    toolchains:
-    let
-      targets = builtins.concatMap (
-        name:
-        map (
-          t:
-          let
-            # Static attrs defined in the mapping
-            staticAttrs = t.attrs or { };
-            # Dynamic attrs resolved from registry (e.g., absolute paths to compilers)
-            dynamicAttrs =
-              if t ? dynamicAttrs then t.dynamicAttrs resolvedRegistry else { };
-            # Inject mdbook preprocessor paths from config and/or mdbook-toolchain
-            preprocessorAttrs =
-              if t.name == "mdbook" then
-                let
-                  # Explicit preprocessors from config
-                  configPaths = map (p: "${p}/bin") cfg.mdbook.preprocessors;
-                  # Auto-detect mdbook-toolchain in registry (has preprocessors in same bin/)
-                  toolchainPath =
-                    if resolvedRegistry ? "mdbook-toolchain"
-                    then [ "${resolvedRegistry.mdbook-toolchain}/bin" ]
-                    else [];
-                  allPaths = lib.unique (configPaths ++ toolchainPath);
-                in
-                if allPaths != [] then { preprocessor_paths = allPaths; } else {}
-              else {};
-            # Merge: dynamic attrs override static attrs, preprocessors on top
-            attrs = staticAttrs // dynamicAttrs // preprocessorAttrs;
-            attrLines =
-              [ "    name = \"${t.name}\"," ]
-              ++ [ "    visibility = ${builtins.toJSON t.visibility}," ]
-              ++ (lib.mapAttrsToList (k: v: "    ${k} = ${builtins.toJSON v},") attrs);
-          in
-          "${t.rule}(\n${lib.concatStringsSep "\n" attrLines}\n)"
-        ) (mappings.${name}.targets or [ ])
-      ) toolchains;
-    in
-    lib.concatStringsSep "\n\n" targets;
-
-  # Generate the complete rules.star file content
-  buckFileContent = ''
-# Generated by turnkey - do not edit manually
-# Toolchains: ${lib.concatStringsSep ", " finalToolchains}
-
-${generateLoads finalToolchains}
-
-${generateTargets finalToolchains}
-'';
-
   # Toolchains cell derivation
   toolchainsCell = pkgs.runCommand "turnkey-toolchains-cell" { } ''
     mkdir -p $out
 
     # Create BUCK file (Buck2's buildfile name setting only applies to root cell)
     cat > $out/BUCK <<'BUCK'
-    ${buckFileContent}
+    ${toolchainsCellContent.buckFile}
     BUCK
 
     # Create cell identity .buckconfig
