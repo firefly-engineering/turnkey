@@ -6,13 +6,17 @@ The `toolchain.toml` file declares which toolchains your project needs.
 
 ```toml
 [toolchains]
-buck2 = {}
 go = {}
 rust = {}
 python = {}
 ```
 
 Each key under `[toolchains]` is a toolchain name that will be resolved from the registry.
+
+buck2 is not declared here. Turnkey ships its own pinned buck2 release to the
+shells that have the Buck2 integration, and declaring `buck2` or
+`buck2-toolchain` is an error. See
+[The buck2 version](./buck2-integration.md#the-buck2-version).
 
 ## Version Pinning
 
@@ -28,9 +32,6 @@ rust = {}                       # Use registry default
 If no version is specified, the registry's default version is used.
 
 ## Available Toolchains
-
-### Build Systems
-- `buck2` - Buck2 build system
 
 ### Languages
 - `go` - Go compiler and tools
@@ -69,7 +70,6 @@ For example, if you have `go = {}` in your toolchain.toml and `buck2.go.enable =
 
 ```toml
 [toolchains]
-buck2 = {}
 go = {}
 ```
 
@@ -77,9 +77,6 @@ go = {}
 
 ```toml
 [toolchains]
-# Build
-buck2 = {}
-
 # Backend
 go = {}
 python = {}

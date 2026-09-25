@@ -81,7 +81,7 @@ system_go_toolchain(
 ### Prelude Cell (`.turnkey/prelude/`)
 
 Symlink to Nix-built prelude with:
-- Upstream buck2-prelude at pinned commit
+- Upstream buck2-prelude of the pinned buck2 release (`nix/buck2/buck2-source.nix`)
 - Applied patches
 - Custom extensions (TypeScript, mdbook, etc.)
 
@@ -235,8 +235,8 @@ Buck2 supports external cells (bundled or git-based):
 
 The prelude is built by `nix/buck2/prelude.nix`:
 
-1. Fetch upstream buck2-prelude
-2. Apply patches from `nix/patches/prelude/`
+1. Take the upstream buck2-prelude of the pinned buck2 release, from toolbox
+2. Apply the patch set for its version, from `nix/patches/prelude/<version>/`
 3. Copy extensions from `nix/buck2/prelude-extensions/`
 
 See [Prelude Extensions](../extending/prelude-extensions.md) for adding custom rules.

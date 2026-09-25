@@ -117,7 +117,6 @@ cat > flake.nix << EOF
           declarationFiles.default = ./toolchain.toml;
 
           registry = {
-            buck2 = pkgs.buck2;
             nix = pkgs.nix;
             go = pkgs.go;
             clang = pkgs.llvmPackages.clang;
@@ -144,7 +143,6 @@ EOF
 step "Adding toolchain.toml"
 cat > toolchain.toml << 'EOF'
 [toolchains]
-buck2 = {}
 nix = {}
 go = {}
 godeps-gen = {}

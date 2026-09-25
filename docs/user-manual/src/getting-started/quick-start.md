@@ -8,11 +8,12 @@ Create a `toolchain.toml` file in your project root:
 
 ```toml
 [toolchains]
-buck2 = {}
 go = {}
 ```
 
-This declares that your project needs Buck2 and Go.
+This declares that your project needs Go. Buck2 isn't declared: turnkey
+ships its own pinned buck2 release, which `buck2.enable` below adds to the
+shell.
 
 ## Configure Your Flake
 

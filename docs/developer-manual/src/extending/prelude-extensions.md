@@ -305,33 +305,23 @@ The Buck2 binary and its prelude must be version-matched. Using a mismatched pre
 
 ### Symptoms
 
-| Error | Likely Cause | Fix |
-|-------|--------------|-----|
-| "Unexpected parameter named `X`" | Prelude too new | Use older prelude commit |
-| "Missing named-only parameter `X`" | Prelude too old | Use newer prelude commit |
+| Error | Likely Cause |
+|-------|--------------|
+| "Unexpected parameter named `X`" | Prelude too new |
+| "Missing named-only parameter `X`" | Prelude too old |
 
-### Finding Compatible Versions
+### How turnkey keeps them matched
 
-1. Check buck2 version:
-   ```bash
-   buck2 --version
-   # Output: buck2 2025-12-01-75e4243c93877a3db4acf55f20d2e80a32523233
-   ```
+Turnkey ships one pinned buck2 release
+([ADR 0002](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0002-turnkey-owns-the-buck2-version.md)). Its record in
+`nix/buck2/buck2-source.nix` names the release date, which is the version key of
+both toolbox's `buck2` and `buck2-prelude`. It also holds the prelude commit
+the release was built with, taken from the release's `prelude_hash` asset.
+Evaluation fails if toolbox's prelude for that date is a different commit, so a
+mismatched pair can't be built. Fix a wrong entry in toolbox, not in turnkey.
 
-2. Find matching prelude commit (same date or slightly before):
-   ```bash
-   curl -s "https://api.github.com/repos/facebook/buck2-prelude/commits?until=2025-12-02T00:00:00Z&per_page=5" | \
-     jq -r '.[] | "\(.sha) \(.commit.committer.date)"'
-   ```
-
-3. Update `nix/buck2/prelude.nix` with new rev and hash.
-
-### When to Update
-
-Update both buck2 and prelude when:
-- nixpkgs updates buck2
-- You need new prelude features
-- Build errors appear after nixpkgs update
+The binary, the prelude and turnkey's patches for it (`nix/patches/prelude/<version>/`)
+move together, in the change that bumps the pin.
 
 ## Existing Extensions
 

@@ -59,7 +59,6 @@ cat > flake.nix << EOF
           declarationFiles.default = ./toolchain.toml;
 
           registry = {
-            buck2 = pkgs.buck2;
             nix = pkgs.nix;
             go = pkgs.go;
             rust = pkgs.rustc;

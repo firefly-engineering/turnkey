@@ -97,13 +97,6 @@ turnkey.toolchains.buck2.testCache = {
 };
 ```
 
-Caching needs a buck2 release turnkey supports. With any other release, the
-shell prints this once on entry, and tests run uncached:
-
-```text
-turnkey: test result caching is off: buck2 <version> isn't supported yet (tests run uncached)
-```
-
 ## The local cache
 
 Recorded results live in one store per user per machine, shared by every
