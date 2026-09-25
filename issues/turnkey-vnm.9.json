@@ -4,6 +4,8 @@
     "turnkey-vnm.7"
   ],
   "blocks": [],
+  "closed_at": "2026-09-25T12:50:01Z",
+  "close_reason": "flock on store/server.lock around start with re-check; concurrent test sees one start; red without the lock.",
   "created": "2026-09-25T10:54:21Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nParallel `tk test` runs in several checkouts start at most one server, thanks to a lock in the cache dir (spec §6).\n\n## Acceptance criteria\n\n- [ ] Concurrent `tk test` runs from two checkouts leave exactly one bazel-remote running\n- [ ] Both runs use it\n\n## Blocked by\n\n- turnkey-vnm.7\n",
   "id": "turnkey-vnm.9",
@@ -12,8 +14,8 @@
   ],
   "parent": "turnkey-vnm",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Only one test result cache server per machine",
   "type": "task",
-  "updated_at": "2026-09-25T12:49:26Z"
+  "updated_at": "2026-09-25T12:50:01Z"
 }
