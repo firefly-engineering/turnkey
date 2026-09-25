@@ -45,7 +45,7 @@ pkgs.buildGoModule {
   };
   subPackages = [ "src/cmd/tk" ];
 
-  vendorHash = "sha256-Vgqdy+jGLYByPiGY8z45+nSYo5YHpmlyHjmfAcYEyjU=";
+  vendorHash = "sha256-yJBhZBLYe5LRvDccN2gdIETa6J4H3G9FMzfwqPjFeuQ=";
 
   # buck2 is needed at build time to generate shell completions: the pinned
   # one, so they describe the buck2 the shell runs

@@ -12,6 +12,7 @@ import (
 	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
 	"github.com/pelletier/go-toml/v2"
+	"golang.org/x/mod/modfile"
 )
 
 // DependencyType classifies a dependency.
@@ -240,15 +241,10 @@ func detectGoConfig(projectRoot string) (*GoConfig, error) {
 	return cfg, nil
 }
 
-// extractModulePath extracts the module path from go.mod content.
+// extractModulePath extracts the module path from go.mod content, or ""
+// when it declares none.
 func extractModulePath(content string) string {
-	for _, line := range strings.Split(content, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "module ") {
-			return strings.TrimSpace(strings.TrimPrefix(line, "module "))
-		}
-	}
-	return ""
+	return modfile.ModulePath([]byte(content))
 }
 
 // loadGoDeps loads dependency names from go-deps.toml.

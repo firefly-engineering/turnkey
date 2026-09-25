@@ -15,6 +15,7 @@ import (
 	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/mapper"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
+	"golang.org/x/mod/modfile"
 )
 
 // Config holds syncer configuration.
@@ -588,13 +589,7 @@ func (s *Syncer) getModulePath() string {
 		return ""
 	}
 
-	for _, line := range strings.Split(string(content), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "module ") {
-			return strings.TrimSpace(strings.TrimPrefix(line, "module "))
-		}
-	}
-	return ""
+	return modfile.ModulePath(content)
 }
 
 // classifyImport determines if an import is stdlib, external, or internal.

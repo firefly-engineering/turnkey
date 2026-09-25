@@ -8,6 +8,7 @@ go_library(
         "//src/go/pkg/extraction:extraction",
         "//src/go/pkg/mapper:mapper",
         "//src/go/pkg/starlark:starlark",
+        "godeps//vendor/golang.org/x/mod/modfile:modfile",
     ],
     visibility = ["PUBLIC"],
 )
