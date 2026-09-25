@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [],
   "blocks": [
     "turnkey-w55.7",
@@ -13,8 +13,8 @@
   ],
   "parent": "turnkey-w55",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "What do turnkey's test targets read beyond their declared inputs?",
   "type": "task",
-  "updated_at": "2026-09-25T07:31:21Z"
+  "updated_at": "2026-09-25T07:32:00Z"
 }
