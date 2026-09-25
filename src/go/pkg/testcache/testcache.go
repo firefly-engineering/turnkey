@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -28,6 +29,8 @@ const (
 	AddressEnv = "TURNKEY_TEST_CACHE_ADDRESS"
 	// CacheDirEnv overrides where turnkey keeps its caches.
 	CacheDirEnv = "TURNKEY_CACHE_DIR"
+	// SizeEnv overrides the store's size limit, in GiB.
+	SizeEnv = "TURNKEY_TEST_CACHE_SIZE_GIB"
 )
 
 // Mode is the runner's --turnkey-test-cache value.
@@ -42,9 +45,22 @@ const (
 	Off Mode = "off"
 )
 
-// maxSizeGiB bounds the store; bazel-remote evicts least recently used
-// entries beyond it.
-const maxSizeGiB = 5
+// defaultMaxSizeGiB bounds the store; bazel-remote evicts least recently
+// used entries beyond it.
+const defaultMaxSizeGiB = 5
+
+// MaxSizeGiB is the store's size limit: SizeEnv if set, else the default.
+func MaxSizeGiB() (int, error) {
+	value := os.Getenv(SizeEnv)
+	if value == "" {
+		return defaultMaxSizeGiB, nil
+	}
+	size, err := strconv.Atoi(value)
+	if err != nil || size <= 0 {
+		return 0, fmt.Errorf("%s=%q: expected a positive number of GiB", SizeEnv, value)
+	}
+	return size, nil
+}
 
 // idleTimeout stops a server nobody has used for this long, so no process is
 // left behind on a machine that stopped running tk test. The next tk test
@@ -203,6 +219,10 @@ func (c *Config) start() (<-chan struct{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	maxSize, err := MaxSizeGiB()
+	if err != nil {
+		return nil, err
+	}
 	if err := os.MkdirAll(store, 0o755); err != nil {
 		return nil, fmt.Errorf("creating the test result store: %w", err)
 	}
@@ -214,7 +234,7 @@ func (c *Config) start() (<-chan struct{}, error) {
 
 	cmd := exec.Command(c.Server,
 		"--dir", filepath.Join(store, "cas"),
-		"--max_size", fmt.Sprint(maxSizeGiB),
+		"--max_size", fmt.Sprint(maxSize),
 		"--grpc_address", hostPort,
 		// bazel-remote always serves HTTP too; nothing uses it, so take any
 		// free port rather than risk a clash.

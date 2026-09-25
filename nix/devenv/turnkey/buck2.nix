@@ -363,8 +363,15 @@ ${generateTargets finalToolchains}
   # The local test result cache listens on a fixed loopback port. buck2's RE
   # client can't use Unix sockets, and the address must not be passed with -c,
   # which would change the daemon's startup config.
+  # A user can move it with TURNKEY_TEST_CACHE_PORT, read when the shell is
+  # evaluated (turnkey shells evaluate impurely; a pure evaluation keeps the
+  # default). tk gets the same address through TURNKEY_TEST_CACHE_ADDRESS.
   testCacheAddress = "grpc://127.0.0.1:${toString testCachePort}";
-  testCachePort = 47301;
+  testCachePort =
+    let
+      override = builtins.getEnv "TURNKEY_TEST_CACHE_PORT";
+    in
+    if override == "" then 47301 else lib.toInt override;
 
   # PATH for cached tests: Nix store paths only, so every tool a test can run
   # is part of its result key (test_caching.bzl).

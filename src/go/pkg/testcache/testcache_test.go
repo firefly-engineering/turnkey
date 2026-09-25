@@ -198,3 +198,20 @@ func TestConcurrentEnsureStartsOneServer(t *testing.T) {
 		t.Fatalf("started %d servers, want 1", n)
 	}
 }
+
+func TestMaxSizeGiB(t *testing.T) {
+	t.Setenv(SizeEnv, "")
+	if size, err := MaxSizeGiB(); err != nil || size != 5 {
+		t.Fatalf("default: got %d, %v", size, err)
+	}
+	t.Setenv(SizeEnv, "2")
+	if size, err := MaxSizeGiB(); err != nil || size != 2 {
+		t.Fatalf("override: got %d, %v", size, err)
+	}
+	for _, bad := range []string{"0", "-1", "lots"} {
+		t.Setenv(SizeEnv, bad)
+		if _, err := MaxSizeGiB(); err == nil {
+			t.Fatalf("expected %q to be rejected", bad)
+		}
+	}
+}
