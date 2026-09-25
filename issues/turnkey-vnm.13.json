@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T10:54:24Z",
+  "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nFor each test result, the buck2 event log lets a tool tell whether it was a hit, whether it came from a local or remote store, and its original duration (spec §2).\n\n## Acceptance criteria\n\n- [ ] A tool reading `buck2 log show` can distinguish hits from fresh runs per test\n- [ ] Local vs remote origin and the original duration are recoverable from the log\n- [ ] No new report format is added\n\n## Blocked by\n\n- turnkey-vnm.5\n",
+  "id": "turnkey-vnm.13",
+  "labels": [],
+  "parent": "turnkey-vnm",
+  "priority": 2,
+  "status": "open",
+  "title": "Event log shows test result provenance",
+  "type": "task",
+  "updated_at": "2026-09-25T10:54:24Z"
+}
