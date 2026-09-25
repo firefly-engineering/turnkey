@@ -4,6 +4,8 @@
   "blocks": [
     "turnkey-vnm.19"
   ],
+  "closed_at": "2026-09-25T11:00:09Z",
+  "close_reason": "Tests use os.Chtimes against a fixed base time; no sleeps.",
   "created": "2026-09-25T10:54:27Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nThe staleness test orders file ages with explicit timestamps (`os.Chtimes`), not a 10 ms sleep, so a recorded pass can't freeze a timing flake (hazard G4, spec §4).\n\n## Acceptance criteria\n\n- [ ] The test no longer sleeps to order file times\n- [ ] The test is deterministic\n\n## Blocked by\n\nNone — can start immediately.\n",
   "id": "turnkey-vnm.18",
@@ -12,8 +14,8 @@
   ],
   "parent": "turnkey-vnm",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Staleness test sets file times explicitly",
   "type": "task",
-  "updated_at": "2026-09-25T10:59:34Z"
+  "updated_at": "2026-09-25T11:00:09Z"
 }
