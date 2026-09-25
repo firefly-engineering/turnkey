@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [
     "turnkey-vnm.7"
   ],
@@ -14,8 +14,8 @@
   ],
   "parent": "turnkey-vnm",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "tk test falls back to uncached when the cache is unreachable",
   "type": "task",
-  "updated_at": "2026-09-25T10:54:33Z"
+  "updated_at": "2026-09-25T12:47:33Z"
 }
