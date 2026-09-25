@@ -8,9 +8,15 @@
   "description": "From the 2026-09-25 architecture review. Eight deepening candidates, grilled then implemented one at a time as granular jj changes.",
   "id": "turnkey-efx",
   "labels": [],
+  "comments": [
+    {
+      "text": "Correction to the close reason: 15 jj changes, not 18.",
+      "timestamp": "2026-09-25T20:15:09Z"
+    }
+  ],
   "priority": 2,
   "status": "closed",
   "title": "Architecture deepening: pinned release, test caching, Nix modules",
   "type": "epic",
-  "updated_at": "2026-09-25T20:15:03Z"
+  "updated_at": "2026-09-25T20:15:09Z"
 }
