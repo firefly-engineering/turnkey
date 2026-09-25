@@ -6,9 +6,15 @@
   "description": "The go mapping implicitly depends on python (nix/buck2/mappings.nix, since 2026-01-22), and python's dynamicAttrs now reads ${registry.python} (added by 'fix(buck2): run Python tests with the toolchain's store-path interpreter', turnkey-vnm.20, on main since 2026-09-25). A consumer whose registry lacks python, like e2e brownfield-adoption's full registry override, fails evaluation: error: attribute 'python' missing at nix/buck2/mappings.nix:75. Reproduce: ./e2e/harness/runner.sh brownfield-adoption (fails on main and on the buck2-bundling map's commits alike). Found while resolving turnkey-luk.7.",
   "id": "turnkey-bop",
   "labels": [],
+  "comments": [
+    {
+      "text": "Fixed in dd8ecda34ff3 (not pushed): mappings.nix registry lookups go through a helper that names the missing entry and where to add it; brownfield-adoption's registry lists python, and the test passes (92s). Dev shell drv unchanged; CI gates pass.",
+      "timestamp": "2026-09-25T16:41:08Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "[BUG] Go toolchain fails to evaluate when the registry has no python",
   "type": "bug",
-  "updated_at": "2026-09-25T16:33:13Z"
+  "updated_at": "2026-09-25T16:41:08Z"
 }
