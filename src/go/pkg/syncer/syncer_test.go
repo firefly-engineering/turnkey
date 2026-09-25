@@ -78,3 +78,33 @@ func TestSyncDepsRunsRulesInConfigOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestARuleWithoutSourcesIsSkipped(t *testing.T) {
+	// Go enabled in a project with no go.mod: nothing to generate from.
+	s, root := newSyncer(t, "go")
+	if err := os.Remove(filepath.Join(root, "go.src")); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := s.SyncDeps()
+	if err != nil || len(result.Errors) > 0 || result.Synced != 0 {
+		t.Fatalf("SyncDeps = %+v, %v; want nothing synced and no error", result, err)
+	}
+	if _, stale, err := s.Check(); err != nil || stale {
+		t.Fatalf("Check: stale %v, %v; want fresh", stale, err)
+	}
+}
+
+func TestAMissingSourceDoesNotKeepARuleStale(t *testing.T) {
+	// A module without dependencies has a go.mod and no go.sum.
+	s, root := newSyncer(t, "go")
+	s.Config.Deps[0].Sources = []string{"go.src", "go.sum"}
+	if _, err := s.SyncDeps(); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, stale, err := s.Check(); err != nil || stale {
+		t.Fatalf("Check after sync: stale %v, %v; want fresh", stale, err)
+	}
+	_ = root
+}

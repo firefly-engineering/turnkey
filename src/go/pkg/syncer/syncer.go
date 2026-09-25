@@ -56,50 +56,10 @@ func New(cfg *syncconfig.Config, root string) *Syncer {
 	}
 }
 
-// SyncDeps checks and regenerates stale dependency files.
+// SyncDeps regenerates the rules' stale targets.
 func (s *Syncer) SyncDeps() (*Result, error) {
-	result := &Result{}
-
-	rules, err := s.selectedRules()
-	if err != nil {
-		return nil, err
-	}
-	for _, rule := range rules {
-		result.Checked++
-
-		stale, err := s.checkDepsRule(rule)
-		if err != nil {
-			result.Errors = append(result.Errors, fmt.Errorf("%s: %w", rule.Name, err))
-			continue
-		}
-
-		if !stale {
-			if !s.Quiet {
-				s.printf("Checking %s... ok\n", rule.Target)
-			}
-			continue
-		}
-
-		if !s.Quiet {
-			s.printf("Checking %s... stale\n", rule.Target)
-		}
-
-		if s.DryRun {
-			s.printf("  Would regenerate %s (dry run)\n", rule.Target)
-			result.Synced++
-			continue
-		}
-
-		if err := s.regenerate(rule); err != nil {
-			result.Errors = append(result.Errors, fmt.Errorf("%s: regeneration failed: %w", rule.Name, err))
-			continue
-		}
-
-		s.printf("  Regenerated %s\n", rule.Target)
-		result.Synced++
-	}
-
-	return result, nil
+	result, _, err := s.run(true)
+	return result, err
 }
 
 // SyncRule regenerates a single dependency rule unconditionally.
@@ -129,9 +89,14 @@ func (s *Syncer) SyncRule(rule syncconfig.DepsRule) error {
 	return nil
 }
 
-// Check performs a staleness check without regenerating.
-// Returns true if any targets are stale.
+// Check reports whether any rule's target is stale, without regenerating.
 func (s *Syncer) Check() (*Result, bool, error) {
+	return s.run(false)
+}
+
+// run checks each selected rule and, when regenerating, regenerates the
+// stale ones. It returns whether any target was stale.
+func (s *Syncer) run(regenerate bool) (*Result, bool, error) {
 	result := &Result{}
 	anyStale := false
 
@@ -142,18 +107,49 @@ func (s *Syncer) Check() (*Result, bool, error) {
 	for _, rule := range rules {
 		result.Checked++
 
-		stale, err := s.checkDepsRule(rule)
+		state, err := s.freshness(rule)
 		if err != nil {
 			result.Errors = append(result.Errors, fmt.Errorf("%s: %w", rule.Name, err))
 			continue
 		}
 
-		if stale {
+		switch {
+		case state == noSources:
+			if s.Verbose {
+				s.printf("%s: none of %s exists, nothing to generate %s from\n", rule.Name, strings.Join(rule.Sources, ", "), rule.Target)
+			}
+			continue
+		case !regenerate && state == stale:
 			s.printf("%s: stale (%s newer than %s)\n", rule.Name, strings.Join(rule.Sources, ", "), rule.Target)
 			anyStale = true
-		} else if s.Verbose {
-			s.printf("%s: ok\n", rule.Name)
+			continue
+		case !regenerate:
+			if s.Verbose {
+				s.printf("%s: ok\n", rule.Name)
+			}
+			continue
+		case state == fresh:
+			if !s.Quiet {
+				s.printf("Checking %s... ok\n", rule.Target)
+			}
+			continue
 		}
+
+		anyStale = true
+		if !s.Quiet {
+			s.printf("Checking %s... stale\n", rule.Target)
+		}
+		if s.DryRun {
+			s.printf("  Would regenerate %s (dry run)\n", rule.Target)
+			result.Synced++
+			continue
+		}
+		if err := s.regenerate(rule); err != nil {
+			result.Errors = append(result.Errors, fmt.Errorf("%s: regeneration failed: %w", rule.Name, err))
+			continue
+		}
+		s.printf("  Regenerated %s\n", rule.Target)
+		result.Synced++
 	}
 
 	return result, anyStale, nil
@@ -181,26 +177,36 @@ func (s *Syncer) selectedRules() ([]syncconfig.DepsRule, error) {
 	return selected, nil
 }
 
-// checkDepsRule checks if a single dependency rule's target is stale.
-func (s *Syncer) checkDepsRule(rule syncconfig.DepsRule) (bool, error) {
-	targetPath := filepath.Join(s.Root, rule.Target)
+// freshness is where a rule's target stands against its sources.
+type freshness int
 
-	// Resolve source paths with globs
-	var sourcePaths []string
-	for _, source := range rule.Sources {
-		pattern := filepath.Join(s.Root, source)
-		matches, err := filepath.Glob(pattern)
-		if err != nil {
-			return false, fmt.Errorf("invalid glob pattern %q: %w", source, err)
-		}
-		if len(matches) == 0 {
-			// Source file might not exist yet, which means target is stale
-			return true, nil
-		}
-		sourcePaths = append(sourcePaths, matches...)
+const (
+	fresh freshness = iota
+	stale
+	// noSources: none of the rule's sources exists (Go enabled in a project
+	// without a go.mod), so there is nothing to generate the target from.
+	noSources
+)
+
+// freshness compares a rule's target with the sources that exist; a missing
+// source (a go.sum in a module without dependencies) doesn't count.
+func (s *Syncer) freshness(rule syncconfig.DepsRule) (freshness, error) {
+	sources := make([]string, len(rule.Sources))
+	for i, source := range rule.Sources {
+		sources[i] = filepath.Join(s.Root, source)
 	}
-
-	return staleness.IsStale(sourcePaths, targetPath)
+	result, err := staleness.Check(sources, filepath.Join(s.Root, rule.Target))
+	if err != nil {
+		return fresh, err
+	}
+	switch {
+	case result.NewestSource == nil:
+		return noSources, nil
+	case result.Stale:
+		return stale, nil
+	default:
+		return fresh, nil
+	}
 }
 
 // regenerate runs the generator command for a rule.
