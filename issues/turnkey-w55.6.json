@@ -4,6 +4,8 @@
   "blocks": [
     "turnkey-w55.7"
   ],
+  "closed_at": "2026-09-25T09:16:59Z",
+  "close_reason": "Hits visible per target ('recorded') and counted within passes; same exit codes; output replayed inline and in the event log; provenance and original duration in the event log; placement left to the mechanism.",
   "created": "2026-09-25T07:30:59Z",
   "description": "## Question\n\nWhen `tk test` serves a recorded result, what does the user see and get?\n- Is a hit marked in the console, like Bazel's `(cached) PASSED`?\n- Is the recorded stdout/stderr replayed, and is it available on demand?\n- Are summary counts of hits and misses shown?\n- What do structured outputs (buck2's test summary, exit code, any JSON report) look like?\n- Is `buck2 test` called directly (not through `tk`) expected to behave the same?",
   "id": "turnkey-w55.6",
@@ -22,7 +24,7 @@
     }
   ],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "What does a cache hit look like to someone running tk test?",
   "type": "task",
   "updated_at": "2026-09-25T09:16:59Z"
