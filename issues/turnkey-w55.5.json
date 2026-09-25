@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [
     "turnkey-w55.4"
   ],
@@ -14,8 +14,8 @@
   ],
   "parent": "turnkey-w55",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "When may a recorded test result be reused?",
   "type": "task",
-  "updated_at": "2026-09-25T07:31:20Z"
+  "updated_at": "2026-09-25T08:34:08Z"
 }
