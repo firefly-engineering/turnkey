@@ -1,6 +1,7 @@
 package testcache
 
 import (
+	"io"
 	"net"
 	"path/filepath"
 	"testing"
@@ -30,13 +31,67 @@ func TestStoreDirHonoursTurnkeyCacheDir(t *testing.T) {
 	}
 }
 
-func TestEnsureUsesARunningServer(t *testing.T) {
+// serve accepts connections and answers each with respond.
+func serve(t *testing.T, respond func(net.Conn)) string {
+	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer listener.Close()
-	c := &Config{Server: "/nonexistent/bazel-remote", Address: "grpc://" + listener.Addr().String()}
+	t.Cleanup(func() { listener.Close() })
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				defer conn.Close()
+				respond(conn)
+			}()
+		}
+	}()
+	return listener.Addr().String()
+}
+
+// http2Server reads the client preface and answers with a SETTINGS frame,
+// as any HTTP/2 (and so gRPC) server does.
+func http2Server(conn net.Conn) {
+	buf := make([]byte, len(http2Preface))
+	if _, err := io.ReadFull(conn, buf); err != nil {
+		return
+	}
+	conn.Write([]byte{0, 0, 0, 0x4, 0, 0, 0, 0, 0})
+	time.Sleep(time.Second)
+}
+
+func TestReachableNeedsAnHTTP2Server(t *testing.T) {
+	grpcLike := &Config{Address: "grpc://" + serve(t, http2Server)}
+	if !grpcLike.Reachable(time.Second) {
+		t.Fatal("expected an HTTP/2 server to be reachable")
+	}
+	silent := &Config{Address: "grpc://" + serve(t, func(net.Conn) { time.Sleep(time.Second) })}
+	if silent.Reachable(100 * time.Millisecond) {
+		t.Fatal("expected a listener that doesn't speak HTTP/2 to be unreachable")
+	}
+}
+
+func TestEnsureFailsFastWhenThePortIsTaken(t *testing.T) {
+	t.Setenv(CacheDirEnv, t.TempDir())
+	// Something that isn't the cache holds the port, and the "server" exits
+	// at once, as bazel-remote does when it can't bind.
+	c := &Config{Server: "/usr/bin/false", Address: "grpc://" + serve(t, func(net.Conn) { time.Sleep(time.Second) })}
+	start := time.Now()
+	if err := c.Ensure(); err == nil {
+		t.Fatal("expected an error")
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Fatalf("took %s to give up; expected a fast failure", elapsed)
+	}
+}
+
+func TestEnsureUsesARunningServer(t *testing.T) {
+	c := &Config{Server: "/nonexistent/bazel-remote", Address: "grpc://" + serve(t, http2Server)}
 	if err := c.Ensure(); err != nil {
 		t.Fatalf("expected the running server to be used without starting one: %v", err)
 	}
