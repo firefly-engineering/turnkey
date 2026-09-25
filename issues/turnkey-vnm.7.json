@@ -19,9 +19,15 @@
     "ready-for-agent"
   ],
   "parent": "turnkey-vnm",
+  "comments": [
+    {
+      "text": "Follow-up: the Buck2 build of //src/cmd/tk:tk was missing the //src/go/pkg/testcache dep (only the Nix build had been checked). Fixed in a later commit on the branch; rules sync gap filed as turnkey-1bt.",
+      "timestamp": "2026-09-25T13:24:38Z"
+    }
+  ],
   "priority": 2,
   "status": "closed",
   "title": "tk starts the local test result cache on demand",
   "type": "task",
-  "updated_at": "2026-09-25T12:46:44Z"
+  "updated_at": "2026-09-25T13:24:38Z"
 }
