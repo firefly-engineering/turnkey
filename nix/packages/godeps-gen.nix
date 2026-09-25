@@ -24,7 +24,6 @@ pkgs.buildGoModule {
       (root + "/go.sum")
       (root + "/src/cmd/godeps-gen")
       (root + "/src/go/pkg/godeps")
-      (root + "/src/go/pkg/prefetchcache")
     ];
   };
   subPackages = [ "src/cmd/godeps-gen" ];
@@ -33,11 +32,10 @@ pkgs.buildGoModule {
 
   nativeBuildInputs = [ pkgs.makeWrapper ];
 
-  # Wrap the binary to include prefetcher tools in PATH
+  # Wrap the binary to include the prefetcher in PATH
   postInstall = ''
     wrapProgram $out/bin/godeps-gen \
       --prefix PATH : ${lib.makeBinPath [
-        pkgs.nix-prefetch-github
         pkgs.nix
         nix-prefetch-cached
       ]}

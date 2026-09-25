@@ -22,7 +22,7 @@ func main() {
 	goModPath := flag.String("go-mod", "go.mod", "path to go.mod file")
 	goSumPath := flag.String("go-sum", "go.sum", "path to go.sum file")
 	outputPath := flag.String("o", "", "output file path (default: stdout)")
-	prefetch := flag.Bool("prefetch", false, "fetch Nix hashes using nix-prefetch-github (requires nix)")
+	prefetch := flag.Bool("prefetch", false, "fetch Nix hashes of the modules' proxy.golang.org zips (requires nix)")
 	noCache := flag.Bool("no-cache", false, "disable prefetch caching (always fetch from network)")
 	includeIndirect := flag.Bool("indirect", true, "include indirect (transitive) dependencies")
 	flag.Parse()
@@ -73,21 +73,7 @@ func main() {
 	if *prefetch {
 		fmt.Fprintf(os.Stderr, "Prefetching %d dependencies...\n", len(deps))
 
-		var prefetcher godeps.Prefetcher
-		if *noCache {
-			prefetcher = godeps.DefaultPrefetcher(os.Stderr)
-		} else {
-			var cache interface{ Close() error }
-			prefetcher, cache = godeps.CachedDefaultPrefetcher(os.Stderr)
-			if cache != nil {
-				defer func() {
-					if err := cache.Close(); err != nil {
-						fmt.Fprintf(os.Stderr, "warning: failed to save cache: %v\n", err)
-					}
-				}()
-			}
-		}
-
+		prefetcher := godeps.DefaultPrefetcher(os.Stderr, *noCache)
 		godeps.PrefetchAll(deps, prefetcher, func(dep godeps.Dependency, err error) {
 			fmt.Fprintf(os.Stderr, "warning: failed to prefetch %s: %v\n", dep.ImportPath, err)
 		})

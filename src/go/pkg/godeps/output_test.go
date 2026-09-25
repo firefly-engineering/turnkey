@@ -200,7 +200,7 @@ func TestFormatHashComment(t *testing.T) {
 		{
 			name:     "with hash",
 			hash:     "h1:abc123=",
-			expected: " # go.sum h1:abc123= - run nix-prefetch-github to get correct hash",
+			expected: " # go.sum h1:abc123= - run godeps-gen --prefetch to get correct hash",
 		},
 		{
 			name:     "empty hash",

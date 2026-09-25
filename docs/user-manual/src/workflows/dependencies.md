@@ -180,8 +180,8 @@ godeps-gen --prefetch -o go-deps.toml
 
 Options:
 
-- `--prefetch`: Fetch Nix hashes using nix-prefetch-github (required for valid
-  hashes)
+- `--prefetch`: Fetch Nix hashes of the modules' proxy.golang.org zips, the
+  source the godeps cell fetches from (required for valid hashes)
 - `--indirect`: Include indirect (transitive) dependencies (default: true)
 - `-o`: Output file (default: stdout)
 

@@ -1,11 +1,11 @@
 package godeps
 
 import (
-	"bytes"
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
-
-	"github.com/firefly-engineering/turnkey/src/go/pkg/prefetchcache"
 )
 
 // MockPrefetcher is a test double for Prefetcher
@@ -35,137 +35,6 @@ func (m *MockPrefetcher) Prefetch(importPath, version string) (string, error) {
 		return hash, nil
 	}
 	return "", errors.New("not found")
-}
-
-func TestGitHubPrefetcher_Supports(t *testing.T) {
-	p := &GitHubPrefetcher{}
-
-	tests := []struct {
-		path     string
-		expected bool
-	}{
-		{"github.com/foo/bar", true},
-		{"github.com/owner/repo/subpkg", true},
-		{"golang.org/x/mod", false},
-		{"gopkg.in/yaml.v3", false},
-		{"example.com/pkg", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.path, func(t *testing.T) {
-			if p.Supports(tt.path) != tt.expected {
-				t.Errorf("Supports(%s) = %v, want %v", tt.path, !tt.expected, tt.expected)
-			}
-		})
-	}
-}
-
-func TestGolangOrgPrefetcher_Supports(t *testing.T) {
-	p := &GolangOrgPrefetcher{}
-
-	tests := []struct {
-		path     string
-		expected bool
-	}{
-		{"golang.org/x/mod", true},
-		{"golang.org/x/tools", true},
-		{"golang.org/x/crypto/bcrypt", true},
-		{"github.com/foo/bar", false},
-		{"golang.org/something", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.path, func(t *testing.T) {
-			if p.Supports(tt.path) != tt.expected {
-				t.Errorf("Supports(%s) = %v, want %v", tt.path, !tt.expected, tt.expected)
-			}
-		})
-	}
-}
-
-func TestChainPrefetcher_Supports(t *testing.T) {
-	chain := ChainPrefetcher{
-		&MockPrefetcher{SupportedPaths: []string{"github.com/foo/bar"}},
-		&MockPrefetcher{SupportedPaths: []string{"golang.org/x/mod"}},
-	}
-
-	tests := []struct {
-		path     string
-		expected bool
-	}{
-		{"github.com/foo/bar", true},
-		{"golang.org/x/mod", true},
-		{"unsupported.com/pkg", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.path, func(t *testing.T) {
-			if chain.Supports(tt.path) != tt.expected {
-				t.Errorf("Supports(%s) = %v, want %v", tt.path, !tt.expected, tt.expected)
-			}
-		})
-	}
-}
-
-func TestChainPrefetcher_Prefetch(t *testing.T) {
-	first := &MockPrefetcher{
-		SupportedPaths: []string{"github.com/first/pkg"},
-		Hashes:         map[string]string{"github.com/first/pkg v1.0.0": "sha256-first="},
-	}
-	second := &MockPrefetcher{
-		SupportedPaths: []string{"github.com/second/pkg"},
-		Hashes:         map[string]string{"github.com/second/pkg v1.0.0": "sha256-second="},
-	}
-	chain := ChainPrefetcher{first, second}
-
-	t.Run("first prefetcher", func(t *testing.T) {
-		hash, err := chain.Prefetch("github.com/first/pkg", "v1.0.0")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if hash != "sha256-first=" {
-			t.Errorf("expected sha256-first=, got %s", hash)
-		}
-	})
-
-	t.Run("second prefetcher", func(t *testing.T) {
-		hash, err := chain.Prefetch("github.com/second/pkg", "v1.0.0")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if hash != "sha256-second=" {
-			t.Errorf("expected sha256-second=, got %s", hash)
-		}
-	})
-
-	t.Run("unsupported path", func(t *testing.T) {
-		_, err := chain.Prefetch("unsupported.com/pkg", "v1.0.0")
-		if err == nil {
-			t.Error("expected error for unsupported path")
-		}
-	})
-}
-
-func TestChainPrefetcher_TriesFallback(t *testing.T) {
-	// First prefetcher supports the path but fails
-	failing := &MockPrefetcher{
-		SupportedPaths: []string{"github.com/test/pkg"},
-		Errors:         map[string]error{"github.com/test/pkg v1.0.0": errors.New("first failed")},
-	}
-	// Second prefetcher also supports it and succeeds
-	succeeding := &MockPrefetcher{
-		SupportedPaths: []string{"github.com/test/pkg"},
-		Hashes:         map[string]string{"github.com/test/pkg v1.0.0": "sha256-success="},
-	}
-	chain := ChainPrefetcher{failing, succeeding}
-
-	hash, err := chain.Prefetch("github.com/test/pkg", "v1.0.0")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if hash != "sha256-success=" {
-		t.Errorf("expected sha256-success=, got %s", hash)
-	}
 }
 
 func TestPrefetchFunc(t *testing.T) {
@@ -250,154 +119,6 @@ func TestPrefetchAll_WithErrors(t *testing.T) {
 	}
 }
 
-func TestParseGitHubPath(t *testing.T) {
-	tests := []struct {
-		path          string
-		expectedOwner string
-		expectedRepo  string
-		expectError   bool
-	}{
-		{"github.com/foo/bar", "foo", "bar", false},
-		{"github.com/owner/repo/subpkg", "owner", "repo", false},
-		{"github.com/org/repo-name", "org", "repo-name", false},
-		{"golang.org/x/mod", "", "", true},
-		{"github.com/onlyowner", "", "", true},
-		{"not-github", "", "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.path, func(t *testing.T) {
-			owner, repo, err := parseGitHubPath(tt.path)
-			if tt.expectError {
-				if err == nil {
-					t.Error("expected error")
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				if owner != tt.expectedOwner {
-					t.Errorf("owner: expected %s, got %s", tt.expectedOwner, owner)
-				}
-				if repo != tt.expectedRepo {
-					t.Errorf("repo: expected %s, got %s", tt.expectedRepo, repo)
-				}
-			}
-		})
-	}
-}
-
-func TestGopkgInPrefetcher_Supports(t *testing.T) {
-	p := &GopkgInPrefetcher{}
-
-	tests := []struct {
-		path     string
-		expected bool
-	}{
-		{"gopkg.in/yaml.v3", true},
-		{"gopkg.in/check.v1", true},
-		{"gopkg.in/user/pkg.v2", true},
-		{"github.com/foo/bar", false},
-		{"golang.org/x/mod", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.path, func(t *testing.T) {
-			if p.Supports(tt.path) != tt.expected {
-				t.Errorf("Supports(%s) = %v, want %v", tt.path, !tt.expected, tt.expected)
-			}
-		})
-	}
-}
-
-func TestParseGopkgInPath(t *testing.T) {
-	tests := []struct {
-		path          string
-		expectedOwner string
-		expectedRepo  string
-		expectError   bool
-	}{
-		// Single-element paths: gopkg.in/name.vN -> go-name/name
-		{"gopkg.in/yaml.v3", "go-yaml", "yaml", false},
-		{"gopkg.in/check.v1", "go-check", "check", false},
-		{"gopkg.in/ini.v1", "go-ini", "ini", false},
-		// Two-element paths: gopkg.in/user/pkg.vN -> user/pkg
-		{"gopkg.in/user/pkg.v2", "user", "pkg", false},
-		{"gopkg.in/natefinch/lumberjack.v2", "natefinch", "lumberjack", false},
-		// Subpackages
-		{"gopkg.in/user/pkg.v2/subpkg", "user", "pkg", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.path, func(t *testing.T) {
-			owner, repo, err := parseGopkgInPath(tt.path)
-			if tt.expectError {
-				if err == nil {
-					t.Error("expected error")
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				if owner != tt.expectedOwner {
-					t.Errorf("owner: expected %s, got %s", tt.expectedOwner, owner)
-				}
-				if repo != tt.expectedRepo {
-					t.Errorf("repo: expected %s, got %s", tt.expectedRepo, repo)
-				}
-			}
-		})
-	}
-}
-
-func TestStripVersionSuffix(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"yaml.v3", "yaml"},
-		{"check.v1", "check"},
-		{"pkg.v10", "pkg"},
-		{"lumberjack.v2", "lumberjack"},
-		{"noversion", "noversion"},
-		{"has.dot", "has.dot"},
-		{"pkg.vx", "pkg.vx"}, // 'x' is not a digit
-		{".v1", ""},          // Edge case: just version suffix
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			result := stripVersionSuffix(tt.input)
-			if result != tt.expected {
-				t.Errorf("stripVersionSuffix(%s) = %s, want %s", tt.input, result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestUberGoPrefetcher_Supports(t *testing.T) {
-	p := &UberGoPrefetcher{}
-
-	tests := []struct {
-		path     string
-		expected bool
-	}{
-		{"go.uber.org/zap", true},
-		{"go.uber.org/atomic", true},
-		{"go.uber.org/multierr", true},
-		{"github.com/uber-go/zap", false},
-		{"golang.org/x/mod", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.path, func(t *testing.T) {
-			if p.Supports(tt.path) != tt.expected {
-				t.Errorf("Supports(%s) = %v, want %v", tt.path, !tt.expected, tt.expected)
-			}
-		})
-	}
-}
-
 func TestGoProxyPrefetcher_Supports(t *testing.T) {
 	p := &GoProxyPrefetcher{}
 
@@ -442,140 +163,43 @@ func TestEscapeModulePath(t *testing.T) {
 	}
 }
 
-func TestDefaultPrefetcher(t *testing.T) {
-	var buf bytes.Buffer
-	p := DefaultPrefetcher(&buf)
+func TestDefaultPrefetcherHashesTheProxyZipTheCellFetches(t *testing.T) {
+	// A stand-in nix-prefetch-cached that records its arguments
+	bin := t.TempDir()
+	calls := filepath.Join(bin, "calls")
+	script := "#!/bin/sh\necho \"$@\" >> " + calls + "\necho sha256-stand-in=\n"
+	if err := os.WriteFile(filepath.Join(bin, "nix-prefetch-cached"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	// Should support golang.org/x paths
-	if !p.Supports("golang.org/x/mod") {
-		t.Error("should support golang.org/x/*")
+	for _, noCache := range []bool{false, true} {
+		hash, err := DefaultPrefetcher(nil, noCache).Prefetch("github.com/BurntSushi/toml", "v1.4.0")
+		if err != nil || hash != "sha256-stand-in=" {
+			t.Fatalf("Prefetch = %q, %v", hash, err)
+		}
 	}
 
-	// Should support github.com paths
-	if !p.Supports("github.com/foo/bar") {
-		t.Error("should support github.com/*")
-	}
-
-	// Should support gopkg.in paths
-	if !p.Supports("gopkg.in/yaml.v3") {
-		t.Error("should support gopkg.in/*")
-	}
-
-	// Should support go.uber.org paths
-	if !p.Supports("go.uber.org/zap") {
-		t.Error("should support go.uber.org/*")
-	}
-
-	// Should now support any path via GoProxy fallback
-	if !p.Supports("example.com/pkg") {
-		t.Error("should support example.com/* via GoProxy fallback")
+	got, _ := os.ReadFile(calls)
+	// The URL nix/lib/deps-cell/fetchers.nix's goproxy fetcher builds,
+	// unpacked as fetchzip unpacks it
+	url := "https://proxy.golang.org/github.com/!burnt!sushi/toml/@v/v1.4.0.zip"
+	want := "--unpack " + url + "\n--unpack --no-cache " + url + "\n"
+	if string(got) != want {
+		t.Errorf("nix-prefetch-cached called with\n%s\nwant\n%s", got, want)
 	}
 }
 
-func TestCachedPrefetcher(t *testing.T) {
-	// Create a mock inner prefetcher
-	inner := &MockPrefetcher{
-		SupportedPaths: []string{"*"},
-		Hashes: map[string]string{
-			"github.com/foo/bar v1.0.0": "sha256-foo=",
-			"github.com/baz/qux v1.0.0": "sha256-baz=",
-		},
+func TestPrefetchFailureNamesTheURL(t *testing.T) {
+	bin := t.TempDir()
+	script := "#!/bin/sh\necho 'no such module' >&2\nexit 1\n"
+	if err := os.WriteFile(filepath.Join(bin, "nix-prefetch-cached"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
 	}
+	t.Setenv("PATH", bin)
 
-	// Create cache in temp directory
-	dir := t.TempDir()
-	cache, err := prefetchcache.WithDir(dir)
-	if err != nil {
-		t.Fatalf("failed to create cache: %v", err)
-	}
-
-	var logBuf bytes.Buffer
-	cached := &CachedPrefetcher{
-		Inner:  inner,
-		Cache:  cache,
-		Logger: &logBuf,
-	}
-
-	// First prefetch - should be a cache miss
-	hash, err := cached.Prefetch("github.com/foo/bar", "v1.0.0")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if hash != "sha256-foo=" {
-		t.Errorf("expected sha256-foo=, got %s", hash)
-	}
-	if len(inner.Calls) != 1 {
-		t.Errorf("expected 1 inner call, got %d", len(inner.Calls))
-	}
-
-	// Second prefetch of same dep - should be a cache hit
-	logBuf.Reset()
-	hash, err = cached.Prefetch("github.com/foo/bar", "v1.0.0")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if hash != "sha256-foo=" {
-		t.Errorf("expected sha256-foo=, got %s", hash)
-	}
-	// Inner should NOT have been called again
-	if len(inner.Calls) != 1 {
-		t.Errorf("expected still 1 inner call (cache hit), got %d", len(inner.Calls))
-	}
-	if !bytes.Contains(logBuf.Bytes(), []byte("cache hit")) {
-		t.Error("expected cache hit message in log")
-	}
-
-	// Different dep - should be a cache miss
-	hash, err = cached.Prefetch("github.com/baz/qux", "v1.0.0")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if hash != "sha256-baz=" {
-		t.Errorf("expected sha256-baz=, got %s", hash)
-	}
-	if len(inner.Calls) != 2 {
-		t.Errorf("expected 2 inner calls, got %d", len(inner.Calls))
-	}
-}
-
-func TestCachedPrefetcher_Persistence(t *testing.T) {
-	inner := &MockPrefetcher{
-		SupportedPaths: []string{"*"},
-		Hashes: map[string]string{
-			"github.com/test/pkg v1.0.0": "sha256-test=",
-		},
-	}
-
-	dir := t.TempDir()
-
-	// First session: prefetch and save
-	cache1, _ := prefetchcache.WithDir(dir)
-	cached1 := &CachedPrefetcher{Inner: inner, Cache: cache1}
-
-	_, err := cached1.Prefetch("github.com/test/pkg", "v1.0.0")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(inner.Calls) != 1 {
-		t.Fatalf("expected 1 inner call, got %d", len(inner.Calls))
-	}
-
-	// Save cache
-	cache1.Save()
-
-	// Second session: load cache, should be a hit
-	cache2, _ := prefetchcache.WithDir(dir)
-	cached2 := &CachedPrefetcher{Inner: inner, Cache: cache2}
-
-	hash, err := cached2.Prefetch("github.com/test/pkg", "v1.0.0")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if hash != "sha256-test=" {
-		t.Errorf("expected sha256-test=, got %s", hash)
-	}
-	// Inner should NOT have been called again (cache was loaded from disk)
-	if len(inner.Calls) != 1 {
-		t.Errorf("expected still 1 inner call (loaded from disk), got %d", len(inner.Calls))
+	_, err := DefaultPrefetcher(nil, false).Prefetch("example.com/gone", "v1.0.0")
+	if err == nil || !strings.Contains(err.Error(), "proxy.golang.org/example.com/gone/@v/v1.0.0.zip") || !strings.Contains(err.Error(), "no such module") {
+		t.Errorf("error %v doesn't name the URL and nix-prefetch-cached's reason", err)
 	}
 }

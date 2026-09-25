@@ -62,7 +62,7 @@ func WriteTOMLWithReplaces(w io.Writer, deps []Dependency, replaces []Replace, o
 	if opts.IncludeHashWarning && hasMissingHashes {
 		_, _ = fmt.Fprintln(w, "# IMPORTANT: Nix hashes must be obtained separately.")
 		_, _ = fmt.Fprintln(w, "# Run with --prefetch to automatically fetch hashes, or manually run:")
-		_, _ = fmt.Fprintln(w, "# nix-prefetch-github --owner OWNER --repo REPO --rev VERSION")
+		_, _ = fmt.Fprintln(w, "# nix-prefetch-cached --unpack https://proxy.golang.org/MODULE/@v/VERSION.zip")
 		_, _ = fmt.Fprintln(w, "#")
 	}
 
@@ -129,7 +129,7 @@ func writeDependency(w io.Writer, dep Dependency) error {
 // formatHashComment returns the go.sum hash as a reference comment.
 func formatHashComment(goSumHash string) string {
 	if goSumHash != "" {
-		return fmt.Sprintf(" # go.sum %s - run nix-prefetch-github to get correct hash", goSumHash)
+		return fmt.Sprintf(" # go.sum %s - run godeps-gen --prefetch to get correct hash", goSumHash)
 	}
 	return ""
 }

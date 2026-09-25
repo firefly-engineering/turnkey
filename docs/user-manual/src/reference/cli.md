@@ -394,7 +394,7 @@ godeps-gen [OPTIONS]
 |--------|-------------|
 | `--go-mod PATH` | Path to go.mod file (default: go.mod) |
 | `--go-sum PATH` | Path to go.sum file (default: go.sum) |
-| `--prefetch` | Fetch Nix hashes using nix-prefetch-github |
+| `--prefetch` | Fetch Nix hashes of the modules' proxy.golang.org zips, the source the godeps cell fetches (through `nix-prefetch-cached`) |
 | `--indirect` | Include indirect dependencies (default: true) |
 | `-o, --output PATH` | Output file (default: stdout) |
 

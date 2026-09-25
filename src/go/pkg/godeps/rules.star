@@ -16,7 +16,6 @@ go_library(
         # turnkey:auto-start
         "godeps//vendor/golang.org/x/mod/modfile:modfile",
         # turnkey:auto-end
-        "//src/go/pkg/prefetchcache:prefetchcache",
     ],
     visibility = ["PUBLIC"],
 )
@@ -33,7 +32,6 @@ go_test(
     # Integration fixtures, copied next to the test binary by go_test
     resources = ["//src/testdata:godeps_fixtures"],
     deps = [
-        "//src/go/pkg/prefetchcache:prefetchcache",
     ],
     visibility = ["PUBLIC"],
 )
