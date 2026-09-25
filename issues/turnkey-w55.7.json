@@ -18,9 +18,15 @@
     "wayfinder:grilling"
   ],
   "parent": "turnkey-w55",
+  "comments": [
+    {
+      "text": "Input from turnkey-w55.6: buck2 at the pin has no console marker for a hit. For each hit, tk test's console output must show 'recorded' per target and a hit count in the summary. That means a buck2 patch, a test runner we own, or tk keeping buck2 as a child process instead of exec'ing it. For each result, the event log must show whether it was a hit, local vs remote, and the original duration.",
+      "timestamp": "2026-09-25T09:16:59Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "Which mechanism makes test results cacheable locally and remotely?",
   "type": "task",
-  "updated_at": "2026-09-25T07:31:21Z"
+  "updated_at": "2026-09-25T09:16:59Z"
 }
