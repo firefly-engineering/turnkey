@@ -4,6 +4,8 @@
   "blocks": [
     "turnkey-luk.6"
   ],
+  "closed_at": "2026-09-25T15:23:58Z",
+  "close_reason": "buck2.shells list (default [\"default\"]) under master buck2.enable; read-only buck2.version",
   "created": "2026-09-25T15:11:17Z",
   "description": "## Question\n\nWhich shells get buck2 moves from 'the shell's toolchain.toml declares buck2' to a per-shell setting in flake.nix next to `turnkey.toolchains.declarationFiles`. What exactly is that setting: its name, type and default (on for every shell? only default?), how it interacts with the global `turnkey.buck2.enable`, and where `turnkey.buck2.version` (read-only) sits? Settle the interface, including what a consumer with a single shell writes.",
   "id": "turnkey-luk.4",
@@ -18,7 +20,7 @@
     }
   ],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "What is the shape of the per-shell buck2 option?",
   "type": "task",
   "updated_at": "2026-09-25T15:23:58Z"
