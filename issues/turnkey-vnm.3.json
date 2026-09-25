@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T10:54:18Z",
+  "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nAn automated check runs turnkey's own test targets under both runners and fails on any difference in outcome, exit code or argument handling. It is the gate for accepting a buck2 version (spec §5, §7).\n\n## Acceptance criteria\n\n- [ ] The suite runs every turnkey test target under both runners\n- [ ] It fails on any per-target outcome or exit-code difference\n- [ ] It covers `--env`, `--timeout` and `--test-arg` handling\n- [ ] It is documented as the gate for adding a supported buck2 version\n\n## Blocked by\n\n- turnkey-vnm.2\n",
+  "id": "turnkey-vnm.3",
+  "labels": [],
+  "parent": "turnkey-vnm",
+  "priority": 2,
+  "status": "open",
+  "title": "Parity suite compares our test runner with buck2's",
+  "type": "task",
+  "updated_at": "2026-09-25T10:54:18Z"
+}
