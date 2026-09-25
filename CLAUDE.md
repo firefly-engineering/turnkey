@@ -598,6 +598,10 @@ When adding functionality, ensure it works across all platforms.
 2. **Keep the registry simple** - Resist the temptation to make it complex
 3. **Test with self-usage** - If the flake can't use itself, something is wrong
 4. **Document thoroughly** - Match the quality of existing docs
+5. **The Buck2 prelude is ours to change** - Turnkey builds its own prelude
+   (`nix/buck2/prelude.nix`: upstream + `nix/patches/prelude/` +
+   `nix/buck2/prelude-extensions/`), and a turnkey-owned prelude is on the table.
+   "Needs a prelude change" is a cost to weigh, never a reason to rule a design out.
 
 ### Code Quality Expectations
 1. **Consistent formatting** - Follow existing Nix code style
