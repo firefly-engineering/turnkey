@@ -2,14 +2,16 @@
   "assignee": "unknown",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-09-25T19:19:50Z",
+  "close_reason": "Helper takes upstream kwargs verbatim + re_executors; new prelude patch 0005 has RemoteTestExecutorConfig report remote. check-test-caching (BXL) proven red twice. tk test //... 33/33.",
   "created": "2026-09-25T17:24:07Z",
   "description": "test_caching.bzl takes the rule's RE executors and decides default_executor + paths; prelude patches shrink to one wrapping call.",
   "id": "turnkey-efx.2",
   "labels": [],
   "parent": "turnkey-efx",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Test-caching helper owns the executor decision",
   "type": "task",
-  "updated_at": "2026-09-25T19:07:34Z"
+  "updated_at": "2026-09-25T19:19:50Z"
 }
