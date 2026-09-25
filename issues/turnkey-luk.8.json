@@ -6,6 +6,8 @@
   "blocks": [
     "turnkey-luk.9"
   ],
+  "closed_at": "2026-09-25T15:29:21Z",
+  "close_reason": "Manual checklist step with parity summary in the bump commit; CI gate split out as turnkey-kxe",
   "created": "2026-09-25T15:11:18Z",
   "description": "## Question\n\nGiven the research on its runtime and requirements, does the test-runner parity suite become a CI job (on every change? only when buck2-source.nix changes?) or stay a manual step in the bump checklist?",
   "id": "turnkey-luk.8",
@@ -20,7 +22,7 @@
     }
   ],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Should the parity suite be a CI gate for buck2 pin bumps?",
   "type": "task",
   "updated_at": "2026-09-25T15:29:21Z"
