@@ -6,6 +6,8 @@
   "blocks": [
     "turnkey-vnm.27"
   ],
+  "closed_at": "2026-09-25T12:55:34Z",
+  "close_reason": "Runner maps the no-test-cache label to Off per target; verified: labelled target runs every time, never written; other targets unaffected.",
   "created": "2026-09-25T10:54:25Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nA target labelled `no-test-cache` always runs and is never recorded (spec §1).\n\n## Acceptance criteria\n\n- [ ] A labelled target executes on every `tk test`\n- [ ] No result is ever recorded for it\n- [ ] Other targets are unaffected\n\n## Blocked by\n\n- turnkey-vnm.5\n",
   "id": "turnkey-vnm.14",
@@ -14,8 +16,8 @@
   ],
   "parent": "turnkey-vnm",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "`no-test-cache` label opts a target out",
   "type": "task",
-  "updated_at": "2026-09-25T12:53:07Z"
+  "updated_at": "2026-09-25T12:55:34Z"
 }
