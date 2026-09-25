@@ -66,14 +66,14 @@ func main() {
 	}
 
 	// Load configuration
-	cfg, err := syncconfig.LoadDefaultFrom(root)
+	s, err := syncer.Load(root)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "tw: failed to load config: %v\n", err)
+		fmt.Fprintf(os.Stderr, "tw: %v\n", err)
 		runToolAndExit(toolName, toolArgs)
 	}
 
 	// Find the wrapper rule for this tool
-	rule := cfg.FindWrapper(toolName)
+	rule := s.Config.FindWrapper(toolName)
 	if rule == nil {
 		// No wrapper configured for this tool - just pass through
 		if verbose {
@@ -141,7 +141,7 @@ func main() {
 		if verbose {
 			fmt.Fprintf(os.Stderr, "tw: running sync\n")
 		}
-		syncExitCode := runSyncForRule(cfg, rule, root)
+		syncExitCode := runSyncForRule(s, rule)
 		if syncExitCode != 0 {
 			fmt.Fprintf(os.Stderr, "tw: sync failed with exit code %d\n", syncExitCode)
 		}
@@ -247,14 +247,13 @@ func runPostCommand(cmdStr, dir string) int {
 // runSyncForRule regenerates the wrapper's deps rule, then every rule left
 // stale by it: a rule whose source is that rule's target (python-deps.toml
 // from pylock.toml) comes after it in sync.toml.
-func runSyncForRule(cfg *syncconfig.Config, wrapper *syncconfig.WrapperRule, root string) int {
-	depsRule := cfg.FindDepsRule(wrapper.DepsRule)
+func runSyncForRule(s *syncer.Syncer, wrapper *syncconfig.WrapperRule) int {
+	depsRule := s.Config.FindDepsRule(wrapper.DepsRule)
 	if depsRule == nil {
 		fmt.Fprintf(os.Stderr, "tw: deps rule %q not found\n", wrapper.DepsRule)
 		return 1
 	}
 
-	s := syncer.New(cfg, root)
 	s.Verbose = verbose
 	s.Output = os.Stderr
 

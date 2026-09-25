@@ -26,7 +26,6 @@ import (
 	"github.com/firefly-engineering/turnkey/src/go/pkg/buck2args"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/cellfresh"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/localconfig"
-	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncer"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/testcache"
 )
@@ -192,108 +191,70 @@ func shouldSync(subcommand string) bool {
 	return true
 }
 
-// runSync runs the turnkey sync operation for the named deps rules, or for
-// every rule when none is named.
-// Returns exit code (0 for success, non-zero for failure).
+// runSync regenerates the stale files of the named deps rules, or of every
+// rule when none is named. Returns exit code (0 for success, non-zero for
+// failure).
 func runSync(only ...string) int {
-	// Find project root (where .buckconfig is)
-	root, err := findProjectRoot()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "tk: %v\n", err)
-		return 1
-	}
-
-	// Load configuration
-	cfg, err := syncconfig.LoadDefaultFrom(root)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "tk: failed to load sync config: %v\n", err)
-		return 1
-	}
-
-	// Validate configuration
-	if err := cfg.Validate(); err != nil {
-		fmt.Fprintf(os.Stderr, "tk: invalid sync config: %v\n", err)
-		return 1
-	}
-
-	// Run sync
-	s := syncer.New(cfg, root)
-	s.Verbose = verbose
-	s.Quiet = quiet
-	s.DryRun = dryRun
-	s.Output = os.Stderr
-	s.Only = only
-
-	result, err := s.SyncDeps()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "tk: sync failed: %v\n", err)
-		return 1
-	}
-
-	// Report results
-	if len(result.Errors) > 0 {
-		fmt.Fprintf(os.Stderr, "tk: sync completed with %d error(s):\n", len(result.Errors))
-		for _, e := range result.Errors {
-			fmt.Fprintf(os.Stderr, "  - %v\n", e)
-		}
-		return 1
-	}
-
-	if result.Synced > 0 {
-		fmt.Fprintf(os.Stderr, "tk: synced %d file(s)\n", result.Synced)
-	} else if verbose && !quiet {
-		fmt.Fprintln(os.Stderr, "tk: nothing to sync, all files up-to-date")
-	}
-
-	return 0
+	return runDeps(true, only)
 }
 
 // runCheck checks if the named deps rules' files (or every rule's, when
 // none is named) are stale without regenerating them.
 // Returns exit code (0 if all up-to-date, 1 if stale).
 func runCheck(only ...string) int {
-	// Find project root
+	return runDeps(false, only)
+}
+
+// runDeps syncs or checks the deps rules in .turnkey/sync.toml.
+func runDeps(regenerate bool, only []string) int {
 	root, err := findProjectRoot()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tk: %v\n", err)
 		return 1
 	}
-
-	// Load configuration
-	cfg, err := syncconfig.LoadDefaultFrom(root)
+	s, err := syncer.Load(root)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "tk: failed to load sync config: %v\n", err)
+		fmt.Fprintf(os.Stderr, "tk: %v\n", err)
 		return 1
 	}
-
-	// Run check
-	s := syncer.New(cfg, root)
 	s.Verbose = verbose
 	s.Quiet = quiet
+	s.DryRun = dryRun
 	s.Output = os.Stderr
 	s.Only = only
 
-	result, anyStale, err := s.Check()
+	operation := "check"
+	var result *syncer.Result
+	var stale bool
+	if regenerate {
+		operation = "sync"
+		result, err = s.SyncDeps()
+	} else {
+		result, stale, err = s.Check()
+	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "tk: check failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "tk: %s failed: %v\n", operation, err)
 		return 1
 	}
-
-	// Report results
 	if len(result.Errors) > 0 {
-		fmt.Fprintf(os.Stderr, "tk: check completed with %d error(s):\n", len(result.Errors))
+		fmt.Fprintf(os.Stderr, "tk: %s completed with %d error(s):\n", operation, len(result.Errors))
 		for _, e := range result.Errors {
 			fmt.Fprintf(os.Stderr, "  - %v\n", e)
 		}
 		return 1
 	}
 
-	if anyStale {
+	switch {
+	case regenerate && result.Synced > 0:
+		fmt.Fprintf(os.Stderr, "tk: synced %d file(s)\n", result.Synced)
+	case regenerate:
+		if verbose && !quiet {
+			fmt.Fprintln(os.Stderr, "tk: nothing to sync, all files up-to-date")
+		}
+	case stale:
 		fmt.Fprintln(os.Stderr, "tk: some files are stale, run 'tk sync' to update")
 		return 1
-	}
-
-	if !quiet {
+	case !quiet:
 		fmt.Fprintln(os.Stderr, "tk: all files up-to-date")
 	}
 	return 0

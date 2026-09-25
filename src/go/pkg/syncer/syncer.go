@@ -56,6 +56,19 @@ func New(cfg *syncconfig.Config, root string) *Syncer {
 	}
 }
 
+// Load returns a Syncer for the project at root, from its
+// .turnkey/sync.toml; a project without one has no rules.
+func Load(root string) (*Syncer, error) {
+	cfg, err := syncconfig.LoadDefaultFrom(root)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load sync config: %w", err)
+	}
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid sync config: %w", err)
+	}
+	return New(cfg, root), nil
+}
+
 // SyncDeps regenerates the rules' stale targets.
 func (s *Syncer) SyncDeps() (*Result, error) {
 	result, _, err := s.run(true)
