@@ -8,7 +8,8 @@
     "turnkey-w55.6"
   ],
   "blocks": [
-    "turnkey-w55.8"
+    "turnkey-w55.8",
+    "turnkey-w55.9"
   ],
   "created": "2026-09-25T07:31:10Z",
   "description": "## Question\n\nWhich mechanism gives local cache hits (same daemon, restarts, `buck2 clean`, other checkouts) on darwin and Linux, while letting remote execution take over sharing later? Record the choice as an ADR under `docs/adr/`. The candidates as they stood at charting time:\n\n- **(A) Native test execution caching through a local remote-execution service with workers.** The rule flag plus an executor that allows caching. Tests execute on localhost workers, so buck2 stores and serves them from the action cache.\n- **(B) Tests as build actions.** The test runs as an ordinary `run` action that records its outcome in an output file. buck2 sees a trivial replay test. Results persist through a local cache-only server with `allow_cache_uploads`.\n- **(C) A runner-owned cache.** A custom `v2_test_executor` computes its own key and reports recorded results without executing.\n- **(D) Patch buck2** to cache and upload local test executions.\n\nIt must honour the reuse policy and cache-hit UX decided in the blocking tickets.",
@@ -21,5 +22,5 @@
   "status": "open",
   "title": "Which mechanism makes test results cacheable locally and remotely?",
   "type": "task",
-  "updated_at": "2026-09-25T07:31:20Z"
+  "updated_at": "2026-09-25T07:31:21Z"
 }
