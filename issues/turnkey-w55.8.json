@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T07:31:11Z",
+  "description": "## Question\n\nGiven the chosen mechanism, how does each test rule (`go_test`, `rust_test`, `python_test`, `solidity_test`, `jsonnet_test`, and later `typescript_test`) come to emit what the mechanism needs? The options:\n- patch the prelude through `nix/patches/prelude/`;\n- override files through `nix/buck2/prelude-extensions/`;\n- wrapper macros that the rule generators emit;\n- changes to turnkey's own rules.\n\nIs caching on by default for every target, or opt-in? How are the undeclared-input hazards found by the research ticket fixed or fenced off per language?",
+  "id": "turnkey-w55.8",
+  "labels": [],
+  "parent": "turnkey-w55",
+  "priority": 2,
+  "status": "open",
+  "title": "How does each language's test rule opt into caching?",
+  "type": "task",
+  "updated_at": "2026-09-25T07:31:11Z"
+}
