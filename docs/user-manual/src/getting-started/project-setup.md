@@ -163,10 +163,17 @@ Then allow it:
 direnv allow
 ```
 
-The turnkey direnv library provides additional options:
+`use_turnkey` runs `tk sync` to regenerate stale dependency files (the
+same rules as `tk sync` everywhere else, from `.turnkey/sync.toml`), keeps
+the cell symlinks current and watches the rules' files so that a changed
+deps file reloads the shell. It takes options:
 - `use_turnkey --skip-regen` - Skip dependency file regeneration
 - `use_turnkey --skip-sync` - Skip symlink synchronization
-- Environment variables like `TURNKEY_SKIP_ALL=1` for CI environments
+- `use_turnkey --only-<rule>` / `--skip-<rule>` - Sync only, or all but,
+  the named deps rules (`go`, `rust`, `pylock`, `python`, `javascript`,
+  `solidity`)
+- Environment variables like `TURNKEY_SKIP_ALL=1` (with
+  `TURNKEY_ENABLE_<RULE>=1` to add rules back) or `TURNKEY_SKIP_<RULE>=1`
 
 ## Buck2 Configuration
 

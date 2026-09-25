@@ -1,8 +1,8 @@
 # Generate turnkey-direnv-lib.sh for use in .envrc
 #
 # This module creates a shell script containing the `use_turnkey` function
-# that handles dependency regeneration, symlink syncing, and watch_file
-# declarations based on the toolchains declared in toolchain.toml.
+# that handles dependency regeneration (tk sync), symlink syncing, and
+# watch_file declarations for the shell's deps rules.
 
 { lib, pkgs, config }:
 
@@ -13,39 +13,17 @@ let
   # Teller lib for registry resolution (injected via flake-parts module)
   turnkeyLib = cfg.tellerLib;
 
-  # Detect which languages are enabled from toolchain.toml
-  toolchainNames =
-    if cfg.declarationFile != null then
-      let
-        decl = builtins.fromTOML (builtins.readFile cfg.declarationFile);
-      in
-      if decl ? toolchains then builtins.attrNames decl.toolchains else [ ]
-    else
-      [ ];
-
-  hasGo = builtins.elem "go" toolchainNames;
-  hasPython = builtins.elem "python" toolchainNames;
-  hasRust = builtins.elem "rust" toolchainNames;
-
-  enabledLangs = lib.concatStringsSep " " (
-    lib.optional hasGo "go"
-    ++ lib.optional hasPython "python"
-    ++ lib.optional hasRust "rust"
+  # The deps rules tk sync runs, the same ones buck2.nix writes into
+  # .turnkey/sync.toml; a shell without Buck2 has none
+  languages = import ../../buck2/languages.nix { inherit pkgs lib; };
+  syncRules = lib.optionals buck2Cfg.enable (
+    builtins.concatMap (language: language.syncRules buck2Cfg.${language.name}) languages
   );
+  ruleNames = map (rule: rule.name) syncRules;
 
-  # Import internal tools directly (not exposed through registry)
-  godepsGen = import ../../packages/godeps-gen.nix { inherit pkgs lib; };
-  pydepsGen = import ../../packages/pydeps-gen.nix { inherit pkgs lib; };
-  rustdepsGen = import ../../packages/rustdeps-gen.nix { inherit pkgs lib; };
-
-  # Helper to resolve a tool from the versioned registry
-  resolveTool = name:
-    let entry = cfg.registry.${name} or null;
-    in if entry == null then null
-       else turnkeyLib.resolveTool cfg.registry name {};
-
-  # uv is a user-facing tool in the registry
-  uv = resolveTool "uv";
+  # turnkey's tk, from the registry (it is built in), or whatever tk is on PATH
+  tk =
+    if cfg.registry ? tk then "${turnkeyLib.resolveTool cfg.registry "tk" { }}/bin/tk" else "tk";
 
   # Helper functions (always included)
   helperFunctions = ''
@@ -57,117 +35,18 @@ let
     if [ -n "$DEVENV_PROFILE" ]; then
       path_add fish_complete_path "$DEVENV_PROFILE/share/fish/vendor_completions.d"
     fi
-
-    TURNKEY_DEPS_CACHE=".turnkey-deps-hashes"
-
-    # Compute combined SHA256 hash of files
-    _turnkey_hash_files() {
-      local hash=""
-      for f in "$@"; do
-        if [ -f "$f" ]; then
-          hash="$hash$(sha256sum "$f" 2>/dev/null | cut -d' ' -f1)"
-        fi
-      done
-      if [ -n "$hash" ]; then
-        echo "$hash" | sha256sum | cut -d' ' -f1
-      fi
-    }
-
-    # Get cached hash for a key
-    _turnkey_get_cached_hash() {
-      local key="$1"
-      if [ -f "$TURNKEY_DEPS_CACHE" ]; then
-        grep "^''${key}=" "$TURNKEY_DEPS_CACHE" 2>/dev/null | cut -d'=' -f2
-      fi
-    }
-
-    # Set cached hash for a key
-    _turnkey_set_cached_hash() {
-      local key="$1"
-      local hash="$2"
-      if [ -f "$TURNKEY_DEPS_CACHE" ]; then
-        grep -v "^''${key}=" "$TURNKEY_DEPS_CACHE" > "''${TURNKEY_DEPS_CACHE}.tmp" 2>/dev/null || true
-        mv "''${TURNKEY_DEPS_CACHE}.tmp" "$TURNKEY_DEPS_CACHE"
-      fi
-      echo "''${key}=''${hash}" >> "$TURNKEY_DEPS_CACHE"
-    }
-
-    # Check if regeneration is needed
-    _turnkey_needs_regen() {
-      local key="$1"
-      local output="$2"
-      shift 2
-
-      if [ ! -f "$output" ]; then
-        return 0
-      fi
-
-      local current_hash=$(_turnkey_hash_files "$@")
-      local cached_hash=$(_turnkey_get_cached_hash "$key")
-
-      if [ "$current_hash" != "$cached_hash" ]; then
-        return 0
-      fi
-
-      return 1
-    }
   '';
 
-  # Go regeneration function
-  goRegenFunction = lib.optionalString hasGo ''
-    _turnkey_regen_go() {
-      if [ ! -f go.mod ]; then return 0; fi
-      if _turnkey_needs_regen "go" "go-deps.toml" go.mod go.sum; then
-        echo "turnkey: Regenerating go-deps.toml..."
-        if "${godepsGen}/bin/godeps-gen" --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml.tmp; then
-          mv go-deps.toml.tmp go-deps.toml
-          _turnkey_set_cached_hash "go" "$(_turnkey_hash_files go.mod go.sum)"
-          echo "turnkey: Updated go-deps.toml (remember to commit)"
-        else
-          rm -f go-deps.toml.tmp
-          echo "turnkey: Warning: Failed to generate go-deps.toml"
-          return 1
-        fi
+  # Regenerate stale deps files: tk sync, for the rules passed as arguments
+  # or all of them. tk decides what is stale, from .turnkey/sync.toml.
+  regenFunction = ''
+    _turnkey_regen() {
+      if [ ! -e .turnkey/sync.toml ]; then return 0; fi
+      if [ -n "''${TURNKEY_VERBOSE:-}" ]; then
+        "${tk}" sync "$@" || echo "turnkey: tk sync failed (continuing anyway)"
+      else
+        "${tk}" --quiet sync "$@" || echo "turnkey: tk sync failed (continuing anyway)"
       fi
-      return 0
-    }
-  '';
-
-  # Python regeneration function
-  pythonRegenFunction = lib.optionalString hasPython ''
-    _turnkey_regen_python() {
-      if [ ! -f pyproject.toml ]; then return 0; fi
-      if _turnkey_needs_regen "python" "python-deps.toml" pyproject.toml; then
-        echo "turnkey: Regenerating python-deps.toml..."
-        if "${uv}/bin/uv" lock && \
-           "${uv}/bin/uv" export --all-packages --no-dev --format pylock.toml -o pylock.toml && \
-           "${pydepsGen}/bin/pydeps-gen" --lock pylock.toml -o python-deps.toml; then
-          _turnkey_set_cached_hash "python" "$(_turnkey_hash_files pyproject.toml)"
-          echo "turnkey: Updated python-deps.toml (remember to commit pylock.toml, uv.lock, python-deps.toml)"
-        else
-          echo "turnkey: Warning: Failed to generate python-deps.toml"
-          return 1
-        fi
-      fi
-      return 0
-    }
-  '';
-
-  # Rust regeneration function
-  rustRegenFunction = lib.optionalString hasRust ''
-    _turnkey_regen_rust() {
-      if [ ! -f Cargo.lock ]; then return 0; fi
-      if _turnkey_needs_regen "rust" "rust-deps.toml" Cargo.toml Cargo.lock; then
-        echo "turnkey: Regenerating rust-deps.toml..."
-        if "${rustdepsGen}/bin/rustdeps-gen" --cargo-lock Cargo.lock -o rust-deps.toml; then
-          _turnkey_set_cached_hash "rust" "$(_turnkey_hash_files Cargo.toml Cargo.lock)"
-          echo "turnkey: Updated rust-deps.toml (remember to commit)"
-        else
-          echo "turnkey: Warning: Failed to generate rust-deps.toml"
-          return 1
-        fi
-      fi
-      return 0
     }
   '';
 
@@ -205,30 +84,24 @@ let
     }
   '';
 
-  # Watch file declarations
+  # Watch file declarations: turnkey's Nix, and each rule's sources and
+  # target, so a regenerated deps file reloads the shell with its new cell
   watchFileDeclarations = ''
     _turnkey_watch_files() {
       watch_file nix/**/*.nix
       watch_file nix/**/*.patch
-      ${lib.optionalString hasGo ''
-      watch_file go.mod
-      watch_file go.sum
-      ''}
-      ${lib.optionalString hasPython ''
-      watch_file pyproject.toml
-      ''}
-      ${lib.optionalString hasRust ''
-      watch_file Cargo.toml
-      watch_file Cargo.lock
-      ''}
+      ${lib.concatMapStringsSep "\n  " (file: "watch_file ${lib.escapeShellArg file}") (
+        lib.unique (builtins.concatMap (rule: rule.sources ++ [ rule.target ]) syncRules)
+      )}
     }
   '';
 
-  # Main use_turnkey function
+  # Main use_turnkey function. --only-<rule> and --skip-<rule> (and the
+  # TURNKEY_ENABLE_<RULE> / TURNKEY_SKIP_<RULE> variables) name deps rules.
   useTurnkeyFunction = ''
     use_turnkey() {
       local skip_regen=0 skip_sync=0 skip_watch=0
-      local only_langs="" skip_langs=""
+      local only_rules="" skip_rules=""
 
       # Parse flags
       while [[ $# -gt 0 ]]; do
@@ -236,12 +109,8 @@ let
           --skip-regen) skip_regen=1 ;;
           --skip-sync)  skip_sync=1 ;;
           --skip-watch) skip_watch=1 ;;
-          --only-go)    only_langs="$only_langs go" ;;
-          --only-python) only_langs="$only_langs python" ;;
-          --only-rust)  only_langs="$only_langs rust" ;;
-          --skip-go)    skip_langs="$skip_langs go" ;;
-          --skip-python) skip_langs="$skip_langs python" ;;
-          --skip-rust)  skip_langs="$skip_langs rust" ;;
+          --only-*)     only_rules="$only_rules ''${1#--only-}" ;;
+          --skip-*)     skip_rules="$skip_rules ''${1#--skip-}" ;;
           *) echo "turnkey: Unknown flag: $1" >&2 ;;
         esac
         shift
@@ -250,33 +119,37 @@ let
       # Check env vars (flags take precedence)
       [[ -n "''${TURNKEY_SKIP_REGEN:-}" ]] && skip_regen=1
 
-      # Build list of languages to process
-      local langs_to_process=""
-      local enabled_langs="${enabledLangs}"
-
-      if [[ -n "$only_langs" ]]; then
-        # Flags: --only-go etc take highest precedence
-        langs_to_process="$only_langs"
+      # Build the list of rules to sync
+      local rules=""
+      if [[ -n "$only_rules" ]]; then
+        # Flags: --only-<rule> take highest precedence
+        rules="$only_rules"
       elif [[ -n "''${TURNKEY_SKIP_ALL:-}" ]]; then
-        # SKIP_ALL mode: start empty, add ENABLE_* languages
-        [[ -n "''${TURNKEY_ENABLE_GO:-}" ]] && langs_to_process="$langs_to_process go"
-        [[ -n "''${TURNKEY_ENABLE_PYTHON:-}" ]] && langs_to_process="$langs_to_process python"
-        [[ -n "''${TURNKEY_ENABLE_RUST:-}" ]] && langs_to_process="$langs_to_process rust"
+        # SKIP_ALL mode: start empty, add ENABLE_* rules
+        ${lib.concatMapStringsSep "\n    " (
+          name:
+          ''[[ -n "''${TURNKEY_ENABLE_${lib.toUpper name}:-}" ]] && rules="$rules ${name}"''
+        ) ruleNames}
       else
-        # Default mode: start with all enabled, remove SKIP_* languages
-        langs_to_process="$enabled_langs"
-        [[ -n "''${TURNKEY_SKIP_GO:-}" ]] && skip_langs="$skip_langs go"
-        [[ -n "''${TURNKEY_SKIP_PYTHON:-}" ]] && skip_langs="$skip_langs python"
-        [[ -n "''${TURNKEY_SKIP_RUST:-}" ]] && skip_langs="$skip_langs rust"
+        # Default mode: every rule, minus SKIP_* rules
+        rules="${lib.concatStringsSep " " ruleNames}"
+        ${lib.concatMapStringsSep "\n    " (
+          name:
+          ''[[ -n "''${TURNKEY_SKIP_${lib.toUpper name}:-}" ]] && skip_rules="$skip_rules ${name}"''
+        ) ruleNames}
       fi
 
       # Regenerate deps
       if [[ "$skip_regen" != "1" ]]; then
-        for lang in $langs_to_process; do
-          if [[ ! " $skip_langs " =~ " $lang " ]]; then
-            "_turnkey_regen_$lang" || true
+        local selected=""
+        for rule in $rules; do
+          if [[ ! " $skip_rules " =~ " $rule " ]]; then
+            selected="$selected $rule"
           fi
         done
+        if [[ -n "$selected" ]]; then
+          _turnkey_regen $selected
+        fi
       fi
 
       # Sync symlinks
@@ -294,9 +167,7 @@ let
   # Complete script
   scriptContent = lib.concatStringsSep "\n\n" [
     helperFunctions
-    goRegenFunction
-    pythonRegenFunction
-    rustRegenFunction
+    regenFunction
     symlinkSyncFunction
     watchFileDeclarations
     useTurnkeyFunction
