@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [
     "turnkey-vnm.7"
   ],
@@ -12,8 +12,8 @@
   ],
   "parent": "turnkey-vnm",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Test result cache server shuts down when idle",
   "type": "task",
-  "updated_at": "2026-09-25T10:54:22Z"
+  "updated_at": "2026-09-25T12:50:01Z"
 }
