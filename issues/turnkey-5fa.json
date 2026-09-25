@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-09-25T16:46:15Z",
@@ -7,7 +7,7 @@
   "id": "turnkey-5fa",
   "labels": [],
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Extract buck2's executor-side test protocol from turnkey-test-runner into a library",
   "type": "task",
   "updated_at": "2026-09-25T16:46:15Z"
