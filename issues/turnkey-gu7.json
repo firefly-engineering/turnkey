@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [],
   "blocks": [
     "turnkey-vnm.24"
@@ -9,8 +9,8 @@
   "id": "turnkey-gu7",
   "labels": [],
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "solidity_test may not use the Nix-provided solc",
   "type": "bug",
-  "updated_at": "2026-09-25T10:57:00Z"
+  "updated_at": "2026-09-25T11:14:20Z"
 }
