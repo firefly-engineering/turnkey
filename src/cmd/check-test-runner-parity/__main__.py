@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check that turnkey-test-runner behaves exactly like buck2's bundled runner.
 
-Runs `tk test` on the same targets twice per scenario, once with buck2's
+Runs `buck2 test` on the same targets twice per scenario, once with buck2's
 bundled runner (`-c test.v2_test_executor=`) and once with turnkey's, and
 compares, from buck2's event log:
 
@@ -53,9 +53,14 @@ def target_name(label: dict) -> str:
 
 
 def run(patterns: list[str], config: list[str], runner_args: list[str]) -> Run:
-    """Run `tk test`, then read its results from buck2's event log."""
+    """Run `buck2 test`, then read its results from buck2's event log.
+
+    buck2 directly, not `tk test`: tk adds turnkey-test-runner's caching
+    flags after `--`, which buck2's bundled runner rejects. Without them
+    turnkey's runner neither reads nor records, like the bundled one.
+    """
     test = subprocess.run(
-        ["tk", "test", *config, *patterns, "--", *runner_args],
+        ["buck2", "test", *config, *patterns, "--", *runner_args],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -104,6 +109,8 @@ def compare(bundled: Run, turnkey: Run) -> list[str]:
 
 def main() -> int:
     patterns = sys.argv[1:] or ["//..."]
+    # Bring generated files and cells up to date once, as tk test would.
+    subprocess.run(["tk", "sync"], stdout=subprocess.DEVNULL, check=True)
     failed = False
     for scenario, runner_args in SCENARIOS.items():
         bundled = run(patterns, BUNDLED_RUNNER, runner_args)
