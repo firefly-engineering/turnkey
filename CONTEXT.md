@@ -13,3 +13,14 @@ _Avoid_: test caching, incremental testing, build caching (which is the existing
 **Target determination**:
 Choosing, from a change, which tests *could* be affected before anything is built. Distinct from test result caching, which decides after the build whether a test's inputs actually changed.
 _Avoid_: test selection, affected tests
+
+**Recorded result**:
+A test's pass, stored under its result key so that a later run can report it instead of running the test. Only passes are ever recorded results; a failure is always run again.
+_Avoid_: cached failure, test cache entry
+
+**Result key**:
+Everything the test process can see (its inputs, argv, declared environment, timeout, working directory and platform), plus the versions of buck2 and of the caching tool. Two runs share a recorded result only if their result keys are equal.
+_Avoid_: cache key, test hash
+
+**Reuse policy**:
+The rules, kept outside the result key, for when a recorded result may be read or written: only passes, only under `tk`, not for targets labelled `no-test-cache`, and not when a re-run is forced. Changing the policy never splits the recorded results.
