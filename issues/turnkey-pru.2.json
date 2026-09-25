@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T20:29:52Z",
+  "description": "src/go/pkg/rules (no importers), the unused parts of src/go/pkg/staleness (only IsStale is called), and the unpackaged regex src/cmd/*-deps-extract commands. tk rules sync uses rulessync+mapper+starlark+deps-extract only.",
+  "id": "turnkey-pru.2",
+  "labels": [],
+  "parent": "turnkey-pru",
+  "priority": 2,
+  "status": "open",
+  "title": "Delete dead rules.star sync code",
+  "type": "task",
+  "updated_at": "2026-09-25T20:29:52Z"
+}
