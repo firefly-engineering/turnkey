@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -16,20 +18,75 @@ import (
 	"time"
 )
 
-func TestFromEnv(t *testing.T) {
-	t.Setenv(ServerEnv, "")
-	t.Setenv(AddressEnv, "")
-	if FromEnv() != nil {
-		t.Fatal("expected no config without an address")
+// shellContract is how the dev shell describes the cache. The Nix side
+// (nix/buck2/test-cache.nix) is checked against the same file.
+//
+//go:embed testdata/shell-contract.json
+var shellContract []byte
+
+func TestFromEnvReadsWhatTheShellWrites(t *testing.T) {
+	var contract struct {
+		Env    string
+		Caches []struct {
+			Descriptor json.RawMessage
+			Options    struct{ Endpoint *string }
+		}
 	}
-	t.Setenv(AddressEnv, "grpc://cache.example.com:443")
-	if c := FromEnv(); c == nil || c.Managed() {
-		t.Fatalf("expected an unmanaged remote cache, got %+v", c)
+	if err := json.Unmarshal(shellContract, &contract); err != nil {
+		t.Fatal(err)
 	}
-	t.Setenv(ServerEnv, "/bin/bazel-remote")
-	t.Setenv(AddressEnv, "grpc://127.0.0.1:1")
-	if c := FromEnv(); c == nil || !c.Managed() || c.Address != "grpc://127.0.0.1:1" {
-		t.Fatalf("expected a managed local cache, got %+v", c)
+	if contract.Env != Env {
+		t.Fatalf("the shell sets %s, tk reads %s", contract.Env, Env)
+	}
+	for _, cache := range contract.Caches {
+		t.Setenv(Env, string(cache.Descriptor))
+		config, err := FromEnv()
+		if err != nil {
+			t.Fatalf("FromEnv(%s): %v", cache.Descriptor, err)
+		}
+		var want map[string]any
+		_ = json.Unmarshal(cache.Descriptor, &want)
+		if config.Address != want["address"] || config.TLS != want["tls"] {
+			t.Errorf("FromEnv(%s) = %+v", cache.Descriptor, config)
+		}
+		// Only the local cache (no endpoint) is tk's to run
+		if local := cache.Options.Endpoint == nil; config.Managed() != local {
+			t.Errorf("FromEnv(%s): managed %v, want %v", cache.Descriptor, config.Managed(), local)
+		}
+	}
+}
+
+func TestFromEnvWithoutACache(t *testing.T) {
+	t.Setenv(Env, "")
+	if config, err := FromEnv(); config != nil || err != nil {
+		t.Fatalf("FromEnv() = %+v, %v; want no cache", config, err)
+	}
+	for _, bad := range []string{"grpc://127.0.0.1:1", `{"tls": true}`} {
+		t.Setenv(Env, bad)
+		if _, err := FromEnv(); err == nil {
+			t.Errorf("FromEnv(%q) succeeded", bad)
+		}
+	}
+}
+
+func TestRemoteTLSCacheMustCompleteAHandshake(t *testing.T) {
+	// Accepts connections but never speaks TLS: a plain TCP probe would pass.
+	address := serve(t, func(conn net.Conn) { time.Sleep(3 * remoteProbe) })
+	cache := &Config{Address: "grpc://" + address, TLS: true}
+	err := cache.usable()
+	if err == nil || !strings.Contains(err.Error(), "TLS handshake") {
+		t.Fatalf("usable() = %v; want a failed TLS handshake", err)
+	}
+}
+
+func TestRemoteTLSCacheWithAnUntrustedCertificate(t *testing.T) {
+	server := httptest.NewUnstartedServer(http.NotFoundHandler())
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	defer server.Close()
+	cache := &Config{Address: "grpc://" + server.Listener.Addr().String(), TLS: true}
+	if err := cache.usable(); err == nil {
+		t.Fatal("usable() accepted a certificate buck2 wouldn't trust")
 	}
 }
 

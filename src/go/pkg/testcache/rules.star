@@ -10,7 +10,10 @@ go_library(
 go_test(
     name = "testcache_test",
     srcs = ["testcache_test.go"],
-    embed_srcs = ["testdata/runner-contract.json"],
+    embed_srcs = [
+        "testdata/runner-contract.json",
+        "testdata/shell-contract.json",
+    ],
     target_under_test = ":testcache",
     visibility = ["PUBLIC"],
 )

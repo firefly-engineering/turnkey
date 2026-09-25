@@ -1,0 +1,34 @@
+{
+  "description": "How the dev shell describes the test result cache to tk: the variable, and the JSON it holds for given testCache options. The Nix side (nix/buck2/test-cache.nix, checked by checks.buck2-generators) must produce exactly these descriptors from these options; tk's side (src/go/pkg/testcache) must read them. Change both sides together.",
+  "env": "TURNKEY_TEST_CACHE",
+  "caches": [
+    {
+      "options": { "endpoint": null, "tls": true },
+      "port": 47301,
+      "server": "/nix/store/stand-in-bazel-remote/bin/bazel-remote",
+      "descriptor": {
+        "address": "grpc://127.0.0.1:47301",
+        "server": "/nix/store/stand-in-bazel-remote/bin/bazel-remote",
+        "tls": false
+      }
+    },
+    {
+      "options": { "endpoint": "grpc://cache.example.com:443", "tls": true },
+      "port": 47301,
+      "server": "/nix/store/stand-in-bazel-remote/bin/bazel-remote",
+      "descriptor": {
+        "address": "grpc://cache.example.com:443",
+        "tls": true
+      }
+    },
+    {
+      "options": { "endpoint": "grpc://cache.internal:9092", "tls": false },
+      "port": 47301,
+      "server": "/nix/store/stand-in-bazel-remote/bin/bazel-remote",
+      "descriptor": {
+        "address": "grpc://cache.internal:9092",
+        "tls": false
+      }
+    }
+  ]
+}

@@ -374,6 +374,24 @@
                 buck2 = buck2Options;
               };
               syncToml = builtins.fromTOML syncConfig.content;
+
+              # How the shell describes the cache to tk, as tk's tests read it
+              shellContract = builtins.fromJSON (builtins.readFile ./src/go/pkg/testcache/testdata/shell-contract.json);
+              describes =
+                example:
+                let
+                  env =
+                    (import ./nix/buck2/test-cache.nix { inherit lib; } {
+                      testCache = example.options // {
+                        enable = true;
+                      };
+                      enabled = true;
+                      runner = "/nix/store/stand-in-runner";
+                      path = "/nix/store/stand-in-bash/bin";
+                      inherit (example) port server;
+                    }).env;
+                in
+                env ? ${shellContract.env} && builtins.fromJSON env.${shellContract.env} == example.descriptor;
             in
             assert lib.assertMsg (lib.all (name: builtins.elem name goCell.toolchains) [
               "go"
@@ -408,6 +426,8 @@
               "go"
               "pylock"
             ]) "sync.toml: the go and uv wrappers don't run the go and pylock rules";
+            assert lib.assertMsg (lib.all describes shellContract.caches)
+              "test cache: the shell doesn't describe the cache as testdata/shell-contract.json says";
             pkgs.runCommand "buck2-generators-check" { } "touch $out";
 
           # The language records (nix/buck2/languages.nix) agree with

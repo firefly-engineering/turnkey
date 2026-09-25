@@ -546,7 +546,11 @@ func delegateToBuck2(args []string) {
 	// stays around to print how many results were reused once buck2's own
 	// summary is out.
 	if subcommand, _ := buck2args.Subcommand(args); subcommand == "test" {
-		if cache := testcache.FromEnv(); cache != nil {
+		cache, err := testcache.FromEnv()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "tk: running tests without the test result cache: %v\n", err)
+		}
+		if cache != nil {
 			os.Exit(cache.RunTests(args, rerun, runBuck2(buck2Path), os.Stderr))
 		}
 	}

@@ -10,6 +10,8 @@
 package testcache
 
 import (
+	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -23,15 +25,11 @@ import (
 	"time"
 )
 
-// Environment variables the turnkey dev shell sets when test result caching
-// is enabled.
 const (
-	// ServerEnv names the bazel-remote binary. It is unset when the shell
-	// uses a remote cache, which tk doesn't manage.
-	ServerEnv = "TURNKEY_TEST_CACHE_SERVER"
-	// AddressEnv is the cache's gRPC address, as in the generated
-	// .buckconfig's [buck2_re_client] section: grpc://127.0.0.1:<port>.
-	AddressEnv = "TURNKEY_TEST_CACHE_ADDRESS"
+	// Env is where the turnkey dev shell describes the test result cache,
+	// as JSON (nix/buck2/test-cache.nix, testdata/shell-contract.json). It
+	// is unset when the shell doesn't enable test result caching.
+	Env = "TURNKEY_TEST_CACHE"
 	// CacheDirEnv overrides where turnkey keeps its caches.
 	CacheDirEnv = "TURNKEY_CACHE_DIR"
 	// SizeEnv overrides the store's size limit, in GiB.
@@ -85,20 +83,33 @@ func MaxSizeGiB() (int, error) {
 // starts it again; recorded results stay in the store.
 const idleTimeout = "24h"
 
-// Config is the test result cache as the dev shell describes it.
+// Config is the test result cache as the dev shell describes it, the same
+// cache the generated .buckconfig's [buck2_re_client] section points buck2 at.
 type Config struct {
-	Server  string // bazel-remote binary; empty for a remote cache
-	Address string // grpc://host:port
+	// Server is the bazel-remote binary tk runs; the shell names one only
+	// for the local cache.
+	Server string `json:"server"`
+	// Address is grpc://host:port.
+	Address string `json:"address"`
+	// TLS is whether the cache is reached over TLS; never for the local one.
+	TLS bool `json:"tls"`
 }
 
 // FromEnv returns the cache configuration, or nil when the dev shell doesn't
 // enable test result caching.
-func FromEnv() *Config {
-	address := os.Getenv(AddressEnv)
-	if address == "" {
-		return nil
+func FromEnv() (*Config, error) {
+	descriptor := os.Getenv(Env)
+	if descriptor == "" {
+		return nil, nil
 	}
-	return &Config{Server: os.Getenv(ServerEnv), Address: address}
+	var cache Config
+	if err := json.Unmarshal([]byte(descriptor), &cache); err != nil {
+		return nil, fmt.Errorf("%s: %w", Env, err)
+	}
+	if cache.Address == "" {
+		return nil, fmt.Errorf("%s names no address", Env)
+	}
+	return &cache, nil
 }
 
 // Managed reports whether tk runs this cache (a local one) itself. The dev
@@ -198,9 +209,10 @@ func (c *Config) plan(forced bool, usable func() error) Plan {
 	return plan
 }
 
-// usable starts the local cache if needed. A remote cache only has to accept
-// a connection: it may use TLS, which tk isn't told about, so it isn't asked
-// to answer as a gRPC server.
+// usable starts the local cache if needed. A remote cache has to accept a
+// connection and, if it takes TLS, complete a handshake as buck2 would, with
+// the system's roots: a certificate buck2 rejects would otherwise fail every
+// cached test after buck2's retries.
 func (c *Config) usable() error {
 	if c.Managed() {
 		return c.Ensure()
@@ -209,7 +221,17 @@ func (c *Config) usable() error {
 	if err != nil {
 		return err
 	}
-	conn, err := net.DialTimeout("tcp", hostPort, remoteProbe)
+	dialer := &net.Dialer{Timeout: remoteProbe}
+	if c.TLS {
+		host, _, _ := net.SplitHostPort(hostPort)
+		conn, err := tls.DialWithDialer(dialer, "tcp", hostPort, &tls.Config{ServerName: host, NextProtos: []string{"h2"}})
+		if err != nil {
+			return fmt.Errorf("the test result cache at %s doesn't complete a TLS handshake: %w", c.Address, err)
+		}
+		conn.Close()
+		return nil
+	}
+	conn, err := dialer.Dial("tcp", hostPort)
 	if err != nil {
 		return fmt.Errorf("the test result cache at %s is unreachable: %w", c.Address, err)
 	}

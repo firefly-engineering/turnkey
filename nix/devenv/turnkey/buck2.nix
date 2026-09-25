@@ -198,52 +198,38 @@ let
   # release (nix/buck2/buck2-source.nix)
   testRunnerProtocol = import ../../packages/test-runner-protocol.nix { inherit pkgs lib; };
 
-  # turnkey-test-runner replaces buck2's bundled runner when test result
-  # caching is enabled. Only turnkey's prelude is known to mark its test rules
-  # cache-safe, so a custom prelude turns caching off.
-  testRunner =
-    if cfg.testCache.enable && !customPrelude then
-      import ../../packages/turnkey-test-runner.nix { inherit pkgs lib; }
-    else
-      null;
-
-  # The local test result cache listens on a fixed loopback port. buck2's RE
-  # client can't use Unix sockets, and the address must not be passed with -c,
-  # which would change the daemon's startup config.
-  # A user can move it with TURNKEY_TEST_CACHE_PORT, read when the shell is
-  # evaluated (turnkey shells evaluate impurely; a pure evaluation keeps the
-  # default). tk gets the same address through TURNKEY_TEST_CACHE_ADDRESS.
-  testCacheLocal = cfg.testCache.endpoint == null;
-  testCacheAddress =
-    if testCacheLocal then "grpc://127.0.0.1:${toString testCachePort}" else cfg.testCache.endpoint;
-  testCachePort =
-    let
-      override = builtins.getEnv "TURNKEY_TEST_CACHE_PORT";
-    in
-    if override == "" then 47301 else lib.toInt override;
-
-  # PATH for cached tests: Nix store paths only, so every tool a test can run
-  # is part of its result key (test_caching.bzl).
-  testPath = lib.makeBinPath [
-    pkgs.bash
-    pkgs.coreutils
-    pkgs.diffutils
-  ];
+  # Test result caching (nix/buck2/test-cache.nix). turnkey-test-runner
+  # replaces buck2's bundled runner when it is on. Only turnkey's prelude is
+  # known to mark its test rules cache-safe, so a custom prelude turns it off.
+  testCache = import ../../buck2/test-cache.nix { inherit lib; } {
+    inherit (cfg) testCache;
+    enabled = !customPrelude;
+    runner = import ../../packages/turnkey-test-runner.nix { inherit pkgs lib; };
+    server = "${pkgs.bazel-remote}/bin/bazel-remote";
+    # PATH for cached tests: Nix store paths only, so every tool a test can
+    # run is part of its result key (test_caching.bzl).
+    path = lib.makeBinPath [
+      pkgs.bash
+      pkgs.coreutils
+      pkgs.diffutils
+    ];
+    # The local cache listens on a fixed loopback port. buck2's RE client
+    # can't use Unix sockets, and the address must not be passed with -c,
+    # which would change the daemon's startup config. A user can move it with
+    # TURNKEY_TEST_CACHE_PORT, read when the shell is evaluated (turnkey
+    # shells evaluate impurely; a pure evaluation keeps the default).
+    port =
+      let
+        override = builtins.getEnv "TURNKEY_TEST_CACHE_PORT";
+      in
+      if override == "" then 47301 else lib.toInt override;
+  };
 
   # The .buckconfig (nix/buck2/buckconfig.nix)
   buckconfigContent = import ../../buck2/buckconfig.nix { inherit lib; } {
     cells = lib.attrValues nixCells;
     inherit toolchainsCellPath testRunnerProtocol;
-    testCache =
-      if testRunner == null then
-        null
-      else
-        {
-          runner = testRunner;
-          path = testPath;
-          address = testCacheAddress;
-          tls = !testCacheLocal && cfg.testCache.tls;
-        };
+    testCache = testCache.buckconfig;
   };
 
   # Buckconfig file derivation
@@ -329,14 +315,8 @@ in
       // {
         TURNKEY_TEST_RUNNER_PROTOCOL = "${testRunnerProtocol}";
       }
-      # The local test result cache tk starts on demand (src/go/pkg/testcache)
-      // lib.optionalAttrs (testRunner != null) {
-        TURNKEY_TEST_CACHE_ADDRESS = testCacheAddress;
-      }
-      # Only a local cache has a server for tk to manage
-      // lib.optionalAttrs (testRunner != null && testCacheLocal) {
-        TURNKEY_TEST_CACHE_SERVER = "${pkgs.bazel-remote}/bin/bazel-remote";
-      }
+      # The test result cache, as tk reads it (src/go/pkg/testcache)
+      // testCache.env
       # Store tk's share path for shell completion setup
       // lib.optionalAttrs (turnkeyCfg.registry ? tk) {
         TURNKEY_TK_SHARE = "${resolvedRegistry.tk}/share";
