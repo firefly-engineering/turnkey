@@ -11,9 +11,15 @@
     "wayfinder:grilling"
   ],
   "parent": "turnkey-luk",
+  "comments": [
+    {
+      "text": "Resolution:\n1. The per-shell setting switches the shell's whole Buck2 integration: binary, prelude, cells, toolchains cell, tk sync hooks and test caching. This is what today's shellNeedsBuck2 gate means.\n2. Shape: `turnkey.toolchains.buck2.shells`, a list of shell names, default `[ \"default\" ]`. Naming a shell missing from `declarationFiles` is an eval error. `declarationFiles` is unchanged.\n3. `turnkey.toolchains.buck2.enable` stays the master switch (default false); `shells` applies only when it is on. A single-shell consumer writes `buck2.enable = true;` as today and only deletes buck2-toolchain from toolchain.toml. Turnkey's own docs shell needs no change.\n4. `turnkey.toolchains.buck2.version`: read-only str computed from the pinned record, passed to each shell's devenv module as read-only `turnkey.buck2.version`; the welcome message reads it.\n5. The standalone devenv module (flake.devenvModules.turnkey) keeps its interface. Its `turnkey.buck2.enable` means this shell gets the pinned buck2 plus the integration, and it resolves the pin itself.",
+      "timestamp": "2026-09-25T15:23:58Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "What is the shape of the per-shell buck2 option?",
   "type": "task",
-  "updated_at": "2026-09-25T15:20:01Z"
+  "updated_at": "2026-09-25T15:23:58Z"
 }
