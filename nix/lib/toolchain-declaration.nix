@@ -10,16 +10,26 @@
 #     toolchainDeclaration = import ./toolchain-declaration.nix { inherit lib; };
 #   in
 #   toolchainDeclaration.resolve { inherit tellerLib registry declarationFile; }
+#   toolchainDeclaration.toolchains declarationFile  # { go = { version = "3"; }; ... }
 #
 { lib }:
 
-{
+rec {
+  # The declared toolchains, name -> spec (e.g. { version = "3"; }), with
+  # the same checks as resolve
+  toolchains = declarationFile: (read declarationFile).toolchains or { };
+
   resolve =
     {
       tellerLib,
       registry,
       declarationFile,
     }:
+    tellerLib.resolveToolchains registry (read declarationFile);
+
+  # The parsed declaration file, or an error if it declares buck2
+  read =
+    declarationFile:
     let
       declaration = builtins.fromTOML (builtins.readFile declarationFile);
       declaredBuck2 = builtins.filter (name: (declaration.toolchains or { }) ? ${name}) [
@@ -33,5 +43,5 @@
         Remove the entry; turnkey.toolchains.buck2.shells chooses which shells get buck2.
         See https://github.com/firefly-engineering/turnkey/blob/main/docs/user-manual/src/configuration/buck2-integration.md#the-buck2-version''
     else
-      tellerLib.resolveToolchains registry declaration;
+      declaration;
 }

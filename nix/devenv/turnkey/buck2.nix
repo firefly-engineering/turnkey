@@ -24,7 +24,7 @@ let
   # Toolchain declarations (name -> spec, e.g. { version = "3"; }) from the declaration file
   declaredToolchains =
     if turnkeyCfg.declarationFile != null then
-      (builtins.fromTOML (builtins.readFile turnkeyCfg.declarationFile)).toolchains or { }
+      (import ../../lib/toolchain-declaration.nix { inherit lib; }).toolchains turnkeyCfg.declarationFile
     else
       { };
 
