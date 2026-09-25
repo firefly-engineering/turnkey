@@ -6,9 +6,15 @@
   "description": "Found during test-input research (docs/research/test-undeclared-inputs.md on jj bookmark research/test-undeclared-inputs (from turnkey-w55.3)). The integration cases in godeps_test skip under buck2 because their fixtures aren't declared as test resources, so the target passes without exercising them.",
   "id": "turnkey-2gk",
   "labels": [],
+  "comments": [
+    {
+      "text": "Per turnkey-w55.8, fixing this (declaring the fixtures as resources and turning the skip into a failure) must happen before test result caching is switched on for go_test in turnkey's own repo.",
+      "timestamp": "2026-09-25T10:03:27Z"
+    }
+  ],
   "priority": 3,
   "status": "open",
   "title": "godeps_test integration cases always skip: fixtures not declared as resources",
   "type": "bug",
-  "updated_at": "2026-09-25T07:51:10Z"
+  "updated_at": "2026-09-25T10:03:27Z"
 }
