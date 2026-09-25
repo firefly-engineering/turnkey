@@ -6,6 +6,8 @@
   "blocks": [
     "turnkey-w55.9"
   ],
+  "closed_at": "2026-09-25T10:42:33Z",
+  "close_reason": "Per-user store in the platform cache dir; LRU 5 GiB; tk starts bazel-remote on demand with an idle timeout; probe then uncached fallback; runner switched by a flag after --; tk prints the recorded count for test; fixed loopback port in the generated .buckconfig.",
   "created": "2026-09-25T09:56:37Z",
   "description": "## Question\n\nADR 0001 needs a local cache-only REAPI server (bazel-remote) on every developer machine. Where does its store live (per machine, shared across checkouts: required by the local-hits constraint), what size and eviction, who starts and stops it (tk on demand, a user service, devenv process), how tk makes sure it is up before a cached test runs (a failed connect may stick for the daemon's life), and how tk turns the runner on per invocation without invalidating buck2's build state?",
   "id": "turnkey-w55.12",
@@ -20,7 +22,7 @@
     }
   ],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "How does tk run the local test result cache?",
   "type": "question",
   "updated_at": "2026-09-25T10:42:33Z"
