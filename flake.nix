@@ -190,7 +190,10 @@
           packages.cargo-prune-workspace = import ./nix/packages/cargo-prune-workspace.nix {
             inherit pkgs lib;
           };
-          packages.tk = import ./nix/packages/tk.nix { inherit pkgs lib; };
+          packages.tk = import ./nix/packages/tk.nix {
+            inherit pkgs lib;
+            inherit ((self.lib.pinnedBuck2Release system)) buck2;
+          };
           packages.tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
           packages.e2e-runner = import ./nix/packages/e2e-runner.nix { inherit pkgs lib; };
           packages.jsdeps-gen = import ./nix/packages/jsdeps-gen.nix { inherit pkgs lib; };
@@ -249,6 +252,43 @@
               && shellBuck2.prelude.package.drvPath == config.packages.turnkey-prelude.drvPath
             ) "pinned buck2 release: the default shell's prelude is not packages.turnkey-prelude";
             pkgs.runCommand "pinned-buck2-release-check" { } "touch $out";
+
+          # buck2 comes only from the pinned release
+          # (docs/adr/0002-turnkey-owns-the-buck2-version.md): declaring it is
+          # an error, the toolchain profile gets the pinned one, and no Nix
+          # file reaches for another.
+          checks.toolchain-declaration =
+            let
+              release = self.lib.pinnedBuck2Release system;
+              resolve = (import ./nix/lib/toolchain-declaration.nix { inherit lib; }).resolve;
+              declaringBuck2 = resolve {
+                tellerLib = self.lib.defaultTellerLib;
+                registry = self.lib.defaultTellerRegistry system;
+                declarationFile = builtins.toFile "toolchain.toml" ''
+                  [toolchains]
+                  buck2 = {}
+                '';
+              };
+              nixFiles = builtins.filter (lib.hasSuffix ".nix") (lib.filesystem.listFilesRecursive ./nix);
+              reachesForBuck2 =
+                file:
+                let
+                  text = builtins.readFile file;
+                in
+                builtins.any (use: lib.hasInfix use text) [
+                  "pkgs.buck2}"
+                  "pkgs.buck2;"
+                  "pkgs.buck2 "
+                ];
+              strayBuck2 = builtins.filter reachesForBuck2 nixFiles;
+            in
+            assert lib.assertMsg (!(builtins.tryEval declaringBuck2).success)
+              "toolchain declaration: declaring buck2 in toolchain.toml resolves instead of failing";
+            assert lib.assertMsg (builtins.any (pkg: pkg.drvPath == release.buck2.drvPath) config.packages.toolchain-profile.toolchainPackages)
+              "toolchain declaration: the toolchain profile lacks the pinned buck2";
+            assert lib.assertMsg (strayBuck2 == [ ])
+              "toolchain declaration: ${lib.concatMapStringsSep ", " toString strayBuck2} use a buck2 other than the pinned one";
+            pkgs.runCommand "toolchain-declaration-check" { } "touch $out";
 
           # Configure turnkey to use our local toolchain files. tellerLib
           # and tellerRegistry default to self.lib.defaultTellerLib /

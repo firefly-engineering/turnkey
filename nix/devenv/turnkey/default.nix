@@ -42,28 +42,10 @@ in
   };
 
   config = lib.mkIf (cfg.enable && cfg.declarationFile != null) {
-    packages =
-      let
-        # Parse toolchain.toml
-        toolchainDeclaration = builtins.fromTOML (builtins.readFile cfg.declarationFile);
-
-        # buck2 is turnkey's, not a toolchain to declare
-        # (docs/adr/0002-turnkey-owns-the-buck2-version.md)
-        declaredBuck2 = builtins.filter (name: (toolchainDeclaration.toolchains or { }) ? ${name}) [
-          "buck2"
-          "buck2-toolchain"
-        ];
-
-        # Resolve all toolchains using the versioned registry
-        resolvedPackages = turnkeyLib.resolveToolchains cfg.registry toolchainDeclaration;
-      in
-      if declaredBuck2 != [ ] then
-        throw ''
-          turnkey: ${toString cfg.declarationFile} declares ${lib.concatStringsSep " and " declaredBuck2}, but turnkey now ships buck2 itself.
-          Remove the entry; turnkey.toolchains.buck2.shells chooses which shells get buck2.
-          See https://github.com/firefly-engineering/turnkey/blob/main/docs/user-manual/src/configuration/buck2-integration.md#the-buck2-version''
-      else
-        resolvedPackages;
+    packages = (import ../../lib/toolchain-declaration.nix { inherit lib; }).resolve {
+      tellerLib = turnkeyLib;
+      inherit (cfg) registry declarationFile;
+    };
 
     # Export direnv library path
     env.TURNKEY_DIRENV_LIB = "${direnvLib}";

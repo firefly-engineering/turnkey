@@ -8,7 +8,12 @@
 #   tk build //some:target     # syncs first, then runs buck2 build
 #   tk sync                    # explicit sync
 #   tk check                   # check staleness (for CI)
-{ pkgs, lib }:
+{
+  pkgs,
+  lib,
+  # The pinned buck2 (turnkeyLib.pinnedBuck2Release system).buck2
+  buck2,
+}:
 
 let
   fs = lib.fileset;
@@ -42,8 +47,9 @@ pkgs.buildGoModule {
 
   vendorHash = "sha256-Vgqdy+jGLYByPiGY8z45+nSYo5YHpmlyHjmfAcYEyjU=";
 
-  # buck2 is needed at build time to generate shell completions
-  nativeBuildInputs = [ pkgs.buck2 pkgs.installShellFiles ];
+  # buck2 is needed at build time to generate shell completions: the pinned
+  # one, so they describe the buck2 the shell runs
+  nativeBuildInputs = [ buck2 pkgs.installShellFiles ];
 
   postInstall = ''
     # Generate and install shell completions

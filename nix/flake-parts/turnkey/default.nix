@@ -199,7 +199,10 @@ in
         base // (builtins.mapAttrs mergeToolchain extensions);
 
       # Built-in turnkey tools that all consumers get automatically
-      tk = import ../../packages/tk.nix { inherit pkgs lib; };
+      tk = import ../../packages/tk.nix {
+        inherit pkgs lib;
+        buck2 = pinnedBuck2;
+      };
       builtinExtensions = {
         tk = single tk;
       };
@@ -446,15 +449,22 @@ in
         toolchain-profile =
           let
             defaultDecl = cfg.declarationFiles.default or null;
+            # What the default shell gets: its declared toolchains, and the
+            # pinned buck2 when it has the Buck2 integration
             toolchainPackages =
-              if defaultDecl != null then
-                turnkeyLib.resolveToolchains registry (builtins.fromTOML (builtins.readFile defaultDecl))
-              else
-                [];
+              lib.optionals (defaultDecl != null) (
+                (import ../../lib/toolchain-declaration.nix { inherit lib; }).resolve {
+                  tellerLib = turnkeyLib;
+                  inherit registry;
+                  declarationFile = defaultDecl;
+                }
+              )
+              ++ lib.optional (cfg.buck2.enable && builtins.elem "default" cfg.buck2.shells) pinnedBuck2;
           in
           pkgs.buildEnv {
             name = "turnkey-toolchain-profile";
             paths = toolchainPackages;
+            passthru = { inherit toolchainPackages; };
             # Ignore collisions (multiple packages may provide the same binary name)
             ignoreCollisions = true;
           };

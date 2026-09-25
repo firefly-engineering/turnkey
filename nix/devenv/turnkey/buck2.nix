@@ -887,7 +887,7 @@ in
         files = "(rules\\.star|BUCK|\\.bzl)$";
         pass_filenames = true;
         entry = ''
-          ${pkgs.buck2}/bin/buck2 starlark lint
+          ${cfg.package}/bin/buck2 starlark lint
         '';
       };
 
