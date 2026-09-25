@@ -12,11 +12,15 @@
     {
       "text": "Done in 77590ca02706 (not pushed). New src/rust/buck2-test-executor (bindings + launch/transport/TestExecutor; start(\u0026launch) -\u003e Session { specs, orchestrator, server }). Runner generic over an Orchestrator trait with 5 new fake-buck2 tests (runner: 15 tests, lib: 1). fmt/clippy -D warnings clean, cargo + Buck2 tests pass, Nix package builds, CI gates pass, parity 3/3 on 31 targets.",
       "timestamp": "2026-09-25T17:06:16Z"
+    },
+    {
+      "text": "Landed on main as 77590ca0.",
+      "timestamp": "2026-09-25T17:08:30Z"
     }
   ],
   "priority": 2,
   "status": "closed",
   "title": "Extract buck2's executor-side test protocol from turnkey-test-runner into a library",
   "type": "task",
-  "updated_at": "2026-09-25T17:06:17Z"
+  "updated_at": "2026-09-25T17:08:30Z"
 }
