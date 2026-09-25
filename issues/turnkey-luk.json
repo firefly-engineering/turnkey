@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-09-25T15:10:57Z",
@@ -9,8 +9,8 @@
     "wayfinder:map"
   ],
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Bundle buck2 inside turnkey",
   "type": "epic",
-  "updated_at": "2026-09-25T15:10:57Z"
+  "updated_at": "2026-09-25T15:10:58Z"
 }
