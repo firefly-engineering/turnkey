@@ -2,6 +2,8 @@
   "assignee": "unknown",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-09-25T17:06:17Z",
+  "close_reason": "Library extracted, orchestrator trait + tests; commit 77590ca02706",
   "created": "2026-09-25T16:46:15Z",
   "description": "Move the generated protocol bindings and the executor side of buck2's test-runner protocol (launch arguments, inherited-fd sockets, gRPC transport, TestExecutor spec stream) out of src/cmd/turnkey-test-runner into src/rust/buck2-test-executor, so the part pinned to buck2's protocol (TURNKEY_TEST_RUNNER_PROTOCOL, generated-code lint allowances, exact prost/tonic versions) is one crate. Keep runner policy (Config, runner.rs, cache.rs) in the binary. Put a small trait over the three orchestrator calls so run_one can be tested end to end with a fake buck2. No behaviour change: parity suite must still match 3/3.",
   "id": "turnkey-5fa",
@@ -13,8 +15,8 @@
     }
   ],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Extract buck2's executor-side test protocol from turnkey-test-runner into a library",
   "type": "task",
-  "updated_at": "2026-09-25T17:06:16Z"
+  "updated_at": "2026-09-25T17:06:17Z"
 }
