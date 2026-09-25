@@ -2,7 +2,8 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [
-    "turnkey-w55.7"
+    "turnkey-w55.7",
+    "turnkey-w55.8"
   ],
   "created": "2026-09-25T07:30:57Z",
   "description": "## Question\n\nA cached result is only sound if everything a test reads is part of its cache key. Two things are needed for every test target in turnkey (Go `go_test`, Rust `rust_test`, Python `python_test`, `solidity_test`, `jsonnet_test`, and the example projects):\n\n1. **Undeclared inputs.** Which files, env vars, network, clock or `$HOME` state does the test read that are not declared inputs of the test action? Examples: Go `testdata/` reached through relative paths, Python fixtures and `conftest.py`, forge's `foundry.toml`, `lib/` and cache dirs, solc downloads, jsonnet golden files.\n2. **Key stability across checkouts.** Does anything in the test's command, args or env contain an absolute path (repo root, `BUCK_ISOLATION_DIR`, `$HOME`) that would change the key between two checkouts of the same revision? Nix store paths are fine.\n\nAlso list how each rule declares runtime resources (`resources`, hidden inputs, `env`), and whether `run_from_project_root` / `use_project_relative_paths` hold. Cite file:line.",
@@ -15,5 +16,5 @@
   "status": "open",
   "title": "What do turnkey's test targets read beyond their declared inputs?",
   "type": "task",
-  "updated_at": "2026-09-25T07:31:20Z"
+  "updated_at": "2026-09-25T07:31:21Z"
 }
