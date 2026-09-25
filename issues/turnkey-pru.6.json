@@ -6,14 +6,16 @@
   "blocks": [
     "turnkey-pru.7"
   ],
+  "closed_at": "2026-09-25T21:09:42Z",
+  "close_reason": "Landed as zlstyvys: nix/buck2/test-cache.nix feeds buckconfig and TURNKEY_TEST_CACHE (JSON); tk probes TLS endpoints with a handshake; shell-contract.json checked on both sides.",
   "created": "2026-09-25T20:29:53Z",
   "description": "Cache endpoint config reaches buckconfig, tk and runner through separate channels (TURNKEY_TEST_CACHE_ADDRESS, TURNKEY_TEST_CACHE_SERVER presence, TLS only in buckconfig). tk's probe rejects anything but grpc:// so a TLS remote reads as unusable. One descriptor emitted by Nix, checked contract at the Nix/tk seam.",
   "id": "turnkey-pru.6",
   "labels": [],
   "parent": "turnkey-pru",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "One test cache descriptor from Nix to tk to runner",
   "type": "task",
-  "updated_at": "2026-09-25T21:06:22Z"
+  "updated_at": "2026-09-25T21:09:42Z"
 }
