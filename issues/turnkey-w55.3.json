@@ -22,11 +22,15 @@
     {
       "text": "Research branch pushed: research/test-undeclared-inputs. Permalink: https://github.com/firefly-engineering/turnkey/blob/01bc5ebf124e86270105910a70ffea160ec23e04/docs/research/test-undeclared-inputs.md",
       "timestamp": "2026-09-25T08:08:41Z"
+    },
+    {
+      "text": "Research doc now on main (research branch folded in and deleted). Permalink: https://github.com/firefly-engineering/turnkey/blob/e111bcb02e0d80fb8ec1ed97edd1557c3abf72b0/docs/research/test-undeclared-inputs.md",
+      "timestamp": "2026-09-25T08:10:27Z"
     }
   ],
   "priority": 2,
   "status": "closed",
   "title": "What do turnkey's test targets read beyond their declared inputs?",
   "type": "task",
-  "updated_at": "2026-09-25T08:08:41Z"
+  "updated_at": "2026-09-25T08:10:27Z"
 }
