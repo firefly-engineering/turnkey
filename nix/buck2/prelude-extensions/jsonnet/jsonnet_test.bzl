@@ -29,10 +29,23 @@ def _jsonnet_test_impl(ctx: AnalysisContext) -> list[Provider]:
                 dep_sources.extend(dep_info.sources)
 
     # Add source directory to import paths
-    if ctx.attrs.src:
-        src_path = ctx.attrs.src.short_path
-        src_dir = src_path.rsplit("/", 1)[0] if "/" in src_path else "."
-        import_paths.append(src_dir)
+    src_path = ctx.attrs.src.short_path
+    src_dir = src_path.rsplit("/", 1)[0] if "/" in src_path else "."
+    import_paths.append(src_dir)
+
+    # Stage the test source and its dependencies' sources into a copied
+    # directory, and run jsonnet there. Imports resolve relative to the
+    # importing file and to the -J paths, so both must point inside this
+    # directory: an import of a file that isn't declared then fails instead of
+    # being read from the checkout. A copy, not symlinks, so a resolved path
+    # can't lead back into the source tree.
+    staged = {}
+    for source in [ctx.attrs.src] + dep_sources:
+        existing = staged.get(source.short_path)
+        if existing != None and existing != source:
+            fail("jsonnet_test: two sources share the path `{}`".format(source.short_path))
+        staged[source.short_path] = source
+    srcs_dir = ctx.actions.copied_dir("__jsonnet_srcs__", staged)
 
     # Create test script
     test_script = ctx.actions.declare_output("run_test.sh")
@@ -41,7 +54,7 @@ def _jsonnet_test_impl(ctx: AnalysisContext) -> list[Provider]:
     import_args = []
     for path in import_paths:
         import_args.append("-J")
-        import_args.append(path)
+        import_args.append("$SRCS/" + path)
     import_args_str = " ".join(['"{}"'.format(a) for a in import_args]) if import_args else ""
 
     # Build ext-str args
@@ -65,9 +78,10 @@ def _jsonnet_test_impl(ctx: AnalysisContext) -> list[Provider]:
 set -euo pipefail
 
 JSONNET="$1"
-SRC="$2"
-GOLDEN="$3"
-shift 3
+SRCS="$2"
+SRC="$SRCS/$3"
+GOLDEN="$4"
+shift 4
 
 # Compile jsonnet to temp file
 OUTPUT=$(mktemp)
@@ -97,8 +111,9 @@ fi
 set -euo pipefail
 
 JSONNET="$1"
-SRC="$2"
-shift 2
+SRCS="$2"
+SRC="$SRCS/$3"
+shift 3
 
 # Compile jsonnet - assertions will cause non-zero exit
 # Redirect output to /dev/null since we only care about success/failure
@@ -121,15 +136,12 @@ fi
         is_executable = True,
     )
 
-    # Collect hidden inputs for dependency tracking
-    hidden_inputs = [ctx.attrs.src] + dep_sources
-    if ctx.attrs.golden:
-        hidden_inputs.append(ctx.attrs.golden)
-
-    # Build test command with hidden inputs
-    test_cmd = cmd_args(test_script, hidden = hidden_inputs)
+    # Build test command. Every jsonnet input reaches the test through the
+    # staged directory.
+    test_cmd = cmd_args(test_script)
     test_cmd.add(toolchain.jsonnet)
-    test_cmd.add(ctx.attrs.src)
+    test_cmd.add(srcs_dir)
+    test_cmd.add(src_path)
 
     if ctx.attrs.golden:
         test_cmd.add(ctx.attrs.golden)
