@@ -734,3 +734,17 @@ git push                # Push code to remote
 - Create new issues with `bw create` when you discover follow-up tasks
 - Use descriptive titles and set appropriate priority/type
 - Always `bw sync` before ending a session
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in beadwork (`bw`) on the `beadwork` branch, not GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), applied with `bw label`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root (created lazily). See `docs/agents/domain.md`.
