@@ -9,9 +9,15 @@
     "wayfinder:task"
   ],
   "parent": "turnkey-luk",
+  "comments": [
+    {
+      "text": "Resolution: docs/adr/0002-turnkey-owns-the-buck2-version.md (accepted) and the CONTEXT.md term **Pinned buck2 release** (new Buck2 section), committed as 5685c90c on top of main, not yet pushed.",
+      "timestamp": "2026-09-25T15:37:14Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "Record the ADR and glossary term for turnkey owning the buck2 version",
   "type": "task",
-  "updated_at": "2026-09-25T15:36:35Z"
+  "updated_at": "2026-09-25T15:37:14Z"
 }
