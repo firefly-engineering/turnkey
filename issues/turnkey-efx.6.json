@@ -2,14 +2,16 @@
   "assignee": "unknown",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-09-25T19:57:31Z",
+  "close_reason": "Buck2 options declared once in nix/buck2/options.nix; hand-over is one expression; shells evaluate to identical derivations (darwin+linux); devenvModules export dropped.",
   "created": "2026-09-25T17:24:07Z",
   "description": "End mkShellConfig's field-by-field copy; defaults and descriptions in one place.",
   "id": "turnkey-efx.6",
   "labels": [],
   "parent": "turnkey-efx",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "One owner for the Buck2 option tree (flake-parts -\u003e devenv)",
   "type": "task",
-  "updated_at": "2026-09-25T19:51:20Z"
+  "updated_at": "2026-09-25T19:57:31Z"
 }
