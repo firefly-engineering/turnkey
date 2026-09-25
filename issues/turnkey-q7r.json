@@ -6,9 +6,15 @@
   "description": "toolbox (locked at 9b190de9) now has buck2-toolchain 4 (buck2 2026-07-01) and 5 (buck2 2026-09-15). Update the input, move turnkey to 5, add both releases to nix/buck2/buck2-source.nix after the test-runner parity suite passes on each, and make sure every gate still passes. Write down what the upgrade took as a reusable checklist for future buck2/toolbox upgrades.",
   "id": "turnkey-q7r",
   "labels": [],
+  "comments": [
+    {
+      "text": "Parked (2026-09-25) as local commit 'chore: update toolbox...' on top of turnkey-vnm/test-result-caching, not pushed. Done and verified on buck2-toolchain 5. Remaining: the upgrade checklist, and fixing the user manual's remote-endpoint note (on buck2 2026-09-15 an unreachable cache means ~45s of retries then a local run, not failures). Paused for the effort to bundle buck2 inside turnkey, which changes what an upgrade involves (consumers would no longer pick buck2 versions).",
+      "timestamp": "2026-09-25T14:57:22Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "Update toolbox and support buck2-toolchain 4 and 5",
   "type": "task",
-  "updated_at": "2026-09-25T13:52:20Z"
+  "updated_at": "2026-09-25T14:57:22Z"
 }
