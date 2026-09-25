@@ -7,6 +7,8 @@
     "turnkey-vnm.3",
     "turnkey-vnm.4"
   ],
+  "closed_at": "2026-09-25T12:20:55Z",
+  "close_reason": "Runner implements the protocol at parity: all 29 turnkey test targets pass under it; failing test exit 32; --env reaches the command; --timeout 0 -\u003e Timeout; v2_test_executor gated by buck2.testCache.enable.",
   "created": "2026-09-25T10:54:17Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nWith `buck2.testCache.enable` (a new option, default true), the generated .buckconfig sets our runner as `[test] v2_test_executor`, and `tk test` runs every test through it. Caching is off: the runner sends `disable_test_execution_caching` and records nothing. What the user sees is unchanged from buck2's bundled runner (spec §5).\n\n## Acceptance criteria\n\n- [ ] `tk test //...` gives the same pass/fail outcome per target as before\n- [ ] stdout/stderr are shown in each test's details as before\n- [ ] `-- --env K=V`, `-- --timeout N` and `-- --test-arg X` behave as with buck2's runner\n- [ ] Exit code is 0 when everything passes and 32 when any test fails\n- [ ] `buck2.testCache.enable = false` removes the runner from the generated .buckconfig\n\n## Blocked by\n\n- turnkey-vnm.1\n",
   "id": "turnkey-vnm.2",
@@ -15,8 +17,8 @@
   ],
   "parent": "turnkey-vnm",
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "Test runner runs tests at parity with buck2's runner",
   "type": "task",
-  "updated_at": "2026-09-25T10:54:19Z"
+  "updated_at": "2026-09-25T12:20:55Z"
 }
