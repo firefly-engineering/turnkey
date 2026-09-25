@@ -35,6 +35,7 @@ pkgs.buildGoModule {
       (root + "/src/go/pkg/extraction")
       (root + "/src/go/pkg/starlark")
       (root + "/src/go/pkg/cellfresh")
+      (root + "/src/go/pkg/testcache")
     ];
   };
   subPackages = [ "src/cmd/tk" ];

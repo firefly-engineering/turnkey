@@ -26,6 +26,7 @@ import (
 	"github.com/firefly-engineering/turnkey/src/go/pkg/localconfig"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncer"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/testcache"
 )
 
 // passThroughCommands are buck2 subcommands that don't read the build
@@ -511,6 +512,13 @@ func delegateToBuck2(args []string) {
 		args = applyLocalOverrides(args)
 	}
 
+	// Tell turnkey's test runner to use the local test result cache. Added
+	// last, so the flags land first after `--`: the runner's --test-arg
+	// consumes every argument after it.
+	if len(args) > 0 && args[0] == "test" {
+		args = withTestCache(args)
+	}
+
 	if verbose {
 		fmt.Fprintf(os.Stderr, "tk: executing buck2 %v\n", args)
 	}
@@ -522,6 +530,22 @@ func delegateToBuck2(args []string) {
 		fmt.Fprintf(os.Stderr, "tk: failed to exec buck2: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// withTestCache makes sure the local test result cache is up and passes the
+// runner the flags to use it. Without a cache in this dev shell the args are
+// unchanged, and the runner neither reads nor records.
+func withTestCache(args []string) []string {
+	cache := testcache.FromEnv()
+	if cache == nil {
+		return args
+	}
+	mode := testcache.On
+	if err := cache.Ensure(); err != nil {
+		fmt.Fprintf(os.Stderr, "tk: running tests without the test result cache: %v\n", err)
+		mode = testcache.Off
+	}
+	return injectArgsAfterSeparator(args, cache.RunnerArgs(mode))
 }
 
 // applyLocalOverrides loads local.toml and injects target-specific args.

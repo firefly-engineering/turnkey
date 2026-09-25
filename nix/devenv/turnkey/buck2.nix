@@ -1113,6 +1113,11 @@ in
       // lib.optionalAttrs (testRunnerProtocol != null) {
         TURNKEY_TEST_RUNNER_PROTOCOL = "${testRunnerProtocol}";
       }
+      # The local test result cache tk starts on demand (src/go/pkg/testcache)
+      // lib.optionalAttrs (testRunner != null) {
+        TURNKEY_TEST_CACHE_SERVER = "${pkgs.bazel-remote}/bin/bazel-remote";
+        TURNKEY_TEST_CACHE_ADDRESS = testCacheAddress;
+      }
       # Store tk's share path for shell completion setup
       // lib.optionalAttrs (turnkeyCfg.registry ? tk) {
         TURNKEY_TK_SHARE = "${resolvedRegistry.tk}/share";
