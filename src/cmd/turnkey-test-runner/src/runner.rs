@@ -206,6 +206,21 @@ async fn record_if_pass(recorder: &Recorder, name: &str, result: &ExecutionResul
     }
 }
 
+/// First line of a hit's details.
+pub const HIT_MARKER: &str = "recorded: reused the result of an earlier run with the same inputs\n";
+
+/// Whether buck2 served this result from the cache instead of running the test.
+fn is_hit(result: &ExecutionResult2) -> bool {
+    matches!(
+        result
+            .execution_details
+            .as_ref()
+            .and_then(|d| d.execution_kind.as_ref())
+            .and_then(|k| k.command.as_ref()),
+        Some(command_execution_kind::Command::RemoteCommand(remote)) if remote.cache_hit
+    )
+}
+
 fn duration(d: Option<&prost_types::Duration>) -> std::time::Duration {
     d.and_then(|d| std::time::Duration::try_from(*d).ok())
         .unwrap_or_default()
@@ -256,8 +271,11 @@ fn test_result(
         execution_status::Status::Finished(_) => TestStatus::Fail,
         execution_status::Status::TimedOut(_) => TestStatus::Timeout,
     };
+    // A hit is marked in the details, the part of a result buck2 prints
+    // under the test's line.
+    let marker = if is_hit(&result) { HIT_MARKER } else { "" };
     let details = format!(
-        "---- STDOUT ----\n{}\n---- STDERR ----\n{}\n",
+        "{marker}---- STDOUT ----\n{}\n---- STDERR ----\n{}\n",
         stream_text(result.stdout),
         stream_text(result.stderr)
     );
@@ -270,4 +288,56 @@ fn test_result(
         details,
         max_memory_used_bytes: result.max_memory_used_bytes,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::proto::buck::data::{CommandExecutionKind, LocalCommand, RemoteCommand};
+    use crate::proto::buck::test::{ConfiguredTargetHandle, ExecutionDetails, ExecutionStatus};
+
+    fn pass_with(command: command_execution_kind::Command) -> ExecutionResult2 {
+        ExecutionResult2 {
+            status: Some(ExecutionStatus {
+                status: Some(execution_status::Status::Finished(0)),
+            }),
+            stdout: Some(ExecutionStream {
+                item: Some(execution_stream::Item::Inline(b"out".to_vec())),
+            }),
+            execution_details: Some(ExecutionDetails {
+                execution_kind: Some(CommandExecutionKind {
+                    command: Some(command),
+                }),
+            }),
+            ..Default::default()
+        }
+    }
+
+    fn details(result: ExecutionResult2) -> String {
+        test_result("t".into(), ConfiguredTargetHandle { id: 1 }, result)
+            .unwrap()
+            .details
+    }
+
+    #[test]
+    fn hits_are_marked_recorded() {
+        let hit = pass_with(command_execution_kind::Command::RemoteCommand(
+            RemoteCommand {
+                cache_hit: true,
+                ..Default::default()
+            },
+        ));
+        assert!(details(hit).starts_with("recorded: "));
+    }
+
+    #[test]
+    fn fresh_runs_are_not_marked() {
+        let local = pass_with(command_execution_kind::Command::LocalCommand(
+            LocalCommand::default(),
+        ));
+        assert_eq!(
+            details(local),
+            "---- STDOUT ----\nout\n---- STDERR ----\n\n"
+        );
+    }
 }
