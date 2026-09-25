@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-pru.4"
+  ],
   "blocks": [],
   "created": "2026-09-25T20:29:52Z",
   "description": "test_caching.bzl adds turnkey-cacheable to no-test-cache targets and the runner undoes it (runner.rs mode_for, NO_TEST_CACHE_LABEL); solidity_test.bzl:73 repeats the literal. Helper returns no-test-cache kwargs unchanged; runner keeps only the cacheable label. Sharpen CONTEXT.md reuse policy.",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Decide test-cache eligibility once, in the test-caching helper",
   "type": "task",
-  "updated_at": "2026-09-25T20:29:52Z"
+  "updated_at": "2026-09-25T20:29:54Z"
 }

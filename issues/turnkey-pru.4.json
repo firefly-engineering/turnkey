@@ -3,7 +3,9 @@
   "blocked_by": [
     "turnkey-pru.3"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-pru.5"
+  ],
   "created": "2026-09-25T20:29:52Z",
   "description": "delegateToBuck2/withTestCache/injectArgsAfterSeparator/runTestsWithSummary in src/cmd/tk/main.go are untested glue. Bug: tk --isolation-dir X test skips caching (args[0]=='test' check, main.go:524). Move the run behind one testcache interface with buck2 behind a port.",
   "id": "turnkey-pru.4",
