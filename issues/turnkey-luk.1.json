@@ -5,11 +5,13 @@
   "created": "2026-09-25T15:11:15Z",
   "description": "## Question\n\nDoes toolbox (at the locked rev, and its registry as turnkey's teller resolves it) expose a plain `buck2` entry versioned by release date (e.g. `2026-09-15`) and a `buck2-prelude` entry versioned the same way? Which versions exist for each, what are the default versions, and is there a prelude version exactly matching every buck2 release? If not, what is the closest faithful way to name the pinned prelude exactly?",
   "id": "turnkey-luk.1",
-  "labels": [],
+  "labels": [
+    "wayfinder:research"
+  ],
   "parent": "turnkey-luk",
   "priority": 2,
   "status": "open",
   "title": "Which buck2 and buck2-prelude versions does toolbox expose?",
   "type": "task",
-  "updated_at": "2026-09-25T15:11:15Z"
+  "updated_at": "2026-09-25T15:11:16Z"
 }
