@@ -14,9 +14,15 @@
     "ready-for-agent"
   ],
   "parent": "turnkey-vnm",
+  "comments": [
+    {
+      "text": "From turnkey-vnm.22: solidity_test also has a fork_url attribute that makes forge read chain state over the network. That is a rule-level wrong-hit hazard not in the research. A target with fork_url set must not be cached: have the rule treat fork_url as no-test-cache (don't call the caching helper for it).",
+      "timestamp": "2026-09-25T11:13:11Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "Solidity tests are cached",
   "type": "task",
-  "updated_at": "2026-09-25T10:54:32Z"
+  "updated_at": "2026-09-25T11:13:11Z"
 }
