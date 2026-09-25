@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-vnm.2"
+  ],
   "blocks": [],
   "created": "2026-09-25T10:54:18Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nA shared rule helper turns a rule's ExternalRunnerTestInfo arguments into their cache-enabled form. It sets: supports_test_execution_caching; the cache-reading default_executor (never the execution platform); project-relative paths and cwd; declared env PATH restricted to Nix store paths; declared env HOME=/homeless-shelter. rust_test calls it through a prelude patch. The generated .buckconfig gains `[buck2_re_client]` addresses for the local endpoint (fixed loopback port, tls off). The runner is still off, so behaviour is unchanged (spec §4, §7).\n\n## Acceptance criteria\n\n- [ ] rust_test targets emit the cache-enabled provider through the helper\n- [ ] Build actions still execute locally, and `tk build` never contacts a cache\n- [ ] Rust tests pass with the pinned PATH and HOME\n- [ ] With the runner off and no server running, `tk test` behaves exactly as before, with no connection attempts\n\n## Blocked by\n\n- turnkey-vnm.2\n",
