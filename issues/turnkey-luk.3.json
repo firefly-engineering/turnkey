@@ -5,7 +5,9 @@
   "created": "2026-09-25T15:11:16Z",
   "description": "## Question\n\nWrite `docs/adr/0002-turnkey-owns-the-buck2-version.md` recording the decisions settled on the map (one pinned buck2 release per turnkey revision, resolved from turnkey's own toolbox, not declarable in toolchain.toml, override only via flake-input follows, why: format mirrors like the test-runner protocol must match the producing binary exactly), and add **Pinned buck2 release** to CONTEXT.md. Use /domain-modeling.",
   "id": "turnkey-luk.3",
-  "labels": [],
+  "labels": [
+    "wayfinder:task"
+  ],
   "parent": "turnkey-luk",
   "priority": 2,
   "status": "open",
