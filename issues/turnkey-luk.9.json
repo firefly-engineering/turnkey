@@ -5,6 +5,8 @@
     "turnkey-luk.8"
   ],
   "blocks": [],
+  "closed_at": "2026-09-25T16:24:32Z",
+  "close_reason": "Bump checklist + parity summary line, commit 37065860",
   "created": "2026-09-25T15:11:19Z",
   "description": "## Question\n\nWrite down, as a reusable checklist, what bumping turnkey's pinned buck2 release takes: toolbox update, the pinned record (rev, protos hash, prelude version), prelude patches rebasing, the parity suite gate, every CI gate. Supersedes the checklist owed by turnkey-q7r; fold in what that upgrade actually took.",
   "id": "turnkey-luk.9",
@@ -23,7 +25,7 @@
     }
   ],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Write the checklist for bumping turnkey's pinned buck2 release",
   "type": "task",
   "updated_at": "2026-09-25T16:24:32Z"
