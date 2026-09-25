@@ -16,11 +16,15 @@
     {
       "text": "Input from turnkey-w55.3 (docs/research/test-undeclared-inputs.md): go_test/python_test need use_project_relative_paths/run_from_project_root forced on for cross-checkout reuse. python3 is resolved via PATH, so it's unkeyed. solidity_test has solc/foundry.toml/fuzz-seed and soldeps-cell hazards. jsonnet_test's -J . is a latent hazard.",
       "timestamp": "2026-09-25T07:51:11Z"
+    },
+    {
+      "text": "Resolution (grilled 2026-09-25). 'Cache-safe rule' added to CONTEXT.md in https://github.com/firefly-engineering/turnkey/commit/c9f5d71569a3 . Hazard IDs refer to docs/research/test-undeclared-inputs.md.\n\n1. Opt-in: a shared helper in nix/buck2/prelude-extensions/ (e.g. test_caching.bzl) turns ExternalRunnerTestInfo arguments into their cache-enabled form: supports_test_execution_caching=True, the cache-reading default_executor, both path flags True, and the pinned env from item 4. Upstream go_test, rust_test and python_test call it through small patches in nix/patches/prelude/. solidity_test, jsonnet_test and later typescript_test call it directly. No wrapper macros and no full fork. The helper is the documented way for consumers' own test rules to opt in.\n2. The gate: a rule is switched on (for all its targets) once its rule-level wrong-hit hazards are fixed. Spurious-miss fixes (absolute paths) ship with it but don't block it. Target-level hazards are fixed in the target or it gets the no-test-cache label; they never block the rule.\n3. Go/Python absolute paths (G1, P2): the helper forces use_project_relative_paths and run_from_project_root on. We don't use tk --unstable-allow-all-tests-on-re.\n4. Every cached test (X1): the helper sets declared env PATH to Nix store paths only (bash, coreutils, plus the toolchain's needs) and HOME=/homeless-shelter. This also fixes S5, J2 and G3, and turns S1/S2's HOME lookups into clean failures.\n5. Python: system_python_toolchain gets a store-path interpreter in nix/buck2/mappings.nix (P1, and P3 through it), and PYTHONDONTWRITEBYTECODE=1 goes in the declared env (P5).\n6. Solidity: the generated foundry.toml passes the Nix solc explicitly with offline=true (S1). The soldeps remappings and sources become declared artifacts, not the '.turnkey/soldeps' string (S3). Fuzzing uses a fixed seed derived from the target label (S4); stochastic fuzzing means labelling the target no-test-cache.\n7. Jsonnet: run jrsonnet against a symlinked_dir of the declared sources and derive -J from it, not '.' (J1).\n8. Rust: nothing beyond calling the helper.\n9. Negligible target-level hazards (G5, P6, R1: they need odd host state) are accepted and noted. Before Go is switched on in turnkey's own repo, fix G2 (turnkey-2gk) and G4 (os.Chtimes).\n10. Rollout order: Rust, Jsonnet, Go, Python, Solidity. Each is its own change. typescript_test opts in by calling the helper and passing the same gate.",
+      "timestamp": "2026-09-25T10:03:27Z"
     }
   ],
   "priority": 2,
   "status": "in_progress",
   "title": "How does each language's test rule opt into caching?",
   "type": "task",
-  "updated_at": "2026-09-25T09:56:55Z"
+  "updated_at": "2026-09-25T10:03:27Z"
 }
