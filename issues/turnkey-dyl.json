@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T12:10:33Z",
+  "description": "futures-util 0.3 has an optional dependency futures_01 = { package = \"futures\", version = \"0.1\" }. gen-rust-buck resolves it to the vendored crate named futures regardless of version, so once futures 0.3 is vendored (it depends on futures-util) the rustdeps cell has a configured target cycle futures-util@0.3.34 -\u003e futures -\u003e futures-util, even though the compat feature that enables futures_01 is off. Seen in turnkey-vnm.2; avoided there by depending on futures-util instead of futures. Fix: match a dependency to a vendored crate by version requirement, and drop optional deps whose enabling feature isn't on.",
+  "id": "turnkey-dyl",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "gen-rust-buck resolves renamed optional deps by name, ignoring the version",
+  "type": "bug",
+  "updated_at": "2026-09-25T12:10:33Z"
+}
