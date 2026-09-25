@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T20:29:51Z",
+  "description": "What each language needs (cell, deps file, generator, sync rule, wrapper rule, watch files) is spread over flake-parts:278-354, buck2.nix:434-487/649-718/764-781, direnv-lib.nix, options.nix, nix/buck2/*-deps-cell.nix and tw's hard-coded map (src/cmd/tw/main.go:41-64). Drift already causes a bug: the uv wrapper watches uv.lock but the python rule regenerates from pylock.toml with no uv export in between. Collapse into one description per language, iterated by every consumer; tw reads wrapper rules from sync.toml.",
+  "id": "turnkey-pru.1",
+  "labels": [],
+  "parent": "turnkey-pru",
+  "priority": 2,
+  "status": "open",
+  "title": "One language module owns 'language X is enabled'",
+  "type": "task",
+  "updated_at": "2026-09-25T20:29:51Z"
+}
