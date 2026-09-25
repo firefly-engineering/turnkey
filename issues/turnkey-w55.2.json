@@ -21,11 +21,15 @@
     {
       "text": "Research branch pushed: research/re-servers-local. Permalink: https://github.com/firefly-engineering/turnkey/blob/e94112597afe428c35943c32e24685769f7b38e5/docs/research/local-re-api-servers.md",
       "timestamp": "2026-09-25T08:08:41Z"
+    },
+    {
+      "text": "Research doc now on main (research branch folded in and deleted). Permalink: https://github.com/firefly-engineering/turnkey/blob/c37d637e0a6d46492178b01b382891d3116c3d46/docs/research/local-re-api-servers.md",
+      "timestamp": "2026-09-25T08:10:27Z"
     }
   ],
   "priority": 2,
   "status": "closed",
   "title": "Which remote-execution-API servers can run on a developer machine?",
   "type": "task",
-  "updated_at": "2026-09-25T08:08:41Z"
+  "updated_at": "2026-09-25T08:10:27Z"
 }
