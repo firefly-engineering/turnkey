@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T17:24:07Z",
+  "description": "test_caching.bzl takes the rule's RE executors and decides default_executor + paths; prelude patches shrink to one wrapping call.",
+  "id": "turnkey-efx.2",
+  "labels": [],
+  "parent": "turnkey-efx",
+  "priority": 2,
+  "status": "open",
+  "title": "Test-caching helper owns the executor decision",
+  "type": "task",
+  "updated_at": "2026-09-25T17:24:07Z"
+}
