@@ -15,11 +15,15 @@
     {
       "text": "From turnkey-luk.6: the evaluation error links to docs/user-manual/src/configuration/buck2-integration.md#the-buck2-version, so that page needs a section headed 'The buck2 version' holding the migration note. Also: e2e/tests/05-brownfield-adoption.sh, docs/user-manual/src/configuration/toolchain-toml.md and getting-started/quick-start.md still declare buck2-toolchain; ADR 0001's 'unreachable cache =\u003e tests fail' consequence predates buck2 2026-09-15 (not ours to rewrite, but the manual must not repeat it).",
       "timestamp": "2026-09-25T16:12:01Z"
+    },
+    {
+      "text": "Resolution: commit ae5362d9871a (not pushed). User manual: 'The buck2 version' section (anchor verified in the built site) with migration steps, buck2.shells, toolchain.toml/quick-start examples without buck2, unsupported-release notice removed from test caching. Developer manual: pinned prelude + preludeRev check. e2e: brownfield-adoption no longer declares buck2; dead buck2 registry entries dropped in 04/05/07. mdbook builds clean. e2e greenfield-template PASS; brownfield-adoption FAILS on a bug already on main, filed as turnkey-bop. 04/07 not run (only a dead registry line changed).",
+      "timestamp": "2026-09-25T16:22:54Z"
     }
   ],
   "priority": 2,
   "status": "in_progress",
   "title": "Update docs, e2e and the migration note for the bundled buck2",
   "type": "task",
-  "updated_at": "2026-09-25T16:12:02Z"
+  "updated_at": "2026-09-25T16:22:54Z"
 }
