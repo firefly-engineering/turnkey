@@ -13,6 +13,7 @@ go_binary(
         "//src/go/pkg/rulessync:rulessync",
         "//src/go/pkg/syncconfig:syncconfig",
         "//src/go/pkg/syncer:syncer",
+        "//src/go/pkg/testcache:testcache",
         # turnkey:auto-end
     ],
     visibility = ["PUBLIC"],
