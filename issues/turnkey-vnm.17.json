@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T10:54:26Z",
+  "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\njsonnet_test calls the shared helper, so its targets get recorded results (spec §4).\n\n## Acceptance criteria\n\n- [ ] An unchanged jsonnet_test is a hit on the second run\n- [ ] Tools come from store paths, not the host PATH\n\n## Blocked by\n\n- turnkey-vnm.5\n- turnkey-vnm.16\n",
+  "id": "turnkey-vnm.17",
+  "labels": [],
+  "parent": "turnkey-vnm",
+  "priority": 2,
+  "status": "open",
+  "title": "Jsonnet tests are cached",
+  "type": "task",
+  "updated_at": "2026-09-25T10:54:26Z"
+}
