@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-luk.5"
+  ],
   "blocks": [],
   "created": "2026-09-25T15:11:18Z",
   "description": "## Question\n\nImplement the per-shell buck2 option as settled, put the pinned buck2 on PATH of the selected shells, expose read-only `turnkey.buck2.version` (welcome message included), and make `buck2`/`buck2-toolchain` in any declaration file a hard evaluation error naming the migration note. Migrate turnkey's own toolchain.toml/flake.nix and the default template.",
@@ -13,5 +15,5 @@
   "status": "open",
   "title": "Replace toolchain.toml buck2 declarations with the per-shell option",
   "type": "task",
-  "updated_at": "2026-09-25T15:11:18Z"
+  "updated_at": "2026-09-25T15:11:23Z"
 }

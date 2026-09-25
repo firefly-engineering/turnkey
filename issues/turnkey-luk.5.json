@@ -3,7 +3,9 @@
   "blocked_by": [
     "turnkey-luk.1"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-luk.6"
+  ],
   "created": "2026-09-25T15:11:17Z",
   "description": "## Question\n\nReplace the `releases` table, `versionOf`, `matchingPreludeVersion` and `isSupported` in `nix/buck2/buck2-source.nix` with one pinned record (buck2 version, prelude version, source rev, protos hash). Resolve the buck2 binary and prelude from turnkey's own toolbox/teller at exactly those versions, ignoring the consumer's registry. Rewire every consumer of the old API (flake.nix declaredBuck2, nix/flake-parts/turnkey/default.nix prelude resolution, nix/devenv/turnkey/buck2.nix test-runner/protocol + the 'caching is off' warning, turnkey-test-runner, test-runner-protocol). Done when all gates pass with buck2 no longer read from any toolchain.toml.",
   "id": "turnkey-luk.5",
@@ -15,5 +17,5 @@
   "status": "open",
   "title": "Collapse buck2-source.nix to a single pinned buck2 release",
   "type": "task",
-  "updated_at": "2026-09-25T15:11:22Z"
+  "updated_at": "2026-09-25T15:11:23Z"
 }
