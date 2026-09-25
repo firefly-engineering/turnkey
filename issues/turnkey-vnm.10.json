@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T10:54:22Z",
+  "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nThe on-demand server runs with an idle timeout (e.g. 24h) and exits by itself. The next `tk test` starts it again (spec §6).\n\n## Acceptance criteria\n\n- [ ] The server exits after the configured idle period with no traffic\n- [ ] The next `tk test` restarts it transparently, and earlier recorded results are still hits\n\n## Blocked by\n\n- turnkey-vnm.7\n",
+  "id": "turnkey-vnm.10",
+  "labels": [],
+  "parent": "turnkey-vnm",
+  "priority": 2,
+  "status": "open",
+  "title": "Test result cache server shuts down when idle",
+  "type": "task",
+  "updated_at": "2026-09-25T10:54:22Z"
+}
