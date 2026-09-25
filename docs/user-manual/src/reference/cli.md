@@ -58,10 +58,14 @@ Unknown commands default to syncing first (safe default).
 
 #### tk sync
 
-Explicitly synchronize all stale files.
+Explicitly synchronize all stale files, or only those of the named deps
+rules (`go`, `rust`, `pylock`, `python`, `javascript`, `solidity`; the
+rules are in `.turnkey/sync.toml`). Rules always run in `sync.toml` order,
+so `pylock` runs before `python`, which reads what it writes.
 
 ```bash
 tk sync              # sync stale files
+tk sync go           # sync only go-deps.toml
 tk sync --verbose    # show what's being synced
 tk sync --dry-run    # show what would be synced without doing it
 ```
@@ -76,6 +80,7 @@ Check if any files are stale without regenerating them. Useful for CI validation
 
 ```bash
 tk check             # check staleness
+tk check rust        # check only rust-deps.toml
 tk check --verbose   # show detailed status
 ```
 

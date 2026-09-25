@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/firefly-engineering/turnkey/src/go/pkg/staleness"
@@ -42,6 +43,8 @@ type Syncer struct {
 	DryRun bool
 	// Output is where to write status messages.
 	Output io.Writer
+	// Only names the rules to sync or check. Empty means every enabled rule.
+	Only []string
 }
 
 // New creates a new Syncer with the given configuration.
@@ -57,7 +60,10 @@ func New(cfg *syncconfig.Config, root string) *Syncer {
 func (s *Syncer) SyncDeps() (*Result, error) {
 	result := &Result{}
 
-	rules := s.Config.EnabledDepsRules()
+	rules, err := s.selectedRules()
+	if err != nil {
+		return nil, err
+	}
 	for _, rule := range rules {
 		result.Checked++
 
@@ -129,7 +135,10 @@ func (s *Syncer) Check() (*Result, bool, error) {
 	result := &Result{}
 	anyStale := false
 
-	rules := s.Config.EnabledDepsRules()
+	rules, err := s.selectedRules()
+	if err != nil {
+		return nil, false, err
+	}
 	for _, rule := range rules {
 		result.Checked++
 
@@ -148,6 +157,28 @@ func (s *Syncer) Check() (*Result, bool, error) {
 	}
 
 	return result, anyStale, nil
+}
+
+// selectedRules returns the enabled rules named by Only, in config order,
+// or every enabled rule when Only is empty. Rules run in config order, so a
+// rule whose target is another's source comes first in sync.toml.
+func (s *Syncer) selectedRules() ([]syncconfig.DepsRule, error) {
+	rules := s.Config.EnabledDepsRules()
+	if len(s.Only) == 0 {
+		return rules, nil
+	}
+	var selected []syncconfig.DepsRule
+	for _, name := range s.Only {
+		if !slices.ContainsFunc(rules, func(r syncconfig.DepsRule) bool { return r.Name == name }) {
+			return nil, fmt.Errorf("no enabled deps rule named %q", name)
+		}
+	}
+	for _, rule := range rules {
+		if slices.Contains(s.Only, rule.Name) {
+			selected = append(selected, rule)
+		}
+	}
+	return selected, nil
 }
 
 // checkDepsRule checks if a single dependency rule's target is stale.

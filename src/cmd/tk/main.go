@@ -74,10 +74,10 @@ func main() {
 	// Handle tk-specific subcommands
 	switch subcommand {
 	case "sync":
-		exitCode := runSync()
+		exitCode := runSync(ruleArgs(args[1:])...)
 		os.Exit(exitCode)
 	case "check":
-		exitCode := runCheck()
+		exitCode := runCheck(ruleArgs(args[1:])...)
 		os.Exit(exitCode)
 	case "rules":
 		exitCode := runRules(args[1:])
@@ -158,6 +158,24 @@ func parseFlags(args []string) []string {
 	return args
 }
 
+// ruleArgs returns the deps rule names given to sync or check, applying any
+// tk flag among them, so `tk sync --verbose go` works like
+// `tk --verbose sync go`.
+func ruleArgs(args []string) []string {
+	var rules []string
+	for _, arg := range args {
+		if !strings.HasPrefix(arg, "-") {
+			rules = append(rules, arg)
+			continue
+		}
+		if rest := parseFlags([]string{arg}); len(rest) > 0 {
+			fmt.Fprintf(os.Stderr, "tk: unknown flag %q\n", arg)
+			os.Exit(2)
+		}
+	}
+	return rules
+}
+
 // shouldSync returns true if the subcommand should have sync run first.
 // Unknown commands default to requiring sync (safe default).
 func shouldSync(subcommand string) bool {
@@ -171,9 +189,10 @@ func shouldSync(subcommand string) bool {
 	return true
 }
 
-// runSync runs the turnkey sync operation.
+// runSync runs the turnkey sync operation for the named deps rules, or for
+// every rule when none is named.
 // Returns exit code (0 for success, non-zero for failure).
-func runSync() int {
+func runSync(only ...string) int {
 	// Find project root (where .buckconfig is)
 	root, err := findProjectRoot()
 	if err != nil {
@@ -200,6 +219,7 @@ func runSync() int {
 	s.Quiet = quiet
 	s.DryRun = dryRun
 	s.Output = os.Stderr
+	s.Only = only
 
 	result, err := s.SyncDeps()
 	if err != nil {
@@ -225,9 +245,10 @@ func runSync() int {
 	return 0
 }
 
-// runCheck checks if any files are stale without regenerating them.
+// runCheck checks if the named deps rules' files (or every rule's, when
+// none is named) are stale without regenerating them.
 // Returns exit code (0 if all up-to-date, 1 if stale).
-func runCheck() int {
+func runCheck(only ...string) int {
 	// Find project root
 	root, err := findProjectRoot()
 	if err != nil {
@@ -247,6 +268,7 @@ func runCheck() int {
 	s.Verbose = verbose
 	s.Quiet = quiet
 	s.Output = os.Stderr
+	s.Only = only
 
 	result, anyStale, err := s.Check()
 	if err != nil {
@@ -779,11 +801,11 @@ tk-specific flags (must come before subcommand):
   -h                Same as --help
 
 tk-specific subcommands:
-  sync         Run dependency sync manually
-  check        Check if dependency files are stale
-  rules        Manage rules.star files (check, sync)
-  compose      Edit external dependencies (edit, patch, reset, status)
-  completion   Generate shell completion scripts (bash, zsh, fish)
+  sync [rule...]   Regenerate stale dependency files (every deps rule, or the named ones)
+  check [rule...]  Check if dependency files are stale
+  rules            Manage rules.star files (check, sync)
+  compose          Edit external dependencies (edit, patch, reset, status)
+  completion       Generate shell completion scripts (bash, zsh, fish)
 
 All other subcommands are delegated to buck2.
 
