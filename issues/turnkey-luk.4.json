@@ -5,7 +5,9 @@
   "created": "2026-09-25T15:11:17Z",
   "description": "## Question\n\nWhich shells get buck2 moves from 'the shell's toolchain.toml declares buck2' to a per-shell setting in flake.nix next to `turnkey.toolchains.declarationFiles`. What exactly is that setting: its name, type and default (on for every shell? only default?), how it interacts with the global `turnkey.buck2.enable`, and where `turnkey.buck2.version` (read-only) sits? Settle the interface, including what a consumer with a single shell writes.",
   "id": "turnkey-luk.4",
-  "labels": [],
+  "labels": [
+    "wayfinder:grilling"
+  ],
   "parent": "turnkey-luk",
   "priority": 2,
   "status": "open",
