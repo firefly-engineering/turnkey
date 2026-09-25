@@ -12,9 +12,15 @@
     "wayfinder:task"
   ],
   "parent": "turnkey-luk",
+  "comments": [
+    {
+      "text": "Per turnkey-luk.8: the parity suite is a manual checklist step, and the bump commit must carry its summary line (scenarios matched, target count, buck2 release, platform). CI gate is tracked separately in turnkey-kxe.",
+      "timestamp": "2026-09-25T15:29:21Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "Write the checklist for bumping turnkey's pinned buck2 release",
   "type": "task",
-  "updated_at": "2026-09-25T15:11:24Z"
+  "updated_at": "2026-09-25T15:29:21Z"
 }
