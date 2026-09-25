@@ -4,6 +4,8 @@
   "blocks": [
     "turnkey-vnm.19"
   ],
+  "closed_at": "2026-09-25T11:01:42Z",
+  "close_reason": "Fixtures declared as resources; missing fixtures now fail the test (verified red without the resource).",
   "created": "2026-09-25T07:51:10Z",
   "description": "Found during test-input research (docs/research/test-undeclared-inputs.md on jj bookmark research/test-undeclared-inputs (from turnkey-w55.3)). The integration cases in godeps_test skip under buck2 because their fixtures aren't declared as test resources, so the target passes without exercising them.",
   "id": "turnkey-2gk",
@@ -15,8 +17,8 @@
     }
   ],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "godeps_test integration cases always skip: fixtures not declared as resources",
   "type": "bug",
-  "updated_at": "2026-09-25T11:00:13Z"
+  "updated_at": "2026-09-25T11:01:42Z"
 }
