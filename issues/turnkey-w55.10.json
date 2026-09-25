@@ -4,6 +4,8 @@
   "blocks": [
     "turnkey-w55.12"
   ],
+  "closed_at": "2026-09-25T10:34:53Z",
+  "close_reason": "Mechanism verified end to end; two inferences refuted (missing metadata isn't fatal; failed connect doesn't stick); server-down = ~45s then Fail, so reachability must be checked before a run.",
   "created": "2026-09-25T09:56:36Z",
   "description": "## Question\n\nRun ADR 0001 once for real, before the spec rests on its inferred facts. On one pure test target (e.g. a rust_test), with bazel-remote local and the cache-reading executor on the test's default_executor, a throwaway script or runner that writes the ActionResult after a pass. Confirm or refute each item marked *(inferred)* in docs/research/test-cache-mechanism-feasibility.md:\n- engine_address pointed at bazel-remote works with no Execution service;\n- bazel-remote's AC→CAS validation accepts the written entry;\n- a hit survives a daemon restart and buck2 clean;\n- what happens when bazel-remote is down: does a failed connect stay failed for the daemon's life, and does the test report as failed?\n- a missing output is silently left out.\nRecord the facts in a comment. Throwaway code is not kept.",
   "id": "turnkey-w55.10",
@@ -18,7 +20,7 @@
     }
   ],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Does the recording mechanism work end to end on one test target?",
   "type": "task",
   "updated_at": "2026-09-25T10:34:53Z"
