@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [
     "turnkey-w55.11",
     "turnkey-w55.12",
@@ -14,8 +14,8 @@
   ],
   "parent": "turnkey-w55",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "How does the caching tool ship to consumer repos and get configured?",
   "type": "task",
-  "updated_at": "2026-09-25T09:56:38Z"
+  "updated_at": "2026-09-25T10:42:36Z"
 }
