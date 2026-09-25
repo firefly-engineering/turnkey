@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [],
   "blocks": [
     "turnkey-vnm.21"
@@ -12,8 +12,8 @@
   ],
   "parent": "turnkey-vnm",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Python toolchain uses a store-path interpreter",
   "type": "task",
-  "updated_at": "2026-09-25T10:54:30Z"
+  "updated_at": "2026-09-25T11:01:45Z"
 }
