@@ -4,7 +4,8 @@
     "turnkey-vnm.4"
   ],
   "blocks": [
-    "turnkey-vnm.6"
+    "turnkey-vnm.6",
+    "turnkey-vnm.7"
   ],
   "created": "2026-09-25T10:54:19Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nWith bazel-remote started by hand and the runner's `on` mode passed after `--`, the runner writes an ActionResult after each passing local run, under the action digest buck2 reported. A second run of an unchanged rust_test is then a hit: the test does not execute (spec §3).\n\n## Acceptance criteria\n\n- [ ] Second run of an unchanged rust_test does not execute the test and reports a pass with the original output and duration\n- [ ] The hit survives a daemon restart, `buck2 clean` and a second checkout of the same revision\n- [ ] Failed, timed-out and fatal runs are never recorded, and always run again\n- [ ] Recorded entries carry execution_metadata, buck2's instance_name and project-relative output paths\n- [ ] Without the `on` flag, nothing is read or recorded\n\n## Blocked by\n\n- turnkey-vnm.4\n",
@@ -17,5 +18,5 @@
   "status": "open",
   "title": "Test runner records and replays passing tests (Rust)",
   "type": "task",
-  "updated_at": "2026-09-25T10:54:20Z"
+  "updated_at": "2026-09-25T10:54:21Z"
 }
