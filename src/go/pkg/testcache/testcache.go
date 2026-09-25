@@ -1,9 +1,11 @@
-// Package testcache runs the local test result cache for tk test.
+// Package testcache owns tk test's reuse policy and runs the local test
+// result cache.
 //
 // Test results are recorded in, and reused from, a local cache-only Remote
 // Execution API server (bazel-remote), one per user per machine, shared by
-// every checkout (docs/specs/test-result-caching.md). tk starts it on demand
-// and tells turnkey's test runner, through flags after `--`, whether to use it.
+// every checkout (docs/specs/test-result-caching.md). tk starts it on demand.
+// Plan decides, for one tk test run, what turnkey's test runner does with the
+// cache, and the runner only obeys the flags it gets after `--`.
 package testcache
 
 import (
@@ -42,8 +44,21 @@ const (
 	On Mode = "on"
 	// RecordOnly runs every test and records fresh passes.
 	RecordOnly Mode = "record-only"
+	// ReadOnly reuses recorded results and never records.
+	ReadOnly Mode = "read-only"
 	// Off neither reads nor records.
 	Off Mode = "off"
+)
+
+// Origin is the runner's --turnkey-test-cache-origin value: where the cache
+// lives, which the runner reports on each hit.
+type Origin string
+
+const (
+	// Local is the cache tk runs on this machine.
+	Local Origin = "local"
+	// Remote is a shared cache the dev shell points at.
+	Remote Origin = "remote"
 )
 
 // defaultMaxSizeGiB bounds the store; bazel-remote evicts least recently
@@ -84,9 +99,81 @@ func FromEnv() *Config {
 	return &Config{Server: os.Getenv(ServerEnv), Address: address}
 }
 
-// Managed reports whether tk runs this cache (a local one) itself.
+// Managed reports whether tk runs this cache (a local one) itself. The dev
+// shell names a server only for the local cache, so this is also where the
+// cache lives.
 func (c *Config) Managed() bool {
 	return c.Server != ""
+}
+
+// Origin is where the cache lives.
+func (c *Config) Origin() Origin {
+	if c.Managed() {
+		return Local
+	}
+	return Remote
+}
+
+// Plan is what turnkey's test runner does with the cache in one tk test run.
+type Plan struct {
+	Mode    Mode
+	Origin  Origin
+	Address string
+	// Unusable says why the cache is off for this run; empty when it's in use.
+	Unusable string
+}
+
+// remoteProbe bounds how long tk waits for a remote cache to accept a
+// connection before running the tests uncached.
+const remoteProbe = 2 * time.Second
+
+// Plan applies the reuse policy (CONTEXT.md) to one tk test run. A forced
+// re-run reads nothing. Results are recorded only into the local cache: who
+// may write to a shared one isn't decided. A cache that can't be used is
+// off, since buck2 would otherwise retry it for about 45 s and then fail
+// every cached test without running it.
+func (c *Config) Plan(forced bool) Plan {
+	return c.plan(forced, c.usable)
+}
+
+// plan is Plan with the check that the cache can be used as a seam.
+func (c *Config) plan(forced bool, usable func() error) Plan {
+	plan := Plan{Origin: c.Origin(), Address: c.Address}
+	if err := usable(); err != nil {
+		plan.Mode = Off
+		plan.Unusable = err.Error()
+		return plan
+	}
+	switch {
+	case plan.Origin == Local && forced:
+		plan.Mode = RecordOnly
+	case plan.Origin == Local:
+		plan.Mode = On
+	case forced:
+		plan.Mode = Off
+	default:
+		plan.Mode = ReadOnly
+	}
+	return plan
+}
+
+// usable starts the local cache if needed. A remote cache only has to accept
+// a connection: it may use TLS, which tk isn't told about, so it isn't asked
+// to answer as a gRPC server.
+func (c *Config) usable() error {
+	if c.Managed() {
+		return c.Ensure()
+	}
+	hostPort, err := c.hostPort()
+	if err != nil {
+		return err
+	}
+	conn, err := net.DialTimeout("tcp", hostPort, remoteProbe)
+	if err != nil {
+		return fmt.Errorf("the test result cache at %s is unreachable: %w", c.Address, err)
+	}
+	conn.Close()
+	return nil
 }
 
 // hostPort returns the address without its grpc:// scheme.
@@ -265,10 +352,11 @@ func (c *Config) start() (<-chan struct{}, error) {
 
 // RunnerArgs are the turnkey-test-runner flags tk passes after `--`. The
 // runner writes the number of reused results to report when it's done.
-func (c *Config) RunnerArgs(mode Mode, report string) []string {
+func (p Plan) RunnerArgs(report string) []string {
 	return []string{
-		"--turnkey-test-cache=" + string(mode),
-		"--turnkey-test-cache-address=" + c.Address,
+		"--turnkey-test-cache=" + string(p.Mode),
+		"--turnkey-test-cache-address=" + p.Address,
+		"--turnkey-test-cache-origin=" + string(p.Origin),
 		"--turnkey-test-cache-report=" + report,
 	}
 }

@@ -31,16 +31,14 @@ async fn run(launch: Launch) -> Result<()> {
     // its two socket fds are distinct and only we own them.
     let session = unsafe { buck2_test_executor::start(&launch).await? };
 
-    let address = config.turnkey_test_cache_address.as_deref();
-    // Results are recorded only in a local cache: who may write to a shared
-    // one isn't decided (docs/specs/test-result-caching.md).
-    let local = address.is_some_and(|a| runner::Origin::of(a) == runner::Origin::Local);
-    let recorder = if config.turnkey_test_cache.records() && local {
-        let address = address.context("--turnkey-test-cache needs --turnkey-test-cache-address")?;
-        Some(cache::Recorder::new(
-            address,
-            config.turnkey_test_cache_instance_name.clone(),
-        )?)
+    // Whether to record at all is tk's decision (the mode); it never asks
+    // for recording into a shared cache.
+    let recorder = if config.turnkey_test_cache.records() {
+        let address = config
+            .turnkey_test_cache_address
+            .as_deref()
+            .context("--turnkey-test-cache needs --turnkey-test-cache-address")?;
+        Some(cache::Recorder::new(address)?)
     } else {
         None
     };

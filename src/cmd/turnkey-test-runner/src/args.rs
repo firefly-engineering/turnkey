@@ -33,9 +33,10 @@ pub struct Config {
     #[clap(long)]
     pub turnkey_test_cache_address: Option<String>,
 
-    /// turnkey: REAPI instance name, as in `buck2_re_client.instance_name`.
-    #[clap(long, default_value = "")]
-    pub turnkey_test_cache_instance_name: String,
+    /// turnkey: where the test result cache lives, for reporting hits.
+    /// `tk test` knows it from the dev shell.
+    #[clap(long, value_enum, default_value = "local")]
+    pub turnkey_test_cache_origin: crate::runner::Origin,
 
     /// turnkey: file to write the number of hits to once all tests are done,
     /// for `tk test`'s summary.

@@ -544,35 +544,26 @@ func delegateToBuck2(args []string) {
 	}
 }
 
-// withTestCache makes sure the local test result cache is up and passes the
-// runner the flags to use it. It returns the file the runner reports its
-// number of reused results to. Without a cache in this dev shell the args are
-// unchanged, and the runner neither reads nor records.
+// withTestCache passes the runner the flags for this run's use of the test
+// result cache, as testcache.Plan decides it. It returns the file the runner
+// reports its number of reused results to. Without a cache in this dev shell
+// the args are unchanged, and the runner neither reads nor records.
 func withTestCache(args []string) ([]string, string) {
 	cache := testcache.FromEnv()
 	if cache == nil {
 		return args, ""
 	}
-	mode := testcache.On
-	if noTestCache {
-		// Skip reads, keep recording: the fresh results replace old ones.
-		mode = testcache.RecordOnly
-	}
-	// tk starts and probes only the local cache it manages; a remote one is
-	// used as configured.
-	if cache.Managed() {
-		if err := cache.Ensure(); err != nil {
-			fmt.Fprintf(os.Stderr, "tk: running tests without the test result cache: %v\n", err)
-			mode = testcache.Off
-		}
+	plan := cache.Plan(noTestCache)
+	if plan.Unusable != "" {
+		fmt.Fprintf(os.Stderr, "tk: running tests without the test result cache: %s\n", plan.Unusable)
 	}
 	report, err := os.CreateTemp("", "tk-test-report-*")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tk: not reporting reused test results: %v\n", err)
-		return injectArgsAfterSeparator(args, cache.RunnerArgs(mode, os.DevNull)), ""
+		return injectArgsAfterSeparator(args, plan.RunnerArgs(os.DevNull)), ""
 	}
 	report.Close()
-	return injectArgsAfterSeparator(args, cache.RunnerArgs(mode, report.Name())), report.Name()
+	return injectArgsAfterSeparator(args, plan.RunnerArgs(report.Name())), report.Name()
 }
 
 // runTestsWithSummary runs buck2 as a child, then prints how many test

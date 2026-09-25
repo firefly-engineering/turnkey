@@ -20,7 +20,8 @@ use buck2_test_executor::proto::build::bazel::remote::execution::v2::{
 /// size a result isn't recorded at all, rather than recorded incompletely.
 const MAX_INLINE_OUTPUT: usize = 1024 * 1024;
 
-/// What the runner does with the cache for a test run.
+/// What the runner does with the cache for a test run. `tk test` chooses it
+/// by the reuse policy (src/go/pkg/testcache); the runner only obeys it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum Mode {
     /// Neither read nor record: tests run as under buck2's bundled runner.
@@ -29,17 +30,24 @@ pub enum Mode {
     On,
     /// Run every test, and record fresh passes.
     RecordOnly,
+    /// Reuse recorded results, and never record: for a shared cache.
+    ReadOnly,
 }
 
 impl Mode {
     pub fn reads(self) -> bool {
-        self == Mode::On
+        matches!(self, Mode::On | Mode::ReadOnly)
     }
 
     pub fn records(self) -> bool {
-        self != Mode::Off
+        matches!(self, Mode::On | Mode::RecordOnly)
     }
 }
+
+/// The REAPI instance name buck2 uses. turnkey never sets
+/// `buck2_re_client.instance_name`, so it is buck2's default, the empty name
+/// (docs/specs/test-result-caching.md).
+const INSTANCE_NAME: &str = "";
 
 /// A passing local run, as reported by buck2.
 pub struct Pass<'a> {
@@ -54,13 +62,12 @@ pub struct Pass<'a> {
 
 pub struct Recorder {
     client: ActionCacheClient<Channel>,
-    instance_name: String,
 }
 
 impl Recorder {
     /// Connect lazily to the cache at `address` (`grpc://host:port`, as in
     /// the `[buck2_re_client]` config).
-    pub fn new(address: &str, instance_name: String) -> Result<Self> {
+    pub fn new(address: &str) -> Result<Self> {
         let uri = address
             .strip_prefix("grpc://")
             .map(|rest| format!("http://{rest}"))
@@ -68,7 +75,6 @@ impl Recorder {
         let channel = Endpoint::try_from(uri)?.connect_lazy();
         Ok(Self {
             client: ActionCacheClient::new(channel),
-            instance_name,
         })
     }
 
@@ -93,7 +99,7 @@ impl Recorder {
         self.client
             .clone()
             .update_action_result(UpdateActionResultRequest {
-                instance_name: self.instance_name.clone(),
+                instance_name: INSTANCE_NAME.to_owned(),
                 action_digest: Some(parse_digest(pass.action_digest)?),
                 action_result: Some(result),
                 ..Default::default()
@@ -138,9 +144,10 @@ mod tests {
     }
 
     #[test]
-    fn only_on_reads() {
+    fn modes_read_and_record() {
         assert!(Mode::On.reads() && Mode::On.records());
         assert!(!Mode::RecordOnly.reads() && Mode::RecordOnly.records());
+        assert!(Mode::ReadOnly.reads() && !Mode::ReadOnly.records());
         assert!(!Mode::Off.reads() && !Mode::Off.records());
     }
 }

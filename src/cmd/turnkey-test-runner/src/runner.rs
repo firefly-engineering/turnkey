@@ -87,10 +87,7 @@ pub struct Runner<O> {
 
 impl<O: Orchestrator> Runner<O> {
     pub fn new(orchestrator: O, config: Config, recorder: Option<Recorder>) -> Self {
-        let origin = config
-            .turnkey_test_cache_address
-            .as_deref()
-            .map_or(Origin::Local, Origin::of);
+        let origin = config.turnkey_test_cache_origin;
         Self {
             orchestrator,
             config,
@@ -264,28 +261,15 @@ async fn record_if_pass(recorder: &Recorder, name: &str, result: &ExecutionResul
 }
 
 /// Where the test result cache in use lives.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum Origin {
-    /// This machine's cache, which the runner records into.
+    /// This machine's cache.
     Local,
     /// A shared cache elsewhere.
     Remote,
 }
 
 impl Origin {
-    /// The origin of a cache at `address` (`grpc://host:port`).
-    pub fn of(address: &str) -> Origin {
-        let host = address
-            .strip_prefix("grpc://")
-            .unwrap_or(address)
-            .rsplit_once(':')
-            .map_or(address, |(host, _port)| host);
-        match host {
-            "127.0.0.1" | "localhost" | "[::1]" => Origin::Local,
-            _ => Origin::Remote,
-        }
-    }
-
     fn as_str(self) -> &'static str {
         match self {
             Origin::Local => "local",
@@ -488,13 +472,6 @@ mod tests {
         )
         .unwrap();
         assert!(reported.details.starts_with("recorded, remote: "));
-    }
-
-    #[test]
-    fn origin_follows_the_address() {
-        assert_eq!(Origin::of("grpc://127.0.0.1:47301"), Origin::Local);
-        assert_eq!(Origin::of("grpc://localhost:47301"), Origin::Local);
-        assert_eq!(Origin::of("grpc://cache.example.com:443"), Origin::Remote);
     }
 
     /// Stands in for buck2's orchestrator: answers each test with a canned

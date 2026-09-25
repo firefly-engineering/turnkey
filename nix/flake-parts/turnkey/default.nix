@@ -200,8 +200,8 @@ in
                 A remote Remote Execution API cache to reuse test results
                 from, as grpc://host:port. When null (the default), tk manages
                 a local cache on this machine. With a remote endpoint, tk
-                starts no local cache and the runner records nothing: who may
-                write to a shared cache is not decided yet.
+                starts no local cache and only reuses results from it, never
+                recording: who may write to a shared cache is not decided yet.
               '';
             };
 

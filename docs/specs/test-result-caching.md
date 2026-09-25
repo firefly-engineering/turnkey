@@ -55,7 +55,7 @@ tk test ──probe──▶ bazel-remote (local, loopback TCP)
 - A cache-enabled test sets `supports_test_execution_caching = True` and a cache-reading `default_executor`, i.e. `CommandExecutorConfig(local_enabled = True, remote_enabled = False, remote_cache_enabled = True)`. The executor goes on the test provider, never on the execution platform, so build actions don't use the cache.
 - buck2 computes the test's action digest, looks it up in the action cache, and on a miss runs the test locally. It reports the digest to the runner (`LocalCommand.action_digest`).
 - After a **passing** local run, the runner writes an `ActionResult` under that exact digest. The entry has:
-  - buck2's `instance_name`;
+  - buck2's `instance_name`, the empty name: turnkey never sets `buck2_re_client.instance_name`, so the runner uses buck2's default rather than taking it as a flag;
   - stdout and stderr, inline or as CAS blobs;
   - `execution_metadata` with start and completion timestamps, which is where a hit's duration comes from;
   - output paths relative to the project root.
@@ -105,11 +105,12 @@ Accepted as negligible: G5, P6 and R1.
   - The REAPI protos come from `bazelbuild/remote-apis` at a pinned revision.
 - **REAPI calls:** it uses only FindMissingBlobs, BatchUpdateBlobs and UpdateActionResult.
 - **Deterministic timeout:** the timeout it sends is part of the digest, so it is derived deterministically from the rule and the flags.
-- **Mode flag:** the runner's mode comes from a flag after `--`: `on`, `record-only` or `off`. The runner consumes the flag, so it never reaches the test and never enters the result key.
+- **Mode flag:** the runner's mode comes from a flag after `--`: `on`, `record-only`, `read-only` or `off`. The runner consumes the flag, so it never reaches the test and never enters the result key. `tk` chooses the mode (§6); the runner obeys it and decides nothing about the reuse policy except the per-target label.
   - **Default is off.** It then sends `disable_test_execution_caching`, so buck2 never contacts the cache, and records nothing.
   - **record-only** skips reads and still records.
+  - **read-only** reads and never records.
   - The `no-test-cache` label means off for that target.
-- **Remote endpoint:** it records nothing when the configured endpoint is not the local server (§7).
+- **Origin flag:** `tk` also passes whether the cache is `local` or `remote`, which the runner reports on each hit. The runner never infers it from the address.
 
 ## 6. `tk` and the local cache server
 
@@ -121,8 +122,8 @@ Accepted as negligible: G5, P6 and R1.
 - **Address:** a fixed loopback TCP port chosen by turnkey, written into the generated `.buckconfig`. buck2's RE client can't use Unix sockets. The address is never passed with `-c`, because that would change the daemon's startup config. The port is overridable per user.
 - **Lifecycle:** `tk` starts the server on demand, detached, the first time a cached `tk test` needs it. A lock in the cache directory prevents two servers. The server runs with `--idle_timeout` (e.g. 24 h), so an explicit stop command is optional. A launchd/systemd user service is a possible later add-on, not v1.
 - **`tk test` sequence:**
-  1. Probe the server with a sub-second timeout, starting it if needed.
-  2. Reachable → add `-- --<runner mode flag>=on`, or `record-only` under `tk --no-test-cache`. Unreachable → add `off` and print a one-line warning.
+  1. Check the cache can be used: probe the local server with a sub-second timeout, starting it if needed, or check that a remote endpoint accepts a connection within 2 s.
+  2. Choose the mode (`testcache.Plan`): for the local cache `on`, or `record-only` under `tk --no-test-cache`; for a remote one `read-only`, or `off` under `tk --no-test-cache`, since results are recorded only locally. An unusable cache → `off` and a one-line warning.
   3. Run buck2 as a child process.
   4. Print `N recorded`.
   5. Pass buck2's exit code through.
@@ -141,7 +142,7 @@ Accepted as negligible: G5, P6 and R1.
 - **Generated `.buckconfig`** (only when `enable` is true):
   - `[buck2_re_client]`: the engine, action-cache and CAS addresses all set to the endpoint, with `tls = false` for the local one;
   - `[test] v2_test_executor`: the runner's store path.
-- **Remote:** setting `endpoint` to a remote REAPI address is the whole switch. `tk` stops managing and probing a local server, and the runner stops recording (see Out of scope).
+- **Remote:** setting `endpoint` to a remote REAPI address is the whole switch. `tk` stops managing a local server, only checks the endpoint accepts connections, and never asks the runner to record (see Out of scope).
 
 ## Out of scope
 

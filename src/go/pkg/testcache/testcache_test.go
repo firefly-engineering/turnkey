@@ -1,10 +1,12 @@
 package testcache
 
 import (
+	"errors"
 	"io"
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -122,21 +124,75 @@ func TestReachableRejectsNonGrpcAddresses(t *testing.T) {
 	}
 }
 
+func TestPlanAppliesTheReusePolicy(t *testing.T) {
+	local := &Config{Server: "bazel-remote", Address: "grpc://127.0.0.1:47301"}
+	remote := &Config{Address: "grpc://cache.example.com:443"}
+	up := func() error { return nil }
+	down := func() error { return errors.New("down") }
+	for _, tc := range []struct {
+		name   string
+		cache  *Config
+		forced bool
+		usable func() error
+		want   Mode
+	}{
+		{"local", local, false, up, On},
+		{"local, forced re-run", local, true, up, RecordOnly},
+		{"local, unusable", local, false, down, Off},
+		{"remote: never recorded into", remote, false, up, ReadOnly},
+		{"remote, forced re-run", remote, true, up, Off},
+		{"remote, unusable", remote, false, down, Off},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := tc.cache.plan(tc.forced, tc.usable)
+			if plan.Mode != tc.want {
+				t.Errorf("mode %q, want %q", plan.Mode, tc.want)
+			}
+			if (plan.Unusable != "") != (tc.usable() != nil) {
+				t.Errorf("unusable %q, want it set only for an unusable cache", plan.Unusable)
+			}
+			if plan.Origin != tc.cache.Origin() || plan.Address != tc.cache.Address {
+				t.Errorf("plan %+v doesn't name the cache %+v", plan, tc.cache)
+			}
+		})
+	}
+}
+
+func TestOriginFollowsWhoRunsTheCache(t *testing.T) {
+	// A shared cache reached through a loopback tunnel is still remote.
+	tunnel := &Config{Address: "grpc://127.0.0.1:9092"}
+	if tunnel.Origin() != Remote {
+		t.Errorf("unmanaged loopback cache: origin %q, want remote", tunnel.Origin())
+	}
+	if (&Config{Server: "bazel-remote", Address: tunnel.Address}).Origin() != Local {
+		t.Error("managed cache: want origin local")
+	}
+}
+
+func TestUnreachableRemoteCacheIsUnusable(t *testing.T) {
+	// Nothing listens on a port just released.
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	address := "grpc://" + listener.Addr().String()
+	listener.Close()
+	if err := (&Config{Address: address}).usable(); err == nil {
+		t.Fatal("expected an unreachable remote cache to be unusable")
+	}
+}
+
 func TestRunnerArgs(t *testing.T) {
-	c := &Config{Address: "grpc://127.0.0.1:47301"}
-	got := c.RunnerArgs(On, "/tmp/report")
+	plan := Plan{Mode: On, Origin: Local, Address: "grpc://127.0.0.1:47301"}
+	got := plan.RunnerArgs("/tmp/report")
 	want := []string{
 		"--turnkey-test-cache=on",
 		"--turnkey-test-cache-address=grpc://127.0.0.1:47301",
+		"--turnkey-test-cache-origin=local",
 		"--turnkey-test-cache-report=/tmp/report",
 	}
-	if len(got) != len(want) {
+	if !slices.Equal(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("got %v, want %v", got, want)
-		}
 	}
 }
 
