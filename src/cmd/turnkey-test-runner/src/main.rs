@@ -38,7 +38,7 @@ async fn run(launch: Launch) -> Result<()> {
             .turnkey_test_cache_address
             .as_deref()
             .context("--turnkey-test-cache needs --turnkey-test-cache-address")?;
-        Some(cache::Recorder::new(address)?)
+        Some(cache::Recorder::connect(address)?)
     } else {
         None
     };

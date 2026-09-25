@@ -60,22 +60,45 @@ pub struct Pass<'a> {
     pub execution_time: Duration,
 }
 
-pub struct Recorder {
-    client: ActionCacheClient<Channel>,
+/// The one call the runner makes to the test result cache, so a test can
+/// stand in for it.
+pub trait ActionCache {
+    /// Store an action result under an action digest.
+    async fn update(&self, request: UpdateActionResultRequest) -> Result<()>;
+}
+
+impl ActionCache for ActionCacheClient<Channel> {
+    async fn update(&self, request: UpdateActionResultRequest) -> Result<()> {
+        self.clone()
+            .update_action_result(request)
+            .await
+            .context("writing the action result")?;
+        Ok(())
+    }
+}
+
+/// Writes passing runs as recorded results, in the form buck2 needs to
+/// serve them as hits (docs/adr/0001-runner-recorded-native-test-caching.md).
+pub struct Recorder<C = ActionCacheClient<Channel>> {
+    cache: C,
 }
 
 impl Recorder {
     /// Connect lazily to the cache at `address` (`grpc://host:port`, as in
     /// the `[buck2_re_client]` config).
-    pub fn new(address: &str) -> Result<Self> {
+    pub fn connect(address: &str) -> Result<Self> {
         let uri = address
             .strip_prefix("grpc://")
             .map(|rest| format!("http://{rest}"))
             .with_context(|| format!("unsupported cache address `{address}`: expected grpc://"))?;
         let channel = Endpoint::try_from(uri)?.connect_lazy();
-        Ok(Self {
-            client: ActionCacheClient::new(channel),
-        })
+        Ok(Self::new(ActionCacheClient::new(channel)))
+    }
+}
+
+impl<C: ActionCache> Recorder<C> {
+    pub fn new(cache: C) -> Self {
+        Self { cache }
     }
 
     pub async fn record(&self, pass: Pass<'_>) -> Result<()> {
@@ -96,17 +119,14 @@ impl Recorder {
             }),
             ..Default::default()
         };
-        self.client
-            .clone()
-            .update_action_result(UpdateActionResultRequest {
+        self.cache
+            .update(UpdateActionResultRequest {
                 instance_name: INSTANCE_NAME.to_owned(),
                 action_digest: Some(parse_digest(pass.action_digest)?),
                 action_result: Some(result),
                 ..Default::default()
             })
             .await
-            .context("writing the action result")?;
-        Ok(())
     }
 }
 
@@ -141,13 +161,5 @@ mod tests {
         assert_eq!(digest.size_bytes, 147);
         assert!(parse_digest("28d8aace45").is_err());
         assert!(parse_digest("28d8aace45:x").is_err());
-    }
-
-    #[test]
-    fn modes_read_and_record() {
-        assert!(Mode::On.reads() && Mode::On.records());
-        assert!(!Mode::RecordOnly.reads() && Mode::RecordOnly.records());
-        assert!(Mode::ReadOnly.reads() && !Mode::ReadOnly.records());
-        assert!(!Mode::Off.reads() && !Mode::Off.records());
     }
 }

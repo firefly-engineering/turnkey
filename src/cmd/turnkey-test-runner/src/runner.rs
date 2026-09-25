@@ -26,7 +26,7 @@ use buck2_test_executor::proto::buck::test::{
 };
 
 use crate::args::{Config, EnvValue};
-use crate::cache::{Mode, Pass, Recorder};
+use crate::cache::{ActionCache, Mode, Pass, Recorder};
 
 /// Label that opts a target out of test result caching: it always runs and is
 /// never recorded (docs/specs/test-result-caching.md).
@@ -75,18 +75,18 @@ impl Orchestrator for TestOrchestratorClient<Channel> {
     }
 }
 
-pub struct Runner<O> {
+pub struct Runner<O, C> {
     orchestrator: O,
     config: Config,
-    recorder: Option<Recorder>,
+    recorder: Option<Recorder<C>>,
     /// Tests whose result buck2 reused instead of running them.
     hits: AtomicUsize,
     /// Where the cache in use lives, for reporting hits.
     origin: Origin,
 }
 
-impl<O: Orchestrator> Runner<O> {
-    pub fn new(orchestrator: O, config: Config, recorder: Option<Recorder>) -> Self {
+impl<O: Orchestrator, C: ActionCache> Runner<O, C> {
+    pub fn new(orchestrator: O, config: Config, recorder: Option<Recorder<C>>) -> Self {
         let origin = config.turnkey_test_cache_origin;
         Self {
             orchestrator,
@@ -228,7 +228,11 @@ impl<O: Orchestrator> Runner<O> {
 /// hit. Anything the runner can't reproduce in full is not recorded: failures,
 /// runs that were themselves hits, and tests that declare outputs. Recording
 /// problems never fail the test.
-async fn record_if_pass(recorder: &Recorder, name: &str, result: &ExecutionResult2) {
+async fn record_if_pass<C: ActionCache>(
+    recorder: &Recorder<C>,
+    name: &str,
+    result: &ExecutionResult2,
+) {
     let passed = matches!(
         result.status.as_ref().and_then(|s| s.status),
         Some(execution_status::Status::Finished(0))
@@ -406,6 +410,7 @@ mod tests {
     use buck2_test_executor::proto::buck::test::{
         ConfiguredTarget, ExecutionDetails, ExecutionStatus,
     };
+    use buck2_test_executor::proto::build::bazel::remote::execution::v2::UpdateActionResultRequest;
 
     fn pass_with(command: command_execution_kind::Command) -> ExecutionResult2 {
         ExecutionResult2 {
@@ -551,17 +556,235 @@ mod tests {
         execute_response2::Response::Result(result)
     }
 
-    /// Run `specs` through a runner talking to `buck2`.
+    /// Stands in for the test result cache: keeps every recorded result.
+    #[derive(Default)]
+    struct FakeCache {
+        written: std::sync::Mutex<Vec<UpdateActionResultRequest>>,
+    }
+
+    impl ActionCache for &FakeCache {
+        async fn update(&self, request: UpdateActionResultRequest) -> Result<()> {
+            self.written.lock().unwrap().push(request);
+            Ok(())
+        }
+    }
+
+    impl FakeCache {
+        /// The digests recorded, in hash order.
+        fn digests(&self) -> Vec<String> {
+            let mut digests: Vec<_> = self
+                .written
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|r| r.action_digest.as_ref().unwrap().hash.clone())
+                .collect();
+            digests.sort();
+            digests
+        }
+    }
+
+    /// Run `specs` through a runner talking to `buck2`, without a cache.
     async fn run(buck2: &FakeBuck2, config: Config, specs: Vec<ExternalRunnerSpec>) {
+        run_recording(buck2, None, config, specs).await
+    }
+
+    /// Run `specs` through a runner talking to `buck2` and recording into
+    /// `cache`, as main.rs sets it up: a recorder only when the mode records.
+    async fn run_recording(
+        buck2: &FakeBuck2,
+        cache: Option<&FakeCache>,
+        config: Config,
+        specs: Vec<ExternalRunnerSpec>,
+    ) {
         let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
         for spec in specs {
             sender.send(spec).unwrap();
         }
         drop(sender);
-        Runner::new(buck2, config, None)
+        let recorder = cache
+            .filter(|_| config.turnkey_test_cache.records())
+            .map(Recorder::new);
+        Runner::new(buck2, config, recorder)
             .run_all(receiver)
             .await
             .unwrap();
+    }
+
+    /// A local run of the test with digest `<hash>:10`, exiting with `exit`.
+    fn local_run(hash: &str, exit: i32) -> execute_response2::Response {
+        let mut result = pass_with(command_execution_kind::Command::LocalCommand(
+            LocalCommand {
+                action_digest: format!("{hash}:10"),
+                ..Default::default()
+            },
+        ));
+        result.status = Some(ExecutionStatus {
+            status: Some(execution_status::Status::Finished(exit)),
+        });
+        result.start_time = Some(prost_types::Duration {
+            seconds: 100,
+            nanos: 0,
+        });
+        result.execution_time = Some(prost_types::Duration {
+            seconds: 2,
+            nanos: 500_000_000,
+        });
+        execute_response2::Response::Result(result)
+    }
+
+    fn with_result(
+        response: execute_response2::Response,
+        change: impl FnOnce(&mut ExecutionResult2),
+    ) -> execute_response2::Response {
+        let execute_response2::Response::Result(mut result) = response else {
+            unreachable!()
+        };
+        change(&mut result);
+        execute_response2::Response::Result(result)
+    }
+
+    /// buck2 answering one test per name with `results`.
+    fn buck2_answering(results: Vec<(&str, execute_response2::Response)>) -> FakeBuck2 {
+        FakeBuck2 {
+            results: results
+                .into_iter()
+                .map(|(name, response)| (name.to_owned(), response))
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    fn specs(names: &[&str]) -> Vec<ExternalRunnerSpec> {
+        names
+            .iter()
+            .zip(1..)
+            .map(|(name, id)| spec(name, id))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn records_only_passing_local_runs_without_outputs() {
+        let buck2 = buck2_answering(vec![
+            ("passes", local_run("passes", 0)),
+            ("fails", local_run("fails", 1)),
+            ("hit", execute_response2::Response::Result(hit())),
+            (
+                "has-outputs",
+                with_result(local_run("has-outputs", 0), |r| {
+                    r.outputs = vec![Default::default()]
+                }),
+            ),
+        ]);
+        let cache = FakeCache::default();
+        run_recording(
+            &buck2,
+            Some(&cache),
+            config(&["--turnkey-test-cache=on"]),
+            specs(&["passes", "fails", "hit", "has-outputs"]),
+        )
+        .await;
+        assert_eq!(cache.digests(), ["passes"]);
+    }
+
+    #[tokio::test]
+    async fn a_recorded_result_is_what_buck2_needs_to_serve_a_hit() {
+        let buck2 = buck2_answering(vec![(
+            "passes",
+            with_result(local_run("passes", 0), |r| {
+                r.stderr = Some(ExecutionStream {
+                    item: Some(execution_stream::Item::Inline(b"err".to_vec())),
+                })
+            }),
+        )]);
+        let cache = FakeCache::default();
+        run_recording(
+            &buck2,
+            Some(&cache),
+            config(&["--turnkey-test-cache=on"]),
+            specs(&["passes"]),
+        )
+        .await;
+
+        let written = cache.written.lock().unwrap();
+        let [request] = written.as_slice() else {
+            panic!("expected one recorded result, got {}", written.len())
+        };
+        // buck2's instance name, which turnkey leaves at its default
+        assert_eq!(request.instance_name, "");
+        let digest = request.action_digest.as_ref().unwrap();
+        assert_eq!((digest.hash.as_str(), digest.size_bytes), ("passes", 10));
+        let result = request.action_result.as_ref().unwrap();
+        assert_eq!(result.exit_code, 0);
+        assert_eq!(result.stdout_raw, b"out");
+        assert_eq!(result.stderr_raw, b"err");
+        assert!(result.output_files.is_empty() && result.output_directories.is_empty());
+        // buck2 takes a hit's duration from these timestamps.
+        let metadata = result.execution_metadata.as_ref().unwrap();
+        let start = metadata.execution_start_timestamp.unwrap();
+        let completed = metadata.execution_completed_timestamp.unwrap();
+        assert_eq!((start.seconds, start.nanos), (100, 0));
+        assert_eq!((completed.seconds, completed.nanos), (102, 500_000_000));
+    }
+
+    #[tokio::test]
+    async fn output_too_large_to_inline_is_not_recorded() {
+        let buck2 = buck2_answering(vec![(
+            "chatty",
+            with_result(local_run("chatty", 0), |r| {
+                r.stdout = Some(ExecutionStream {
+                    item: Some(execution_stream::Item::Inline(vec![b'x'; 2 * 1024 * 1024])),
+                })
+            }),
+        )]);
+        let cache = FakeCache::default();
+        run_recording(
+            &buck2,
+            Some(&cache),
+            config(&["--turnkey-test-cache=on"]),
+            specs(&["chatty"]),
+        )
+        .await;
+        assert!(cache.digests().is_empty());
+        // Not recording never fails the test.
+        assert_eq!(*buck2.exit_code.lock().unwrap(), Some(0));
+    }
+
+    #[tokio::test]
+    async fn only_modes_that_record_record() {
+        for (mode, recorded) in [
+            ("on", true),
+            ("record-only", true),
+            ("read-only", false),
+            ("off", false),
+        ] {
+            let buck2 = buck2_answering(vec![("passes", local_run("passes", 0))]);
+            let cache = FakeCache::default();
+            run_recording(
+                &buck2,
+                Some(&cache),
+                config(&[&format!("--turnkey-test-cache={mode}")]),
+                specs(&["passes"]),
+            )
+            .await;
+            assert_eq!(!cache.digests().is_empty(), recorded, "mode {mode}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_target_labelled_no_test_cache_is_never_recorded() {
+        let buck2 = buck2_answering(vec![("opted-out", local_run("opted-out", 0))]);
+        let cache = FakeCache::default();
+        let mut opted_out = spec("opted-out", 1);
+        opted_out.labels = vec![NO_TEST_CACHE_LABEL.to_owned()];
+        run_recording(
+            &buck2,
+            Some(&cache),
+            config(&["--turnkey-test-cache=on"]),
+            vec![opted_out],
+        )
+        .await;
+        assert!(cache.digests().is_empty());
     }
 
     #[tokio::test]
