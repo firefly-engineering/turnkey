@@ -24,3 +24,7 @@ _Avoid_: cache key, test hash
 
 **Reuse policy**:
 The rules, kept outside the result key, for when a recorded result may be read or written: only passes, only under `tk`, not for targets labelled `no-test-cache`, and not when a re-run is forced. Changing the policy never splits the recorded results.
+
+**Hit**:
+A test run answered by a recorded result instead of running the test. Every hit is visible as such to the person running the tests. Its opposite is simply that the test ran.
+_Avoid_: cached pass, cache hit (buck2 uses that for build actions too)
