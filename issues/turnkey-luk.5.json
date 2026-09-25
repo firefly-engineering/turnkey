@@ -14,9 +14,15 @@
     "wayfinder:task"
   ],
   "parent": "turnkey-luk",
+  "comments": [
+    {
+      "text": "From turnkey-luk.1: pin buck2 and buck2-prelude by date (2026-09-15, never \"default\"), add preludeRev = 4d101dce3482c35b32f9f1e7072b354ae789d256 to the pinned record and assert the resolved prelude's passthru.preludeRev matches at eval. Missing/wrong prelude entries get fixed in toolbox, not overridden here.",
+      "timestamp": "2026-09-25T15:16:13Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "Collapse buck2-source.nix to a single pinned buck2 release",
   "type": "task",
-  "updated_at": "2026-09-25T15:11:24Z"
+  "updated_at": "2026-09-25T15:16:13Z"
 }
