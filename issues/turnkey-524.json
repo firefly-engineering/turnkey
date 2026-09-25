@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T20:43:47Z",
+  "description": "flake-parts wraps registry entries named go, cargo and uv (wrappableTools, from nix/buck2/languages.nix). A toolchain.toml that declares the toolbox meta packages instead (turnkey's own does: go-toolchain, rust-toolchain, python-toolchain) gets the unwrapped binaries, so go get / cargo add / uv add never trigger tk sync. Found while doing turnkey-pru.1. Options: wrap the tool inside the meta package's bin/, or map each language's wrapper to every registry entry that provides its tool.",
+  "id": "turnkey-524",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "tw wrappers never apply to meta toolchains (go-toolchain, rust-toolchain, python-toolchain)",
+  "type": "bug",
+  "updated_at": "2026-09-25T20:43:47Z"
+}
