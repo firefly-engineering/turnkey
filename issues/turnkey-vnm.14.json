@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-vnm.5"
+  ],
   "blocks": [],
   "created": "2026-09-25T10:54:25Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nA target labelled `no-test-cache` always runs and is never recorded (spec §1).\n\n## Acceptance criteria\n\n- [ ] A labelled target executes on every `tk test`\n- [ ] No result is ever recorded for it\n- [ ] Other targets are unaffected\n\n## Blocked by\n\n- turnkey-vnm.5\n",
