@@ -22,5 +22,6 @@ Each patch starts with a plain-text header saying what it changes and why;
    that don't, redo the same change on the new files, keep the header, and
    regenerate the diff against the new version's own files.
 3. Remove the old version's directory in the same change that bumps the pin.
-4. Build turnkey's prelude on top of the new version, and follow the upgrade
-   checklist in `docs/developer-manual`.
+4. Build turnkey's prelude on top of the new version, and follow the rest of
+   the bump checklist in
+   `docs/developer-manual/src/contributing/bumping-buck2.md`.

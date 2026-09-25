@@ -32,3 +32,4 @@
 - [Code Style](./contributing/code-style.md)
 - [Testing](./contributing/testing.md)
 - [Submitting Changes](./contributing/submitting.md)
+- [Bumping buck2](./contributing/bumping-buck2.md)

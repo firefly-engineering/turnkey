@@ -11,8 +11,9 @@ compares, from buck2's event log:
   runner sends (command, env, timeout, ...), so equal digests mean the
   runners asked for the same execution.
 
-This is the gate for supporting a buck2 release: add a release to
-nix/buck2/buck2-source.nix only once this passes against it.
+This is the gate for bumping turnkey's pinned buck2 release
+(nix/buck2/buck2-source.nix): a bump lands only once this passes against the
+new release, and its commit carries the summary line printed last.
 
 Usage (from the repo root, in the dev shell):
     python3 src/cmd/check-test-runner-parity/__main__.py [TARGET_PATTERN ...]
@@ -21,6 +22,7 @@ Exits 0 when every scenario matches, 1 otherwise.
 """
 
 import json
+import platform
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -109,7 +111,9 @@ def compare(bundled: Run, turnkey: Run) -> list[str]:
     if not bundled.digests:
         # The event log's test span wasn't found: a buck2 upgrade may have
         # renamed it. Without digests the requests weren't compared.
-        problems.append("no action digests found in the event log: requests were not compared")
+        problems.append(
+            "no action digests found in the event log: requests were not compared"
+        )
     return problems
 
 
@@ -117,7 +121,8 @@ def main() -> int:
     patterns = sys.argv[1:] or ["//..."]
     # Bring generated files and cells up to date once, as tk test would.
     subprocess.run(["tk", "sync"], stdout=subprocess.DEVNULL, check=True)
-    failed = False
+    matched = 0
+    targets = 0
     for scenario, runner_args in SCENARIOS.items():
         bundled = run(patterns, BUNDLED_RUNNER, runner_args)
         turnkey = run(patterns, TURNKEY_RUNNER, runner_args)
@@ -129,8 +134,17 @@ def main() -> int:
         )
         for problem in problems:
             print(f"  {problem}")
-        failed = failed or bool(problems)
-    return 1 if failed else 0
+        matched += not problems
+        targets = max(targets, len(bundled.statuses))
+    # The line a pin bump's commit message carries
+    buck2 = subprocess.run(
+        ["buck2", "--version"], capture_output=True, text=True, check=True
+    ).stdout.split()[-1]
+    print(
+        f"parity: {matched}/{len(SCENARIOS)} scenarios match on {targets} targets "
+        f"(buck2 {buck2}, {platform.machine()}-{platform.system().lower()})"
+    )
+    return 0 if matched == len(SCENARIOS) else 1
 
 
 if __name__ == "__main__":

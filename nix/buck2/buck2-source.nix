@@ -7,10 +7,11 @@
 # from that source revision. This record is the single place that names
 # them; they are bumped together.
 #
-# A bump is gated by the test-runner parity suite: with the new release in
-# the dev shell, run `python3 src/cmd/check-test-runner-parity/__main__.py`,
-# require it to report every scenario as matching, and put its summary line
-# in the commit that bumps the pin.
+# A bump follows docs/developer-manual/src/contributing/bumping-buck2.md. It
+# is gated by the test-runner parity suite: with the new release in the dev
+# shell, run `python3 src/cmd/check-test-runner-parity/__main__.py`, require
+# it to report every scenario as matching, and put its summary line in the
+# commit that bumps the pin.
 { pkgs, lib }:
 
 let
