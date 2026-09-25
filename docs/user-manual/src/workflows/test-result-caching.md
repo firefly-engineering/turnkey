@@ -149,8 +149,8 @@ turnkey.toolchains.buck2.testCache.endpoint = "grpc://cache.example.com:443";
 `tk test` then starts no local cache, and results found there are marked
 `recorded, remote`. Nothing is recorded to a remote cache yet: who may write
 to a shared cache hasn't been decided. `tk` can't check a remote cache
-before running, so if it is unreachable, buck2 retries for a while before
-reporting the tests as failed.
+before running, so if it is unreachable, buck2 retries for about 45 seconds
+and then runs the tests locally, uncached.
 
 ## In the event log
 
