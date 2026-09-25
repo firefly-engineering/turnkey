@@ -4,14 +4,16 @@
   "blocks": [
     "turnkey-efx.4"
   ],
+  "closed_at": "2026-09-25T19:34:19Z",
+  "close_reason": "tk owns the reuse policy (testcache.Plan, read-only mode, origin flag, remote probe); shared runner-contract.json golden checked from Go and Rust (proven red); --no-test-cache renamed --rerun.",
   "created": "2026-09-25T17:24:07Z",
   "description": "testcache gets one entry point (forced?) -\u003e runner args + report; Nix states locality, runner stops parsing host strings; args/report contract checked from both sides.",
   "id": "turnkey-efx.3",
   "labels": [],
   "parent": "turnkey-efx",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Reuse policy has one owner; cache locality passed down as a fact",
   "type": "task",
-  "updated_at": "2026-09-25T19:19:50Z"
+  "updated_at": "2026-09-25T19:34:19Z"
 }
