@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T10:54:29Z",
+  "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\npython_test calls the shared helper through a prelude patch (project-relative paths, hazard P2), and sets `PYTHONDONTWRITEBYTECODE=1` (hazard P5) (spec §4).\n\n## Acceptance criteria\n\n- [ ] An unchanged python_test is a hit on the second run, including in a second checkout\n- [ ] Tests write no bytecode into the tree\n\n## Blocked by\n\n- turnkey-vnm.5\n- turnkey-vnm.20\n",
+  "id": "turnkey-vnm.21",
+  "labels": [],
+  "parent": "turnkey-vnm",
+  "priority": 2,
+  "status": "open",
+  "title": "Python tests are cached",
+  "type": "task",
+  "updated_at": "2026-09-25T10:54:29Z"
+}
