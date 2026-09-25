@@ -322,6 +322,11 @@ name = "futures-core"
 version = "0.3.34"
 hash = "sha256-jiEPPgLxiZ3Kh0ZYoayNxzMyFX2KR5dpg81R3121PfE="
 
+[deps."futures-macro@0.3.34"]
+name = "futures-macro"
+version = "0.3.34"
+hash = "sha256-makhRGW+ul+VU3paf+XHpDxMexBNwbumUxoVyN6md8Q="
+
 [deps."futures-sink@0.3.34"]
 name = "futures-sink"
 version = "0.3.34"

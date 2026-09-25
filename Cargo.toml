@@ -61,6 +61,10 @@ walkdir = "2.5"
 
 # gRPC and protobuf (turnkey-test-runner speaks buck2's test-runner protocol
 # and the Remote Execution API)
+futures-util = "0.3"
+hyper-util = { version = "0.1", features = ["tokio"] }
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "sync"] }
+tower = { version = "0.5", features = ["util"] }
 prost = "0.14"
 prost-types = "0.14"
 protox = "0.9"

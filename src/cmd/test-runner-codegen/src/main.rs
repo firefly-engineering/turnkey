@@ -13,8 +13,14 @@ use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
     let mut args = std::env::args_os().skip(1);
-    let protos = PathBuf::from(args.next().context("usage: test-runner-codegen <protos-dir> <out-dir>")?);
-    let out = PathBuf::from(args.next().context("usage: test-runner-codegen <protos-dir> <out-dir>")?);
+    let protos = PathBuf::from(
+        args.next()
+            .context("usage: test-runner-codegen <protos-dir> <out-dir>")?,
+    );
+    let out = PathBuf::from(
+        args.next()
+            .context("usage: test-runner-codegen <protos-dir> <out-dir>")?,
+    );
 
     let buck2 = protos.join("buck2");
     let reapi = protos.join("reapi");

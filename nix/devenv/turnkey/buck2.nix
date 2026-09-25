@@ -352,6 +352,14 @@ ${generateTargets finalToolchains}
     else
       null;
 
+  # turnkey-test-runner replaces buck2's bundled runner when test result
+  # caching is enabled and the declared buck2 release is supported.
+  testRunner =
+    if cfg.testCache.enable && testRunnerProtocol != null then
+      import ../../packages/turnkey-test-runner.nix { inherit pkgs lib buck2Version; }
+    else
+      null;
+
   # Generate buckconfig content
   # Note: isolation_dir is set via BUCK_ISOLATION_DIR env var, not here
   # (Buck2 ignores the config file setting for isolation_dir)
@@ -386,6 +394,10 @@ ${generateTargets finalToolchains}
 
     [turnkey]
         test_runner_protocol = ${testRunnerProtocol}
+  '' + lib.optionalString (testRunner != null) ''
+
+    [test]
+        v2_test_executor = ${testRunner}/bin/turnkey-test-runner
   '';
 
   # Buckconfig file derivation
@@ -488,6 +500,19 @@ ${generateTargets finalToolchains}
 in
 {
   options.turnkey.buck2 = {
+    testCache = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Run tests through turnkey's test runner, which can reuse recorded
+          results for unchanged tests (docs/specs/test-result-caching.md).
+          When false, or when turnkey doesn't support the declared buck2
+          release, tests run under buck2's bundled runner.
+        '';
+      };
+    };
+
     enable = lib.mkOption {
       type = lib.types.bool;
       default = false;
