@@ -25,7 +25,7 @@ Sharing results across machines later has to need nothing more than pointing the
 | **Only passes** | Only a passing run becomes a recorded result. A failure, timeout or fatal result always runs again. Nothing but passes is ever read or written, whether locally or, later, remotely. |
 | **Default on** | Every target of a cache-safe rule (§4) is cached. |
 | **Opting a target out** | The target label `no-test-cache` means "always run, never record". The reason goes in a comment next to it. There is only one label. |
-| **Forcing a re-run** | `tk --no-test-cache test <patterns>` is a tk-level flag, placed before the subcommand like `--no-sync`. It skips reads but still records fresh passes. There is no env-var or config equivalent. |
+| **Forcing a re-run** | `tk --rerun test <patterns>` is a tk-level flag, placed before the subcommand like `--no-sync`. It skips reads but still records fresh passes. There is no env-var or config equivalent. |
 | **Result key** | Everything the test process can see: its inputs, argv (including `--test-arg` and the args from `.turnkey/local.toml`), declared env (including `--env`), timeout, working directory and platform. Plus a salt made of the buck2 version and the caching tool's version. Filters are argv, so a filtered run gets its own key. |
 | **Correctness beats hit rate** | A wrong hit is never acceptable. When in doubt, miss. Anything a test reads from its surroundings is added to the key, cleaned out, pinned, or the test opts out. Hazards that need an unusual host state to trigger ("negligible") are accepted and noted (§4). |
 | **Only under `tk`** | A plain `buck2 test` neither reads nor records. Only `tk` guarantees that the cells are fresh. |
@@ -123,7 +123,7 @@ Accepted as negligible: G5, P6 and R1.
 - **Lifecycle:** `tk` starts the server on demand, detached, the first time a cached `tk test` needs it. A lock in the cache directory prevents two servers. The server runs with `--idle_timeout` (e.g. 24 h), so an explicit stop command is optional. A launchd/systemd user service is a possible later add-on, not v1.
 - **`tk test` sequence:**
   1. Check the cache can be used: probe the local server with a sub-second timeout, starting it if needed, or check that a remote endpoint accepts a connection within 2 s.
-  2. Choose the mode (`testcache.Plan`): for the local cache `on`, or `record-only` under `tk --no-test-cache`; for a remote one `read-only`, or `off` under `tk --no-test-cache`, since results are recorded only locally. An unusable cache → `off` and a one-line warning.
+  2. Choose the mode (`testcache.Plan`): for the local cache `on`, or `record-only` under `tk --rerun`; for a remote one `read-only`, or `off` under `tk --rerun`, since results are recorded only locally. An unusable cache → `off` and a one-line warning.
   3. Run buck2 as a child process.
   4. Print `N recorded`.
   5. Pass buck2's exit code through.

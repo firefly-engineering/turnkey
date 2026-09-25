@@ -51,7 +51,7 @@ var (
 	noRulesSync bool
 	strictRules bool
 	noLocal     bool
-	noTestCache bool
+	rerun       bool
 	verbose     bool
 	dryRun      bool
 	quiet       bool
@@ -135,8 +135,8 @@ func parseFlags(args []string) []string {
 		case "--no-local":
 			noLocal = true
 			args = args[1:]
-		case "--no-test-cache":
-			noTestCache = true
+		case "--rerun":
+			rerun = true
 			args = args[1:]
 		case "--verbose", "-v":
 			verbose = true
@@ -553,7 +553,7 @@ func withTestCache(args []string) ([]string, string) {
 	if cache == nil {
 		return args, ""
 	}
-	plan := cache.Plan(noTestCache)
+	plan := cache.Plan(rerun)
 	if plan.Unusable != "" {
 		fmt.Fprintf(os.Stderr, "tk: running tests without the test result cache: %s\n", plan.Unusable)
 	}
@@ -767,7 +767,7 @@ tk-specific flags (must come before subcommand):
   --no-rules-sync   Skip rules.star sync (still runs deps sync)
   --strict-rules    Fail if rules.star files would change (CI mode)
   --no-local        Skip local target overrides from .turnkey/local.toml
-  --no-test-cache   Run every test instead of reusing recorded results
+  --rerun           Run every test instead of reusing recorded results
                     (fresh passes are still recorded)
   --verbose         Show what tk is doing
   -v                Same as --verbose
@@ -826,7 +826,7 @@ Examples:
   tk test //some:target               # sync then test
   tk --no-sync build //some:target    # skip sync
   tk --no-local run //target          # skip local overrides
-  tk --no-test-cache test //some:target  # re-run, ignoring recorded results
+  tk --rerun test //some:target       # re-run, ignoring recorded results
   tk sync                             # just run sync
   tk check                            # check staleness
   tk clean                            # clean (no sync needed)

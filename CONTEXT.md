@@ -29,7 +29,11 @@ Everything the test process can see (its inputs, argv, declared environment, tim
 _Avoid_: cache key, test hash
 
 **Reuse policy**:
-The rules, kept outside the result key, for when a recorded result may be read or written: only passes, only under `tk`, not for targets labelled `no-test-cache`, and not when a re-run is forced. Changing the policy never splits the recorded results.
+The rules, kept outside the result key, for when a recorded result may be read or written: only passes, only under `tk`, not for targets labelled `no-test-cache`, not read when a re-run is forced, and written only into the local cache. `tk` applies it for each run; the test runner only obeys the mode it is given. Changing the policy never splits the recorded results.
+
+**Forced re-run**:
+A `tk --rerun test` run: every test runs instead of reusing a recorded result, and fresh passes are still recorded into the local cache. Distinct from the `no-test-cache` label, which keeps a target out of caching altogether.
+_Avoid_: `--no-test-cache` (the label's name), cache bypass
 
 **Hit**:
 A test run answered by a recorded result instead of running the test. Every hit is visible as such to the person running the tests. Its opposite is simply that the test ran.

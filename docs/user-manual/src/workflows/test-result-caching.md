@@ -42,7 +42,7 @@ records results.
 ### Forcing a re-run
 
 ```bash
-tk --no-test-cache test //src/...
+tk --rerun test //src/...
 ```
 
 runs every matched test, and records the fresh passes, which replace the old
