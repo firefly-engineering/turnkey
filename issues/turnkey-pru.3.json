@@ -3,7 +3,9 @@
   "blocked_by": [
     "turnkey-pru.2"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-pru.4"
+  ],
   "created": "2026-09-25T20:29:52Z",
   "description": "buck2.nix (949 lines) mixes toolchain closure, rules.star render, buckconfig+test-cache wiring, sync.toml, enterShell bash and git hooks. Extract pure generators for rules.star/buckconfig/sync.toml with eval checks; one managed-symlink routine shared with direnv-lib; read toolchain.toml only through nix/lib/toolchain-declaration.nix.",
   "id": "turnkey-pru.3",
