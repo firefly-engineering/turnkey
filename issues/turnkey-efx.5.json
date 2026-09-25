@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T17:24:07Z",
+  "description": "turnkey's prelude only, plus at most one escape hatch that disables test result caching (ADR 0002).",
+  "id": "turnkey-efx.5",
+  "labels": [],
+  "parent": "turnkey-efx",
+  "priority": 2,
+  "status": "open",
+  "title": "Collapse the prelude-strategy seam",
+  "type": "task",
+  "updated_at": "2026-09-25T17:24:07Z"
+}
