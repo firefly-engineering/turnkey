@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T07:30:59Z",
+  "description": "## Question\n\nWhen `tk test` serves a recorded result, what does the user see and get?\n- Is a hit marked in the console, like Bazel's `(cached) PASSED`?\n- Is the recorded stdout/stderr replayed, and is it available on demand?\n- Are summary counts of hits and misses shown?\n- What do structured outputs (buck2's test summary, exit code, any JSON report) look like?\n- Is `buck2 test` called directly (not through `tk`) expected to behave the same?",
+  "id": "turnkey-w55.6",
+  "labels": [],
+  "parent": "turnkey-w55",
+  "priority": 2,
+  "status": "open",
+  "title": "What does a cache hit look like to someone running tk test?",
+  "type": "task",
+  "updated_at": "2026-09-25T07:30:59Z"
+}
