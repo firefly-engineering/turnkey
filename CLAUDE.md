@@ -51,7 +51,7 @@ This document provides comprehensive guidance for AI assistants working on the T
 
 ### `/home/user/turnkey/flake.nix`
 **Primary flake configuration**
-- Exposes `flakeModules.turnkey` (flake-parts) and `devenvModules.turnkey` (devenv)
+- Exposes `flakeModules.turnkey` (flake-parts), the one entry point; it configures the devenv module (`nix/devenv/turnkey/`) for each shell
 - Supports 4 systems: x86_64-linux, aarch64-linux, x86_64-darwin, aarch64-darwin
 - Demonstrates self-usage with local `toolchain.toml`
 - Inputs: nixpkgs (unstable), flake-parts, devenv
@@ -530,7 +530,7 @@ Then add to `toolchain.toml` and rebuild the dev shell to verify.
 ### Modifying Module Behavior
 
 1. **Identify the right module**:
-   - User-facing API changes → `nix/flake-parts/turnkey/default.nix`
+   - User-facing API changes → `nix/flake-parts/turnkey/default.nix`; Buck2 options → `nix/buck2/options.nix` (declared once, used by both modules)
    - Shell behavior changes → `nix/devenv/turnkey/default.nix`
    - Default toolchain mappings → [teller](https://github.com/firefly-engineering/teller) repo
    - Turnkey-specific tools → `registryExtensions` in `flake.nix`

@@ -53,7 +53,10 @@ Wrap `go`, `cargo`, `uv` with auto-sync behavior.
 
 ### turnkey.toolchains.buck2
 
-Nested options for Buck2 integration:
+Nested options for Buck2 integration. They are declared once, in
+`nix/buck2/options.nix`, which the devenv module uses as well; this module
+adds only `buck2.shells`, builds the dependency cells, and hands the whole
+value to each shell's devenv module. The main ones:
 
 - `enable` - Enable Buck2 cell generation
 - `prelude.path` - A prelude to use instead of turnkey's (off the supported path; turns test result caching off)

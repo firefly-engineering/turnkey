@@ -141,11 +141,6 @@
         };
       };
 
-      # Export the turnkey devenv module separately
-      flake.devenvModules = {
-        turnkey = ./nix/devenv/turnkey;
-      };
-
       # Export home-manager module for turnkey-composed service
       flake.homeManagerModules = {
         turnkey-composed = ./nix/home-manager/turnkey-composed.nix;
