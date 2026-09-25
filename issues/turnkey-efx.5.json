@@ -4,14 +4,16 @@
     "turnkey-efx.1"
   ],
   "blocks": [],
+  "closed_at": "2026-09-25T19:51:15Z",
+  "close_reason": "Strategies removed; prelude.path escape hatch disables caching; removal errors proven in both modules; template/e2e/docs migrated; ADR 0002 consequence added.",
   "created": "2026-09-25T17:24:07Z",
   "description": "turnkey's prelude only, plus at most one escape hatch that disables test result caching (ADR 0002).",
   "id": "turnkey-efx.5",
   "labels": [],
   "parent": "turnkey-efx",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Collapse the prelude-strategy seam",
   "type": "task",
-  "updated_at": "2026-09-25T19:45:29Z"
+  "updated_at": "2026-09-25T19:51:15Z"
 }
