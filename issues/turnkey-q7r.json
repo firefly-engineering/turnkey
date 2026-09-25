@@ -14,11 +14,15 @@
     {
       "text": "Remaining work (upgrade checklist) folds into the wayfinder map turnkey-luk 'Bundle buck2 inside turnkey' as turnkey-luk.9, rewritten for bumping turnkey's pinned buck2 release.",
       "timestamp": "2026-09-25T15:11:24Z"
+    },
+    {
+      "text": "Landed on main: ad929ef409a2 (toolbox update, buck2-toolchain 5) and a38b57483dce (user-manual remote-endpoint note). The upgrade checklist moved to turnkey-luk.9.",
+      "timestamp": "2026-09-25T15:35:59Z"
     }
   ],
   "priority": 2,
   "status": "in_progress",
   "title": "Update toolbox and support buck2-toolchain 4 and 5",
   "type": "task",
-  "updated_at": "2026-09-25T15:11:24Z"
+  "updated_at": "2026-09-25T15:35:59Z"
 }
