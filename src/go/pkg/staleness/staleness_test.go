@@ -7,6 +7,22 @@ import (
 	"time"
 )
 
+// base is a fixed reference time. Tests order file modification times
+// explicitly relative to it instead of sleeping, so the outcome never
+// depends on filesystem timestamp resolution or scheduling.
+var base = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+// writeAt writes content to path and sets its modification time to mtime.
+func writeAt(t *testing.T, path, content string, mtime time.Time) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(path, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestIsStale_TargetMissing(t *testing.T) {
 	// Create a temporary source file
 	dir := t.TempDir()
@@ -30,20 +46,12 @@ func TestIsStale_TargetMissing(t *testing.T) {
 func TestIsStale_TargetNewer(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create source file
 	source := filepath.Join(dir, "source.txt")
-	if err := os.WriteFile(source, []byte("content"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	writeAt(t, source, "content", base)
 
-	// Wait a bit to ensure different timestamps
-	time.Sleep(10 * time.Millisecond)
-
-	// Create target file (newer)
+	// Target is newer than the source
 	target := filepath.Join(dir, "target.txt")
-	if err := os.WriteFile(target, []byte("generated"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	writeAt(t, target, "generated", base.Add(time.Second))
 
 	stale, err := IsStale([]string{source}, target)
 	if err != nil {
@@ -58,20 +66,12 @@ func TestIsStale_TargetNewer(t *testing.T) {
 func TestIsStale_SourceNewer(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create target file first
 	target := filepath.Join(dir, "target.txt")
-	if err := os.WriteFile(target, []byte("generated"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	writeAt(t, target, "generated", base)
 
-	// Wait a bit to ensure different timestamps
-	time.Sleep(10 * time.Millisecond)
-
-	// Create source file (newer)
+	// Source is newer than the target
 	source := filepath.Join(dir, "source.txt")
-	if err := os.WriteFile(source, []byte("content"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	writeAt(t, source, "content", base.Add(time.Second))
 
 	stale, err := IsStale([]string{source}, target)
 	if err != nil {
@@ -86,25 +86,14 @@ func TestIsStale_SourceNewer(t *testing.T) {
 func TestIsStale_MultipleSources(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create target file first
 	target := filepath.Join(dir, "target.txt")
-	if err := os.WriteFile(target, []byte("generated"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	writeAt(t, target, "generated", base)
 
-	time.Sleep(10 * time.Millisecond)
-
-	// Create first source (newer than target)
+	// Both sources are newer than the target
 	source1 := filepath.Join(dir, "source1.txt")
-	if err := os.WriteFile(source1, []byte("content1"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	// Create second source (also newer)
+	writeAt(t, source1, "content1", base.Add(time.Second))
 	source2 := filepath.Join(dir, "source2.txt")
-	if err := os.WriteFile(source2, []byte("content2"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	writeAt(t, source2, "content2", base.Add(time.Second))
 
 	stale, err := IsStale([]string{source1, source2}, target)
 	if err != nil {
@@ -119,20 +108,12 @@ func TestIsStale_MultipleSources(t *testing.T) {
 func TestIsStale_GlobPattern(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create target file first
 	target := filepath.Join(dir, "target.txt")
-	if err := os.WriteFile(target, []byte("generated"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	writeAt(t, target, "generated", base)
 
-	time.Sleep(10 * time.Millisecond)
-
-	// Create some Go files
+	// Go files newer than the target
 	for _, name := range []string{"a.go", "b.go", "c.go"} {
-		path := filepath.Join(dir, name)
-		if err := os.WriteFile(path, []byte("package main"), 0644); err != nil {
-			t.Fatal(err)
-		}
+		writeAt(t, filepath.Join(dir, name), "package main", base.Add(time.Second))
 	}
 
 	pattern := filepath.Join(dir, "*.go")
@@ -149,26 +130,14 @@ func TestIsStale_GlobPattern(t *testing.T) {
 func TestCheck_DetailedResult(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create target file first
 	target := filepath.Join(dir, "target.txt")
-	if err := os.WriteFile(target, []byte("generated"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	writeAt(t, target, "generated", base)
 
-	time.Sleep(10 * time.Millisecond)
-
-	// Create source files
+	// Two sources newer than the target; source2 is the newest
 	source1 := filepath.Join(dir, "source1.txt")
-	if err := os.WriteFile(source1, []byte("content1"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	time.Sleep(10 * time.Millisecond)
-
+	writeAt(t, source1, "content1", base.Add(time.Second))
 	source2 := filepath.Join(dir, "source2.txt")
-	if err := os.WriteFile(source2, []byte("content2"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	writeAt(t, source2, "content2", base.Add(2*time.Second))
 
 	result, err := Check([]string{source1, source2}, target)
 	if err != nil {
