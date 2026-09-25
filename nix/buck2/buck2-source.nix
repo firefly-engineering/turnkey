@@ -12,7 +12,17 @@
 # shell, run `python3 src/cmd/check-test-runner-parity/__main__.py`, require
 # it to report every scenario as matching, and put its summary line in the
 # commit that bumps the pin.
-{ pkgs, lib }:
+#
+# Callers get the pinned release through turnkey's flake lib,
+# `turnkeyLib.pinnedBuck2Release system`, which binds `registry` to turnkey's
+# own (never a consumer's, so the binary and prelude can't drift from each
+# other). `version` and `protos` don't need it, so a plain
+# `import ./buck2-source.nix { inherit pkgs lib; }` still reads those.
+{
+  pkgs,
+  lib,
+  registry ? throw "turnkey: the pinned buck2 release needs turnkey's registry; use turnkeyLib.pinnedBuck2Release system",
+}:
 
 let
   pinned = {
@@ -25,32 +35,46 @@ let
     preludeRev = "4d101dce3482c35b32f9f1e7072b354ae789d256";
   };
 
-  # The entry for the pinned release in a registry's `name` tool
+  # The entry for the pinned release in the registry's `name` tool
   fromRegistry =
-    registry: name:
+    name:
     registry.${name}.versions.${pinned.version}
       or (throw "turnkey: toolbox has no ${name} ${pinned.version}, the pinned buck2 release");
+
+  # The date key alone doesn't name a build exactly, so each of toolbox's
+  # entries is checked against the commit the release records for it. A
+  # mismatch is fixed in toolbox.
+  checkRev =
+    name: pkg: attr: expected:
+    let
+      rev = pkg.passthru.${attr} or null;
+    in
+    if rev == expected then
+      pkg
+    else
+      throw "turnkey: toolbox's ${name} ${pinned.version} is commit ${toString rev}, but the pinned buck2 release records ${expected}";
+
+  # toolbox's buck2 doesn't record its source commit yet (turnkey-s2a), so
+  # the binary is checked only once it does
+  buck2 =
+    let
+      pkg = fromRegistry "buck2";
+    in
+    if pkg.passthru ? rev then checkRev "buck2" pkg "rev" pinned.rev else pkg;
+
+  upstreamPrelude = checkRev "buck2-prelude" (fromRegistry "buck2-prelude") "preludeRev" pinned.preludeRev;
 in
 {
   inherit (pinned) version;
 
-  # The pinned buck2 binary. `registry` is turnkey's own
-  # (turnkeyLib.defaultTellerRegistry system), never a consumer's.
-  buck2 = registry: fromRegistry registry "buck2";
+  # The pinned buck2 binary
+  inherit buck2;
 
-  # The upstream prelude built with the pinned release. The date key alone
-  # doesn't name a prelude exactly, so toolbox's entry is checked against the
-  # release's own prelude commit; a mismatch is fixed in toolbox.
-  upstreamPrelude =
-    registry:
-    let
-      prelude = fromRegistry registry "buck2-prelude";
-      rev = prelude.passthru.preludeRev or null;
-    in
-    if rev == pinned.preludeRev then
-      prelude
-    else
-      throw "turnkey: toolbox's buck2-prelude ${pinned.version} is commit ${toString rev}, but buck2 ${pinned.version} was built with ${pinned.preludeRev}";
+  # The upstream prelude built with the pinned release
+  inherit upstreamPrelude;
+
+  # turnkey's prelude: the upstream one with turnkey's patches and extensions
+  prelude = import ./prelude.nix { inherit pkgs lib upstreamPrelude; };
 
   # buck2's test-runner protocol files at the pinned source revision
   protos = pkgs.fetchFromGitHub {

@@ -771,15 +771,11 @@ in
           mergeRegistries (mergeRegistries defaultRegistry builtinExtensions) cfg.registryExtensions
       );
 
-      # The pinned buck2 release and its upstream prelude, from turnkey's own
-      # registry (never the consumer's, so neither can drift from the other),
-      # with turnkey's patches and extensions applied to the prelude
-      buck2Source = import ../../buck2/buck2-source.nix { inherit pkgs lib; };
-      pinnedBuck2 = buck2Source.buck2 (turnkeyFlakeLib.defaultTellerRegistry system);
-      turnkeyPrelude = import ../../buck2/prelude.nix {
-        inherit pkgs lib;
-        upstreamPrelude = buck2Source.upstreamPrelude (turnkeyFlakeLib.defaultTellerRegistry system);
-      };
+      # The pinned buck2 release, from turnkey's own registry (never the
+      # consumer's), and turnkey's patched prelude for it
+      pinnedRelease = turnkeyFlakeLib.pinnedBuck2Release system;
+      pinnedBuck2 = pinnedRelease.buck2;
+      turnkeyPrelude = pinnedRelease.prelude;
 
       # Build tw for wrapping native tools
       tw = import ../../packages/tw.nix { inherit pkgs lib; };

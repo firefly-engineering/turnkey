@@ -45,6 +45,18 @@
       nixpkgs,
       ...
     }:
+    let
+      # nixpkgs with teller's and toolbox's overlays: turnkey's own registry
+      toolboxPkgs =
+        system:
+        import inputs.nixpkgs {
+          inherit system;
+          overlays = [
+            inputs.teller.overlays.default
+            inputs.toolbox.overlays.default
+          ];
+        };
+    in
     flake-parts.lib.mkFlake { inherit inputs; } {
       # Reusable helpers exposed at the flake's lib output. Surfacing
       # these makes the teller+toolbox setup that turnkey bundles
@@ -57,14 +69,23 @@
       # flake.lib stays system-agnostic by convention.
       flake.lib = {
         defaultTellerLib = inputs.teller.lib;
-        defaultTellerRegistry = system:
-          (import inputs.nixpkgs {
-            inherit system;
-            overlays = [
-              inputs.teller.overlays.default
-              inputs.toolbox.overlays.default
-            ];
-          }).turnkeyRegistry;
+        defaultTellerRegistry = system: (toolboxPkgs system).turnkeyRegistry;
+
+        # The pinned buck2 release (nix/buck2/buck2-source.nix): the binary,
+        # the upstream prelude, turnkey's patched prelude, the protocol
+        # sources and the version, all from turnkey's own registry
+        # (docs/adr/0002-turnkey-owns-the-buck2-version.md). Build it once
+        # per system and read fields from it.
+        pinnedBuck2Release =
+          system:
+          let
+            pkgs = toolboxPkgs system;
+          in
+          import ./nix/buck2/buck2-source.nix {
+            inherit pkgs;
+            inherit (pkgs) lib;
+            registry = pkgs.turnkeyRegistry;
+          };
 
         # Single source of truth for the packages worth caching/publishing.
         # Consumed by .github/workflows/cachix.yaml. Two categories are
@@ -164,12 +185,6 @@
           system,
           ...
         }:
-        let
-          # The upstream prelude of the pinned buck2 release (nix/buck2/buck2-source.nix)
-          upstreamPrelude =
-            (import ./nix/buck2/buck2-source.nix { inherit pkgs lib; }).upstreamPrelude
-              (self.lib.defaultTellerRegistry system);
-        in
         {
           # Export tools as packages
           packages.godeps-gen = import ./nix/packages/godeps-gen.nix { inherit pkgs lib; };
@@ -217,9 +232,7 @@
 
           # Expose turnkey-prelude for CI builds: the pinned buck2 release's
           # prelude, as the dev shell uses it
-          packages.turnkey-prelude = import ./nix/buck2/prelude.nix {
-            inherit pkgs lib upstreamPrelude;
-          };
+          packages.turnkey-prelude = (self.lib.pinnedBuck2Release system).prelude;
 
           # Configure turnkey to use our local toolchain files. tellerLib
           # and tellerRegistry default to self.lib.defaultTellerLib /
