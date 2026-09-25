@@ -30,6 +30,8 @@ go_test(
         "prefetch_test.go",
     ],
     target_under_test = ":godeps",
+    # Integration fixtures, copied next to the test binary by go_test
+    resources = ["//src/testdata:godeps_fixtures"],
     deps = [
         "//src/go/pkg/prefetchcache:prefetchcache",
     ],

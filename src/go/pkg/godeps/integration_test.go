@@ -131,6 +131,8 @@ func findTestdataDir(t *testing.T) string {
 		}
 	}
 
-	t.Skip("testdata directory not found - skipping integration test")
+	// Fail rather than skip: a skipped integration case reports a pass that
+	// certifies nothing, and a recorded result would keep reporting it.
+	t.Fatal("testdata directory not found: declare //src/testdata:godeps_fixtures as a resource")
 	return ""
 }
