@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T10:54:30Z",
+  "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nCached solidity tests fuzz with a fixed seed derived from the target label, so the same inputs always run the same fuzz cases. Stochastic fuzzing needs the `no-test-cache` label (hazard S4, spec §4).\n\n## Acceptance criteria\n\n- [ ] Two runs of the same fuzz test use the same seed\n- [ ] Different targets get different seeds\n\n## Blocked by\n\nNone — can start immediately.\n",
+  "id": "turnkey-vnm.23",
+  "labels": [],
+  "parent": "turnkey-vnm",
+  "priority": 2,
+  "status": "open",
+  "title": "Solidity fuzzing is seeded from the target label",
+  "type": "task",
+  "updated_at": "2026-09-25T10:54:30Z"
+}
