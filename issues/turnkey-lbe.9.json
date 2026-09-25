@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-lbe.7"
+  ],
   "blocks": [],
   "created": "2026-09-25T19:18:08Z",
   "description": "Configure local bazel-remote with --grpc_proxy.url to the shared cache instead of the endpoint replacing it, so laptops keep fast local hits and gain CI's. See docs/research/remote-execution-and-caching.md (commit adc3619d) §5.",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Tier the per-user bazel-remote in front of the shared cache (G8)",
   "type": "task",
-  "updated_at": "2026-09-25T19:18:08Z"
+  "updated_at": "2026-09-25T19:18:14Z"
 }

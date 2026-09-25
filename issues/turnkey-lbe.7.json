@@ -4,7 +4,8 @@
     "turnkey-lbe.6"
   ],
   "blocks": [
-    "turnkey-lbe.8"
+    "turnkey-lbe.8",
+    "turnkey-lbe.9"
   ],
   "created": "2026-09-25T19:18:08Z",
   "description": "Endpoint, tls, instance_name, httpHeaders with $VAR, writer flag; write [buck2_re_client] whenever a cache is configured, not only for tests. Hosted services need headers/mTLS; only CI writes; secrets stay in env. See docs/research/remote-execution-and-caching.md (commit adc3619d) §5.",
@@ -15,5 +16,5 @@
   "status": "open",
   "title": "Generalise buck2.testCache into buck2.remoteCache options (G6)",
   "type": "task",
-  "updated_at": "2026-09-25T19:18:13Z"
+  "updated_at": "2026-09-25T19:18:14Z"
 }
