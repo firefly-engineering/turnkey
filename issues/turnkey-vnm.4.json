@@ -13,9 +13,15 @@
     "ready-for-agent"
   ],
   "parent": "turnkey-vnm",
+  "comments": [
+    {
+      "text": "From turnkey-vnm.20: Python now runs a store-path interpreter, so only its own site-packages is on sys.path. User site-packages ($HOME/.local/lib/python3.x) stay enabled until this ticket pins HOME=/homeless-shelter. Verify a python_test can't see them once it's switched on.",
+      "timestamp": "2026-09-25T11:06:46Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "Shared test-caching helper, wired into rust_test",
   "type": "task",
-  "updated_at": "2026-09-25T10:54:19Z"
+  "updated_at": "2026-09-25T11:06:46Z"
 }
