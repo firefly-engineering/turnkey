@@ -5,7 +5,9 @@
   "created": "2026-09-25T10:54:25Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nA tk-level flag before the subcommand makes the runner skip reads but still record fresh passes (runner mode `record-only`) (spec §1).\n\n## Acceptance criteria\n\n- [ ] `tk --no-test-cache test \u003cpatterns\u003e` executes every matched test\n- [ ] Fresh passes are recorded, and a following plain `tk test` hits\n- [ ] There is no env-var or config equivalent\n\n## Blocked by\n\n- turnkey-vnm.7\n",
   "id": "turnkey-vnm.15",
-  "labels": [],
+  "labels": [
+    "ready-for-agent"
+  ],
   "parent": "turnkey-vnm",
   "priority": 2,
   "status": "open",
