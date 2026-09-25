@@ -1,31 +1,24 @@
 //! Runs every test target buck2 hands over and reports its result.
 //!
-//! Behaviour matches buck2's bundled runner (app/buck2_test_runner/src/runner.rs
-//! at the pinned release): same Execute2 request, same result mapping, same
-//! details text, same exit code.
+//! Each test is run and reported as buck2's bundled runner would
+//! (buck2_test_executor::bundled); on top, the runner applies the mode tk
+//! chose, marks hits, and records passes.
 
-use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::{Context, Result};
 use futures_util::{StreamExt, TryStreamExt, stream};
 use tokio::sync::mpsc::UnboundedReceiver;
-use tonic::transport::Channel;
 
+use buck2_test_executor::Orchestrator;
+use buck2_test_executor::bundled;
 use buck2_test_executor::proto::buck::data::command_execution_kind;
-use buck2_test_executor::proto::buck::host_sharing::{
-    HostSharingRequirements, WeightClass, host_sharing_requirements, weight_class,
-};
-use buck2_test_executor::proto::buck::test::test_orchestrator_client::TestOrchestratorClient;
 use buck2_test_executor::proto::buck::test::{
-    ArgValue, ArgValueContent, ConfiguredTargetHandle, EndOfTestResultsRequest,
-    EnvironmentVariable, ExecuteRequest2, ExecuteResponse2, ExecutionResult2, ExecutionStream,
-    ExternalRunnerSpec, ExternalRunnerSpecValue, ReportTestResultRequest, TestExecutable,
-    TestResult, TestStage, TestStatus, Testing, arg_value_content, execute_response2,
-    execution_status, execution_stream, external_runner_spec_value, test_result, test_stage,
+    ConfiguredTargetHandle, ExecutionResult2, ExecutionStream, ExternalRunnerSpec, TestResult,
+    TestStatus, execute_response2, execution_status, execution_stream, test_result,
 };
 
-use crate::args::{Config, EnvValue};
+use crate::args::Config;
 use crate::cache::{ActionCache, Mode, Pass, Recorder};
 
 /// Label that opts a target out of test result caching: it always runs and is
@@ -36,49 +29,6 @@ pub const NO_TEST_CACHE_LABEL: &str = "no-test-cache";
 /// Only such targets are recorded: buck2 reports an action digest for every
 /// local run, cacheable or not, so the label is the only way to tell.
 pub const CACHEABLE_LABEL: &str = "turnkey-cacheable";
-
-/// Exit code reported to buck2 when any test did not pass.
-const FAILURE_EXIT_CODE: i32 = 32;
-
-/// The calls the runner makes to buck2's test orchestrator, so a test can
-/// stand in for buck2.
-pub trait Orchestrator {
-    /// Have buck2 run (or reuse) one test.
-    async fn execute(&self, request: ExecuteRequest2) -> Result<ExecuteResponse2>;
-    /// Report one test's result.
-    async fn report(&self, result: TestResult) -> Result<()>;
-    /// Say every result is reported, with the run's exit code.
-    async fn end(&self, exit_code: i32) -> Result<()>;
-}
-
-impl Orchestrator for TestOrchestratorClient<Channel> {
-    async fn execute(&self, request: ExecuteRequest2) -> Result<ExecuteResponse2> {
-        Ok(self
-            .clone()
-            .execute2(request)
-            .await
-            .context("Test execution request failed")?
-            .into_inner())
-    }
-
-    async fn report(&self, result: TestResult) -> Result<()> {
-        self.clone()
-            .report_test_result(ReportTestResultRequest {
-                result: Some(result),
-            })
-            .await
-            .context("Test result reporting failed")?;
-        Ok(())
-    }
-
-    async fn end(&self, exit_code: i32) -> Result<()> {
-        self.clone()
-            .end_of_test_results(EndOfTestResultsRequest { exit_code })
-            .await
-            .context("reporting the end of test results")?;
-        Ok(())
-    }
-}
 
 pub struct Runner<O, C> {
     orchestrator: O,
@@ -116,7 +66,11 @@ impl<O: Orchestrator, C: ActionCache> Runner<O, C> {
                 Ok(all_passed && status == TestStatus::Pass)
             })
             .await?;
-        let exit_code = if all_passed { 0 } else { FAILURE_EXIT_CODE };
+        let exit_code = if all_passed {
+            0
+        } else {
+            bundled::FAILURE_EXIT_CODE
+        };
         if let Some(report) = &self.config.turnkey_test_cache_report {
             let hits = self.hits.load(Ordering::Relaxed);
             std::fs::write(report, hits_report(hits))
@@ -134,7 +88,12 @@ impl<O: Orchestrator, C: ActionCache> Runner<O, C> {
 
         let response = self
             .orchestrator
-            .execute(self.execute_request(spec, mode)?)
+            // buck2 reads recorded results only when the mode allows it.
+            .execute(bundled::execute_request(
+                spec,
+                &self.config.bundled,
+                !mode.reads(),
+            )?)
             .await?;
         let result = match response
             .response
@@ -166,67 +125,6 @@ impl<O: Orchestrator, C: ActionCache> Runner<O, C> {
         } else {
             self.config.turnkey_test_cache
         }
-    }
-
-    fn execute_request(&self, spec: ExternalRunnerSpec, mode: Mode) -> Result<ExecuteRequest2> {
-        let target = spec.target.context("spec without a target")?;
-
-        let cmd = spec
-            .command
-            .into_iter()
-            .chain(self.config.test_arg.iter().map(|arg| verbatim(arg)))
-            .map(spec_arg)
-            .collect();
-
-        // Sorted by name, later values winning: the spec's env, then `--env`.
-        // This is the order buck2's runner produces, and the env is part of the
-        // action digest.
-        let mut env: BTreeMap<String, ExternalRunnerSpecValue> = spec.env.into_iter().collect();
-        for value in &self.config.env {
-            let EnvValue { name, value } = value.parse()?;
-            env.insert(name, verbatim(&value));
-        }
-        let env = env
-            .into_iter()
-            .map(|(key, value)| EnvironmentVariable {
-                key,
-                value: Some(spec_arg(value)),
-            })
-            .collect();
-
-        Ok(ExecuteRequest2 {
-            timeout: Some(prost_types::Duration {
-                seconds: i64::try_from(self.config.timeout).context("timeout out of range")?,
-                nanos: 0,
-            }),
-            host_sharing_requirements: Some(HostSharingRequirements {
-                requirements: Some(host_sharing_requirements::Requirements::Shared(
-                    host_sharing_requirements::Shared {
-                        weight_class: Some(WeightClass {
-                            value: Some(weight_class::Value::Permits(1)),
-                        }),
-                    },
-                )),
-            }),
-            test_executable: Some(TestExecutable {
-                stage: Some(TestStage {
-                    item: Some(test_stage::Item::Testing(Testing {
-                        suite: target.target,
-                        testcases: Vec::new(),
-                        variant: None,
-                        repeat_count: None,
-                    })),
-                }),
-                target: target.handle,
-                cmd,
-                pre_create_dirs: Vec::new(),
-                env,
-            }),
-            executor_override: None,
-            required_local_resources: Vec::new(),
-            // buck2 reads recorded results only when the runner allows it.
-            disable_test_execution_caching: !mode.reads(),
-        })
     }
 }
 
@@ -328,93 +226,50 @@ fn stream_bytes(stream: &Option<ExecutionStream>) -> &[u8] {
     }
 }
 
-fn verbatim(value: &str) -> ExternalRunnerSpecValue {
-    ExternalRunnerSpecValue {
-        value: Some(external_runner_spec_value::Value::Verbatim(
-            value.to_owned(),
-        )),
-    }
-}
-
-fn spec_arg(value: ExternalRunnerSpecValue) -> ArgValue {
-    ArgValue {
-        content: Some(ArgValueContent {
-            value: Some(arg_value_content::Value::SpecValue(value)),
-        }),
-        format: None,
-    }
-}
-
-fn stream_text(stream: Option<ExecutionStream>) -> String {
-    match stream.and_then(|s| s.item) {
-        Some(execution_stream::Item::Inline(bytes)) => String::from_utf8_lossy(&bytes).into_owned(),
-        None => String::new(),
-    }
-}
-
+/// The bundled runner's result for one test, with a hit marked as such. The
+/// marker goes in the details, the part of a result buck2 prints under the
+/// test's line. The hit's provenance goes in `msg`, which buck2 keeps in the
+/// event log but doesn't print, and its duration (the original run's) moves
+/// there too: the console shows no duration for a test that didn't run.
 fn test_result(
     name: String,
     target: ConfiguredTargetHandle,
     result: ExecutionResult2,
     origin: Origin,
 ) -> Result<TestResult> {
-    let status = match result
-        .status
-        .and_then(|s| s.status)
-        .context("execution result without a status")?
-    {
-        execution_status::Status::Finished(0) => TestStatus::Pass,
-        execution_status::Status::Finished(_) => TestStatus::Fail,
-        execution_status::Status::TimedOut(_) => TestStatus::Timeout,
-    };
-    // A hit is marked in the details, the part of a result buck2 prints
-    // under the test's line. Its provenance goes in `msg`, which buck2 keeps
-    // in the event log but doesn't print, and its duration (the original
-    // run's) moves there too: the console shows no duration for a test that
-    // didn't run.
     let hit = is_hit(&result);
-    let (marker, msg, duration) = if hit {
+    let original_duration = duration(result.execution_time.as_ref());
+    let mut reported = bundled::test_result(name, target, result)?;
+    if hit {
         let provenance = serde_json::json!({
             "turnkey_test_cache": {
                 "hit": true,
                 "origin": origin.as_str(),
-                "original_duration_us": duration(result.execution_time.as_ref()).as_micros() as u64,
+                "original_duration_us": original_duration.as_micros() as u64,
             }
         });
-        (
-            hit_marker(origin),
-            Some(test_result::OptionalMsg {
-                msg: provenance.to_string(),
-            }),
-            None,
-        )
-    } else {
-        ("", None, result.execution_time)
-    };
-    let details = format!(
-        "{marker}---- STDOUT ----\n{}\n---- STDERR ----\n{}\n",
-        stream_text(result.stdout),
-        stream_text(result.stderr)
-    );
-    Ok(TestResult {
-        name,
-        status: status as i32,
-        msg,
-        target: Some(target),
-        duration,
-        details,
-        max_memory_used_bytes: result.max_memory_used_bytes,
-    })
+        reported.details = format!("{}{}", hit_marker(origin), reported.details);
+        reported.msg = Some(test_result::OptionalMsg {
+            msg: provenance.to_string(),
+        });
+        reported.duration = None;
+    }
+    Ok(reported)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
+
     use buck2_test_executor::proto::buck::data::{
         CommandExecutionKind, LocalCommand, RemoteCommand,
     };
     use buck2_test_executor::proto::buck::test::{
         ConfiguredTarget, ExecutionDetails, ExecutionStatus,
+    };
+    use buck2_test_executor::proto::buck::test::{
+        ExecuteRequest2, ExecuteResponse2, TestStage, test_stage,
     };
     use buck2_test_executor::proto::build::bazel::remote::execution::v2::UpdateActionResultRequest;
 
@@ -847,7 +702,10 @@ mod tests {
                 ("root//pkg:passes".to_owned(), TestStatus::Pass, 1),
             ]
         );
-        assert_eq!(*buck2.exit_code.lock().unwrap(), Some(FAILURE_EXIT_CODE));
+        assert_eq!(
+            *buck2.exit_code.lock().unwrap(),
+            Some(bundled::FAILURE_EXIT_CODE)
+        );
     }
 
     #[tokio::test]
@@ -872,58 +730,20 @@ mod tests {
         run(&buck2, config(&[]), vec![spec("cancelled", 1)]).await;
         assert!(buck2.reported.lock().unwrap().is_empty());
         // An omitted test isn't a pass.
-        assert_eq!(*buck2.exit_code.lock().unwrap(), Some(FAILURE_EXIT_CODE));
+        assert_eq!(
+            *buck2.exit_code.lock().unwrap(),
+            Some(bundled::FAILURE_EXIT_CODE)
+        );
     }
 
     #[tokio::test]
-    async fn requests_sort_the_env_and_let_env_flags_win() {
+    async fn caching_is_off_unless_tk_turns_it_on() {
         let buck2 = FakeBuck2 {
             results: BTreeMap::from([("t".into(), finished(0))]),
             ..Default::default()
         };
-        let mut spec = spec("t", 1);
-        spec.env = [("B", "spec"), ("A", "spec")]
-            .into_iter()
-            .map(|(k, v)| (k.to_owned(), verbatim(v)))
-            .collect();
-        run(
-            &buck2,
-            config(&["--env", "B=flag", "--timeout", "5"]),
-            vec![spec],
-        )
-        .await;
-
-        let requests = buck2.requests.lock().unwrap();
-        let request = &requests[0];
-        let env: Vec<_> = request
-            .test_executable
-            .as_ref()
-            .unwrap()
-            .env
-            .iter()
-            .map(|e| {
-                let value = match e.value.as_ref().and_then(|v| v.content.as_ref()) {
-                    Some(ArgValueContent {
-                        value:
-                            Some(arg_value_content::Value::SpecValue(ExternalRunnerSpecValue {
-                                value: Some(external_runner_spec_value::Value::Verbatim(v)),
-                            })),
-                    }) => v.clone(),
-                    other => panic!("unexpected env value {other:?}"),
-                };
-                (e.key.clone(), value)
-            })
-            .collect();
-        assert_eq!(
-            env,
-            [
-                ("A".to_owned(), "spec".to_owned()),
-                ("B".to_owned(), "flag".to_owned())
-            ]
-        );
-        assert_eq!(request.timeout.unwrap().seconds, 5);
-        // Caching is off unless tk turns it on.
-        assert!(request.disable_test_execution_caching);
+        run(&buck2, config(&[]), vec![spec("t", 1)]).await;
+        assert!(buck2.requests.lock().unwrap()[0].disable_test_execution_caching);
     }
 
     #[tokio::test]

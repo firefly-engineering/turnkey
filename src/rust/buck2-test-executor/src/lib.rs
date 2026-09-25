@@ -6,15 +6,21 @@
 //! per test target, then says there are no more. On the other, it serves
 //! TestOrchestrator, which runs tests and takes their results. [`start`]
 //! sets up both and hands back the specs as a stream and a client for the
-//! orchestrator; what to do with them is the runner's business.
+//! orchestrator, which implements [`Orchestrator`]. [`bundled`] is what
+//! buck2's bundled runner does with them; what a runner adds on top is its
+//! own business.
 //!
 //! The protocol code is generated from buck2's own protos at the pinned
 //! revision ([`proto`]); anything here that mirrors buck2 cites the buck2
 //! source it follows.
 
+pub mod bundled;
 mod executor;
+mod orchestrator;
 pub mod proto;
 mod transport;
+
+pub use orchestrator::Orchestrator;
 
 use std::os::unix::io::RawFd;
 
