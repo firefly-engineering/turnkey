@@ -50,6 +50,19 @@ pub struct Config {
     #[clap(long, hide = true)]
     buck_test_info: String,
 
+    /// turnkey: whether to reuse and record test results. `tk test` sets
+    /// this; buck2 called directly leaves it off.
+    #[clap(long, value_enum, default_value = "off")]
+    pub turnkey_test_cache: crate::cache::Mode,
+
+    /// turnkey: the test result cache (`grpc://host:port`).
+    #[clap(long)]
+    pub turnkey_test_cache_address: Option<String>,
+
+    /// turnkey: REAPI instance name, as in `buck2_re_client.instance_name`.
+    #[clap(long, default_value = "")]
+    pub turnkey_test_cache_instance_name: String,
+
     /// Passthrough argments to test binary.
     /// Available as a workaround for when test features are available.
     #[clap(long, num_args=1.., allow_hyphen_values = true)]
@@ -107,6 +120,7 @@ mod tests {
         let config = Config::try_parse_from(&launch.runner_args).unwrap();
         assert_eq!(config.env, vec!["A=1"]);
         assert_eq!(config.timeout, 600);
+        assert_eq!(config.turnkey_test_cache, crate::cache::Mode::Off);
     }
 
     #[test]

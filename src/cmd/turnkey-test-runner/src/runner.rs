@@ -12,6 +12,8 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use tonic::transport::Channel;
 
 use crate::args::{Config, EnvValue};
+use crate::cache::{Pass, Recorder};
+use crate::proto::buck::data::command_execution_kind;
 use crate::proto::buck::host_sharing::{
     HostSharingRequirements, WeightClass, host_sharing_requirements, weight_class,
 };
@@ -30,13 +32,19 @@ const FAILURE_EXIT_CODE: i32 = 32;
 pub struct Runner {
     orchestrator: TestOrchestratorClient<Channel>,
     config: Config,
+    recorder: Option<Recorder>,
 }
 
 impl Runner {
-    pub fn new(orchestrator: TestOrchestratorClient<Channel>, config: Config) -> Self {
+    pub fn new(
+        orchestrator: TestOrchestratorClient<Channel>,
+        config: Config,
+        recorder: Option<Recorder>,
+    ) -> Self {
         Self {
             orchestrator,
             config,
+            recorder,
         }
     }
 
@@ -83,6 +91,10 @@ impl Runner {
             // Cancelled tests are not reported.
             execute_response2::Response::Cancelled(_) => return Ok(TestStatus::Omitted),
         };
+
+        if let Some(recorder) = &self.recorder {
+            record_if_pass(recorder, &name, &result).await;
+        }
 
         let result = test_result(name, handle, result)?;
         let status = result.status();
@@ -152,9 +164,57 @@ impl Runner {
             }),
             executor_override: None,
             required_local_resources: Vec::new(),
-            // Test result caching is off until the runner records results.
-            disable_test_execution_caching: true,
+            // buck2 reads recorded results only when the runner allows it.
+            disable_test_execution_caching: !self.config.turnkey_test_cache.reads(),
         })
+    }
+}
+
+/// Record a passing local run, so the next run with the same result key is a
+/// hit. Anything the runner can't reproduce in full is not recorded: failures,
+/// runs that were themselves hits, and tests that declare outputs. Recording
+/// problems never fail the test.
+async fn record_if_pass(recorder: &Recorder, name: &str, result: &ExecutionResult2) {
+    let passed = matches!(
+        result.status.as_ref().and_then(|s| s.status),
+        Some(execution_status::Status::Finished(0))
+    );
+    let local_digest = result
+        .execution_details
+        .as_ref()
+        .and_then(|d| d.execution_kind.as_ref())
+        .and_then(|k| k.command.as_ref())
+        .and_then(|c| match c {
+            command_execution_kind::Command::LocalCommand(local) => {
+                Some(local.action_digest.as_str())
+            }
+            _ => None,
+        });
+    let (Some(action_digest), true, true) = (local_digest, passed, result.outputs.is_empty())
+    else {
+        return;
+    };
+    let pass = Pass {
+        action_digest,
+        stdout: stream_bytes(&result.stdout),
+        stderr: stream_bytes(&result.stderr),
+        start_time: duration(result.start_time.as_ref()),
+        execution_time: duration(result.execution_time.as_ref()),
+    };
+    if let Err(e) = recorder.record(pass).await {
+        eprintln!("turnkey-test-runner: not recording {name}: {e:#}");
+    }
+}
+
+fn duration(d: Option<&prost_types::Duration>) -> std::time::Duration {
+    d.and_then(|d| std::time::Duration::try_from(*d).ok())
+        .unwrap_or_default()
+}
+
+fn stream_bytes(stream: &Option<ExecutionStream>) -> &[u8] {
+    match stream.as_ref().and_then(|s| s.item.as_ref()) {
+        Some(execution_stream::Item::Inline(bytes)) => bytes,
+        None => &[],
     }
 }
 

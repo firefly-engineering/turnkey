@@ -1,10 +1,12 @@
 //! turnkey-test-runner: turnkey's buck2 test runner.
 //!
 //! Speaks buck2's test-runner protocol, pinned to the buck2 release turnkey
-//! ships, and runs tests exactly as buck2's bundled runner does. Recording
-//! and reusing results (docs/specs/test-result-caching.md) builds on it.
+//! ships, and runs tests exactly as buck2's bundled runner does. Under
+//! `tk test` it also lets buck2 reuse recorded results and records fresh
+//! passes (docs/specs/test-result-caching.md).
 
 mod args;
+mod cache;
 mod executor;
 #[allow(dead_code)]
 mod proto;
@@ -37,7 +39,20 @@ async fn run(launch: Launch) -> Result<()> {
     let server = transport::serve(executor_io, executor::Executor::new(spec_sender));
     let orchestrator = TestOrchestratorClient::new(transport::channel(orchestrator_io).await?);
 
-    runner::Runner::new(orchestrator, config)
+    let recorder = if config.turnkey_test_cache.records() {
+        let address = config
+            .turnkey_test_cache_address
+            .as_deref()
+            .context("--turnkey-test-cache needs --turnkey-test-cache-address")?;
+        Some(cache::Recorder::new(
+            address,
+            config.turnkey_test_cache_instance_name.clone(),
+        )?)
+    } else {
+        None
+    };
+
+    runner::Runner::new(orchestrator, config, recorder)
         .run_all(specs)
         .await?;
     server.shutdown().await

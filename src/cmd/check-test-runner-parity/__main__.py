@@ -33,7 +33,12 @@ SCENARIOS: dict[str, list[str]] = {
     "test-arg": ["--test-arg", "--turnkey-parity-probe"],
 }
 
-BUNDLED_RUNNER = ["-c", "test.v2_test_executor="]
+# Both runs turn test result caching off in the rules, so they build the
+# same test commands: cache-enabled rules would make buck2 look results up
+# for the bundled runner, which never disables caching.
+RULES_WITHOUT_CACHING = ["-c", "turnkey.test_cache=false"]
+BUNDLED_RUNNER = ["-c", "test.v2_test_executor=", *RULES_WITHOUT_CACHING]
+TURNKEY_RUNNER = RULES_WITHOUT_CACHING
 
 
 @dataclass
@@ -102,7 +107,7 @@ def main() -> int:
     failed = False
     for scenario, runner_args in SCENARIOS.items():
         bundled = run(patterns, BUNDLED_RUNNER, runner_args)
-        turnkey = run(patterns, [], runner_args)
+        turnkey = run(patterns, TURNKEY_RUNNER, runner_args)
         problems = compare(bundled, turnkey)
         verdict = "differs" if problems else "matches"
         print(
