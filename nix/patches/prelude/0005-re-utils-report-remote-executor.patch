@@ -1,0 +1,32 @@
+re_utils: report whether a test's executor is remote.
+
+Adds `remote` to RemoteTestExecutorConfig, set only when
+get_re_executors_from_props builds a remote executor: from a target's
+remote_execution profile or from the remote test execution toolchain's
+default profile, but not for remote_execution = "disabled".
+run_from_project_root can't tell, because "disabled" sets it too.
+
+turnkey's test-caching helper
+(nix/buck2/prelude-extensions/test_caching/test_caching.bzl) keeps a remote
+executor and replaces a local one with its cache-reading executor. With
+this field it asks upstream which one it built, instead of re-deriving
+upstream's choice of profile.
+
+--- a/tests/re_utils.bzl
++++ b/tests/re_utils.bzl
+@@ -28,6 +28,9 @@
+     executor_overrides = field(dict[str, CommandExecutorConfig], default = {}),
+     run_from_project_root = field(bool, default = False),
+     use_project_relative_paths = field(bool, default = False),
++    # Whether `default_executor` runs the test remotely, from a
++    # `remote_execution` profile or the toolchain's default profile.
++    remote = field(bool, default = False),
+ )
+ 
+ def _network_access_kwargs(network_access: str | None) -> dict[str, str]:
+@@ -227,4 +230,5 @@
+         executor_overrides = {"listing": listing_executor},
+         run_from_project_root = True,
+         use_project_relative_paths = True,
++        remote = True,
+     )

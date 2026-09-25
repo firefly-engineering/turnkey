@@ -186,7 +186,11 @@ def _my_test_impl(ctx):
     ]
 ```
 
-When caching is off, the arguments come back unchanged. Only opt a rule in
+When caching is off, the arguments come back unchanged. When it is on, the
+helper also gives the test an executor that reads recorded results. A rule
+that supports remote execution passes its `re_executors` as well, and a test
+that upstream runs remotely keeps its executor.
+Only opt a rule in
 when its tests can't read anything that isn't in their result key: every
 file they read must be a declared input, and every tool must come from a
 store path.

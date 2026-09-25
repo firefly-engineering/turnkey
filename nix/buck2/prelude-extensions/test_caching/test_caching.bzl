@@ -5,22 +5,35 @@
 
 """Opting a test rule into turnkey's test result caching.
 
-A test rule passes the keyword arguments it would give ExternalRunnerTestInfo
-through `test_caching_kwargs`:
+A test rule passes the keyword arguments it would give ExternalRunnerTestInfo,
+exactly as it builds them without caching, and, if it has them, the
+RemoteTestExecutorConfig it got from `get_re_executors_from_props`, through
+`test_caching_kwargs`:
 
     ExternalRunnerTestInfo(**test_caching_kwargs({
         "type": "rust",
         "command": [args],
         "env": env,
-    }))
+        "default_executor": re_executors.default_executor,
+        ...
+    }, re_executors))
+
+Calling it is what makes a rule cache-safe (see CONTEXT.md); every decision
+about what caching changes is made here, so a prelude patch only wraps
+upstream's arguments.
 
 When the repo enables test result caching (the generated .buckconfig sets
 `turnkey.test_cache = true`), the returned arguments:
 
 - declare the test cacheable (`supports_test_execution_caching`);
 - run it on an executor that reads recorded results from the local test
-  result cache, unless the rule already chose an executor. Build actions are
-  unaffected: this executor only runs the test itself;
+  result cache, unless `re_executors` says upstream built a remote executor
+  (from a `remote_execution` profile or the toolchain's default profile),
+  which is kept. Upstream gives every other test an explicit local executor
+  that never reads a cache, so that one is replaced. Build actions are
+  unaffected: this executor only runs the test itself. It doesn't carry the
+  target's `network_access` policy, so a test that needs the network
+  shouldn't be cached (label it `no-test-cache`);
 - render its command with project-relative paths from the project root, so
   other checkouts of the same revision share results;
 - pin PATH to Nix store paths (`turnkey.test_path`) and HOME to a path that
@@ -31,6 +44,8 @@ Otherwise the arguments are returned unchanged. See
 docs/specs/test-result-caching.md.
 """
 
+load("@prelude//tests:re_utils.bzl", "RemoteTestExecutorConfig")
+
 # Nix's convention for "no home directory".
 _HOMELESS = "/homeless-shelter"
 
@@ -40,11 +55,13 @@ def test_caching_enabled() -> bool:
 
 def test_caching_kwargs(
         kwargs: dict[str, typing.Any],
+        re_executors: RemoteTestExecutorConfig | None = None,
         extra_path: list[str] = [],
         extra_env: dict[str, str] = {}) -> dict[str, typing.Any]:
     """Return ExternalRunnerTestInfo keyword arguments with caching enabled.
 
-    `extra_path` lists additional Nix store `bin` directories the rule's test
+    `re_executors` is the rule's RemoteTestExecutorConfig; a rule without
+    remote execution leaves it out. `extra_path` lists additional Nix store `bin` directories the rule's test
     needs on PATH, beyond the shared base (bash, coreutils, diffutils).
     `extra_env` adds variables the rule's tests need when cached, such as
     ones that stop them writing into their inputs. Like the pinned PATH and
@@ -66,7 +83,7 @@ def test_caching_kwargs(
     result["supports_test_execution_caching"] = True
     result["run_from_project_root"] = True
     result["use_project_relative_paths"] = True
-    if result.get("default_executor") == None:
+    if re_executors == None or not re_executors.remote:
         result["default_executor"] = CommandExecutorConfig(
             local_enabled = True,
             remote_enabled = False,

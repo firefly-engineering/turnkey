@@ -1,18 +1,11 @@
 rust_test: opt into turnkey's test result caching.
 
-Routes rust_test's ExternalRunnerTestInfo arguments through
-test_caching_kwargs (nix/buck2/prelude-extensions/test_caching), which, when
-the repo enables test result caching, declares the test cacheable, gives it
-the cache-reading executor and pins PATH and HOME. When caching is off the
-arguments are unchanged. See docs/specs/test-result-caching.md.
-
-From this prelude version on, upstream gives a test without a
-remote_execution profile an explicit local executor with
-remote_cache_enabled = False. The rule passes that executor on only for
-targets with a remote_execution profile; for the others the caching helper
-installs its cache-reading executor. That executor doesn't carry a target's
-network_access policy: a test that needs the network shouldn't be cached
-(label it no-test-cache).
+Passes rust_test's ExternalRunnerTestInfo arguments, exactly as upstream builds
+them, and its re_executors through test_caching_kwargs
+(nix/buck2/prelude-extensions/test_caching/test_caching.bzl). That helper
+decides what changes when the repo enables test result caching, and leaves
+the arguments unchanged when it is off. It relies on re_executors.remote
+(0005-re-utils-report-remote-executor.patch).
 
 --- a/rust/rust_binary.bzl
 +++ b/rust/rust_binary.bzl
@@ -24,7 +17,7 @@ network_access policy: a test that needs the network shouldn't be cached
  load(
      "@prelude//tests:re_utils.bzl",
      "get_re_executors_from_props",
-@@ -842,17 +843,20 @@
+@@ -842,17 +843,17 @@
      return (
          inject_test_run_info(
              ctx,
@@ -45,14 +38,11 @@ network_access policy: a test that needs the network shouldn't be cached
 +                "env": ctx.attrs.env | ctx.attrs.run_env,
 +                "labels": ctx.attrs.labels,
 +                "contacts": ctx.attrs.contacts,
-+                # Upstream gives a test without an RE profile an explicit
-+                # local executor that never reads a cache; let the
-+                # caching helper choose one for such tests instead.
-+                "default_executor": re_executors.default_executor if getattr(ctx.attrs, "remote_execution", None) != None else None,
++                "default_executor": re_executors.default_executor,
 +                "executor_overrides": re_executors.executor_overrides,
 +                "run_from_project_root": True,
 +                "use_project_relative_paths": True,
-+            })),
++            }, re_executors)),
          )
          + providers
      )

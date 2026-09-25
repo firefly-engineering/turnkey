@@ -1,20 +1,11 @@
 go_test: opt into turnkey's test result caching.
 
-Routes go_test's ExternalRunnerTestInfo arguments through test_caching_kwargs
-(nix/buck2/prelude-extensions/test_caching). When the repo enables test
-result caching, that also forces run_from_project_root and
-use_project_relative_paths on (the upstream FIXME), so a go_test's command
-no longer embeds the checkout's absolute path and other checkouts of the
-same revision share results. When caching is off the arguments are
-unchanged. See docs/specs/test-result-caching.md.
-
-From this prelude version on, upstream gives a test without a
-remote_execution profile an explicit local executor with
-remote_cache_enabled = False. The rule passes that executor on only for
-targets with a remote_execution profile; for the others the caching helper
-installs its cache-reading executor. That executor doesn't carry a target's
-network_access policy: a test that needs the network shouldn't be cached
-(label it no-test-cache).
+Passes go_test's ExternalRunnerTestInfo arguments, exactly as upstream builds
+them, and its re_executors through test_caching_kwargs
+(nix/buck2/prelude-extensions/test_caching/test_caching.bzl). That helper
+decides what changes when the repo enables test result caching, and leaves
+the arguments unchanged when it is off. It relies on re_executors.remote
+(0005-re-utils-report-remote-executor.patch).
 
 --- a/go/go_test.bzl
 +++ b/go/go_test.bzl
@@ -26,7 +17,7 @@ network_access policy: a test that needs the network shouldn't be cached
  load(
      "@prelude//tests:re_utils.bzl",
      "get_re_executors_from_props",
-@@ -176,17 +177,20 @@
+@@ -176,17 +177,17 @@
  
      return inject_test_run_info(
          ctx,
@@ -47,14 +38,11 @@ network_access policy: a test that needs the network shouldn't be cached
 +            "env": env,
 +            "labels": ctx.attrs.labels,
 +            "contacts": ctx.attrs.contacts,
-+            # Upstream gives a test without an RE profile an explicit
-+                # local executor that never reads a cache; let the
-+                # caching helper choose one for such tests instead.
-+                "default_executor": re_executors.default_executor if getattr(ctx.attrs, "remote_execution", None) != None else None,
++            "default_executor": re_executors.default_executor,
 +            "executor_overrides": re_executors.executor_overrides,
 +            "run_from_project_root": True,
 +            "use_project_relative_paths": re_executors.use_project_relative_paths,
-+        })),
++        }, re_executors)),
      ) + [
          DefaultInfo(
              default_output = bin,

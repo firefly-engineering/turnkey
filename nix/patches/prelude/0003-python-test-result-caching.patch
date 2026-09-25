@@ -1,21 +1,14 @@
 python_test: opt into turnkey's test result caching.
 
-Routes python_test's ExternalRunnerTestInfo arguments through
-test_caching_kwargs (nix/buck2/prelude-extensions/test_caching). When the
-repo enables test result caching, that forces project-relative paths (so
-the .pex path and PYTHON_SOURCE_MAP no longer embed the checkout), pins
-PATH and HOME (closing user site-packages), and sets
-PYTHONDONTWRITEBYTECODE so tests don't write .pyc files into their
-inputs. When caching is off the arguments are unchanged. See
-docs/specs/test-result-caching.md.
+Passes python_test's ExternalRunnerTestInfo arguments, exactly as upstream builds
+them, and its re_executors through test_caching_kwargs
+(nix/buck2/prelude-extensions/test_caching/test_caching.bzl). That helper
+decides what changes when the repo enables test result caching, and leaves
+the arguments unchanged when it is off. It relies on re_executors.remote
+(0005-re-utils-report-remote-executor.patch).
 
-From this prelude version on, upstream gives a test without a
-remote_execution profile an explicit local executor with
-remote_cache_enabled = False. The rule passes that executor on only for
-targets with a remote_execution profile; for the others the caching helper
-installs its cache-reading executor. That executor doesn't carry a target's
-network_access policy: a test that needs the network shouldn't be cached
-(label it no-test-cache).
+python_test adds PYTHONDONTWRITEBYTECODE, applied only when caching is on,
+so a cached test doesn't write .pyc files into its own inputs.
 
 --- a/python/compute_providers.bzl
 +++ b/python/compute_providers.bzl
@@ -27,7 +20,7 @@ network_access policy: a test that needs the network shouldn't be cached
  load(
      "@prelude//tests:re_utils.bzl",
      "get_re_executors_from_props",
-@@ -43,19 +44,26 @@
+@@ -43,19 +44,24 @@
  
      return inject_test_run_info(
          ctx,
@@ -53,10 +46,7 @@ network_access policy: a test that needs the network shouldn't be cached
 +                "env": test_env,
 +                "labels": ctx.attrs.labels,
 +                "contacts": ctx.attrs.contacts,
-+                # Upstream gives a test without an RE profile an explicit
-+                # local executor that never reads a cache; let the
-+                # caching helper choose one for such tests instead.
-+                "default_executor": re_executors.default_executor if getattr(ctx.attrs, "remote_execution", None) != None else None,
++                "default_executor": re_executors.default_executor,
 +                "executor_overrides": re_executors.executor_overrides,
 +                # We implicitly make this test via the project root, instead of
 +                # the cell root (e.g. fbcode root). `network_access` is carried on
@@ -65,6 +55,7 @@ network_access policy: a test that needs the network shouldn't be cached
 +                "use_project_relative_paths": re_executors.use_project_relative_paths,
 +                "supports_test_execution_caching": ctx.attrs.supports_test_execution_caching,
 +            },
++            re_executors,
 +            # A cached test must not write bytecode into its own inputs.
 +            extra_env = {"PYTHONDONTWRITEBYTECODE": "1"},
 +        )),
