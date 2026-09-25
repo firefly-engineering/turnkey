@@ -16,11 +16,15 @@
     {
       "text": "Per turnkey-luk.8: the parity suite is a manual checklist step, and the bump commit must carry its summary line (scenarios matched, target count, buck2 release, platform). CI gate is tracked separately in turnkey-kxe.",
       "timestamp": "2026-09-25T15:29:21Z"
+    },
+    {
+      "text": "Resolution: commit 37065860 (not pushed). docs/developer-manual/src/contributing/bumping-buck2.md, linked from SUMMARY, nix/patches/prelude/README.md and buck2-source.nix. The parity suite now prints the summary line bumps carry; ran on this stack: parity: 3/3 scenarios match on 30 targets (buck2 2026-09-14-6507dd15..., arm64-darwin).",
+      "timestamp": "2026-09-25T16:24:32Z"
     }
   ],
   "priority": 2,
   "status": "in_progress",
   "title": "Write the checklist for bumping turnkey's pinned buck2 release",
   "type": "task",
-  "updated_at": "2026-09-25T16:22:55Z"
+  "updated_at": "2026-09-25T16:24:32Z"
 }
