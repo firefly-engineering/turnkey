@@ -11,9 +11,15 @@
     "wayfinder:grilling"
   ],
   "parent": "turnkey-w55",
+  "comments": [
+    {
+      "text": "Input from turnkey-w55.3: caching is only sound when tests run through tk. The buck2 daemon doesn't notice cell symlink retargets; tk's cellfresh kills it, plain buck2 doesn't. This bears on whether plain 'buck2 test' should behave like 'tk test'.",
+      "timestamp": "2026-09-25T07:51:11Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "What does a cache hit look like to someone running tk test?",
   "type": "task",
-  "updated_at": "2026-09-25T07:31:20Z"
+  "updated_at": "2026-09-25T07:51:11Z"
 }
