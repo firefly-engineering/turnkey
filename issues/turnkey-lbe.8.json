@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T19:18:08Z",
+  "description": "Add TLS and header support to the recorder and replace the 'is the host local' rule with an explicit writer setting. Must follow the build-key fixes (G1-G4): a test's key includes its binary, so a wrong build hit yields a stale pass. See docs/research/remote-execution-and-caching.md (commit adc3619d) §5.",
+  "id": "turnkey-lbe.8",
+  "labels": [],
+  "parent": "turnkey-lbe",
+  "priority": 2,
+  "status": "open",
+  "title": "Test runner writes passes to a remote cache (G7)",
+  "type": "task",
+  "updated_at": "2026-09-25T19:18:08Z"
+}
