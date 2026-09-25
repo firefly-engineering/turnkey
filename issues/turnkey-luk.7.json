@@ -4,6 +4,8 @@
     "turnkey-luk.6"
   ],
   "blocks": [],
+  "closed_at": "2026-09-25T16:22:55Z",
+  "close_reason": "Docs, migration note and e2e updated, commit ae5362d9871a",
   "created": "2026-09-25T15:11:18Z",
   "description": "## Question\n\nUpdate the user manual (project-setup, toolchain-toml config reference, test result caching's unsupported-buck2 note), developer manual (architecture/buck2, prelude-extensions), e2e fixtures and the templates to the bundled model, and write the migration note the evaluation error points at.",
   "id": "turnkey-luk.7",
@@ -22,8 +24,8 @@
     }
   ],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Update docs, e2e and the migration note for the bundled buck2",
   "type": "task",
-  "updated_at": "2026-09-25T16:22:54Z"
+  "updated_at": "2026-09-25T16:22:55Z"
 }
