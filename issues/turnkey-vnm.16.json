@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T10:54:26Z",
+  "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\njsonnet_test runs jrsonnet against a staged directory of its declared sources, with `-J` derived from it, not the project root. An undeclared import fails loudly instead of being read from the checkout (hazard J1, spec §4).\n\n## Acceptance criteria\n\n- [ ] An import of an undeclared file fails the test\n- [ ] Existing jsonnet tests still pass\n\n## Blocked by\n\nNone — can start immediately.\n",
+  "id": "turnkey-vnm.16",
+  "labels": [],
+  "parent": "turnkey-vnm",
+  "priority": 2,
+  "status": "open",
+  "title": "Jsonnet test imports resolve only from declared sources",
+  "type": "task",
+  "updated_at": "2026-09-25T10:54:26Z"
+}
