@@ -28,3 +28,6 @@ The rules, kept outside the result key, for when a recorded result may be read o
 **Hit**:
 A test run answered by a recorded result instead of running the test. Every hit is visible as such to the person running the tests. Its opposite is simply that the test ran.
 _Avoid_: cached pass, cache hit (buck2 uses that for build actions too)
+
+**Cache-safe rule**:
+A test rule none of whose own behaviour lets a test read something outside its result key. Only a cache-safe rule has its targets' results recorded. Hazards that belong to one target, not to the rule, are fixed in that target or opt it out, and never make the rule unsafe.
