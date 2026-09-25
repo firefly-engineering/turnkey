@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T17:24:08Z",
+  "description": "Orchestrator port and OSS-equivalent ExecuteRequest2 construction move behind the executor crate's interface.",
+  "id": "turnkey-efx.8",
+  "labels": [],
+  "parent": "turnkey-efx",
+  "priority": 2,
+  "status": "open",
+  "title": "Move the protocol mirror into buck2-test-executor",
+  "type": "task",
+  "updated_at": "2026-09-25T17:24:08Z"
+}
