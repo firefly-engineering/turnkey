@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T17:24:07Z",
+  "description": "testcache gets one entry point (forced?) -\u003e runner args + report; Nix states locality, runner stops parsing host strings; args/report contract checked from both sides.",
+  "id": "turnkey-efx.3",
+  "labels": [],
+  "parent": "turnkey-efx",
+  "priority": 2,
+  "status": "open",
+  "title": "Reuse policy has one owner; cache locality passed down as a fact",
+  "type": "task",
+  "updated_at": "2026-09-25T17:24:07Z"
+}
