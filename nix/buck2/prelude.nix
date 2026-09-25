@@ -1,15 +1,15 @@
 # Turnkey Prelude - Nix-backed Buck2 prelude cell
 #
 # This derivation builds a customizable prelude by:
-# 1. Taking an upstream buck2-prelude (from toolbox registry)
+# 1. Taking the upstream buck2-prelude of the pinned buck2 release
+#    (nix/buck2/buck2-source.nix)
 # 2. Applying the patch set for that upstream version, from
-#    nix/patches/prelude/<version>/ (if there is one)
+#    nix/patches/prelude/<version>/
 # 3. Copying extensions from nix/buck2/prelude-extensions/
 #
-# Patches are written against one upstream version: each supported version
-# has its own set, and a version without one gets no patches. turnkey only
-# enables what the patches support (test result caching) for buck2 releases
-# listed in nix/buck2/buck2-source.nix, whose preludes have a set.
+# Patches are written against one upstream version, so the set is keyed by
+# it. turnkey's test result caching depends on them: an upstream version
+# without a set is an error, not an unpatched prelude.
 #
 # The result is symlinked to .turnkey/prelude in downstream projects.
 {
@@ -34,7 +34,7 @@ let
       in
       map (name: patchDir + "/${name}") (lib.sort (a: b: a < b) patchNames)
     else
-      [ ];
+      throw "turnkey: no prelude patch set for buck2-prelude ${toString version} (nix/patches/prelude/${toString version}/)";
 
   # Directory containing custom extensions
   extensionsDir = ./prelude-extensions;

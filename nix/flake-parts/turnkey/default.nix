@@ -9,6 +9,9 @@
 let
   inherit (flake-parts-lib) mkPerSystemOption;
   inherit (lib) mkOption types;
+  # turnkey's own flake lib. perSystem rebinds `turnkeyLib` to the teller lib,
+  # so the pinned buck2 release is resolved through this name.
+  turnkeyFlakeLib = turnkeyLib;
 in
 {
   options.perSystem = mkPerSystemOption (
@@ -738,36 +741,14 @@ in
           mergeRegistries (mergeRegistries defaultRegistry builtinExtensions) cfg.registryExtensions
       );
 
-      # Resolve buck2-prelude from the registry, then apply turnkey extensions.
-      # The prelude is paired with the buck2 release a toolchain declaration
-      # pins (the newest prelude not newer than it), so each shell's prelude
-      # matches its buck2 binary.
+      # The upstream prelude of the pinned buck2 release, from turnkey's own
+      # registry (never the consumer's, so it can't drift from the binary),
+      # with turnkey's patches and extensions applied
       buck2Source = import ../../buck2/buck2-source.nix { inherit pkgs lib; };
-      declaredBuck2Version =
-        decl:
-        let
-          toolchains = decl.toolchains or { };
-        in
-        if toolchains ? buck2-toolchain then
-          buck2Source.versionOf (turnkeyLib.resolveTool baseRegistry "buck2-toolchain" toolchains.buck2-toolchain)
-        else if toolchains ? buck2 then
-          buck2Source.versionOf (turnkeyLib.resolveTool baseRegistry "buck2" toolchains.buck2)
-        else
-          null;
-      upstreamPreludeFor =
-        decl:
-        let
-          entry =
-            baseRegistry."buck2-prelude"
-              or (builtins.throw "buck2-prelude not found in registry; ensure toolbox overlay is applied");
-          version = buck2Source.matchingPreludeVersion {
-            preludeVersions = builtins.attrNames entry.versions;
-            inherit (entry) default;
-          } (declaredBuck2Version decl);
-        in
-        turnkeyLib.resolveTool baseRegistry "buck2-prelude" { inherit version; };
-      turnkeyPreludeFor =
-        decl: import ../../buck2/prelude.nix { inherit pkgs lib; upstreamPrelude = upstreamPreludeFor decl; };
+      turnkeyPrelude = import ../../buck2/prelude.nix {
+        inherit pkgs lib;
+        upstreamPrelude = buck2Source.upstreamPrelude (turnkeyFlakeLib.defaultTellerRegistry system);
+      };
 
       # Build tw for wrapping native tools
       tw = import ../../packages/tw.nix { inherit pkgs lib; };
@@ -895,13 +876,12 @@ in
           null;
 
       # Resolve the prelude path based on strategy
-      # - nix: use the turnkey prelude matching the declared buck2 (or a user-specified derivation)
+      # - nix: use the turnkey prelude of the pinned buck2 (or a user-specified derivation)
       # - bundled: use "bundled://"
       # - path/git: use user-specified path
-      resolvedPreludePathFor =
-        decl:
+      resolvedPreludePath =
         if cfg.buck2.prelude.strategy == "nix" then
-          if cfg.buck2.prelude.path != null then cfg.buck2.prelude.path else turnkeyPreludeFor decl
+          if cfg.buck2.prelude.path != null then cfg.buck2.prelude.path else turnkeyPrelude
         else if cfg.buck2.prelude.strategy == "bundled" then
           "bundled://"
         else
@@ -948,7 +928,7 @@ in
             enable = shellNeedsBuck2;
             prelude = {
               strategy = cfg.buck2.prelude.strategy;
-              path = resolvedPreludePathFor shellDecl;
+              path = resolvedPreludePath;
             };
             # Test result caching
             testCache = {
@@ -1048,13 +1028,7 @@ in
         jsdeps = jsdepsCell;
         soldeps = soldepsCell;
       } // lib.optionalAttrs (cfg.buck2.prelude.strategy == "nix") {
-        # The default shell's prelude
-        prelude = resolvedPreludePathFor (
-          if cfg.declarationFiles ? default then
-            builtins.fromTOML (builtins.readFile cfg.declarationFiles.default)
-          else
-            { }
-        );
+        prelude = resolvedPreludePath;
       });
 
     in

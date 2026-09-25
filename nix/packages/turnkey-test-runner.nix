@@ -1,18 +1,16 @@
 # turnkey-test-runner Nix package
 #
-# Turnkey's buck2 test runner. Its protocol code is generated for one buck2
-# release (nix/packages/test-runner-protocol.nix), so the package is built per
-# buck2 version.
+# Turnkey's buck2 test runner. Its protocol code is generated for the pinned
+# buck2 release (nix/packages/test-runner-protocol.nix).
 {
   pkgs,
   lib,
-  buck2Version,
 }:
 
 let
   root = ../..;
   cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
-  protocol = import ./test-runner-protocol.nix { inherit pkgs lib buck2Version; };
+  protocol = import ./test-runner-protocol.nix { inherit pkgs lib; };
 in
 pkgs.rustPlatform.buildRustPackage {
   pname = "turnkey-test-runner";

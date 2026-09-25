@@ -3,7 +3,7 @@
 # Generated at build time from pinned upstream sources, never hand-copied:
 # - buck2's test-runner protocol (test.proto and the data.proto / error.proto
 #   / host_sharing.proto it imports), from buck2's source at the revision of
-#   the buck2 release in use (nix/buck2/buck2-source.nix);
+#   the pinned buck2 release (nix/buck2/buck2-source.nix);
 # - the Remote Execution API, from bazelbuild/remote-apis, with the
 #   googleapis revision remote-apis itself pins.
 #
@@ -13,7 +13,6 @@
 {
   pkgs,
   lib,
-  buck2Version,
 }:
 
 let
@@ -21,7 +20,7 @@ let
   cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
   root = ../..;
 
-  buck2Protos = buck2Source.protosFor buck2Version;
+  buck2Protos = buck2Source.protos;
 
   remoteApis = pkgs.fetchFromGitHub {
     owner = "bazelbuild";
@@ -50,7 +49,7 @@ let
 
   # Include roots: buck2/ holds buck2's protos flat (they import each other
   # by bare name), reapi/ holds build/bazel/... and google/...
-  protos = pkgs.runCommand "test-runner-protos-buck2-${buck2Version}" { } ''
+  protos = pkgs.runCommand "test-runner-protos-buck2-${buck2Source.version}" { } ''
     mkdir -p $out/buck2 $out/reapi/build/bazel $out/reapi/google
     cp ${buck2Protos}/app/buck2_test_proto/test.proto $out/buck2/
     cp ${buck2Protos}/app/buck2_data/data.proto $out/buck2/
@@ -75,7 +74,7 @@ let
     doCheck = false;
   };
 in
-pkgs.runCommand "test-runner-protocol-buck2-${buck2Version}"
+pkgs.runCommand "test-runner-protocol-buck2-${buck2Source.version}"
   {
     passthru = { inherit protos codegen; };
   }

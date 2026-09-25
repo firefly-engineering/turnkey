@@ -337,35 +337,15 @@ ${generateTargets finalToolchains}
   # Helper for Go deps enabled
   hasGodeps = cfg.go.enable && cfg.go.cell != null;
 
-  # turnkey-test-runner's protocol code, generated for the declared buck2
-  # release. null when buck2 isn't declared, or when turnkey knows no source
-  # revision for that release.
-  buck2Source = import ../../buck2/buck2-source.nix { inherit pkgs lib; };
-  declaredBuck2 =
-    if declaredToolchains ? buck2-toolchain then resolvedRegistry.buck2-toolchain
-    else if declaredToolchains ? buck2 then resolvedRegistry.buck2
-    else null;
-  buck2Version = if declaredBuck2 == null then null else buck2Source.versionOf declaredBuck2;
-  testRunnerProtocol =
-    if buck2Source.isSupported buck2Version then
-      import ../../packages/test-runner-protocol.nix { inherit pkgs lib buck2Version; }
-    else
-      null;
+  # turnkey-test-runner's protocol code, generated for the pinned buck2
+  # release (nix/buck2/buck2-source.nix)
+  testRunnerProtocol = import ../../packages/test-runner-protocol.nix { inherit pkgs lib; };
 
   # turnkey-test-runner replaces buck2's bundled runner when test result
-  # caching is enabled and the declared buck2 release is supported.
+  # caching is enabled
   testRunner =
-    if cfg.testCache.enable && testRunnerProtocol != null then
-      import ../../packages/turnkey-test-runner.nix { inherit pkgs lib buck2Version; }
-    else
-      null;
-
-  # Shown on shell entry when caching is wanted but the declared buck2
-  # release isn't supported yet (no source revision in buck2-source.nix, so
-  # no runner built for it): tests then run uncached under buck2's own runner.
-  testCacheUnsupportedNotice =
-    if cfg.testCache.enable && buck2Version != null && !(buck2Source.isSupported buck2Version) then
-      "turnkey: test result caching is off: buck2 ${buck2Version} isn't supported yet (tests run uncached)"
+    if cfg.testCache.enable then
+      import ../../packages/turnkey-test-runner.nix { inherit pkgs lib; }
     else
       null;
 
@@ -422,7 +402,6 @@ ${generateTargets finalToolchains}
 
     [build]
         execution_platforms = prelude//platforms:default
-  '' + lib.optionalString (testRunnerProtocol != null) ''
 
     [turnkey]
         test_runner_protocol = ${testRunnerProtocol}
@@ -1147,7 +1126,7 @@ in
       TURNKEY_BUCK2_RUNTIME_DEPS = lib.concatStringsSep "," runtimeDeps;
     } // nixCellsEnvVars
       # Generated protocol code for Cargo builds of turnkey-test-runner
-      // lib.optionalAttrs (testRunnerProtocol != null) {
+      // {
         TURNKEY_TEST_RUNNER_PROTOCOL = "${testRunnerProtocol}";
       }
       # The local test result cache tk starts on demand (src/go/pkg/testcache)
@@ -1168,9 +1147,7 @@ in
       };
 
     # Create symlinks on shell entry
-    enterShell = lib.optionalString (testCacheUnsupportedNotice != null) ''
-      echo "${testCacheUnsupportedNotice}" >&2
-    '' + ''
+    enterShell = ''
       # Add tk completions to XDG_DATA_DIRS for fish/bash/zsh completion discovery
       if [ -n "''${TURNKEY_TK_SHARE:-}" ]; then
         export XDG_DATA_DIRS="''${TURNKEY_TK_SHARE}:''${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"

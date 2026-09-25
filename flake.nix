@@ -165,26 +165,10 @@
           ...
         }:
         let
-          # The buck2 release this repo's toolchain.toml declares, and the
-          # upstream prelude paired with it (nix/buck2/buck2-source.nix)
-          declaredBuck2 =
-            let
-              registry = self.lib.defaultTellerRegistry system;
-              resolve = self.lib.defaultTellerLib.resolveTool registry;
-              buck2Source = import ./nix/buck2/buck2-source.nix { inherit pkgs lib; };
-              declared = (builtins.fromTOML (builtins.readFile ./toolchain.toml)).toolchains.buck2-toolchain;
-              buck2Version = buck2Source.versionOf (resolve "buck2-toolchain" declared);
-              prelude = registry."buck2-prelude";
-            in
-            {
-              inherit buck2Version;
-              upstreamPrelude = resolve "buck2-prelude" {
-                version = buck2Source.matchingPreludeVersion {
-                  preludeVersions = builtins.attrNames prelude.versions;
-                  inherit (prelude) default;
-                } buck2Version;
-              };
-            };
+          # The upstream prelude of the pinned buck2 release (nix/buck2/buck2-source.nix)
+          upstreamPrelude =
+            (import ./nix/buck2/buck2-source.nix { inherit pkgs lib; }).upstreamPrelude
+              (self.lib.defaultTellerRegistry system);
         in
         {
           # Export tools as packages
@@ -226,17 +210,15 @@
             tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
           }).tw-uv;
 
-          # turnkey-test-runner, built for the buck2 release this repo declares
+          # turnkey-test-runner, built for the pinned buck2 release
           packages.turnkey-test-runner = import ./nix/packages/turnkey-test-runner.nix {
             inherit pkgs lib;
-            inherit (declaredBuck2) buck2Version;
           };
 
-          # Expose turnkey-prelude for CI builds, paired with the buck2 release
-          # this repo declares (as the dev shell pairs it)
+          # Expose turnkey-prelude for CI builds: the pinned buck2 release's
+          # prelude, as the dev shell uses it
           packages.turnkey-prelude = import ./nix/buck2/prelude.nix {
-            inherit pkgs lib;
-            inherit (declaredBuck2) upstreamPrelude;
+            inherit pkgs lib upstreamPrelude;
           };
 
           # Configure turnkey to use our local toolchain files. tellerLib
