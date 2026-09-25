@@ -6,8 +6,9 @@
 # The wrappers set TURNKEY_REAL_<TOOL> to the actual tool path, so tw
 # can invoke the real tool without recursion.
 #
-# Usage: Add tw-go, tw-cargo, tw-uv to your shell packages. They will
-# shadow the real tools, making `go get` automatically sync.
+# The flake-parts module wraps the registry's own packages with mkWrapper,
+# so the wrapped tool is the one toolchain.toml resolves. tw-go, tw-cargo
+# and tw-uv wrap nixpkgs' tools, for use outside a turnkey shell.
 { pkgs, lib, tw }:
 
 let
@@ -24,6 +25,8 @@ let
   '';
 
 in {
+  inherit mkWrapper;
+
   # Go wrapper - shadows `go` command
   tw-go = mkWrapper { name = "go"; pkg = pkgs.go; };
 

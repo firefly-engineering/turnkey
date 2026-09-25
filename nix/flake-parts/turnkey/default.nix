@@ -236,32 +236,36 @@ in
       # but transparently invokes tw for auto-sync
       twWrappers = import ../../packages/tw-wrappers.nix { inherit pkgs lib tw; };
 
-      # Tools that can be wrapped (must have entries in tw-wrappers.nix)
-      wrappableTools = [
-        "go"
-        "cargo"
-        "uv"
-      ];
+      # The native tools tw wraps: one per language that has a wrapper
+      # (nix/buck2/languages.nix)
+      wrappableTools = map (language: language.wrapper.tool) (
+        builtins.filter (language: language ? wrapper) languages
+      );
 
-      # Augment registry with wrappers when wrapNativeTools is enabled
-      # This replaces the tool entry with a wrapped version (same versioned structure)
+      # Wrap every version of a registry entry. A version is a package, or
+      # an attrset whose `package` carries deprecation metadata alongside.
+      wrapEntry =
+        tool: entry:
+        entry
+        // {
+          versions = builtins.mapAttrs (
+            _version: versionEntry:
+            if versionEntry ? package then
+              versionEntry // { package = twWrappers.mkWrapper { name = tool; pkg = versionEntry.package; }; }
+            else
+              twWrappers.mkWrapper { name = tool; pkg = versionEntry; }
+          ) entry.versions;
+        };
+
+      # Augment registry with wrappers when wrapNativeTools is enabled: each
+      # wrapped tool keeps its versions, and every version shadows the
+      # registry's own package
       registry =
         if cfg.wrapNativeTools then
           baseRegistry
-          // (lib.listToAttrs (
-            lib.filter (x: x != null) (
-              map (
-                tool:
-                if baseRegistry ? ${tool} then
-                  {
-                    name = tool;
-                    value = single twWrappers."tw-${tool}";
-                  }
-                else
-                  null
-              ) wrappableTools
-            )
-          ))
+          // lib.genAttrs (builtins.filter (tool: baseRegistry ? ${tool}) wrappableTools) (
+            tool: wrapEntry tool baseRegistry.${tool}
+          )
         else
           baseRegistry;
 

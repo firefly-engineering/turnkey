@@ -290,6 +290,86 @@
               "toolchain declaration: ${lib.concatMapStringsSep ", " toString strayBuck2} use a buck2 other than the pinned one";
             pkgs.runCommand "toolchain-declaration-check" { } "touch $out";
 
+          # The language records (nix/buck2/languages.nix) agree with
+          # themselves: rule names are unique, a rule runs after the rule
+          # that writes its source, and each wrapper runs a rule of its own
+          # language that reads a file the wrapper watches. Checked with and
+          # without a uv lock, at evaluation.
+          checks.language-records =
+            let
+              languages = import ./nix/buck2/languages.nix { inherit pkgs lib; };
+              buck2Options =
+                python:
+                (lib.evalModules {
+                  modules = [
+                    (import ./nix/buck2/options.nix {
+                      inherit lib;
+                      version = "check";
+                    })
+                    {
+                      go.depsFile = "go-deps.toml";
+                      rust.depsFile = "rust-deps.toml";
+                      python = python // {
+                        depsFile = "python-deps.toml";
+                      };
+                      javascript.depsFile = "js-deps.toml";
+                      solidity.depsFile = "solidity-deps.toml";
+                    }
+                  ];
+                }).config;
+              problems =
+                python:
+                let
+                  options = buck2Options python;
+                  rulesOf = language: language.syncRules options.${language.name};
+                  rules = builtins.concatMap rulesOf languages;
+                  names = map (rule: rule.name) rules;
+                  indexOf = name: lib.lists.findFirstIndex (n: n == name) null names;
+                  writerOf = file: lib.findFirst (rule: rule.target == file) null rules;
+                  misordered = builtins.filter (
+                    rule:
+                    builtins.any (
+                      source:
+                      let
+                        writer = writerOf source;
+                      in
+                      writer != null && indexOf writer.name > indexOf rule.name
+                    ) rule.sources
+                  ) rules;
+                  wrapperProblems = builtins.concatMap (
+                    language:
+                    let
+                      wrapper = language.wrapper.rule options.${language.name};
+                      rule =
+                        if wrapper == null then
+                          null
+                        else
+                          lib.findFirst (rule: rule.name == wrapper.deps_rule) null (rulesOf language);
+                    in
+                    if wrapper == null then
+                      [ ]
+                    else if rule == null then
+                      [ "${language.wrapper.tool} runs ${wrapper.deps_rule}, not a ${language.name} rule" ]
+                    else
+                      lib.optional (lib.intersectLists wrapper.watch_files rule.sources == [ ])
+                        "${language.wrapper.tool} watches ${toString wrapper.watch_files}, none of which ${rule.name} reads"
+                  ) (builtins.filter (language: language ? wrapper) languages);
+                in
+                lib.optional (lib.unique names != names) "rule names repeat: ${toString names}"
+                ++ map (rule: "${rule.name} runs before the rule that writes its sources") misordered
+                ++ wrapperProblems;
+              allProblems =
+                problems { }
+                ++ problems { lockFile = "pylock.toml"; }
+                ++ problems {
+                  lockFile = "pylock.toml";
+                  uvLockFile = "uv.lock";
+                };
+            in
+            assert lib.assertMsg (allProblems == [ ])
+              "language records: ${lib.concatStringsSep "; " allProblems}";
+            pkgs.runCommand "language-records-check" { } "touch $out";
+
           # Configure turnkey to use our local toolchain files. tellerLib
           # and tellerRegistry default to self.lib.defaultTellerLib /
           # self.lib.defaultTellerRegistry system via the flake-parts

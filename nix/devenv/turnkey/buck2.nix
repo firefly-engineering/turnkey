@@ -404,6 +404,23 @@ ${generateTargets finalToolchains}
   # Each language's sync rules, in language order
   syncRules = builtins.concatMap (language: language.syncRules cfg.${language.name}) languages;
 
+  # What tw does for each wrapped tool: which of its commands can change the
+  # language's files, and the sync rule to run when they do. Only languages
+  # with sync rules get one, so a wrapper always names a rule that exists.
+  wrapperRules = builtins.concatMap (
+    language:
+    let
+      rule = language.wrapper.rule cfg.${language.name};
+    in
+    lib.optional (language ? wrapper && language.syncRules cfg.${language.name} != [ ] && rule != null) (
+      {
+        name = language.wrapper.tool;
+        command = language.wrapper.tool;
+      }
+      // rule
+    )
+  ) languages;
+
   # Format a single rule as TOML
   formatSyncRule = rule: ''
     [[deps]]
@@ -411,6 +428,12 @@ ${generateTargets finalToolchains}
     sources = ${builtins.toJSON rule.sources}
     target = ${builtins.toJSON rule.target}
     generator = ${builtins.toJSON rule.generator}
+  '';
+
+  # Format a wrapper rule as TOML
+  formatWrapperRule = rule: ''
+    [[wrappers]]
+    ${lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "${k} = ${builtins.toJSON v}") rule)}
   '';
 
   # Generate full sync.toml content
@@ -437,6 +460,7 @@ ${generateTargets finalToolchains}
     external_cell = ${builtins.toJSON cfg.rules.go.externalCell}
 
     ${lib.concatMapStringsSep "\n" formatSyncRule syncRules}
+    ${lib.concatMapStringsSep "\n" formatWrapperRule wrapperRules}
   '';
 
   # Sync config file derivation

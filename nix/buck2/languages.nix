@@ -16,6 +16,10 @@
 #                langCfg.depsFile (which must exist)
 #   syncRules    langCfg -> the [[deps]] rules of .turnkey/sync.toml, in
 #                the order tk sync must run them
+#   wrapper      optional: the native tool tw wraps (`tool`), and
+#                langCfg -> its [[wrappers]] rule, which names the sync
+#                rule to run when the tool changes the language's files,
+#                or null when the tool can't change what the rules read
 #
 # `langCfg` is the language's options (nix/buck2/options.nix).
 { pkgs, lib }:
@@ -65,6 +69,21 @@ in
           "--prefetch"
         ];
       };
+    wrapper = {
+      tool = "go";
+      rule = langCfg: {
+        mutating_subcommands = [
+          "get"
+          "mod"
+        ];
+        watch_files = [
+          langCfg.modFile
+          langCfg.sumFile
+        ];
+        deps_rule = "go";
+        post_commands = [ "go mod tidy" ];
+      };
+    };
   }
 
   {
@@ -106,6 +125,21 @@ in
           langCfg.cargoLockFile
         ];
       };
+    wrapper = {
+      tool = "cargo";
+      rule = langCfg: {
+        mutating_subcommands = [
+          "add"
+          "remove"
+          "update"
+        ];
+        watch_files = [
+          langCfg.cargoTomlFile
+          langCfg.cargoLockFile
+        ];
+        deps_rule = "rust";
+      };
+    };
   }
 
   {
@@ -168,6 +202,30 @@ in
             ];
           }
       );
+    # uv changes pyproject.toml and uv.lock. With a uv lock, syncing starts
+    # at the pylock rule; without a lock file, the python rule reads
+    # pyproject.toml. A lock file uv doesn't export is not uv's to change.
+    wrapper = {
+      tool = "uv";
+      rule =
+        langCfg:
+        if langCfg.lockFile != null && langCfg.uvLockFile == null then
+          null
+        else
+          {
+            mutating_subcommands = [
+              "add"
+              "remove"
+              "lock"
+              "sync"
+            ];
+            watch_files = [
+              langCfg.pyprojectFile
+            ]
+            ++ lib.optional (langCfg.uvLockFile != null) langCfg.uvLockFile;
+            deps_rule = if langCfg.uvLockFile != null then "pylock" else "python";
+          };
+    };
   }
 
   {

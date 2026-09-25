@@ -310,21 +310,31 @@ Shell wrapper (provides 'go' binary)
                     ▼
 tw (turnkey wrapper)
 1. Loads .turnkey/sync.toml configuration
-2. Finds wrapper rule for 'go'
+2. Finds the [[wrappers]] rule for 'go' (none: runs go untouched)
 3. Checks if 'get' is a mutating subcommand → yes
 4. Captures SHA256 hashes of go.mod, go.sum
 5. Runs the real 'go get' command
 6. Compares hashes - detects changes
-7. Runs godeps-gen to regenerate go-deps.toml
+7. Runs the rule's post-commands (go mod tidy)
+8. Runs the go deps rule (godeps-gen → go-deps.toml), then any other
+   rule left stale
 ```
 
 ### Supported Tools
 
-| Tool | Mutating Commands | Watch Files | Deps Target |
-|------|-------------------|-------------|-------------|
-| `go` | `get`, `mod` | `go.mod`, `go.sum` | `go-deps.toml` |
-| `cargo` | `add`, `remove`, `update` | `Cargo.toml`, `Cargo.lock` | `rust-deps.toml` |
-| `uv` | `add`, `remove`, `lock`, `sync` | `pyproject.toml`, `uv.lock` | `python-deps.toml` |
+turnkey writes one `[[wrappers]]` rule per language into
+`.turnkey/sync.toml`, from its language records
+(`nix/buck2/languages.nix`), for each enabled language that has deps rules:
+
+| Tool | Mutating Commands | Watch Files | Deps Rule |
+|------|-------------------|-------------|-----------|
+| `go` | `get`, `mod` | `go.mod`, `go.sum` | `go` (`go-deps.toml`) |
+| `cargo` | `add`, `remove`, `update` | `Cargo.toml`, `Cargo.lock` | `rust` (`rust-deps.toml`) |
+| `uv` | `add`, `remove`, `lock`, `sync` | `pyproject.toml`, `uv.lock` | `pylock` (`pylock.toml`), then `python` (`python-deps.toml`) |
+
+The file names are the configured ones (`buck2.go.modFile` and so on).
+Without `buck2.python.uvLockFile`, `uv` watches only `pyproject.toml` and
+runs the `python` rule.
 
 ### Escape Hatches
 

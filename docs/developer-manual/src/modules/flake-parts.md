@@ -49,7 +49,9 @@ type = types.bool;
 default = true;
 ```
 
-Wrap `go`, `cargo`, `uv` with auto-sync behavior.
+Wrap `go`, `cargo`, `uv` with auto-sync behavior. Every version of the
+registry's entry is wrapped, so the wrapper runs the tool toolchain.toml
+resolves.
 
 ### turnkey.toolchains.buck2
 

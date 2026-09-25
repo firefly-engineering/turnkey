@@ -9,7 +9,8 @@
 //	tw cargo add serde              # runs cargo add, syncs if Cargo.lock changed
 //	tw uv add requests              # runs uv add, syncs if pyproject.toml changed
 //
-// Configuration is read from .turnkey/sync.toml:
+// Wrapper rules are read from .turnkey/sync.toml, which turnkey generates
+// from its language records (nix/buck2/languages.nix):
 //
 //	[[wrappers]]
 //	name = "go"
@@ -17,6 +18,8 @@
 //	mutating_subcommands = ["get", "mod"]
 //	watch_files = ["go.mod", "go.sum"]
 //	deps_rule = "go"
+//
+// A tool without a wrapper rule is passed through untouched.
 package main
 
 import (
@@ -36,33 +39,6 @@ var (
 	verbose bool
 	noSync  bool
 )
-
-// defaultWrapperRules provides sensible defaults for common tools.
-// These are used when no [[wrappers]] section exists in sync.toml.
-var defaultWrapperRules = map[string]*syncconfig.WrapperRule{
-	"go": {
-		Name:                "go",
-		Command:             "go",
-		MutatingSubcommands: []string{"get", "mod"},
-		WatchFiles:          []string{"go.mod", "go.sum"},
-		DepsRule:            "go",
-		PostCommands:        []string{"go mod tidy"},
-	},
-	"cargo": {
-		Name:                "cargo",
-		Command:             "cargo",
-		MutatingSubcommands: []string{"add", "remove", "update"},
-		WatchFiles:          []string{"Cargo.toml", "Cargo.lock"},
-		DepsRule:            "rust",
-	},
-	"uv": {
-		Name:                "uv",
-		Command:             "uv",
-		MutatingSubcommands: []string{"add", "remove", "lock", "sync"},
-		WatchFiles:          []string{"pyproject.toml", "uv.lock"},
-		DepsRule:            "python",
-	},
-}
 
 func main() {
 	args := os.Args[1:]
@@ -96,21 +72,14 @@ func main() {
 		runToolAndExit(toolName, toolArgs)
 	}
 
-	// Find wrapper rule for this tool (config takes precedence over defaults)
+	// Find the wrapper rule for this tool
 	rule := cfg.FindWrapper(toolName)
-	if rule == nil {
-		// Try default rules
-		rule = defaultWrapperRules[toolName]
-	}
 	if rule == nil {
 		// No wrapper configured for this tool - just pass through
 		if verbose {
 			fmt.Fprintf(os.Stderr, "tw: no wrapper rule for %q, passing through\n", toolName)
 		}
 		runToolAndExit(toolName, toolArgs)
-	}
-	if verbose && cfg.FindWrapper(toolName) == nil {
-		fmt.Fprintf(os.Stderr, "tw: using default wrapper rule for %q\n", toolName)
 	}
 
 	// Determine if this is a mutating subcommand
@@ -275,7 +244,9 @@ func runPostCommand(cmdStr, dir string) int {
 	return 0
 }
 
-// runSyncForRule runs the sync operation for the specified deps rule.
+// runSyncForRule regenerates the wrapper's deps rule, then every rule left
+// stale by it: a rule whose source is that rule's target (python-deps.toml
+// from pylock.toml) comes after it in sync.toml.
 func runSyncForRule(cfg *syncconfig.Config, wrapper *syncconfig.WrapperRule, root string) int {
 	depsRule := cfg.FindDepsRule(wrapper.DepsRule)
 	if depsRule == nil {
@@ -290,6 +261,19 @@ func runSyncForRule(cfg *syncconfig.Config, wrapper *syncconfig.WrapperRule, roo
 	err := s.SyncRule(*depsRule)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tw: sync error: %v\n", err)
+		return 1
+	}
+
+	s.Quiet = !verbose
+	result, err := s.SyncDeps()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tw: sync error: %v\n", err)
+		return 1
+	}
+	for _, e := range result.Errors {
+		fmt.Fprintf(os.Stderr, "tw: sync error: %v\n", e)
+	}
+	if len(result.Errors) > 0 {
 		return 1
 	}
 
