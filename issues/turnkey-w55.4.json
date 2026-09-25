@@ -21,11 +21,15 @@
     {
       "text": "Research branch pushed: research/bazel-test-caching. Permalink: https://github.com/firefly-engineering/turnkey/blob/36ab738c9f894d5f00f91ba4a1514a480133458c/docs/research/bazel-test-result-caching.md",
       "timestamp": "2026-09-25T08:08:41Z"
+    },
+    {
+      "text": "Research doc now on main (research branch folded in and deleted). Permalink: https://github.com/firefly-engineering/turnkey/blob/2c0c1f08b9c7dc509a6f1bf6d1735d07abc54b62/docs/research/bazel-test-result-caching.md",
+      "timestamp": "2026-09-25T08:10:27Z"
     }
   ],
   "priority": 2,
   "status": "closed",
   "title": "How does Bazel decide when a test result is reusable?",
   "type": "task",
-  "updated_at": "2026-09-25T08:08:41Z"
+  "updated_at": "2026-09-25T08:10:27Z"
 }
