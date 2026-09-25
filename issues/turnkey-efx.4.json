@@ -4,14 +4,16 @@
     "turnkey-efx.3"
   ],
   "blocks": [],
+  "closed_at": "2026-09-25T19:43:57Z",
+  "close_reason": "ActionCache port with in-memory adapter; recording tested through run_all (proven red); turnkey-cacheable label gates recording, checked end to end.",
   "created": "2026-09-25T17:24:07Z",
   "description": "Port for 'record this result' with an in-memory adapter; test recording through Runner::run_all.",
   "id": "turnkey-efx.4",
   "labels": [],
   "parent": "turnkey-efx",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Recording behind a testable ActionCache seam",
   "type": "task",
-  "updated_at": "2026-09-25T19:34:19Z"
+  "updated_at": "2026-09-25T19:43:57Z"
 }
