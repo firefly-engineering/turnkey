@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T13:24:38Z",
+  "description": "Found in turnkey-vnm.7/vnm.21: src/cmd/tk/main.go imports github.com/firefly-engineering/turnkey/src/go/pkg/testcache, but tk rules sync --all -v src/cmd/tk reports 'no changes' and doesn't add //src/go/pkg/testcache:testcache to the go_binary's turnkey:auto block (and doesn't remove it when added by hand). The Buck2 build of //src/cmd/tk:tk then fails with 'cannot find package(s)'. The mapper (src/go/pkg/mapper mapGoInternalImport) would map it correctly, so the gap is earlier: extraction or file selection for this rules.star (srcs = glob([\"*.go\"])?). Worked around by adding the dep by hand.",
+  "id": "turnkey-1bt",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "tk rules sync doesn't add internal Go deps for src/cmd/tk",
+  "type": "bug",
+  "updated_at": "2026-09-25T13:24:38Z"
+}
