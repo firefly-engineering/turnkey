@@ -10,11 +10,15 @@
     {
       "text": "Parked (2026-09-25) as local commit 'chore: update toolbox...' on top of turnkey-vnm/test-result-caching, not pushed. Done and verified on buck2-toolchain 5. Remaining: the upgrade checklist, and fixing the user manual's remote-endpoint note (on buck2 2026-09-15 an unreachable cache means ~45s of retries then a local run, not failures). Paused for the effort to bundle buck2 inside turnkey, which changes what an upgrade involves (consumers would no longer pick buck2 versions).",
       "timestamp": "2026-09-25T14:57:22Z"
+    },
+    {
+      "text": "Remaining work (upgrade checklist) folds into the wayfinder map turnkey-luk 'Bundle buck2 inside turnkey' as turnkey-luk.9, rewritten for bumping turnkey's pinned buck2 release.",
+      "timestamp": "2026-09-25T15:11:24Z"
     }
   ],
   "priority": 2,
   "status": "in_progress",
   "title": "Update toolbox and support buck2-toolchain 4 and 5",
   "type": "task",
-  "updated_at": "2026-09-25T14:57:22Z"
+  "updated_at": "2026-09-25T15:11:24Z"
 }
