@@ -16,11 +16,15 @@
     {
       "text": "Carried over from turnkey-vnm.20 via turnkey-vnm.4: Python now runs a store-path interpreter, so only its own site-packages is on sys.path. User site-packages ($HOME/.local/lib/python3.x) stay enabled until python_test calls the caching helper, which pins HOME=/homeless-shelter. Verify a cached python_test can't see them.",
       "timestamp": "2026-09-25T12:31:24Z"
+    },
+    {
+      "text": "Cross-checkout note: the first attempt showed the Python tests missing in a second workspace. Diagnosed as link-tree symlinks computed from resolved paths (prelude/toolchain files in the Nix store, and differences in how buck2 materialized an artifact), fixed by nix/patches/prelude/0004-python-checkout-independent-links.patch. With the fix, the test inputs and action digests were identical across checkouts, and a clean rerun (fresh store, fresh workspace) hit 4/4. One intermediate run still reported 0 hits with identical digests; it had confounders on the main side (a forced re-run and a prelude cell switch between runs) and did not reproduce.",
+      "timestamp": "2026-09-25T13:21:53Z"
     }
   ],
   "priority": 2,
   "status": "in_progress",
   "title": "Python tests are cached",
   "type": "task",
-  "updated_at": "2026-09-25T13:11:23Z"
+  "updated_at": "2026-09-25T13:21:53Z"
 }
