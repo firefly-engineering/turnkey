@@ -5,7 +5,9 @@
   "created": "2026-09-25T10:54:30Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nsolidity_test passes the soldeps remappings and dependency sources as artifacts of the test action, not as the literal cell path, so a dependency change changes the result key (hazard S3, spec §4).\n\n## Acceptance criteria\n\n- [ ] Changing a soldeps dependency's source changes the test action's inputs\n- [ ] Existing solidity tests still pass\n\n## Blocked by\n\nNone — can start immediately.\n",
   "id": "turnkey-vnm.22",
-  "labels": [],
+  "labels": [
+    "ready-for-agent"
+  ],
   "parent": "turnkey-vnm",
   "priority": 2,
   "status": "open",
