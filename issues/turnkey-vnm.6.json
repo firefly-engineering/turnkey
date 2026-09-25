@@ -6,6 +6,8 @@
   "blocks": [
     "turnkey-vnm.12"
   ],
+  "closed_at": "2026-09-25T12:43:16Z",
+  "close_reason": "Hits' details start with the recorded marker; verified on the console; fresh passes unmarked; exit codes unchanged.",
   "created": "2026-09-25T10:54:20Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nEvery hit is recognisable in the console output of `tk test`: the runner marks each hit's per-test result `recorded` (spec §2).\n\n## Acceptance criteria\n\n- [ ] A hit's console line or details show `recorded`\n- [ ] A fresh pass shows no marker\n- [ ] Exit codes are unchanged\n\n## Blocked by\n\n- turnkey-vnm.5\n",
   "id": "turnkey-vnm.6",
@@ -14,8 +16,8 @@
   ],
   "parent": "turnkey-vnm",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Hits are marked `recorded` per target",
   "type": "task",
-  "updated_at": "2026-09-25T12:41:03Z"
+  "updated_at": "2026-09-25T12:43:16Z"
 }
