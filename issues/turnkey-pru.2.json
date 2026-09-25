@@ -3,7 +3,9 @@
   "blocked_by": [
     "turnkey-pru.1"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-pru.3"
+  ],
   "created": "2026-09-25T20:29:52Z",
   "description": "src/go/pkg/rules (no importers), the unused parts of src/go/pkg/staleness (only IsStale is called), and the unpackaged regex src/cmd/*-deps-extract commands. tk rules sync uses rulessync+mapper+starlark+deps-extract only.",
   "id": "turnkey-pru.2",
