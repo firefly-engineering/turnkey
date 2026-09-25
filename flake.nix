@@ -234,6 +234,25 @@
           # prelude, as the dev shell uses it
           packages.turnkey-prelude = (self.lib.pinnedBuck2Release system).prelude;
 
+          # The pinned buck2 release holds together: the binary and prelude
+          # are the release's, and the shell gets exactly what the flake
+          # publishes. Checked at evaluation, so `nix flake check --no-build`
+          # runs it.
+          checks.pinned-buck2-release =
+            let
+              release = self.lib.pinnedBuck2Release system;
+              shellBuck2 = config.devenv.shells.default.turnkey.buck2;
+            in
+            assert lib.assertMsg (release.buck2.version == release.version)
+              "pinned buck2 release: binary is ${release.buck2.version}, not ${release.version}";
+            assert lib.assertMsg (release.upstreamPrelude.version == release.version)
+              "pinned buck2 release: upstream prelude is ${release.upstreamPrelude.version}, not ${release.version}";
+            assert lib.assertMsg (shellBuck2.package.drvPath == release.buck2.drvPath)
+              "pinned buck2 release: the default shell's buck2 is not the pinned binary";
+            assert lib.assertMsg (shellBuck2.prelude.path.drvPath == config.packages.turnkey-prelude.drvPath)
+              "pinned buck2 release: the default shell's prelude is not packages.turnkey-prelude";
+            pkgs.runCommand "pinned-buck2-release-check" { } "touch $out";
+
           # Configure turnkey to use our local toolchain files. tellerLib
           # and tellerRegistry default to self.lib.defaultTellerLib /
           # self.lib.defaultTellerRegistry system via the flake-parts
