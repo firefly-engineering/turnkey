@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T17:24:06Z",
+  "description": "From the 2026-09-25 architecture review. Eight deepening candidates, grilled then implemented one at a time as granular jj changes.",
+  "id": "turnkey-efx",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "Architecture deepening: pinned release, test caching, Nix modules",
+  "type": "epic",
+  "updated_at": "2026-09-25T17:24:06Z"
+}
