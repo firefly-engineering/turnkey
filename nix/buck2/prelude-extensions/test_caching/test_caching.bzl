@@ -25,7 +25,10 @@ upstream's arguments.
 When the repo enables test result caching (the generated .buckconfig sets
 `turnkey.test_cache = true`), the returned arguments:
 
-- declare the test cacheable (`supports_test_execution_caching`);
+- declare the test cacheable (`supports_test_execution_caching`), and label
+  it `turnkey-cacheable`, the only way turnkey's test runner can tell it
+  may record the test's passes: buck2 reports an action digest for every
+  test;
 - run it on an executor that reads recorded results from the local test
   result cache, unless `re_executors` says upstream built a remote executor
   (from a `remote_execution` profile or the toolchain's default profile),
@@ -45,6 +48,10 @@ docs/specs/test-result-caching.md.
 """
 
 load("@prelude//tests:re_utils.bzl", "RemoteTestExecutorConfig")
+
+# Marks a test whose passes turnkey's test runner may record
+# (src/go/pkg/testcache/testdata/runner-contract.json).
+_CACHEABLE_LABEL = "turnkey-cacheable"
 
 # Nix's convention for "no home directory".
 _HOMELESS = "/homeless-shelter"
@@ -81,6 +88,7 @@ def test_caching_kwargs(
     result = dict(kwargs)
     result["env"] = pinned_env | (kwargs.get("env") or {})
     result["supports_test_execution_caching"] = True
+    result["labels"] = (kwargs.get("labels") or []) + [_CACHEABLE_LABEL]
     result["run_from_project_root"] = True
     result["use_project_relative_paths"] = True
     if re_executors == None or not re_executors.remote:

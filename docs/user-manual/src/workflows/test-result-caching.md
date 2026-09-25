@@ -48,6 +48,12 @@ tk --rerun test //src/...
 runs every matched test, and records the fresh passes, which replace the old
 ones. Like `--no-sync`, the flag goes before the subcommand.
 
+### Which targets are cached
+
+Every target of a cache-safe rule is: turnkey's rules and the rust, go and
+python test rules. With caching on, they carry the label `turnkey-cacheable`,
+which `buck2 uquery` shows. It is added by the rules, never by hand.
+
 ### Opting a target out
 
 Label a target `no-test-cache` to always run it and never record it, for

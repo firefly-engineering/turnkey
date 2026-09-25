@@ -120,6 +120,13 @@ mod tests {
     }
 
     #[test]
+    fn reads_the_labels_the_test_caching_helper_sets() {
+        let labels = &runner_contract()["labels"];
+        assert_eq!(crate::runner::CACHEABLE_LABEL, labels["cacheable"]);
+        assert_eq!(crate::runner::NO_TEST_CACHE_LABEL, labels["no_test_cache"]);
+    }
+
+    #[test]
     fn writes_the_report_tk_reads() {
         let contract = runner_contract();
         let hits = contract["hits"].as_u64().unwrap() as usize;

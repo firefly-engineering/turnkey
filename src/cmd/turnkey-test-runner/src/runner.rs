@@ -32,6 +32,11 @@ use crate::cache::{ActionCache, Mode, Pass, Recorder};
 /// never recorded (docs/specs/test-result-caching.md).
 pub const NO_TEST_CACHE_LABEL: &str = "no-test-cache";
 
+/// Label the test-caching helper gives every target of a cache-safe rule.
+/// Only such targets are recorded: buck2 reports an action digest for every
+/// local run, cacheable or not, so the label is the only way to tell.
+pub const CACHEABLE_LABEL: &str = "turnkey-cacheable";
+
 /// Exit code reported to buck2 when any test did not pass.
 const FAILURE_EXIT_CODE: i32 = 32;
 
@@ -125,6 +130,7 @@ impl<O: Orchestrator, C: ActionCache> Runner<O, C> {
         let name = format!("{}//{}:{}", target.cell, target.package, target.target);
         let handle = target.handle.context("spec target without a handle")?;
         let mode = self.mode_for(&spec);
+        let cacheable = spec.labels.iter().any(|label| label == CACHEABLE_LABEL);
 
         let response = self
             .orchestrator
@@ -142,7 +148,7 @@ impl<O: Orchestrator, C: ActionCache> Runner<O, C> {
         if is_hit(&result) {
             self.hits.fetch_add(1, Ordering::Relaxed);
         }
-        if let (Some(recorder), true) = (&self.recorder, mode.records()) {
+        if let (Some(recorder), true) = (&self.recorder, mode.records() && cacheable) {
             record_if_pass(recorder, &name, &result).await;
         }
 
@@ -655,12 +661,18 @@ mod tests {
         }
     }
 
+    /// Targets of a cache-safe rule, which the test-caching helper labels.
     fn specs(names: &[&str]) -> Vec<ExternalRunnerSpec> {
         names
             .iter()
             .zip(1..)
-            .map(|(name, id)| spec(name, id))
+            .map(|(name, id)| cacheable(spec(name, id)))
             .collect()
+    }
+
+    fn cacheable(mut spec: ExternalRunnerSpec) -> ExternalRunnerSpec {
+        spec.labels.push(CACHEABLE_LABEL.to_owned());
+        spec
     }
 
     #[tokio::test]
@@ -772,11 +784,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn only_targets_of_cache_safe_rules_are_recorded() {
+        let buck2 = buck2_answering(vec![
+            ("cache-safe", local_run("cache-safe", 0)),
+            ("unpatched-rule", local_run("unpatched-rule", 0)),
+        ]);
+        let cache = FakeCache::default();
+        run_recording(
+            &buck2,
+            Some(&cache),
+            config(&["--turnkey-test-cache=on"]),
+            vec![cacheable(spec("cache-safe", 1)), spec("unpatched-rule", 2)],
+        )
+        .await;
+        assert_eq!(cache.digests(), ["cache-safe"]);
+    }
+
+    #[tokio::test]
     async fn a_target_labelled_no_test_cache_is_never_recorded() {
         let buck2 = buck2_answering(vec![("opted-out", local_run("opted-out", 0))]);
         let cache = FakeCache::default();
-        let mut opted_out = spec("opted-out", 1);
-        opted_out.labels = vec![NO_TEST_CACHE_LABEL.to_owned()];
+        let mut opted_out = cacheable(spec("opted-out", 1));
+        opted_out.labels.push(NO_TEST_CACHE_LABEL.to_owned());
         run_recording(
             &buck2,
             Some(&cache),

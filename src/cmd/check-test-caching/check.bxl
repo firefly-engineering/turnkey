@@ -48,10 +48,15 @@ def _impl(ctx):
             "supports_test_execution_caching": info.supports_test_execution_caching,
             "run_from_project_root": info.run_from_project_root,
             "use_project_relative_paths": info.use_project_relative_paths,
+            "cacheable_label": ctx.cli_args.cacheable_label in (info.labels or []),
         }
     ctx.output.print_json(report)
 
 main = bxl_main(
     impl = _impl,
-    cli_args = {"targets": cli_args.list(cli_args.configured_target_label())},
+    cli_args = {
+        "targets": cli_args.list(cli_args.configured_target_label()),
+        # The label turnkey's test runner records by
+        "cacheable_label": cli_args.string(),
+    },
 )

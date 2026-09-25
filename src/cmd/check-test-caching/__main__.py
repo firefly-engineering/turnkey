@@ -5,10 +5,12 @@ Analyses sample test targets of every cache-safe rule with test result
 caching on and off, through check.bxl, and compares what buck2 sees on each
 target's ExternalRunnerTestInfo with the expected table:
 
-- caching on: the test is declared cacheable, runs from the project root
-  with project-relative paths, and gets the cache-reading executor, unless
-  it has a remote_execution profile, whose executor it keeps;
-- caching off: the executor is the rule's own, as upstream builds it.
+- caching on: the test is declared cacheable, labelled for the runner to
+  record, runs from the project root with project-relative paths, and gets
+  the cache-reading executor, unless it has a remote_execution profile,
+  whose executor it keeps;
+- caching off: the executor is the rule's own, as upstream builds it, and
+  nothing marks the test cacheable.
 
 re-profile-test's profile is set on the target. A profile from the remote
 test execution toolchain's default takes the same path through upstream's
@@ -28,8 +30,13 @@ Exits 0 when every target matches, 1 otherwise.
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 BXL = "//src/cmd/check-test-caching/check.bxl:main"
+
+# The label the runner records by, as tk and the runner agree on it.
+CONTRACT = Path("src/go/pkg/testcache/testdata/runner-contract.json")
+CACHEABLE_LABEL = json.loads(CONTRACT.read_text())["labels"]["cacheable"]
 
 # Gives re-profile-test a remote_execution profile (see rules.star).
 RE_PROFILE = ["-c", "turnkey.check_test_caching_re_profile=true"]
@@ -50,6 +57,7 @@ CACHING_FIELDS = (
     "supports_test_execution_caching",
     "run_from_project_root",
     "use_project_relative_paths",
+    "cacheable_label",
 )
 
 
@@ -66,6 +74,8 @@ def report(caching: bool) -> dict[str, dict]:
             "--",
             "--targets",
             *EXPECTED_EXECUTORS,
+            "--cacheable_label",
+            CACHEABLE_LABEL,
         ],
         stdout=subprocess.PIPE,
         check=True,
@@ -89,6 +99,8 @@ def mismatches(caching: bool, actual: dict[str, dict]) -> list[str]:
                 found.append(f"{target}: {name} is {info[name]}, expected True")
         if not caching and info["supports_test_execution_caching"] is True:
             found.append(f"{target}: declared cacheable with caching off")
+        if not caching and info["cacheable_label"]:
+            found.append(f"{target}: labelled {CACHEABLE_LABEL} with caching off")
     return found
 
 

@@ -1,5 +1,5 @@
 {
-  "description": "What tk test passes turnkey-test-runner after `--`, and the report the runner writes back. tk's side (src/go/pkg/testcache) must produce exactly these args and read this report; the runner's side (src/cmd/turnkey-test-runner) must parse these args and write this report. Change both sides together.",
+  "description": "What tk test passes turnkey-test-runner after `--`, and the report the runner writes back. tk's side (src/go/pkg/testcache) must produce exactly these args and read this report; the runner's side (src/cmd/turnkey-test-runner) must parse these args and write this report. The labels are the runner's contract with the test-caching helper (nix/buck2/prelude-extensions/test_caching/test_caching.bzl), checked by src/cmd/check-test-caching. Change all sides together.",
   "address": "grpc://127.0.0.1:47301",
   "report": "/tmp/tk-test-report",
   "plans": [
@@ -45,5 +45,9 @@
     }
   ],
   "hits": 3,
-  "hits_report": "3\n"
+  "hits_report": "3\n",
+  "labels": {
+    "cacheable": "turnkey-cacheable",
+    "no_test_cache": "no-test-cache"
+  }
 }
