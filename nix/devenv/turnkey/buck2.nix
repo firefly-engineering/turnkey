@@ -214,8 +214,25 @@ ${generateTargets finalToolchains}
   # turnkey's prelude for the pinned buck2 release, or the consumer's own
   # (prelude.path), symlinked at .turnkey/prelude
   preludeCellPath = ".turnkey/prelude";
-  customPrelude = cfg.prelude.path != null;
+  # Reading the removed prelude options makes setting one an error.
+  customPrelude =
+    assert lib.all (value: value == null) [
+      cfg.prelude.strategy
+      cfg.prelude.gitOrigin
+      cfg.prelude.commitHash
+    ];
+    cfg.prelude.path != null;
   prelude = if customPrelude then cfg.prelude.path else cfg.prelude.package;
+
+  # A language's deps file by name, as the sync rules and hooks use it:
+  # depsFile is a path from the flake-parts module, or a file name.
+  depsFileName =
+    lang: default:
+    let
+      file = cfg.${lang}.depsFile;
+    in
+    if file != null then baseNameOf (toString file) else default;
+  goDepsFile = depsFileName "go" "go-deps.toml";
 
   # Toolchains cell is accessed via a symlink at .turnkey/toolchains
   toolchainsCellPath = ".turnkey/toolchains";
@@ -416,10 +433,10 @@ ${generateTargets finalToolchains}
   # Build the list of sync rules based on what's enabled
   syncRules = lib.filter (r: r != null) [
     # Go deps rule
-    (if cfg.go.enable && (cfg.go.cell != null || cfg.go.depsFile != null) then {
+    (if cfg.go.enable && (cfg.go.cell != null || goDepsFile != null) then {
       name = "go";
       sources = [ cfg.go.modFile cfg.go.sumFile ];
-      target = cfg.go.depsFile;
+      target = goDepsFile;
       generator = [ "godeps-gen" "--go-mod" cfg.go.modFile "--go-sum" cfg.go.sumFile "--prefetch" ];
     } else null)
 
@@ -427,7 +444,7 @@ ${generateTargets finalToolchains}
     (if cfg.rust.enable && (cfg.rust.cell != null || cfg.rust.depsFile != null) then {
       name = "rust";
       sources = [ cfg.rust.cargoTomlFile cfg.rust.cargoLockFile ];
-      target = if cfg.rust.depsFile != null then cfg.rust.depsFile else "rust-deps.toml";
+      target = depsFileName "rust" "rust-deps.toml";
       generator = [ "rustdeps-gen" "--cargo-lock" cfg.rust.cargoLockFile ];
     } else null)
 
@@ -437,7 +454,7 @@ ${generateTargets finalToolchains}
       sources = if cfg.python.lockFile != null
         then [ cfg.python.lockFile ]
         else [ cfg.python.pyprojectFile ];
-      target = if cfg.python.depsFile != null then cfg.python.depsFile else "python-deps.toml";
+      target = depsFileName "python" "python-deps.toml";
       generator = if cfg.python.lockFile != null
         then [ "pydeps-gen" "--lock" cfg.python.lockFile ]
         else [ "pydeps-gen" "--pyproject" cfg.python.pyprojectFile ];
@@ -447,7 +464,7 @@ ${generateTargets finalToolchains}
     (if cfg.javascript.enable && (cfg.javascript.cell != null || cfg.javascript.depsFile != null) then {
       name = "javascript";
       sources = [ cfg.javascript.lockFile ];
-      target = if cfg.javascript.depsFile != null then cfg.javascript.depsFile else "js-deps.toml";
+      target = depsFileName "javascript" "js-deps.toml";
       generator = [ "jsdeps-gen" "--lock" cfg.javascript.lockFile ]
         ++ lib.optionals cfg.javascript.includeDevDependencies [ "--include-dev" ];
     } else null)
@@ -456,7 +473,7 @@ ${generateTargets finalToolchains}
     (if cfg.solidity.enable && (cfg.solidity.cell != null || cfg.solidity.depsFile != null) then {
       name = "solidity";
       sources = [ cfg.solidity.foundryTomlFile ];
-      target = if cfg.solidity.depsFile != null then cfg.solidity.depsFile else "solidity-deps.toml";
+      target = depsFileName "solidity" "solidity-deps.toml";
       generator = [ "soldeps-gen" "--foundry" cfg.solidity.foundryTomlFile ];
     } else null)
   ];
@@ -501,606 +518,33 @@ ${generateTargets finalToolchains}
 
 in
 {
-  imports =
-    let
-      removed =
-        name:
-        lib.mkRemovedOptionModule [ "turnkey" "buck2" "prelude" name ] ''
-          turnkey always uses its own prelude, part of the pinned buck2 release
-          (docs/adr/0002-turnkey-owns-the-buck2-version.md). Remove this
-          setting; set turnkey.buck2.prelude.path only to use a prelude of
-          your own, which turns test result caching off.
-        '';
-    in
-    map removed [
-      "strategy"
-      "gitOrigin"
-      "commitHash"
-    ];
+  options.turnkey.buck2 = lib.mkOption {
+    type = lib.types.submoduleWith {
+      modules = [
+        (import ../../buck2/options.nix {
+          inherit lib;
+          inherit (buck2Source) version;
+        })
+        {
+          # What the flake-parts module injects
+          options = {
+            package = lib.mkOption {
+              type = lib.types.package;
+              internal = true;
+              description = "The pinned buck2 binary, resolved from turnkey's own registry.";
+            };
 
-  options.turnkey.buck2 = {
-    version = lib.mkOption {
-      type = lib.types.str;
-      default = buck2Source.version;
-      readOnly = true;
-      description = ''
-        The pinned buck2 release this shell gets (a release date). Read-only:
-        each turnkey revision ships exactly one buck2 release, and a consumer
-        moves to another by moving to another turnkey revision
-        (docs/adr/0002-turnkey-owns-the-buck2-version.md).
-      '';
+            prelude.package = lib.mkOption {
+              type = lib.types.package;
+              internal = true;
+              description = "turnkey's prelude for the pinned buck2 release.";
+            };
+          };
+        }
+      ];
     };
-
-    package = lib.mkOption {
-      type = lib.types.package;
-      internal = true;
-      description = "The pinned buck2 binary, resolved from turnkey's own registry (injected by the flake-parts module).";
-    };
-
-    testCache = {
-      enable = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = ''
-          Run tests through turnkey's test runner, which can reuse recorded
-          results for unchanged tests (docs/specs/test-result-caching.md).
-          When false, tests run under buck2's bundled runner.
-        '';
-      };
-
-      endpoint = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        example = "grpc://cache.example.com:443";
-        description = ''
-          A remote Remote Execution API cache to reuse test results from,
-          as grpc://host:port. When null (the default), tk manages a local
-          cache on this machine. With a remote endpoint, tk starts no local
-          cache and only reuses results from it, never recording: who may
-          write to a shared cache is not decided yet.
-        '';
-      };
-
-      tls = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = "Whether to connect to a remote `endpoint` over TLS. The local cache never uses TLS.";
-      };
-    };
-
-    enable = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = ''
-        Enable Buck2 toolchain generation from toolchain.toml.
-
-        When enabled, this module:
-        1. Generates a toolchains cell with Buck2 toolchain rules
-        2. Creates a .buckconfig symlink pointing to Nix-managed configuration
-        3. Adds environment variables for debugging/inspection
-      '';
-    };
-
-    prelude = {
-      package = lib.mkOption {
-        type = lib.types.package;
-        internal = true;
-        description = "turnkey's prelude for the pinned buck2 release (injected by the flake-parts module).";
-      };
-
-      path = lib.mkOption {
-        type = lib.types.nullOr (lib.types.either lib.types.package lib.types.path);
-        default = null;
-        description = ''
-          A prelude to use instead of turnkey's, as a derivation or a path.
-          Off the supported path: turnkey's prelude is part of the pinned
-          buck2 release (docs/adr/0002-turnkey-owns-the-buck2-version.md),
-          and test result caching is turned off, since turnkey can't know
-          which of this prelude's test rules are cache-safe.
-        '';
-      };
-    };
-
-    # ==========================================================================
-    # Go language support
-    # ==========================================================================
-    go = {
-      enable = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = "Enable Go dependency management for Buck2";
-      };
-
-      cell = lib.mkOption {
-        type = lib.types.nullOr lib.types.package;
-        default = null;
-        description = ''
-          Nix derivation containing the Go dependencies cell.
-          When set, a 'godeps' cell will be added to .buckconfig
-          and symlinked to .turnkey/godeps.
-        '';
-      };
-
-      depsFile = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = "go-deps.toml";
-        description = ''
-          Relative path to go-deps.toml file (for staleness checking).
-          Used to warn when go-deps.toml needs regeneration.
-        '';
-      };
-
-      modFile = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = "go.mod";
-        description = ''
-          Relative path to go.mod file (for staleness checking).
-          Used to warn when go-deps.toml needs regeneration.
-        '';
-      };
-
-      sumFile = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = "go.sum";
-        description = ''
-          Relative path to go.sum file (for staleness checking).
-          Used to warn when go-deps.toml needs regeneration.
-        '';
-      };
-
-      autoRegenerate = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = ''
-          Enable automatic go-deps.toml regeneration via pre-commit hook.
-          When enabled, go-deps.toml will be regenerated when go.mod or go.sum
-          are staged for commit.
-
-          Note: godeps-gen is automatically included when go.enable is true.
-          Requires nix-prefetch-github for hash fetching.
-        '';
-      };
-
-      generateOnShellEntry = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = ''
-          Automatically generate/regenerate go-deps.toml when entering the shell
-          if it's missing or stale (older than go.mod or go.sum).
-
-          This enables a workflow where go-deps.toml is generated on-demand:
-          1. First shell entry: go-deps.toml is generated (godeps cell skipped)
-          2. Subsequent entries: Nix uses the generated file
-
-          godeps-gen is automatically included when go.enable is true.
-        '';
-      };
-    };
-
-    # ==========================================================================
-    # Rust language support
-    # ==========================================================================
-    rust = {
-      enable = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = "Enable Rust dependency management for Buck2";
-      };
-
-      cell = lib.mkOption {
-        type = lib.types.nullOr lib.types.package;
-        default = null;
-        description = ''
-          Nix derivation containing the Rust dependencies cell.
-          When set, a 'rustdeps' cell will be added to .buckconfig
-          and symlinked to .turnkey/rustdeps.
-        '';
-      };
-
-      depsFile = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        description = ''
-          Relative path to rust-deps.toml file (for staleness checking).
-          Used by tk sync for Rust dependency management.
-        '';
-      };
-
-      cargoTomlFile = lib.mkOption {
-        type = lib.types.str;
-        default = "Cargo.toml";
-        description = ''
-          Relative path to Cargo.toml file (for staleness checking).
-        '';
-      };
-
-      cargoLockFile = lib.mkOption {
-        type = lib.types.str;
-        default = "Cargo.lock";
-        description = ''
-          Relative path to Cargo.lock file (for staleness checking).
-        '';
-      };
-    };
-
-    # ==========================================================================
-    # Python language support
-    # ==========================================================================
-    python = {
-      enable = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = "Enable Python dependency management for Buck2";
-      };
-
-      cell = lib.mkOption {
-        type = lib.types.nullOr lib.types.package;
-        default = null;
-        description = ''
-          Nix derivation containing the Python dependencies cell.
-          When set, a 'pydeps' cell will be added to .buckconfig
-          and symlinked to .turnkey/pydeps.
-        '';
-      };
-
-      depsFile = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        description = ''
-          Relative path to python-deps.toml file (for staleness checking).
-          Used by tk sync for Python dependency management.
-        '';
-      };
-
-      pyprojectFile = lib.mkOption {
-        type = lib.types.str;
-        default = "pyproject.toml";
-        description = ''
-          Relative path to pyproject.toml file (for staleness checking).
-        '';
-      };
-
-      lockFile = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        description = ''
-          Relative path to Python lock file (for staleness checking).
-        '';
-      };
-    };
-
-    # ==========================================================================
-    # JavaScript language support
-    # ==========================================================================
-    javascript = {
-      enable = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = "Enable JavaScript/TypeScript dependency management for Buck2";
-      };
-
-      cell = lib.mkOption {
-        type = lib.types.nullOr lib.types.package;
-        default = null;
-        description = ''
-          Nix derivation containing the JavaScript dependencies cell.
-          When set, a 'jsdeps' cell will be added to .buckconfig
-          and symlinked to .turnkey/jsdeps.
-        '';
-      };
-
-      depsFile = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        description = ''
-          Relative path to js-deps.toml file (for staleness checking).
-          Used by tk sync for JavaScript dependency management.
-        '';
-      };
-
-      lockFile = lib.mkOption {
-        type = lib.types.str;
-        default = "pnpm-lock.yaml";
-        description = ''
-          Relative path to pnpm-lock.yaml file (for staleness checking).
-        '';
-      };
-
-      includeDevDependencies = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = ''
-          Include dev dependencies when generating js-deps.toml.
-          Passed as --include-dev to jsdeps-gen.
-        '';
-      };
-    };
-
-    # ==========================================================================
-    # Solidity language support
-    # ==========================================================================
-    solidity = {
-      enable = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = "Enable Solidity dependency management for Buck2";
-      };
-
-      cell = lib.mkOption {
-        type = lib.types.nullOr lib.types.package;
-        default = null;
-        description = ''
-          Nix derivation containing the Solidity dependencies cell.
-          When set, a 'soldeps' cell will be added to .buckconfig
-          and symlinked to .turnkey/soldeps.
-        '';
-      };
-
-      depsFile = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        description = ''
-          Relative path to solidity-deps.toml file (for staleness checking).
-          Used by tk sync for Solidity dependency management.
-        '';
-      };
-
-      foundryTomlFile = lib.mkOption {
-        type = lib.types.str;
-        default = "foundry.toml";
-        description = ''
-          Relative path to foundry.toml file (for staleness checking).
-        '';
-      };
-    };
-
-    # ==========================================================================
-    # Rules.star auto-sync configuration
-    # ==========================================================================
-    rules = {
-      enabled = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = ''
-          Enable automatic rules.star synchronization before Buck2 commands.
-
-          When enabled, tk will check rules.star files for staleness and
-          update them automatically (if auto_sync is true) or warn (if false).
-
-          Use --no-rules-sync to skip this check, or --strict-rules for CI.
-        '';
-      };
-
-      autoSync = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = ''
-          Automatically update stale rules.star files.
-
-          When true (default), stale rules.star files are updated before build.
-          When false, tk only warns about stale files.
-        '';
-      };
-
-      strict = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = ''
-          Fail if rules.star files would change (CI mode).
-
-          When true, tk will exit with error if any rules.star file needs updating.
-          This is useful for CI to ensure rules.star files are committed up-to-date.
-
-          Can also be enabled per-invocation with --strict-rules flag.
-        '';
-      };
-
-      go = {
-        internalPrefix = lib.mkOption {
-          type = lib.types.str;
-          default = "//src/go";
-          description = ''
-            Buck2 target prefix for internal Go packages.
-
-            Example: "//src/go" means imports from github.com/org/repo/src/go/pkg/foo
-            will be mapped to //src/go/pkg/foo:foo
-          '';
-        };
-
-        externalCell = lib.mkOption {
-          type = lib.types.str;
-          default = "godeps";
-          description = ''
-            Buck2 cell for external Go dependencies.
-
-            Example: "godeps" means external imports will be mapped to
-            godeps//vendor/github.com/foo/bar:bar
-          '';
-        };
-      };
-    };
-
-    mdbook = {
-      preprocessors = lib.mkOption {
-        type = lib.types.listOf lib.types.package;
-        default = [ ];
-        description = ''
-          List of mdbook preprocessor packages to make available during builds.
-          Their bin/ directories are added to PATH when mdbook runs.
-        '';
-      };
-    };
-
-    tk = {
-      aliasBuck2 = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = ''
-          Alias buck2 to tk in the devenv shell.
-          This allows users to continue using `buck2 build` etc. while
-          getting automatic sync before build-graph-reading commands.
-
-          Set TURNKEY_NO_ALIAS=1 in your environment to bypass the alias
-          and use raw buck2 directly (useful for debugging).
-        '';
-      };
-
-      syncOnShellEntry = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = ''
-          Run `tk sync` automatically when entering the devenv shell.
-          This ensures the workspace is always in sync when starting development.
-
-          The sync is fast when nothing is stale (just timestamp checks).
-          Output is only shown if something needs to be regenerated.
-
-          Requires tk to be available in PATH (add 'tk' to your toolchain.toml).
-        '';
-      };
-
-      preCommitCheck = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = ''
-          Add a pre-commit hook that runs `tk check` before commits.
-          Prevents committing when rules.star files or deps are out of sync.
-
-          On failure, suggests running `tk sync` to fix.
-
-          Requires tk to be available in PATH (add 'tk' to your toolchain.toml).
-        '';
-      };
-
-      rustEditionCheck = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = ''
-          Add a pre-commit hook that verifies Rust edition alignment.
-          Checks that:
-          1. All workspace members use edition.workspace = true
-          2. rules.star files have edition matching workspace.package.edition
-
-          Uses tree-sitter for proper Starlark AST parsing.
-        '';
-      };
-
-      monorepoDepCheck = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = ''
-          Add a pre-commit hook that verifies monorepo dependency rules.
-          Checks that all languages follow the pattern of declaring deps
-          at the root level:
-          - Go: single go.mod at root
-          - Rust: workspace.dependencies with workspace = true refs
-          - Python: deps in root pyproject.toml
-          - JavaScript: workspace: protocol for nested packages
-
-          Note: This hook requires the check-monorepo-deps script from turnkey.
-          Only enable this if you have copied the script to src/cmd/check-monorepo-deps/.
-
-          Requires Python 3.11+ with tomllib support.
-        '';
-      };
-
-      jsTestConfigCheck = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = ''
-          Add a pre-commit hook that verifies Jest/Vitest/Biome configs properly
-          exclude buck-out directories.
-
-          Checks that:
-          - Jest: testPathIgnorePatterns includes '/buck-out/' or '/\\.'
-          - Vitest: exclude includes '**/buck-out/**' or '**/.*/**'
-          - Biome: files.includes contains '!**/buck-out/'
-
-          This prevents spurious failures from buck-out artifacts being
-          picked up by test discovery, linting, or formatting.
-
-          Note: This hook requires the check-js-test-config script from turnkey.
-          Only enable this if you have copied the script to src/cmd/check-js-test-config/.
-
-          Requires Python 3.11+.
-        '';
-      };
-
-      foundryConfigCheck = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = ''
-          Add a pre-commit hook that verifies Foundry configuration consistency.
-
-          Checks that:
-          - solc_version matches the toolchain-provided solc version
-          - Dependencies in per-project foundry.toml match root foundry.toml
-
-          This ensures native `forge` commands work correctly with the toolchain
-          and keeps dependency declarations synchronized.
-
-          Note: This hook requires the check-foundry-config script from turnkey.
-          Only enable this if you have copied the script to src/cmd/check-foundry-config/.
-
-          Requires Python 3.11+ with tomllib support.
-        '';
-      };
-
-      sourceCoverageCheck = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = ''
-          Add a pre-commit hook that validates all source files are covered by
-          Buck2 targets in rules.star files.
-
-          This prevents accidentally adding source files that won't be built.
-          The hook parses rules.star files to extract source patterns (glob and
-          explicit file lists) and compares them against actual source files.
-
-          Configure the scope with tk.sourceScope (default: ".").
-
-          Uses tree-sitter for proper Starlark AST parsing.
-        '';
-      };
-
-      sourceScope = lib.mkOption {
-        type = lib.types.str;
-        default = ".";
-        description = ''
-          Directory scope for source coverage checking.
-          Only source files under this directory are validated.
-          Default is "." (entire repository).
-        '';
-      };
-    };
-
-    quiet = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = ''
-        Suppress verbose shell entry messages.
-
-        When true (default), shell entry shows minimal output.
-        When false, shows detailed toolchain and cell information.
-
-        Set TURNKEY_VERBOSE=1 in your environment to see verbose
-        output even when quiet mode is enabled.
-      '';
-    };
-
-    welcomeMessage = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      example = "Welcome to MyProject turnkey shell";
-      description = ''
-        Custom welcome message to display when entering the shell.
-
-        If null (default), no welcome message is shown.
-        Set to a string to display a custom message on shell entry.
-
-        The message can include shell variables like $PWD.
-      '';
-    };
+    default = { };
+    description = "turnkey's Buck2 integration (options declared in nix/buck2/options.nix).";
   };
 
   config = lib.mkIf (cfg.enable && turnkeyCfg.enable) {
@@ -1203,7 +647,7 @@ in
       ${nixCellsSymlinkScript}
 
       # Auto-generate or check staleness of go-deps.toml
-      _go_deps_file="${cfg.go.depsFile}"
+      _go_deps_file="${goDepsFile}"
       _go_mod_file="${cfg.go.modFile}"
       _go_sum_file="${cfg.go.sumFile}"
       _should_generate=0
@@ -1326,9 +770,9 @@ in
         entry = ''
           sh -c '
             if command -v godeps-gen >/dev/null 2>&1; then
-              echo "Regenerating ${cfg.go.depsFile}..."
-              godeps-gen --go-mod "${cfg.go.modFile}" --go-sum "${cfg.go.sumFile}" --prefetch > "${cfg.go.depsFile}"
-              git add "${cfg.go.depsFile}"
+              echo "Regenerating ${goDepsFile}..."
+              godeps-gen --go-mod "${cfg.go.modFile}" --go-sum "${cfg.go.sumFile}" --prefetch > "${goDepsFile}"
+              git add "${goDepsFile}"
             else
               echo "Warning: godeps-gen not found in PATH, skipping regeneration"
             fi

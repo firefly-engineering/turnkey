@@ -1,0 +1,646 @@
+# turnkey's Buck2 integration options, declared once.
+#
+# Both the flake-parts module (turnkey.toolchains.buck2) and the devenv
+# module (turnkey.buck2) use this as their option type. The flake-parts
+# module adds what is flake-level (which shells get Buck2) and builds the
+# dependency cells; the devenv module adds the inputs the flake-parts module
+# injects (the pinned buck2, turnkey's prelude, the built cells).
+{ lib, version }:
+
+let
+  inherit (lib) mkOption types;
+
+  # Removed prelude options, kept hidden so that setting one is an error
+  # that says what to do. The modules read them to trigger it.
+  removed =
+    name:
+    mkOption {
+      type = types.nullOr types.unspecified;
+      default = null;
+      visible = false;
+      apply =
+        value:
+        if value == null then
+          null
+        else
+          throw "turnkey: buck2.prelude.${name} is removed: turnkey always uses its own prelude, part of the pinned buck2 release (docs/adr/0002-turnkey-owns-the-buck2-version.md). Remove it; set buck2.prelude.path only to use a prelude of your own, which turns test result caching off.";
+    };
+in
+{
+  options = {
+    version = mkOption {
+      type = types.str;
+      default = version;
+      readOnly = true;
+      description = ''
+        The pinned buck2 release (a release date). Read-only: each turnkey
+        revision ships exactly one buck2 release, and a consumer moves to
+        another by moving to another turnkey revision
+        (docs/adr/0002-turnkey-owns-the-buck2-version.md).
+      '';
+    };
+
+    prelude.strategy = removed "strategy";
+    prelude.gitOrigin = removed "gitOrigin";
+    prelude.commitHash = removed "commitHash";
+
+    enable = mkOption {
+      type = types.bool;
+      default = false;
+      description = ''
+        Enable the Buck2 integration: the pinned buck2, the prelude,
+        toolchain generation from toolchain.toml and the dependency cells.
+        Through the flake-parts module, only the shells listed in
+        `buck2.shells` get it.
+      '';
+    };
+
+    prelude.path = mkOption {
+      type = types.nullOr (types.either types.package types.path);
+      default = null;
+      description = ''
+        A prelude to use instead of turnkey's, as a derivation or a path.
+        Off the supported path: turnkey's prelude is part of the pinned
+        buck2 release (docs/adr/0002-turnkey-owns-the-buck2-version.md),
+        and test result caching is turned off, since turnkey can't know
+        which of this prelude's test rules are cache-safe.
+      '';
+    };
+
+    testCache = {
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = ''
+          Run tests through turnkey's test runner, which can reuse
+          recorded results for unchanged tests
+          (docs/specs/test-result-caching.md). When false, or with a
+          custom prelude.path, tests run under buck2's bundled runner.
+        '';
+      };
+
+      endpoint = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        example = "grpc://cache.example.com:443";
+        description = ''
+          A remote Remote Execution API cache to reuse test results
+          from, as grpc://host:port. When null (the default), tk manages
+          a local cache on this machine. With a remote endpoint, tk
+          starts no local cache and only reuses results from it, never
+          recording: who may write to a shared cache is not decided yet.
+        '';
+      };
+
+      tls = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Whether to connect to a remote `endpoint` over TLS. The local cache never uses TLS.";
+      };
+    };
+
+    welcomeMessage = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      example = "Welcome to MyProject turnkey shell";
+      description = ''
+        Custom welcome message to display when entering the shell.
+        If null (default), no welcome message is shown.
+      '';
+    };
+
+    quiet = mkOption {
+      type = types.bool;
+      default = true;
+      description = ''
+        Suppress verbose shell entry messages.
+        Set TURNKEY_VERBOSE=1 in your environment to see verbose output.
+      '';
+    };
+
+    # ==========================================================================
+    # Go language support
+    # ==========================================================================
+    go = {
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Enable Go dependency management for Buck2";
+      };
+
+      cell = mkOption {
+        type = types.nullOr types.package;
+        default = null;
+        description = ''
+          Nix derivation containing the Go dependencies cell.
+          When set, a 'godeps' cell will be added to .buckconfig
+          and symlinked to .turnkey/godeps.
+
+          Prefer using depsFile instead for declarative configuration.
+        '';
+      };
+
+      depsFile = mkOption {
+        type = types.nullOr (types.either types.path types.str);
+        default = null;
+        example = lib.literalExpression "./.turnkey/go-deps.toml";
+        description = ''
+          Path to go-deps.toml file declaring Go dependencies.
+          When set, turnkey will build the godeps cell automatically.
+
+          Recommended: use ./.turnkey/go-deps.toml with the turnkey .envrc
+          pattern, which auto-generates the file to the Nix store before
+          flake evaluation. The .turnkey/ directory should be gitignored.
+        '';
+      };
+
+      modFile = mkOption {
+        type = types.str;
+        default = "go.mod";
+        description = ''
+          Relative path to go.mod file (for staleness checking and regeneration).
+        '';
+      };
+
+      sumFile = mkOption {
+        type = types.str;
+        default = "go.sum";
+        description = ''
+          Relative path to go.sum file (for staleness checking and regeneration).
+        '';
+      };
+
+      autoRegenerate = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Enable automatic go-deps.toml regeneration via pre-commit hook.
+          When enabled, go-deps.toml will be regenerated when go.mod or go.sum
+          are staged for commit.
+
+          godeps-gen is automatically included when go.enable is true.
+        '';
+      };
+
+      generateOnShellEntry = mkOption {
+        type = types.bool;
+        default = true;
+        description = ''
+          Automatically generate/regenerate go-deps.toml when entering the shell
+          if it's missing or stale (older than go.mod or go.sum).
+
+          This enables a workflow where go-deps.toml doesn't need to be committed:
+          1. First shell entry: go-deps.toml is generated (godeps cell skipped)
+          2. Subsequent entries: Nix uses the generated file
+
+          godeps-gen is automatically included when go.enable is true.
+        '';
+      };
+    };
+
+    # ==========================================================================
+    # Rust language support
+    # ==========================================================================
+    rust = {
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Enable Rust dependency management for Buck2";
+      };
+
+      cell = mkOption {
+        type = types.nullOr types.package;
+        default = null;
+        description = ''
+          Nix derivation containing the Rust dependencies cell.
+          When set, a 'rustdeps' cell will be added to .buckconfig
+          and symlinked to .turnkey/rustdeps.
+
+          Prefer using depsFile instead for declarative configuration.
+        '';
+      };
+
+      depsFile = mkOption {
+        type = types.nullOr (types.either types.path types.str);
+        default = null;
+        example = lib.literalExpression "./rust-deps.toml";
+        description = ''
+          Path to rust-deps.toml file declaring Rust crate dependencies.
+          When set, turnkey will build the rustdeps cell automatically
+          using the gen-rust-buck.py approach.
+        '';
+      };
+
+      cargoTomlFile = mkOption {
+        type = types.str;
+        default = "Cargo.toml";
+        description = ''
+          Relative path to Cargo.toml file (for staleness checking and regeneration).
+        '';
+      };
+
+      cargoLockFile = mkOption {
+        type = types.str;
+        default = "Cargo.lock";
+        description = ''
+          Relative path to Cargo.lock file (for staleness checking and regeneration).
+        '';
+      };
+
+      featuresFile = mkOption {
+        type = types.nullOr types.path;
+        default = null;
+        example = lib.literalExpression "./rust-features.toml";
+        description = ''
+          Path to rust-features.toml file for manual feature overrides.
+          This file is NOT generated - it's for resolving feature conflicts
+          or forcing specific feature sets on crates.
+
+          Format:
+            [overrides]
+            # Complete replacement
+            syn = ["derive", "parsing", "visit"]
+
+            # Additive/subtractive
+            serde = { add = ["alloc"] }
+            some-crate = { remove = ["incompatible-feature"] }
+        '';
+      };
+
+      rustcFlagsRegistry = mkOption {
+        type = types.attrsOf (types.listOf types.str);
+        default = { };
+        example = lib.literalExpression ''
+          {
+            serde_json = ["--cfg" "fast_arithmetic=\"64\""];
+            rustix = ["--cfg" "libc" "--cfg" "linux_like" "--cfg" "linux_kernel"];
+            # Version-specific (takes precedence over crate name)
+            "rustix@0.39.0" = ["--cfg" "libc" "--cfg" "linux_like"];
+          }
+        '';
+        description = ''
+          Registry of rustc flags for crates whose build scripts generate cfg directives.
+          Keys can be crate names (catch-all) or "crate@version" for version-specific flags.
+          Version-specific entries take precedence over catch-all entries.
+
+          Default includes serde_json and rustix fixups.
+        '';
+      };
+
+      buildScriptFixups = mkOption {
+        type = types.attrsOf (types.either types.str (types.functionTo types.str));
+        default = { };
+        example = lib.literalExpression ''
+          {
+            # Simple shell string
+            my_crate = '''
+              mkdir -p "$FIXUP_OUT_DIR"
+              echo "// generated" > "$FIXUP_OUT_DIR/config.rs"
+            ''';
+
+            # Version-specific (takes precedence)
+            "my_crate@1.2.3" = '''
+              mkdir -p "$FIXUP_OUT_DIR"
+              echo "// special for 1.2.3" > "$FIXUP_OUT_DIR/config.rs"
+            ''';
+
+            # Function receiving context
+            another_crate = { crateName, version, patchVersion, key }: '''
+              mkdir -p "$FIXUP_OUT_DIR"
+              echo "pub const VERSION: &str = \"''${version}\";" > "$FIXUP_OUT_DIR/version.rs"
+            ''';
+          }
+        '';
+        description = ''
+          Registry of build script fixups for crates that need pre-generated files.
+          Keys can be crate names (catch-all) or "crate@version" for version-specific fixups.
+
+          Fixups can be:
+          - A shell string with variables: $FIXUP_OUT_DIR, $FIXUP_SRC_DIR, $CRATE_NAME, $CRATE_VERSION, $PATCH_VERSION, $CRATE_KEY
+          - A function taking { crateName, version, patchVersion, key } and returning shell commands
+
+          Default includes serde_core, serde, and ring fixups.
+        '';
+      };
+    };
+
+    # ==========================================================================
+    # Python language support
+    # ==========================================================================
+    python = {
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Enable Python dependency management for Buck2";
+      };
+
+      cell = mkOption {
+        type = types.nullOr types.package;
+        default = null;
+        description = ''
+          Nix derivation containing the Python dependencies cell.
+          When set, a 'pydeps' cell will be added to .buckconfig
+          and symlinked to .turnkey/pydeps.
+
+          Prefer using depsFile instead for declarative configuration.
+        '';
+      };
+
+      depsFile = mkOption {
+        type = types.nullOr (types.either types.path types.str);
+        default = null;
+        example = lib.literalExpression "./python-deps.toml";
+        description = ''
+          Path to python-deps.toml file declaring Python package dependencies.
+          When set, turnkey will build the pydeps cell automatically.
+        '';
+      };
+
+      pyprojectFile = mkOption {
+        type = types.str;
+        default = "pyproject.toml";
+        description = ''
+          Relative path to pyproject.toml file (for staleness checking and regeneration).
+        '';
+      };
+
+      lockFile = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        example = "pylock.toml";
+        description = ''
+          Relative path to Python lock file (pylock.toml or requirements.txt).
+          If set, this is used as the source for staleness checking.
+          If null, pyproject.toml is used as the source.
+        '';
+      };
+    };
+
+    # ==========================================================================
+    # JavaScript/TypeScript language support
+    # ==========================================================================
+    javascript = {
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Enable JavaScript/TypeScript dependency management for Buck2";
+      };
+
+      cell = mkOption {
+        type = types.nullOr types.package;
+        default = null;
+        description = ''
+          Nix derivation containing the JavaScript dependencies cell.
+          When set, a 'jsdeps' cell will be added to .buckconfig
+          and symlinked to .turnkey/jsdeps.
+
+          Prefer using depsFile instead for declarative configuration.
+        '';
+      };
+
+      depsFile = mkOption {
+        type = types.nullOr (types.either types.path types.str);
+        default = null;
+        example = lib.literalExpression "./js-deps.toml";
+        description = ''
+          Path to js-deps.toml file declaring JavaScript package dependencies.
+          When set, turnkey will build the jsdeps cell automatically.
+        '';
+      };
+
+      lockFile = mkOption {
+        type = types.str;
+        default = "pnpm-lock.yaml";
+        description = ''
+          Relative path to pnpm-lock.yaml file (for staleness checking and regeneration).
+        '';
+      };
+
+      includeDevDependencies = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Include dev dependencies when generating js-deps.toml.
+          Passed as --include-dev to jsdeps-gen.
+        '';
+      };
+    };
+
+    # ==========================================================================
+    # Solidity language support
+    # ==========================================================================
+    solidity = {
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Enable Solidity dependency management for Buck2";
+      };
+
+      cell = mkOption {
+        type = types.nullOr types.package;
+        default = null;
+        description = ''
+          Nix derivation containing the Solidity dependencies cell.
+          When set, a 'soldeps' cell will be added to .buckconfig
+          and symlinked to .turnkey/soldeps.
+
+          Prefer using depsFile instead for declarative configuration.
+        '';
+      };
+
+      depsFile = mkOption {
+        type = types.nullOr (types.either types.path types.str);
+        default = null;
+        example = lib.literalExpression "./solidity-deps.toml";
+        description = ''
+          Path to solidity-deps.toml file declaring Solidity dependencies.
+          When set, turnkey will build the soldeps cell automatically.
+        '';
+      };
+
+      foundryTomlFile = mkOption {
+        type = types.str;
+        default = "foundry.toml";
+        description = ''
+          Relative path to foundry.toml file (for staleness checking and regeneration).
+        '';
+      };
+    };
+
+    # ==========================================================================
+    # rules.star synchronization
+    # ==========================================================================
+    rules = {
+      enabled = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Enable automatic rules.star synchronization before Buck2 commands.
+
+          When enabled, tk will check rules.star files for staleness and
+          update them automatically (if auto_sync is true) or warn (if false).
+
+          Use --no-rules-sync to skip this check, or --strict-rules for CI.
+        '';
+      };
+
+      autoSync = mkOption {
+        type = types.bool;
+        default = true;
+        description = ''
+          Automatically update stale rules.star files.
+
+          When true (default), stale rules.star files are updated before build.
+          When false, tk only warns about stale files.
+        '';
+      };
+
+      strict = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Fail if rules.star files would change (CI mode).
+
+          When true, tk will exit with error if any rules.star file needs updating.
+          This is useful for CI to ensure rules.star files are committed up-to-date.
+
+          Can also be enabled per-invocation with --strict-rules flag.
+        '';
+      };
+
+      go = {
+        internalPrefix = mkOption {
+          type = types.str;
+          default = "//src/go";
+          description = ''
+            Buck2 target prefix for internal Go packages.
+
+            Example: "//src/go" means imports from github.com/org/repo/src/go/pkg/foo
+            will be mapped to //src/go/pkg/foo:foo
+          '';
+        };
+
+        externalCell = mkOption {
+          type = types.str;
+          default = "godeps";
+          description = ''
+            Buck2 cell for external Go dependencies.
+
+            Example: "godeps" means external imports will be mapped to
+            godeps//vendor/github.com/foo/bar:bar
+          '';
+        };
+      };
+    };
+
+    # ==========================================================================
+    # mdbook configuration
+    # ==========================================================================
+    mdbook = {
+      preprocessors = mkOption {
+        type = types.listOf types.package;
+        default = [ ];
+        example = lib.literalExpression "[ pkgs.mdbook-admonish pkgs.mdbook-mermaid ]";
+        description = ''
+          List of mdbook preprocessor packages to make available during
+          mdbook builds. Their bin/ directories are added to PATH.
+        '';
+      };
+    };
+
+    # ==========================================================================
+    # Pre-commit hook configuration (tk options)
+    # ==========================================================================
+    tk = {
+      aliasBuck2 = mkOption {
+        type = types.bool;
+        default = true;
+        description = ''
+          Alias buck2 to tk in the devenv shell.
+        '';
+      };
+
+      syncOnShellEntry = mkOption {
+        type = types.bool;
+        default = true;
+        description = ''
+          Run `tk sync` automatically when entering the devenv shell.
+        '';
+      };
+
+      preCommitCheck = mkOption {
+        type = types.bool;
+        default = true;
+        description = ''
+          Add a pre-commit hook that runs `tk check` before commits.
+        '';
+      };
+
+      rustEditionCheck = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Add a pre-commit hook that verifies Rust edition alignment.
+        '';
+      };
+
+      monorepoDepCheck = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Add a pre-commit hook that verifies monorepo dependency rules.
+        '';
+      };
+
+      jsTestConfigCheck = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Add a pre-commit hook that verifies Jest/Vitest/Biome configs
+          properly exclude buck-out directories.
+        '';
+      };
+
+      userPatchesDir = mkOption {
+        type = types.nullOr types.path;
+        default = null;
+        example = lib.literalExpression "./.turnkey/patches";
+        description = ''
+          Path to directory containing user patches from the FUSE edit layer.
+          Patches in subdirectories named after cells (e.g., patches/rustdeps/,
+          patches/godeps/) will be applied during cell builds.
+
+          Patch files use unified diff format with paths like a/vendor/... and b/vendor/...
+          Generated by `tk compose patch` from FUSE edit overlay.
+        '';
+      };
+
+      foundryConfigCheck = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Add a pre-commit hook that verifies Foundry configuration consistency.
+          Checks that solc_version matches toolchain and dependencies match root.
+        '';
+      };
+
+      sourceCoverageCheck = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Add a pre-commit hook that validates all source files are covered by
+          Buck2 targets in rules.star files.
+        '';
+      };
+
+      sourceScope = mkOption {
+        type = types.str;
+        default = ".";
+        description = ''
+          Directory scope for source coverage checking.
+          Default is "." (entire repository).
+        '';
+      };
+    };
+  };
+}
