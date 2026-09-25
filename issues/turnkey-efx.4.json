@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-efx.3"
+  ],
   "blocks": [],
   "created": "2026-09-25T17:24:07Z",
   "description": "Port for 'record this result' with an in-memory adapter; test recording through Runner::run_all.",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Recording behind a testable ActionCache seam",
   "type": "task",
-  "updated_at": "2026-09-25T17:24:07Z"
+  "updated_at": "2026-09-25T17:24:09Z"
 }
