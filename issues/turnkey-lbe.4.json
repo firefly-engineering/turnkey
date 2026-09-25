@@ -4,7 +4,8 @@
     "turnkey-lbe.6"
   ],
   "blocks": [
-    "turnkey-lbe.11"
+    "turnkey-lbe.11",
+    "turnkey-lbe.8"
   ],
   "created": "2026-09-25T19:18:07Z",
   "description": "Actions naming no store path get the same key on macOS and Linux. Put turnkey-os/turnkey-arch/turnkey-env in remote_execution_properties of the turnkey execution platform; they enter Command.platform and the key even for local-only actions. Salt coarseness is an open decision on the epic. See docs/research/remote-execution-and-caching.md (commit adc3619d) §5.",
