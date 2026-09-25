@@ -13,12 +13,14 @@ let
   # Teller lib for registry resolution (injected via flake-parts module)
   turnkeyLib = cfg.tellerLib;
 
-  # The deps rules tk sync runs, the same ones buck2.nix writes into
-  # .turnkey/sync.toml; a shell without Buck2 has none
-  languages = import ../../buck2/languages.nix { inherit pkgs lib; };
-  syncRules = lib.optionals buck2Cfg.enable (
-    builtins.concatMap (language: language.syncRules buck2Cfg.${language.name}) languages
-  );
+  # The deps rules tk sync runs, as buck2.nix writes them into
+  # .turnkey/sync.toml (nix/buck2/sync-config.nix); a shell without Buck2
+  # has none
+  syncRules = lib.optionals buck2Cfg.enable
+    (import ../../buck2/sync-config.nix { inherit lib; } {
+      languages = import ../../buck2/languages.nix { inherit pkgs lib; };
+      buck2 = buck2Cfg;
+    }).rules;
   ruleNames = map (rule: rule.name) syncRules;
 
   # turnkey's tk, from the registry (it is built in), or whatever tk is on PATH

@@ -290,6 +290,126 @@
               "toolchain declaration: ${lib.concatMapStringsSep ", " toString strayBuck2} use a buck2 other than the pinned one";
             pkgs.runCommand "toolchain-declaration-check" { } "touch $out";
 
+          # The files turnkey generates for Buck2, through the pure functions
+          # that render them, with a stand-in registry: the toolchains cell
+          # (nix/buck2/toolchains-cell.nix), the .buckconfig
+          # (nix/buck2/buckconfig.nix) and .turnkey/sync.toml
+          # (nix/buck2/sync-config.nix). Checked at evaluation.
+          checks.buck2-generators =
+            let
+              # Every registry name, each a store-path-like stand-in
+              registry = lib.mapAttrs (name: _: { outPath = "/nix/store/stand-in-${name}"; }) (
+                self.lib.defaultTellerRegistry system
+              );
+              preprocessor = { outPath = "/nix/store/stand-in-mdbook-admonish"; };
+              toolchainsCell =
+                args:
+                import ./nix/buck2/toolchains-cell.nix { inherit lib; } (
+                  {
+                    mappings = import ./nix/buck2/mappings.nix { inherit lib; };
+                    resolvedRegistry = registry;
+                  }
+                  // args
+                );
+              goCell = toolchainsCell { declaredToolchains.go = { }; };
+              mdbookCell = toolchainsCell {
+                mappings = import ./nix/buck2/mappings.nix {
+                  inherit lib;
+                  mdbookPreprocessors = [ preprocessor ];
+                };
+                declaredToolchains.mdbook = { };
+              };
+              plainMdbookCell = toolchainsCell {
+                resolvedRegistry = builtins.removeAttrs registry [ "mdbook-toolchain" ];
+                declaredToolchains.mdbook = { };
+              };
+
+              buckconfig =
+                testCache:
+                import ./nix/buck2/buckconfig.nix { inherit lib; } {
+                  cells = [
+                    {
+                      name = "godeps";
+                      path = ".turnkey/godeps";
+                    }
+                    {
+                      name = "prelude";
+                      path = ".turnkey/prelude";
+                    }
+                  ];
+                  toolchainsCellPath = ".turnkey/toolchains";
+                  testRunnerProtocol = "/nix/store/stand-in-protocol";
+                  inherit testCache;
+                };
+              uncached = buckconfig null;
+              cached = buckconfig {
+                runner = "/nix/store/stand-in-runner";
+                path = "/nix/store/stand-in-bash/bin";
+                address = "grpc://127.0.0.1:47301";
+                tls = false;
+              };
+
+              buck2Options =
+                (lib.evalModules {
+                  modules = [
+                    (import ./nix/buck2/options.nix {
+                      inherit lib;
+                      version = "check";
+                    })
+                    {
+                      go.depsFile = "go-deps.toml";
+                      python = {
+                        depsFile = "python-deps.toml";
+                        lockFile = "pylock.toml";
+                        uvLockFile = "uv.lock";
+                      };
+                      rust.enable = false;
+                      javascript.enable = false;
+                      solidity.enable = false;
+                    }
+                  ];
+                }).config;
+              syncConfig = import ./nix/buck2/sync-config.nix { inherit lib; } {
+                languages = import ./nix/buck2/languages.nix { inherit pkgs lib; };
+                buck2 = buck2Options;
+              };
+              syncToml = builtins.fromTOML syncConfig.content;
+            in
+            assert lib.assertMsg (lib.all (name: builtins.elem name goCell.toolchains) [
+              "go"
+              "python"
+              "cxx"
+              "genrule"
+            ]) "toolchains cell: go brings ${toString goCell.toolchains}, not go, python, cxx and genrule";
+            assert lib.assertMsg (builtins.elem "lld" goCell.runtimeDeps)
+              "toolchains cell: cxx's actions don't get lld on PATH";
+            assert lib.assertMsg (lib.hasInfix ''"${preprocessor}/bin"'' mdbookCell.buckFile)
+              "toolchains cell: mdbook lacks the configured preprocessor's bin/";
+            assert lib.assertMsg (!(lib.hasInfix "preprocessor_paths" plainMdbookCell.buckFile))
+              "toolchains cell: mdbook gets preprocessor_paths with none configured";
+            assert lib.assertMsg (
+              lib.hasInfix "godeps = .turnkey/godeps" uncached
+              && lib.hasInfix "target:godeps//...->prelude//platforms:default" uncached
+            ) "buckconfig: a Nix-backed cell is missing from [cells] or the platform detectors";
+            assert lib.assertMsg (
+              !(lib.hasInfix "[test]" uncached) && !(lib.hasInfix "[buck2_re_client]" uncached)
+            ) "buckconfig: test result caching is configured with the test cache off";
+            assert lib.assertMsg (
+              lib.hasInfix "v2_test_executor = /nix/store/stand-in-runner/bin/turnkey-test-runner" cached
+              && lib.hasInfix "action_cache_address = grpc://127.0.0.1:47301" cached
+              && lib.hasInfix "tls = false" cached
+            ) "buckconfig: the test cache's runner, endpoint or TLS setting is missing";
+            assert lib.assertMsg (map (rule: rule.name) syncToml.deps == [
+              "go"
+              "pylock"
+              "python"
+            ]) "sync.toml: [[deps]] are ${toString (map (rule: rule.name) syncToml.deps)}, not go, pylock, python";
+            assert lib.assertMsg (map (wrapper: wrapper.deps_rule) syncToml.wrappers == [
+              "go"
+              "pylock"
+            ]) "sync.toml: the go and uv wrappers don't run the go and pylock rules";
+            pkgs.runCommand "buck2-generators-check" { } "touch $out";
+
           # The language records (nix/buck2/languages.nix) agree with
           # themselves: rule names are unique, a rule runs after the rule
           # that writes its source, and each wrapper runs a rule of its own
