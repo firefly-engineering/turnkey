@@ -12,20 +12,21 @@ use futures_util::{StreamExt, TryStreamExt, stream};
 use tokio::sync::mpsc::UnboundedReceiver;
 use tonic::transport::Channel;
 
-use crate::args::{Config, EnvValue};
-use crate::cache::{Mode, Pass, Recorder};
-use crate::proto::buck::data::command_execution_kind;
-use crate::proto::buck::host_sharing::{
+use buck2_test_executor::proto::buck::data::command_execution_kind;
+use buck2_test_executor::proto::buck::host_sharing::{
     HostSharingRequirements, WeightClass, host_sharing_requirements, weight_class,
 };
-use crate::proto::buck::test::test_orchestrator_client::TestOrchestratorClient;
-use crate::proto::buck::test::{
-    ArgValue, ArgValueContent, EndOfTestResultsRequest, EnvironmentVariable, ExecuteRequest2,
-    ExecutionResult2, ExecutionStream, ExternalRunnerSpec, ExternalRunnerSpecValue,
-    ReportTestResultRequest, TestExecutable, TestResult, TestStage, TestStatus, Testing,
-    arg_value_content, execute_response2, execution_status, execution_stream,
-    external_runner_spec_value, test_result, test_stage,
+use buck2_test_executor::proto::buck::test::test_orchestrator_client::TestOrchestratorClient;
+use buck2_test_executor::proto::buck::test::{
+    ArgValue, ArgValueContent, ConfiguredTargetHandle, EndOfTestResultsRequest,
+    EnvironmentVariable, ExecuteRequest2, ExecuteResponse2, ExecutionResult2, ExecutionStream,
+    ExternalRunnerSpec, ExternalRunnerSpecValue, ReportTestResultRequest, TestExecutable,
+    TestResult, TestStage, TestStatus, Testing, arg_value_content, execute_response2,
+    execution_status, execution_stream, external_runner_spec_value, test_result, test_stage,
 };
+
+use crate::args::{Config, EnvValue};
+use crate::cache::{Mode, Pass, Recorder};
 
 /// Label that opts a target out of test result caching: it always runs and is
 /// never recorded (docs/specs/test-result-caching.md).
@@ -34,8 +35,48 @@ pub const NO_TEST_CACHE_LABEL: &str = "no-test-cache";
 /// Exit code reported to buck2 when any test did not pass.
 const FAILURE_EXIT_CODE: i32 = 32;
 
-pub struct Runner {
-    orchestrator: TestOrchestratorClient<Channel>,
+/// The calls the runner makes to buck2's test orchestrator, so a test can
+/// stand in for buck2.
+pub trait Orchestrator {
+    /// Have buck2 run (or reuse) one test.
+    async fn execute(&self, request: ExecuteRequest2) -> Result<ExecuteResponse2>;
+    /// Report one test's result.
+    async fn report(&self, result: TestResult) -> Result<()>;
+    /// Say every result is reported, with the run's exit code.
+    async fn end(&self, exit_code: i32) -> Result<()>;
+}
+
+impl Orchestrator for TestOrchestratorClient<Channel> {
+    async fn execute(&self, request: ExecuteRequest2) -> Result<ExecuteResponse2> {
+        Ok(self
+            .clone()
+            .execute2(request)
+            .await
+            .context("Test execution request failed")?
+            .into_inner())
+    }
+
+    async fn report(&self, result: TestResult) -> Result<()> {
+        self.clone()
+            .report_test_result(ReportTestResultRequest {
+                result: Some(result),
+            })
+            .await
+            .context("Test result reporting failed")?;
+        Ok(())
+    }
+
+    async fn end(&self, exit_code: i32) -> Result<()> {
+        self.clone()
+            .end_of_test_results(EndOfTestResultsRequest { exit_code })
+            .await
+            .context("reporting the end of test results")?;
+        Ok(())
+    }
+}
+
+pub struct Runner<O> {
+    orchestrator: O,
     config: Config,
     recorder: Option<Recorder>,
     /// Tests whose result buck2 reused instead of running them.
@@ -44,12 +85,8 @@ pub struct Runner {
     origin: Origin,
 }
 
-impl Runner {
-    pub fn new(
-        orchestrator: TestOrchestratorClient<Channel>,
-        config: Config,
-        recorder: Option<Recorder>,
-    ) -> Self {
+impl<O: Orchestrator> Runner<O> {
+    pub fn new(orchestrator: O, config: Config, recorder: Option<Recorder>) -> Self {
         let origin = config
             .turnkey_test_cache_address
             .as_deref()
@@ -83,12 +120,7 @@ impl Runner {
             std::fs::write(report, format!("{hits}\n"))
                 .with_context(|| format!("writing {}", report.display()))?;
         }
-        self.orchestrator
-            .clone()
-            .end_of_test_results(EndOfTestResultsRequest { exit_code })
-            .await
-            .context("reporting the end of test results")?;
-        Ok(())
+        self.orchestrator.end(exit_code).await
     }
 
     async fn run_one(&self, spec: ExternalRunnerSpec) -> Result<TestStatus> {
@@ -99,11 +131,8 @@ impl Runner {
 
         let response = self
             .orchestrator
-            .clone()
-            .execute2(self.execute_request(spec, mode)?)
-            .await
-            .context("Test execution request failed")?
-            .into_inner();
+            .execute(self.execute_request(spec, mode)?)
+            .await?;
         let result = match response
             .response
             .context("execute response without a result")?
@@ -122,13 +151,7 @@ impl Runner {
 
         let result = test_result(name, handle, result, self.origin)?;
         let status = result.status();
-        self.orchestrator
-            .clone()
-            .report_test_result(ReportTestResultRequest {
-                result: Some(result),
-            })
-            .await
-            .context("Test result reporting failed")?;
+        self.orchestrator.report(result).await?;
         Ok(status)
     }
 
@@ -331,7 +354,7 @@ fn stream_text(stream: Option<ExecutionStream>) -> String {
 
 fn test_result(
     name: String,
-    target: crate::proto::buck::test::ConfiguredTargetHandle,
+    target: ConfiguredTargetHandle,
     result: ExecutionResult2,
     origin: Origin,
 ) -> Result<TestResult> {
@@ -387,8 +410,12 @@ fn test_result(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proto::buck::data::{CommandExecutionKind, LocalCommand, RemoteCommand};
-    use crate::proto::buck::test::{ConfiguredTargetHandle, ExecutionDetails, ExecutionStatus};
+    use buck2_test_executor::proto::buck::data::{
+        CommandExecutionKind, LocalCommand, RemoteCommand,
+    };
+    use buck2_test_executor::proto::buck::test::{
+        ConfiguredTarget, ExecutionDetails, ExecutionStatus,
+    };
 
     fn pass_with(command: command_execution_kind::Command) -> ExecutionResult2 {
         ExecutionResult2 {
@@ -470,26 +497,232 @@ mod tests {
         assert_eq!(Origin::of("grpc://cache.example.com:443"), Origin::Remote);
     }
 
-    #[tokio::test]
-    async fn no_test_cache_label_turns_caching_off_for_that_target() {
+    /// Stands in for buck2's orchestrator: answers each test with a canned
+    /// result, keyed by target name, and keeps what the runner sent.
+    #[derive(Default)]
+    struct FakeBuck2 {
+        results: BTreeMap<String, execute_response2::Response>,
+        requests: std::sync::Mutex<Vec<ExecuteRequest2>>,
+        reported: std::sync::Mutex<Vec<TestResult>>,
+        exit_code: std::sync::Mutex<Option<i32>>,
+    }
+
+    impl Orchestrator for &FakeBuck2 {
+        async fn execute(&self, request: ExecuteRequest2) -> Result<ExecuteResponse2> {
+            let suite = match request
+                .test_executable
+                .as_ref()
+                .and_then(|e| e.stage.as_ref())
+            {
+                Some(TestStage {
+                    item: Some(test_stage::Item::Testing(testing)),
+                }) => testing.suite.clone(),
+                _ => anyhow::bail!("request without a testing stage"),
+            };
+            let response = self.results.get(&suite).cloned();
+            self.requests.lock().unwrap().push(request);
+            Ok(ExecuteResponse2 { response })
+        }
+
+        async fn report(&self, result: TestResult) -> Result<()> {
+            self.reported.lock().unwrap().push(result);
+            Ok(())
+        }
+
+        async fn end(&self, exit_code: i32) -> Result<()> {
+            *self.exit_code.lock().unwrap() = Some(exit_code);
+            Ok(())
+        }
+    }
+
+    fn config(args: &[&str]) -> Config {
         use clap::Parser;
-        let config = Config::try_parse_from([
-            "ignored",
-            "--buck-test-info",
-            "ignored",
-            "--turnkey-test-cache=on",
-        ])
-        .unwrap();
-        let channel =
-            tonic::transport::Endpoint::from_static("http://unused.invalid").connect_lazy();
-        let runner = Runner::new(TestOrchestratorClient::new(channel), config, None);
-        let spec = |labels: &[&str]| ExternalRunnerSpec {
-            labels: labels.iter().map(|l| l.to_string()).collect(),
+        Config::try_parse_from(
+            ["ignored", "--buck-test-info", "ignored"]
+                .iter()
+                .chain(args),
+        )
+        .unwrap()
+    }
+
+    fn spec(target: &str, id: i64) -> ExternalRunnerSpec {
+        ExternalRunnerSpec {
+            target: Some(ConfiguredTarget {
+                handle: Some(ConfiguredTargetHandle { id }),
+                cell: "root".into(),
+                package: "pkg".into(),
+                target: target.into(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
+
+    fn finished(exit: i32) -> execute_response2::Response {
+        let mut result = pass_with(command_execution_kind::Command::LocalCommand(
+            LocalCommand::default(),
+        ));
+        result.status = Some(ExecutionStatus {
+            status: Some(execution_status::Status::Finished(exit)),
+        });
+        execute_response2::Response::Result(result)
+    }
+
+    /// Run `specs` through a runner talking to `buck2`.
+    async fn run(buck2: &FakeBuck2, config: Config, specs: Vec<ExternalRunnerSpec>) {
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+        for spec in specs {
+            sender.send(spec).unwrap();
+        }
+        drop(sender);
+        Runner::new(buck2, config, None)
+            .run_all(receiver)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn reports_every_result_and_fails_the_run_on_any_failure() {
+        let buck2 = FakeBuck2 {
+            results: BTreeMap::from([
+                ("passes".into(), finished(0)),
+                ("fails".into(), finished(1)),
+            ]),
             ..Default::default()
         };
-        assert_eq!(runner.mode_for(&spec(&["no-test-cache"])), Mode::Off);
-        assert_eq!(runner.mode_for(&spec(&["other"])), Mode::On);
-        assert_eq!(runner.mode_for(&spec(&[])), Mode::On);
+        run(
+            &buck2,
+            config(&[]),
+            vec![spec("passes", 1), spec("fails", 2)],
+        )
+        .await;
+
+        let mut reported: Vec<_> = buck2
+            .reported
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|r| (r.name.clone(), r.status(), r.target.unwrap().id))
+            .collect();
+        reported.sort();
+        assert_eq!(
+            reported,
+            [
+                ("root//pkg:fails".to_owned(), TestStatus::Fail, 2),
+                ("root//pkg:passes".to_owned(), TestStatus::Pass, 1),
+            ]
+        );
+        assert_eq!(*buck2.exit_code.lock().unwrap(), Some(FAILURE_EXIT_CODE));
+    }
+
+    #[tokio::test]
+    async fn a_run_where_everything_passes_exits_zero() {
+        let buck2 = FakeBuck2 {
+            results: BTreeMap::from([("passes".into(), finished(0))]),
+            ..Default::default()
+        };
+        run(&buck2, config(&[]), vec![spec("passes", 1)]).await;
+        assert_eq!(*buck2.exit_code.lock().unwrap(), Some(0));
+    }
+
+    #[tokio::test]
+    async fn cancelled_tests_are_not_reported() {
+        let buck2 = FakeBuck2 {
+            results: BTreeMap::from([(
+                "cancelled".into(),
+                execute_response2::Response::Cancelled(Default::default()),
+            )]),
+            ..Default::default()
+        };
+        run(&buck2, config(&[]), vec![spec("cancelled", 1)]).await;
+        assert!(buck2.reported.lock().unwrap().is_empty());
+        // An omitted test isn't a pass.
+        assert_eq!(*buck2.exit_code.lock().unwrap(), Some(FAILURE_EXIT_CODE));
+    }
+
+    #[tokio::test]
+    async fn requests_sort_the_env_and_let_env_flags_win() {
+        let buck2 = FakeBuck2 {
+            results: BTreeMap::from([("t".into(), finished(0))]),
+            ..Default::default()
+        };
+        let mut spec = spec("t", 1);
+        spec.env = [("B", "spec"), ("A", "spec")]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), verbatim(v)))
+            .collect();
+        run(
+            &buck2,
+            config(&["--env", "B=flag", "--timeout", "5"]),
+            vec![spec],
+        )
+        .await;
+
+        let requests = buck2.requests.lock().unwrap();
+        let request = &requests[0];
+        let env: Vec<_> = request
+            .test_executable
+            .as_ref()
+            .unwrap()
+            .env
+            .iter()
+            .map(|e| {
+                let value = match e.value.as_ref().and_then(|v| v.content.as_ref()) {
+                    Some(ArgValueContent {
+                        value:
+                            Some(arg_value_content::Value::SpecValue(ExternalRunnerSpecValue {
+                                value: Some(external_runner_spec_value::Value::Verbatim(v)),
+                            })),
+                    }) => v.clone(),
+                    other => panic!("unexpected env value {other:?}"),
+                };
+                (e.key.clone(), value)
+            })
+            .collect();
+        assert_eq!(
+            env,
+            [
+                ("A".to_owned(), "spec".to_owned()),
+                ("B".to_owned(), "flag".to_owned())
+            ]
+        );
+        assert_eq!(request.timeout.unwrap().seconds, 5);
+        // Caching is off unless tk turns it on.
+        assert!(request.disable_test_execution_caching);
+    }
+
+    #[tokio::test]
+    async fn no_test_cache_label_turns_caching_off_for_that_target() {
+        let buck2 = FakeBuck2 {
+            results: BTreeMap::from([
+                ("opted-out".into(), finished(0)),
+                ("cached".into(), finished(0)),
+            ]),
+            ..Default::default()
+        };
+        let mut opted_out = spec("opted-out", 1);
+        opted_out.labels = vec![NO_TEST_CACHE_LABEL.to_owned()];
+        run(
+            &buck2,
+            config(&["--turnkey-test-cache=on"]),
+            vec![opted_out, spec("cached", 2)],
+        )
+        .await;
+
+        let requests = buck2.requests.lock().unwrap();
+        let caching_disabled = |target: &str| {
+            requests
+                .iter()
+                .find(|r| {
+                    r.test_executable.as_ref().and_then(|e| e.stage.as_ref()).is_some_and(|s| {
+                        matches!(&s.item, Some(test_stage::Item::Testing(t)) if t.suite == target)
+                    })
+                })
+                .unwrap()
+                .disable_test_execution_caching
+        };
+        assert!(caching_disabled("opted-out"));
+        assert!(!caching_disabled("cached"));
     }
 
     #[test]

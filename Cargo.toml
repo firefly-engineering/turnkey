@@ -20,6 +20,7 @@ members = [
     "src/cmd/turnkey-test-runner",
     "src/examples/rust-hello",
     "src/examples/rust-hello-deps",
+    "src/rust/buck2-test-executor",
     "src/rust/composition",
     "src/rust/deps-extract",
     "src/rust/nix-eval",
@@ -85,6 +86,7 @@ tree-sitter-solidity = "1.2.13"
 tree-sitter-starlark = "1.3"
 
 # Workspace member references (for path dependencies between crates)
+buck2-test-executor = { path = "src/rust/buck2-test-executor" }
 composition = { path = "src/rust/composition", features = ["watcher"] }
 nix-eval = { path = "src/rust/nix-eval" }
 prefetch-cache = { path = "src/rust/prefetch-cache" }

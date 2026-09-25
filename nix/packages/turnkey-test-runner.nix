@@ -18,7 +18,10 @@ pkgs.rustPlatform.buildRustPackage {
 
   src = cargoLib.prunedCargoSource {
     inherit root;
-    members = [ "src/cmd/turnkey-test-runner" ];
+    members = [
+      "src/cmd/turnkey-test-runner"
+      "src/rust/buck2-test-executor"
+    ];
   };
 
   cargoLock.lockFile = root + "/Cargo.lock";

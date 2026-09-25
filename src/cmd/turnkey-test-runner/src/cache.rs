@@ -11,8 +11,8 @@ use std::time::Duration;
 use anyhow::{Context, Result, bail};
 use tonic::transport::{Channel, Endpoint};
 
-use crate::proto::build::bazel::remote::execution::v2::action_cache_client::ActionCacheClient;
-use crate::proto::build::bazel::remote::execution::v2::{
+use buck2_test_executor::proto::build::bazel::remote::execution::v2::action_cache_client::ActionCacheClient;
+use buck2_test_executor::proto::build::bazel::remote::execution::v2::{
     ActionResult, Digest, ExecutedActionMetadata, UpdateActionResultRequest,
 };
 

@@ -6,13 +6,10 @@ description = "Turnkey's buck2 test runner, with test result caching"
 
 [dependencies]
 anyhow.workspace = true
+buck2-test-executor.workspace = true
 clap.workspace = true
 futures-util.workspace = true
-hyper-util.workspace = true
 tokio.workspace = true
-tower.workspace = true
-prost.workspace = true
 prost-types.workspace = true
 serde_json.workspace = true
 tonic.workspace = true
-tonic-prost.workspace = true

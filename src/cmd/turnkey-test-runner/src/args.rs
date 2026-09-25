@@ -1,37 +1,11 @@
-//! Command-line arguments.
-//!
-//! buck2 launches a `test.v2_test_executor` as
-//! `<executor> --buck-trace-id <id> --config-entry host=<os> [--config-entry ...]
-//!  --executor-fd <fd> --orchestrator-fd <fd> -- ignored --buck-test-info ignored <runner args>`
-//! (buck2 app/buck2_test/src/command.rs and unix/executor.rs at the pinned
-//! release). Everything after `--` is the runner's own configuration, where
+//! The runner's own arguments: what buck2 passes after `--` in the
+//! executor's command line (buck2_test_executor::Launch), where
 //! `tk test -- <args>` ends up.
 
-use std::os::unix::io::RawFd;
 use std::str::FromStr;
 
 use anyhow::{Result, anyhow};
 use clap::Parser;
-
-/// How buck2 launches the executor.
-#[derive(Debug, Parser)]
-pub struct Launch {
-    #[clap(long)]
-    pub buck_trace_id: Option<String>,
-
-    #[clap(long)]
-    pub config_entry: Vec<String>,
-
-    #[clap(long)]
-    pub executor_fd: RawFd,
-
-    #[clap(long)]
-    pub orchestrator_fd: RawFd,
-
-    /// The runner's own arguments, starting with a placeholder program name.
-    #[clap(last = true)]
-    pub runner_args: Vec<String>,
-}
 
 /// The runner's configuration. Mirrors buck2's bundled runner
 /// (app/buck2_test_runner/src/config.rs), so `-- --env`, `-- --timeout` and
@@ -102,27 +76,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn launch_args_as_buck2_sends_them() {
-        let launch = Launch::try_parse_from([
-            "turnkey-test-runner",
-            "--buck-trace-id",
-            "abc",
-            "--config-entry",
-            "host=mac",
-            "--executor-fd",
-            "3",
-            "--orchestrator-fd",
-            "4",
-            "--",
-            "ignored",
-            "--buck-test-info",
-            "ignored",
-            "--env",
-            "A=1",
-        ])
-        .unwrap();
-        assert_eq!((launch.executor_fd, launch.orchestrator_fd), (3, 4));
-        let config = Config::try_parse_from(&launch.runner_args).unwrap();
+    fn runner_args_as_buck2_sends_them() {
+        let config =
+            Config::try_parse_from(["ignored", "--buck-test-info", "ignored", "--env", "A=1"])
+                .unwrap();
         assert_eq!(config.env, vec!["A=1"]);
         assert_eq!(config.timeout, 600);
         assert_eq!(config.turnkey_test_cache, crate::cache::Mode::Off);

@@ -1,0 +1,22 @@
+[package]
+name = "buck2-test-executor"
+version = "0.1.0"
+edition.workspace = true
+description = "The executor side of buck2's test-runner protocol, at turnkey's pinned buck2 release"
+
+[lib]
+# The generated protocol code carries buck2's proto comments, whose code
+# samples aren't Rust
+doctest = false
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+futures-util.workspace = true
+hyper-util.workspace = true
+tokio.workspace = true
+tower.workspace = true
+prost.workspace = true
+prost-types.workspace = true
+tonic.workspace = true
+tonic-prost.workspace = true

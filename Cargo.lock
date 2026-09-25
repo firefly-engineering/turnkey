@@ -220,6 +220,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "buck2-test-executor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "futures-util",
+ "hyper-util",
+ "prost",
+ "prost-types",
+ "tokio",
+ "tonic",
+ "tonic-prost",
+ "tower",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2555,16 +2571,13 @@ name = "turnkey-test-runner"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "buck2-test-executor",
  "clap",
  "futures-util",
- "hyper-util",
- "prost",
  "prost-types",
  "serde_json",
  "tokio",
  "tonic",
- "tonic-prost",
- "tower",
 ]
 
 [[package]]

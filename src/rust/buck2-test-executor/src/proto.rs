@@ -1,4 +1,5 @@
-//! Protocol code generated from pinned upstream protos
+//! Protocol code generated from pinned upstream protos: buck2's test-runner
+//! protocol and the Remote Execution API
 //! (see nix/packages/test-runner-protocol.nix).
 //!
 //! TURNKEY_TEST_RUNNER_PROTOCOL names the generated code's directory at

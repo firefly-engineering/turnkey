@@ -1,23 +1,19 @@
 //! turnkey-test-runner: turnkey's buck2 test runner.
 //!
-//! Speaks buck2's test-runner protocol, pinned to the buck2 release turnkey
-//! ships, and runs tests exactly as buck2's bundled runner does. Under
-//! `tk test` it also lets buck2 reuse recorded results and records fresh
-//! passes (docs/specs/test-result-caching.md).
+//! Speaks buck2's test-runner protocol (through buck2-test-executor, pinned
+//! to the buck2 release turnkey ships), and runs tests exactly as buck2's
+//! bundled runner does. Under `tk test` it also lets buck2 reuse recorded
+//! results and records fresh passes (docs/specs/test-result-caching.md).
 
 mod args;
 mod cache;
-mod executor;
-#[allow(dead_code)]
-mod proto;
 mod runner;
-mod transport;
 
 use anyhow::{Context, Result};
+use buck2_test_executor::Launch;
 use clap::Parser;
 
-use crate::args::{Config, Launch};
-use crate::proto::buck::test::test_orchestrator_client::TestOrchestratorClient;
+use crate::args::Config;
 
 #[tokio::main]
 async fn main() {
@@ -31,13 +27,9 @@ async fn run(launch: Launch) -> Result<()> {
     let config = Config::try_parse_from(&launch.runner_args)
         .context("Error parsing test runner arguments")?;
 
-    // SAFETY: buck2 passes two distinct socket fds that only we own.
-    let executor_io = unsafe { transport::inherited_socket(launch.executor_fd)? };
-    let orchestrator_io = unsafe { transport::inherited_socket(launch.orchestrator_fd)? };
-
-    let (spec_sender, specs) = tokio::sync::mpsc::unbounded_channel();
-    let server = transport::serve(executor_io, executor::Executor::new(spec_sender));
-    let orchestrator = TestOrchestratorClient::new(transport::channel(orchestrator_io).await?);
+    // SAFETY: `launch` comes from the command line buck2 started us with, so
+    // its two socket fds are distinct and only we own them.
+    let session = unsafe { buck2_test_executor::start(&launch).await? };
 
     let address = config.turnkey_test_cache_address.as_deref();
     // Results are recorded only in a local cache: who may write to a shared
@@ -53,8 +45,8 @@ async fn run(launch: Launch) -> Result<()> {
         None
     };
 
-    runner::Runner::new(orchestrator, config, recorder)
-        .run_all(specs)
+    runner::Runner::new(session.orchestrator, config, recorder)
+        .run_all(session.specs)
         .await?;
-    server.shutdown().await
+    session.server.shutdown().await
 }
