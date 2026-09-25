@@ -13,9 +13,15 @@
     "wayfinder:grilling"
   ],
   "parent": "turnkey-luk",
+  "comments": [
+    {
+      "text": "Resolution:\n1. The parity suite stays a manual step in the pin-bump checklist; the CI gate is filed as its own ticket turnkey-kxe, outside this map. Why: bumps are rare, the suite takes about 3 min locally, a slim CI shell is a larger piece of work other checks could share, and Linux-only CI would miss macOS differences. jj doesn't run git hooks, so a pre-push hook can't enforce it either.\n2. Evidence: the commit that bumps the pin must include the parity summary line (scenarios matched, target count, buck2 release, platform), so jj log shows the gate ran.",
+      "timestamp": "2026-09-25T15:29:21Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "Should the parity suite be a CI gate for buck2 pin bumps?",
   "type": "task",
-  "updated_at": "2026-09-25T15:23:59Z"
+  "updated_at": "2026-09-25T15:29:21Z"
 }
