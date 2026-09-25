@@ -1,0 +1,57 @@
+# Copyright (c) Firefly Engineering and affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+
+"""Report what the test-caching helper gave each test target.
+
+Prints one JSON object per target: its executor's kind and the caching
+fields of its ExternalRunnerTestInfo. A CommandExecutorConfig can't be
+inspected field by field, and compares by identity, so its kind is found by
+comparing its whole repr with that of a config built here.
+"""
+
+def _kinds() -> dict[str, str]:
+    return {
+        # test_caching.bzl's executor, which reads recorded results
+        "cache": repr(CommandExecutorConfig(
+            local_enabled = True,
+            remote_enabled = False,
+            remote_cache_enabled = True,
+        )),
+        # Upstream's local executor, for a test without a remote_execution
+        # profile or with remote_execution = "disabled". In OSS buck2 an
+        # unset remote_cache_enabled is False, so both render the same.
+        "local": repr(CommandExecutorConfig(
+            local_enabled = True,
+            remote_enabled = False,
+            remote_cache_enabled = False,
+        )),
+    }
+
+def _executor_kind(executor, kinds: dict[str, str]) -> str:
+    if executor == None:
+        return "none"
+    rendered = repr(executor)
+    for kind, expected in kinds.items():
+        if rendered == expected:
+            return kind
+    return "other"
+
+def _impl(ctx):
+    kinds = _kinds()
+    report = {}
+    for target in ctx.cli_args.targets:
+        info = ctx.analysis(target).providers()[ExternalRunnerTestInfo]
+        report[str(target.raw_target())] = {
+            "executor": _executor_kind(info.default_executor, kinds),
+            "supports_test_execution_caching": info.supports_test_execution_caching,
+            "run_from_project_root": info.run_from_project_root,
+            "use_project_relative_paths": info.use_project_relative_paths,
+        }
+    ctx.output.print_json(report)
+
+main = bxl_main(
+    impl = _impl,
+    cli_args = {"targets": cli_args.list(cli_args.configured_target_label())},
+)

@@ -61,9 +61,17 @@ fails if any patch doesn't apply, so a forgotten port can't ship unpatched.
 
 Read upstream prelude changes that touch the patched code, not just the
 hunks that fail to apply. In 2026-07-01 the new preludes gave tests without
-a remote-execution profile a non-caching local executor. The patches had to
-pass the cache-reading executor on only for targets with
-`remote_execution`.
+a remote-execution profile a non-caching local executor, which the caching
+helper (`nix/buck2/prelude-extensions/test_caching/test_caching.bzl`) now
+replaces. A change like that applies cleanly and only shows up in what the
+rules hand buck2, so check it:
+
+```bash
+python3 src/cmd/check-test-caching/__main__.py
+```
+
+It analyses a test target of every cache-safe rule with test result caching
+on and off, and must report that every target matches.
 
 ## 4. Check the protocol and the parity suite
 
