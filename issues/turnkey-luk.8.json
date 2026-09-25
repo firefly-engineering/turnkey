@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T15:11:18Z",
+  "description": "## Question\n\nGiven the research on its runtime and requirements, does the test-runner parity suite become a CI job (on every change? only when buck2-source.nix changes?) or stay a manual step in the bump checklist?",
+  "id": "turnkey-luk.8",
+  "labels": [],
+  "parent": "turnkey-luk",
+  "priority": 2,
+  "status": "open",
+  "title": "Should the parity suite be a CI gate for buck2 pin bumps?",
+  "type": "task",
+  "updated_at": "2026-09-25T15:11:18Z"
+}
