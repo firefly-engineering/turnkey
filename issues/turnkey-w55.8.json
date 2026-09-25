@@ -12,9 +12,15 @@
     "wayfinder:grilling"
   ],
   "parent": "turnkey-w55",
+  "comments": [
+    {
+      "text": "Input from turnkey-w55.3 (docs/research/test-undeclared-inputs.md): go_test/python_test need use_project_relative_paths/run_from_project_root forced on for cross-checkout reuse. python3 is resolved via PATH, so it's unkeyed. solidity_test has solc/foundry.toml/fuzz-seed and soldeps-cell hazards. jsonnet_test's -J . is a latent hazard.",
+      "timestamp": "2026-09-25T07:51:11Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "How does each language's test rule opt into caching?",
   "type": "task",
-  "updated_at": "2026-09-25T07:31:21Z"
+  "updated_at": "2026-09-25T07:51:11Z"
 }
