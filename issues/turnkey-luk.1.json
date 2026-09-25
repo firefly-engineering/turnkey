@@ -17,11 +17,15 @@
     {
       "text": "Yes. In toolbox 064d060b as turnkey resolves it: buck2 has release-date versions 2025-12-01, 2026-03-15, 2026-04-15, 2026-07-01 and 2026-09-15, plus a 'default' version (nixpkgs buck2-unstable-2025-12-01) merged in from teller. The default is 2026-09-15. buck2-prelude has 2025-12-01, 2026-03-15, 2026-07-01 and 2026-09-15, and its default is 2026-09-15. There is NO 2026-04-15 prelude. Checked against each release's upstream prelude_hash asset: 2026-09-15 (4d101dce), 2026-07-01 and 2026-03-15 match exactly. 2025-12-01 is WRONG: toolbox has 0fabd579, upstream is 0a994e0b. buck2-toolchain 5 is buck2 2026-09-15 with reindeer 2026.09.21.00 and has no prelude. For the pin: use buck2-prelude.\"2026-09-15\", which is exact. To make it faithful rather than trusting the date, record preludeRev = \u003crelease prelude_hash\u003e next to rev in buck2-source.nix and assert passthru.preludeRev equals it. That makes matchingPreludeVersion unnecessary. Pin a date explicitly, never 'default'. Findings are on local bookmark research/toolbox-buck2-versions, in docs/research/toolbox-buck2-versions.md.",
       "timestamp": "2026-09-25T15:15:54Z"
+    },
+    {
+      "text": "Findings landed on main in 827682bc (docs/research/); the research/* bookmark was deleted.",
+      "timestamp": "2026-09-25T15:33:41Z"
     }
   ],
   "priority": 2,
   "status": "closed",
   "title": "Which buck2 and buck2-prelude versions does toolbox expose?",
   "type": "task",
-  "updated_at": "2026-09-25T15:16:13Z"
+  "updated_at": "2026-09-25T15:33:41Z"
 }
