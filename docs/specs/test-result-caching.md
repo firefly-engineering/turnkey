@@ -124,7 +124,7 @@ Accepted as negligible: G5, P6 and R1.
 - **Lifecycle:** `tk` starts the server on demand, detached, the first time a cached `tk test` needs it. A lock in the cache directory prevents two servers. The server runs with `--idle_timeout` (e.g. 24 h), so an explicit stop command is optional. A launchd/systemd user service is a possible later add-on, not v1.
 - **`tk test` sequence:**
   1. Check the cache can be used: probe the local server with a sub-second timeout, starting it if needed, or check that a remote endpoint accepts a connection within 2 s.
-  2. Choose the mode (`testcache.Plan`): for the local cache `on`, or `record-only` under `tk --rerun`; for a remote one `read-only`, or `off` under `tk --rerun`, since results are recorded only locally. An unusable cache → `off` and a one-line warning.
+  2. Choose the mode (`testcache` applies it in `Config.RunTests`): for the local cache `on`, or `record-only` under `tk --rerun`; for a remote one `read-only`, or `off` under `tk --rerun`, since results are recorded only locally. An unusable cache → `off` and a one-line warning.
   3. Run buck2 as a child process.
   4. Print `N recorded`.
   5. Pass buck2's exit code through.

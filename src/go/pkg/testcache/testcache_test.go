@@ -4,11 +4,13 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -207,7 +209,7 @@ func TestRunnerContract(t *testing.T) {
 	}
 	for _, want := range contract.Plans {
 		plan := Plan{Mode: want.Mode, Origin: want.Origin, Address: contract.Address}
-		if got := plan.RunnerArgs(contract.Report); !slices.Equal(got, want.Args) {
+		if got := plan.runnerArgs(contract.Report); !slices.Equal(got, want.Args) {
 			t.Errorf("%s/%s: got %v, want %v", want.Mode, want.Origin, got, want.Args)
 		}
 	}
@@ -215,18 +217,18 @@ func TestRunnerContract(t *testing.T) {
 	if err := os.WriteFile(report, []byte(contract.HitsReport), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if hits, ok := ReadReport(report); !ok || hits != contract.Hits {
-		t.Errorf("ReadReport(%q) = %d, %v; want %d", contract.HitsReport, hits, ok, contract.Hits)
+	if hits, ok := readReport(report); !ok || hits != contract.Hits {
+		t.Errorf("readReport(%q) = %d, %v; want %d", contract.HitsReport, hits, ok, contract.Hits)
 	}
 }
 
 func TestReadReport(t *testing.T) {
 	report := filepath.Join(t.TempDir(), "report")
-	if _, ok := ReadReport(report); ok {
+	if _, ok := readReport(report); ok {
 		t.Fatal("expected a missing report to read as nothing")
 	}
 	os.WriteFile(report, []byte("3\n"), 0o644)
-	if hits, ok := ReadReport(report); !ok || hits != 3 {
+	if hits, ok := readReport(report); !ok || hits != 3 {
 		t.Fatalf("got %d, %v", hits, ok)
 	}
 }
@@ -318,5 +320,108 @@ func TestMaxSizeGiB(t *testing.T) {
 		if _, err := MaxSizeGiB(); err == nil {
 			t.Fatalf("expected %q to be rejected", bad)
 		}
+	}
+}
+
+// fakeBuck2 stands in for buck2 in RunTests: it records the command line,
+// writes hits to the runner's report unless hits is negative, and exits with
+// code.
+func fakeBuck2(got *[]string, hits, code int) Buck2 {
+	return func(args []string) int {
+		*got = args
+		for _, arg := range args {
+			if report, ok := strings.CutPrefix(arg, "--turnkey-test-cache-report="); ok && hits >= 0 {
+				_ = os.WriteFile(report, []byte(fmt.Sprintf("%d\n", hits)), 0o644)
+			}
+		}
+		return code
+	}
+}
+
+func TestRunTestsPutsTheRunnerFlagsFirstAfterTheSeparator(t *testing.T) {
+	cache := &Config{Server: "bazel-remote", Address: "grpc://127.0.0.1:47301"}
+	up := func() error { return nil }
+	for _, tc := range []struct {
+		name string
+		args []string
+		want []string // the command line, with the runner's flags as FLAGS
+	}{
+		{
+			"no separator",
+			[]string{"test", "//:t"},
+			[]string{"test", "//:t", "--", "FLAGS"},
+		},
+		{
+			"test args of its own",
+			[]string{"--isolation-dir", "x", "test", "//:t", "--", "--test-arg", "y"},
+			[]string{"--isolation-dir", "x", "test", "//:t", "--", "FLAGS", "--test-arg", "y"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var got []string
+			cache.runTests(tc.args, false, up, fakeBuck2(&got, -1, 0), io.Discard)
+			flags := slices.IndexFunc(got, func(arg string) bool {
+				return strings.HasPrefix(arg, "--turnkey-test-cache=")
+			})
+			if flags < 0 {
+				t.Fatalf("no runner flags in %q", got)
+			}
+			// The four flags, collapsed to one placeholder
+			collapsed := slices.Concat(got[:flags], []string{"FLAGS"}, got[flags+4:])
+			if !slices.Equal(collapsed, tc.want) {
+				t.Errorf("buck2 got %q, want %q", collapsed, tc.want)
+			}
+		})
+	}
+}
+
+func TestRunTestsReportsReusedResults(t *testing.T) {
+	cache := &Config{Server: "bazel-remote", Address: "grpc://127.0.0.1:47301"}
+	up := func() error { return nil }
+	var got []string
+	var stderr strings.Builder
+
+	code := cache.runTests([]string{"test", "//..."}, false, up, fakeBuck2(&got, 3, 32), &stderr)
+
+	if code != 32 {
+		t.Errorf("exit code %d, want buck2's 32", code)
+	}
+	if !strings.Contains(stderr.String(), "3 recorded (reused without running)") {
+		t.Errorf("stderr %q doesn't report the 3 reused results", stderr.String())
+	}
+	for _, arg := range got {
+		if report, ok := strings.CutPrefix(arg, "--turnkey-test-cache-report="); ok {
+			if _, err := os.Stat(report); !os.IsNotExist(err) {
+				t.Errorf("report %s left behind", report)
+			}
+		}
+	}
+}
+
+func TestRunTestsWithoutAReport(t *testing.T) {
+	cache := &Config{Server: "bazel-remote", Address: "grpc://127.0.0.1:47301"}
+	var got []string
+	var stderr strings.Builder
+
+	// The build failed before any test ran: the runner wrote nothing.
+	cache.runTests([]string{"test", "//..."}, false, func() error { return nil }, fakeBuck2(&got, -1, 1), &stderr)
+
+	if strings.Contains(stderr.String(), "recorded") {
+		t.Errorf("stderr %q reports reused results the runner never wrote", stderr.String())
+	}
+}
+
+func TestRunTestsWithAnUnusableCache(t *testing.T) {
+	cache := &Config{Address: "grpc://cache.example.com:443"}
+	var got []string
+	var stderr strings.Builder
+
+	cache.runTests([]string{"test", "//..."}, false, func() error { return errors.New("unreachable") }, fakeBuck2(&got, -1, 0), &stderr)
+
+	if !slices.Contains(got, "--turnkey-test-cache=off") {
+		t.Errorf("buck2 got %q, want the cache off", got)
+	}
+	if !strings.Contains(stderr.String(), "without the test result cache: unreachable") {
+		t.Errorf("stderr %q doesn't say why the cache is off", stderr.String())
 	}
 }

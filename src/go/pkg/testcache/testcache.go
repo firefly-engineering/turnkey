@@ -4,8 +4,9 @@
 // Test results are recorded in, and reused from, a local cache-only Remote
 // Execution API server (bazel-remote), one per user per machine, shared by
 // every checkout (docs/specs/test-result-caching.md). tk starts it on demand.
-// Plan decides, for one tk test run, what turnkey's test runner does with the
-// cache, and the runner only obeys the flags it gets after `--`.
+// RunTests runs one tk test with the cache: it applies the reuse policy,
+// passes turnkey's test runner the flags that say what to do with the cache,
+// and reports the reused results. The runner only obeys those flags.
 package testcache
 
 import (
@@ -15,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -114,6 +116,50 @@ func (c *Config) Origin() Origin {
 	return Remote
 }
 
+// Buck2 runs buck2 with args and returns its exit code, as a shell would
+// report it.
+type Buck2 func(args []string) int
+
+// RunTests runs a `buck2 test` command line (buck2's universal options may
+// come first) with turnkey's test runner using the cache as the reuse policy
+// decides for this run. It tells stderr why the cache is off, when it is, and
+// how many results were reused, and returns buck2's exit code.
+func (c *Config) RunTests(args []string, forced bool, buck2 Buck2, stderr io.Writer) int {
+	return c.runTests(args, forced, c.usable, buck2, stderr)
+}
+
+// runTests is RunTests with the check that the cache can be used as a seam.
+func (c *Config) runTests(args []string, forced bool, usable func() error, buck2 Buck2, stderr io.Writer) int {
+	plan := c.plan(forced, usable)
+	if plan.Unusable != "" {
+		fmt.Fprintf(stderr, "tk: running tests without the test result cache: %s\n", plan.Unusable)
+	}
+	report, err := os.CreateTemp("", "tk-test-report-*")
+	if err != nil {
+		fmt.Fprintf(stderr, "tk: not reporting reused test results: %v\n", err)
+		return buck2(withRunnerArgs(args, plan.runnerArgs(os.DevNull)))
+	}
+	report.Close()
+	defer os.Remove(report.Name())
+
+	code := buck2(withRunnerArgs(args, plan.runnerArgs(report.Name())))
+	if hits, ok := readReport(report.Name()); ok {
+		fmt.Fprintf(stderr, "%d recorded (reused without running)\n", hits)
+	}
+	return code
+}
+
+// withRunnerArgs puts the runner's flags first after `--`, adding one if
+// needed: the runner's --test-arg takes every argument after it, so the
+// flags must come before any.
+func withRunnerArgs(args, runner []string) []string {
+	separator := slices.Index(args, "--")
+	if separator < 0 {
+		return slices.Concat(args, []string{"--"}, runner)
+	}
+	return slices.Insert(slices.Clone(args), separator+1, runner...)
+}
+
 // Plan is what turnkey's test runner does with the cache in one tk test run.
 type Plan struct {
 	Mode    Mode
@@ -127,16 +173,11 @@ type Plan struct {
 // connection before running the tests uncached.
 const remoteProbe = 2 * time.Second
 
-// Plan applies the reuse policy (CONTEXT.md) to one tk test run. A forced
+// plan applies the reuse policy (CONTEXT.md) to one tk test run. A forced
 // re-run reads nothing. Results are recorded only into the local cache: who
 // may write to a shared one isn't decided. A cache that can't be used is
 // off, since buck2 would otherwise retry it for about 45 s and then fail
 // every cached test without running it.
-func (c *Config) Plan(forced bool) Plan {
-	return c.plan(forced, c.usable)
-}
-
-// plan is Plan with the check that the cache can be used as a seam.
 func (c *Config) plan(forced bool, usable func() error) Plan {
 	plan := Plan{Origin: c.Origin(), Address: c.Address}
 	if err := usable(); err != nil {
@@ -350,9 +391,9 @@ func (c *Config) start() (<-chan struct{}, error) {
 	return exited, nil
 }
 
-// RunnerArgs are the turnkey-test-runner flags tk passes after `--`. The
+// runnerArgs are the turnkey-test-runner flags tk passes after `--`. The
 // runner writes the number of reused results to report when it's done.
-func (p Plan) RunnerArgs(report string) []string {
+func (p Plan) runnerArgs(report string) []string {
 	return []string{
 		"--turnkey-test-cache=" + string(p.Mode),
 		"--turnkey-test-cache-address=" + p.Address,
@@ -361,10 +402,10 @@ func (p Plan) RunnerArgs(report string) []string {
 	}
 }
 
-// ReadReport returns the number of reused results the runner reported, and
+// readReport returns the number of reused results the runner reported, and
 // false when it reported nothing (for instance when the build failed before
 // any test ran).
-func ReadReport(report string) (int, bool) {
+func readReport(report string) (int, bool) {
 	data, err := os.ReadFile(report)
 	if err != nil {
 		return 0, false

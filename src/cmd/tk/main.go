@@ -542,22 +542,17 @@ func delegateToBuck2(args []string) {
 		args = applyLocalOverrides(args)
 	}
 
-	// Tell turnkey's test runner to use the local test result cache. Added
-	// last, so the flags land first after `--`: the runner's --test-arg
-	// consumes every argument after it.
-	report := ""
+	// Tests run with the test result cache when the dev shell has one. tk
+	// stays around to print how many results were reused once buck2's own
+	// summary is out.
 	if subcommand, _ := buck2args.Subcommand(args); subcommand == "test" {
-		args, report = withTestCache(args)
+		if cache := testcache.FromEnv(); cache != nil {
+			os.Exit(cache.RunTests(args, rerun, runBuck2(buck2Path), os.Stderr))
+		}
 	}
 
 	if verbose {
 		fmt.Fprintf(os.Stderr, "tk: executing buck2 %v\n", args)
-	}
-
-	// With a test result cache, tk stays around to print how many results
-	// were reused once buck2's own summary is out.
-	if report != "" {
-		os.Exit(runTestsWithSummary(buck2Path, args, report))
 	}
 
 	// Use syscall.Exec to replace this process with buck2
@@ -569,60 +564,37 @@ func delegateToBuck2(args []string) {
 	}
 }
 
-// withTestCache passes the runner the flags for this run's use of the test
-// result cache, as testcache.Plan decides it. It returns the file the runner
-// reports its number of reused results to. Without a cache in this dev shell
-// the args are unchanged, and the runner neither reads nor records.
-func withTestCache(args []string) ([]string, string) {
-	cache := testcache.FromEnv()
-	if cache == nil {
-		return args, ""
-	}
-	plan := cache.Plan(rerun)
-	if plan.Unusable != "" {
-		fmt.Fprintf(os.Stderr, "tk: running tests without the test result cache: %s\n", plan.Unusable)
-	}
-	report, err := os.CreateTemp("", "tk-test-report-*")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "tk: not reporting reused test results: %v\n", err)
-		return injectArgsAfterSeparator(args, plan.RunnerArgs(os.DevNull)), ""
-	}
-	report.Close()
-	return injectArgsAfterSeparator(args, plan.RunnerArgs(report.Name())), report.Name()
-}
-
-// runTestsWithSummary runs buck2 as a child, then prints how many test
-// results were reused, and returns buck2's exit code.
-func runTestsWithSummary(buck2Path string, args []string, report string) int {
-	defer os.Remove(report)
-
-	cmd := exec.Command(buck2Path, args...)
-	cmd.Args[0] = "buck2"
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-
-	// Ctrl-C reaches buck2 directly through the terminal's process group;
-	// forwarding it too would read as a second Ctrl-C. Other termination
-	// signals are passed on.
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-	defer signal.Stop(signals)
-	if err := cmd.Start(); err != nil {
-		fmt.Fprintf(os.Stderr, "tk: failed to run buck2: %v\n", err)
-		return 1
-	}
-	go func() {
-		for sig := range signals {
-			if sig != syscall.SIGINT {
-				_ = cmd.Process.Signal(sig)
-			}
+// runBuck2 runs buck2 as a child of tk, for a caller that has more to do
+// once it exits, and returns its exit code.
+func runBuck2(buck2Path string) testcache.Buck2 {
+	return func(args []string) int {
+		if verbose {
+			fmt.Fprintf(os.Stderr, "tk: executing buck2 %v\n", args)
 		}
-	}()
-	_ = cmd.Wait()
+		cmd := exec.Command(buck2Path, args...)
+		cmd.Args[0] = "buck2"
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 
-	if hits, ok := testcache.ReadReport(report); ok {
-		fmt.Fprintf(os.Stderr, "%d recorded (reused without running)\n", hits)
+		// Ctrl-C reaches buck2 directly through the terminal's process group;
+		// forwarding it too would read as a second Ctrl-C. Other termination
+		// signals are passed on.
+		signals := make(chan os.Signal, 1)
+		signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+		defer signal.Stop(signals)
+		if err := cmd.Start(); err != nil {
+			fmt.Fprintf(os.Stderr, "tk: failed to run buck2: %v\n", err)
+			return 1
+		}
+		go func() {
+			for sig := range signals {
+				if sig != syscall.SIGINT {
+					_ = cmd.Process.Signal(sig)
+				}
+			}
+		}()
+		_ = cmd.Wait()
+		return exitCode(cmd.ProcessState)
 	}
-	return exitCode(cmd.ProcessState)
 }
 
 // exitCode is the code a shell would report for the process.
