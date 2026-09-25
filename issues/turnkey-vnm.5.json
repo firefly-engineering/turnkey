@@ -8,6 +8,7 @@
     "turnkey-vnm.14",
     "turnkey-vnm.17",
     "turnkey-vnm.19",
+    "turnkey-vnm.21",
     "turnkey-vnm.6",
     "turnkey-vnm.7"
   ],
@@ -22,5 +23,5 @@
   "status": "open",
   "title": "Test runner records and replays passing tests (Rust)",
   "type": "task",
-  "updated_at": "2026-09-25T10:54:28Z"
+  "updated_at": "2026-09-25T10:54:29Z"
 }
