@@ -4,14 +4,16 @@
     "turnkey-efx.1"
   ],
   "blocks": [],
+  "closed_at": "2026-09-25T20:02:59Z",
+  "close_reason": "Shared resolver; profile gets pinned buck2 (restores the mount's bin/buck2); lint hook + tk completions use pinned buck2; eval check with 3 assertions, each proven red.",
   "created": "2026-09-25T17:24:08Z",
   "description": "Shell and toolchain-profile share one resolver that rejects declared buck2; lint hook uses the pinned binary.",
   "id": "turnkey-efx.7",
   "labels": [],
   "parent": "turnkey-efx",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "One toolchain-resolution module enforcing ADR 0002",
   "type": "task",
-  "updated_at": "2026-09-25T19:57:35Z"
+  "updated_at": "2026-09-25T20:02:59Z"
 }
