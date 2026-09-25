@@ -1,7 +1,8 @@
 {
   "assignee": "",
   "blocked_by": [
-    "turnkey-vnm.3"
+    "turnkey-vnm.3",
+    "turnkey-vnm.8"
   ],
   "blocks": [],
   "created": "2026-09-25T10:54:32Z",
@@ -15,5 +16,5 @@
   "status": "open",
   "title": "Consumer repos get test result caching for supported buck2 versions",
   "type": "task",
-  "updated_at": "2026-09-25T10:54:32Z"
+  "updated_at": "2026-09-25T10:54:33Z"
 }
