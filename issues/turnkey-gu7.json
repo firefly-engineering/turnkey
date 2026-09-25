@@ -8,9 +8,9 @@
   "description": "Found during test-input research (docs/research/test-undeclared-inputs.md on jj bookmark research/test-undeclared-inputs (from turnkey-w55.3)), not yet verified at runtime. forge appears to auto-detect or download solc via svm under $HOME instead of using the toolchain's solc 0.8.34. It also merges ~/.foundry/foundry.toml if present, and fuzzes without a fixed seed. Verify which solc forge actually selects, and pin it (e.g. --use / --offline, FOUNDRY_* via the rule) so results depend only on declared inputs.",
   "id": "turnkey-gu7",
   "labels": [],
-  "priority": 3,
+  "priority": 2,
   "status": "open",
   "title": "solidity_test may not use the Nix-provided solc",
   "type": "bug",
-  "updated_at": "2026-09-25T10:54:32Z"
+  "updated_at": "2026-09-25T10:57:00Z"
 }
