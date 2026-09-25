@@ -4,7 +4,9 @@
     "turnkey-vnm.3",
     "turnkey-vnm.8"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-vnm.26"
+  ],
   "created": "2026-09-25T10:54:32Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nTurnkey keeps a table from buck2 version to buck2 source revision and builds the runner for the consumer's selected buck2-toolchain version. An entry is added only after the parity suite passes for it. If the consumer's buck2 version isn't in the table, the runner isn't configured, tests run uncached under buck2's own runner, and entering the shell prints a one-line notice (spec §7).\n\n## Acceptance criteria\n\n- [ ] A consumer on a supported buck2 version gets caching with no toolchain.toml entry\n- [ ] A consumer on an unsupported version gets uncached tests and one notice at shell entry\n- [ ] Adding a version requires a passing parity suite run\n\n## Blocked by\n\n- turnkey-vnm.3\n- turnkey-vnm.8\n",
   "id": "turnkey-vnm.25",
