@@ -14,9 +14,9 @@
       "timestamp": "2026-09-25T10:03:27Z"
     }
   ],
-  "priority": 3,
+  "priority": 2,
   "status": "open",
   "title": "godeps_test integration cases always skip: fixtures not declared as resources",
   "type": "bug",
-  "updated_at": "2026-09-25T10:54:28Z"
+  "updated_at": "2026-09-25T10:57:00Z"
 }
