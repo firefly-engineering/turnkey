@@ -6,14 +6,16 @@
   "blocks": [
     "turnkey-pru.6"
   ],
+  "closed_at": "2026-09-25T21:06:22Z",
+  "close_reason": "Landed as pmtykqou: helper returns no-test-cache kwargs unchanged; runner lost per-target mode and the label; check-test-caching covers it (8 targets pass).",
   "created": "2026-09-25T20:29:52Z",
   "description": "test_caching.bzl adds turnkey-cacheable to no-test-cache targets and the runner undoes it (runner.rs mode_for, NO_TEST_CACHE_LABEL); solidity_test.bzl:73 repeats the literal. Helper returns no-test-cache kwargs unchanged; runner keeps only the cacheable label. Sharpen CONTEXT.md reuse policy.",
   "id": "turnkey-pru.5",
   "labels": [],
   "parent": "turnkey-pru",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Decide test-cache eligibility once, in the test-caching helper",
   "type": "task",
-  "updated_at": "2026-09-25T21:02:44Z"
+  "updated_at": "2026-09-25T21:06:22Z"
 }
