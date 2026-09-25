@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "turnkey-efx.5"
+  ],
   "created": "2026-09-25T17:24:06Z",
   "description": "buck2-source.nix binds turnkey's registry once (self.lib.pinnedBuck2Release system), returns buck2/upstreamPrelude/prelude/protos/version; prelude.nix internal; flat nix/patches/prelude/*.patch; check binary passthru.rev when present; eval-only checks.\u003csystem\u003e.pinned-buck2-release.",
   "id": "turnkey-efx.1",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Make the pinned buck2 release one deep module",
   "type": "task",
-  "updated_at": "2026-09-25T17:24:06Z"
+  "updated_at": "2026-09-25T17:24:08Z"
 }
