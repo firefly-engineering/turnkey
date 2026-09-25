@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "turnkey-luk.8"
+  ],
   "created": "2026-09-25T15:11:16Z",
   "description": "## Question\n\nHow long does `src/cmd/check-test-runner-parity` take on a warm and a cold machine, what does it need (buck2 daemon, nix store paths, network, FUSE/macFUSE), and could it run in the repo's existing GitHub Actions setup (`.github/workflows/*`) on the runners those use? Answer with the facts a 'CI gate or manual checklist step' decision needs.",
   "id": "turnkey-luk.2",
@@ -13,5 +15,5 @@
   "status": "open",
   "title": "Is the test-runner parity suite fast and self-contained enough to be a CI gate?",
   "type": "task",
-  "updated_at": "2026-09-25T15:11:16Z"
+  "updated_at": "2026-09-25T15:11:23Z"
 }
