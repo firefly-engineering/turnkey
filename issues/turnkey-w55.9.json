@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T07:31:11Z",
+  "description": "## Question\n\nHow does a consumer repo get test result caching?\n- As a `tk` built-in, or as a `registryExtensions` toolchain?\n- Where is configuration read from (a `.turnkey/*.toml`, flake-module options)?\n- Which generated `.buckconfig` sections does turnkey emit (`[test]`, `[buck2_re_client]`, executor config)?\n- How is a local service, if any, started and stopped (devenv process, on-demand from `tk`, launchd/systemd user unit)?\n- How does a consumer point it at a shared remote-execution endpoint?",
+  "id": "turnkey-w55.9",
+  "labels": [],
+  "parent": "turnkey-w55",
+  "priority": 2,
+  "status": "open",
+  "title": "How does the caching tool ship to consumer repos and get configured?",
+  "type": "task",
+  "updated_at": "2026-09-25T07:31:11Z"
+}
