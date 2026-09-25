@@ -12,7 +12,7 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use tonic::transport::Channel;
 
 use crate::args::{Config, EnvValue};
-use crate::cache::{Pass, Recorder};
+use crate::cache::{Mode, Pass, Recorder};
 use crate::proto::buck::data::command_execution_kind;
 use crate::proto::buck::host_sharing::{
     HostSharingRequirements, WeightClass, host_sharing_requirements, weight_class,
@@ -25,6 +25,10 @@ use crate::proto::buck::test::{
     arg_value_content, execute_response2, execution_status, execution_stream,
     external_runner_spec_value, test_stage,
 };
+
+/// Label that opts a target out of test result caching: it always runs and is
+/// never recorded (docs/specs/test-result-caching.md).
+pub const NO_TEST_CACHE_LABEL: &str = "no-test-cache";
 
 /// Exit code reported to buck2 when any test did not pass.
 const FAILURE_EXIT_CODE: i32 = 32;
@@ -75,11 +79,12 @@ impl Runner {
         let target = spec.target.clone().context("spec without a target")?;
         let name = format!("{}//{}:{}", target.cell, target.package, target.target);
         let handle = target.handle.context("spec target without a handle")?;
+        let mode = self.mode_for(&spec);
 
         let response = self
             .orchestrator
             .clone()
-            .execute2(self.execute_request(spec)?)
+            .execute2(self.execute_request(spec, mode)?)
             .await
             .context("Test execution request failed")?
             .into_inner();
@@ -92,7 +97,7 @@ impl Runner {
             execute_response2::Response::Cancelled(_) => return Ok(TestStatus::Omitted),
         };
 
-        if let Some(recorder) = &self.recorder {
+        if let (Some(recorder), true) = (&self.recorder, mode.records()) {
             record_if_pass(recorder, &name, &result).await;
         }
 
@@ -108,7 +113,17 @@ impl Runner {
         Ok(status)
     }
 
-    fn execute_request(&self, spec: ExternalRunnerSpec) -> Result<ExecuteRequest2> {
+    /// The cache mode for one target: a target labelled `no-test-cache`
+    /// always runs and is never recorded.
+    fn mode_for(&self, spec: &ExternalRunnerSpec) -> Mode {
+        if spec.labels.iter().any(|label| label == NO_TEST_CACHE_LABEL) {
+            Mode::Off
+        } else {
+            self.config.turnkey_test_cache
+        }
+    }
+
+    fn execute_request(&self, spec: ExternalRunnerSpec, mode: Mode) -> Result<ExecuteRequest2> {
         let target = spec.target.context("spec without a target")?;
 
         let cmd = spec
@@ -165,7 +180,7 @@ impl Runner {
             executor_override: None,
             required_local_resources: Vec::new(),
             // buck2 reads recorded results only when the runner allows it.
-            disable_test_execution_caching: !self.config.turnkey_test_cache.reads(),
+            disable_test_execution_caching: !mode.reads(),
         })
     }
 }
@@ -317,6 +332,28 @@ mod tests {
         test_result("t".into(), ConfiguredTargetHandle { id: 1 }, result)
             .unwrap()
             .details
+    }
+
+    #[tokio::test]
+    async fn no_test_cache_label_turns_caching_off_for_that_target() {
+        use clap::Parser;
+        let config = Config::try_parse_from([
+            "ignored",
+            "--buck-test-info",
+            "ignored",
+            "--turnkey-test-cache=on",
+        ])
+        .unwrap();
+        let channel =
+            tonic::transport::Endpoint::from_static("http://unused.invalid").connect_lazy();
+        let runner = Runner::new(TestOrchestratorClient::new(channel), config, None);
+        let spec = |labels: &[&str]| ExternalRunnerSpec {
+            labels: labels.iter().map(|l| l.to_string()).collect(),
+            ..Default::default()
+        };
+        assert_eq!(runner.mode_for(&spec(&["no-test-cache"])), Mode::Off);
+        assert_eq!(runner.mode_for(&spec(&["other"])), Mode::On);
+        assert_eq!(runner.mode_for(&spec(&[])), Mode::On);
     }
 
     #[test]
