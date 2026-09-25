@@ -11,9 +11,15 @@
     "wayfinder:task"
   ],
   "parent": "turnkey-w55",
+  "comments": [
+    {
+      "text": "Done 2026-09-25 (aarch64-darwin, pinned buck2 7600cb80, bazel-remote 2.6.2). Full table: https://github.com/firefly-engineering/turnkey/blob/56e05c0a5905/docs/research/test-cache-mechanism-feasibility.md#verification-run-turnkey-w5510-2026-09-25 . The ADR 0001 consequences were corrected in the same commit.\n\nSetup: a throwaway buck2 project; a rule emitting ExternalRunnerTestInfo with supports_test_execution_caching and the cache-reading default_executor; the OSS runner; an ActionResult written by hand under the digest buck2 reported. All removed afterwards.\n\nFacts later tickets depend on:\n- CONFIRMED: engine_address pointed at bazel-remote works (Capabilities + AC lookup; no Execution service needed). A hand-written pass is served as a hit: not executed, recorded stdout printed, original duration shown, what-ran says 'cache'. The hit survives the same daemon, a daemon restart, buck2 clean, and another checkout path. bazel-remote accepts inline-stdout entries with AC validation on.\n- A recorded failure is replayed as a failure without running (only passes may be written).\n- REFUTED: a missing execution_metadata does not fail the test (served as Pass 0.0s); it only loses the duration.\n- REFUTED: a failed connect does not stick. The same daemon recovers once the server is back.\n- Server down (fresh daemon, or killed under a connected one): about 45 s of connection retries, then every opted-in test reports Fail (exit 32) without executing.\n- Reads skipped (--no-remote-cache) with the server down: the test runs locally and passes, no connection attempt, identical digest reported. The uncached fallback and 'force re-run, still record' both work.\n- NOT TESTED: a missing output (the OSS runner requests none); entries referencing CAS blobs.",
+      "timestamp": "2026-09-25T10:34:53Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "Does the recording mechanism work end to end on one test target?",
   "type": "task",
-  "updated_at": "2026-09-25T10:29:51Z"
+  "updated_at": "2026-09-25T10:34:53Z"
 }
