@@ -480,3 +480,51 @@ func TestRoundTripWithMarkers(t *testing.T) {
 		t.Errorf("Expected 1 preserved dep after round-trip, got %d", len(preservedDeps))
 	}
 }
+
+func TestSetDepsKeepsDepsOutsideTheMarkers(t *testing.T) {
+	src := `go_library(
+    name = "lib",
+    deps = [
+        "//hand/written:dep",
+        # turnkey:auto-start
+        "//old:auto",
+        # turnkey:auto-end
+    ],
+)
+`
+	f, err := Parse("rules.star", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.GetTarget("lib").SetDeps([]string{"//new:auto"})
+	out := string(f.Write())
+	if !strings.Contains(out, "//hand/written:dep") {
+		t.Errorf("a dep outside the markers was dropped:\n%s", out)
+	}
+}
+
+func TestMarkersFromTheSyntaxTree(t *testing.T) {
+	src := `go_library(
+    name = "lib",
+    deps = [
+        # turnkey:preserve-start
+        "//kept:one", "//kept:two",
+        # turnkey:preserve-end
+        # turnkey:auto-start
+        "//auto:one", "//auto:two",  # two on a line
+        # turnkey:auto-end
+    ],
+)
+`
+	f, err := Parse("rules.star", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lib := f.GetTarget("lib")
+	if got := lib.GetAutoDeps(); strings.Join(got, " ") != "//auto:one //auto:two" {
+		t.Errorf("auto deps %q", got)
+	}
+	if got := lib.GetPreservedDeps(); strings.Join(got, " ") != "//kept:one //kept:two" {
+		t.Errorf("preserved deps %q", got)
+	}
+}

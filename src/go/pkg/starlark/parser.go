@@ -3,6 +3,7 @@ package starlark
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -219,99 +220,79 @@ func parseListValue(list *syntax.ListExpr, source []byte) AttributeValue {
 	}
 }
 
-// parseDepsValue parses a deps attribute with marker support.
-// It looks for turnkey:auto-start/end and turnkey:preserve-start/end markers.
+// parseDepsValue parses a deps attribute with marker support: the labels
+// between turnkey:auto-start and turnkey:auto-end are the auto-managed
+// deps; every other label (between turnkey:preserve-start and
+// turnkey:preserve-end, or outside any markers) is preserved, since a person
+// wrote it. The markers are read from the syntax tree's comments, so any
+// layout works, including several labels on one line.
 func parseDepsValue(list *syntax.ListExpr, source []byte) AttributeValue {
-	// Get the original text for this list
-	text := extractText(list, source)
-
-	// Check for markers
-	hasAutoStart := strings.Contains(text, "# turnkey:auto-start")
-	hasAutoEnd := strings.Contains(text, "# turnkey:auto-end")
-	hasPreserveStart := strings.Contains(text, "# turnkey:preserve-start")
-	hasPreserveEnd := strings.Contains(text, "# turnkey:preserve-end")
-
-	// If no markers, parse as regular string list
-	if !hasAutoStart && !hasAutoEnd && !hasPreserveStart && !hasPreserveEnd {
+	markers := listMarkers(list)
+	if len(markers) == 0 {
 		return parseListValue(list, source)
 	}
 
-	// Parse with markers
-	depsValue := DepsValue{
-		HasMarkers: true,
-	}
-
-	// Parse the text line by line to extract deps in each section
-	lines := strings.Split(text, "\n")
+	depsValue := DepsValue{HasMarkers: true}
 	inAutoSection := false
-	inPreserveSection := false
-
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-
-		// Check for markers
-		if strings.Contains(trimmed, "# turnkey:auto-start") {
-			inAutoSection = true
+	next := 0
+	for _, elem := range list.List {
+		start, _ := elem.Span()
+		for ; next < len(markers) && precedes(markers[next].position, start); next++ {
+			inAutoSection = markers[next].opensAuto
+		}
+		lit, ok := elem.(*syntax.Literal)
+		if !ok || lit.Token != syntax.STRING {
 			continue
 		}
-		if strings.Contains(trimmed, "# turnkey:auto-end") {
-			inAutoSection = false
-			continue
-		}
-		if strings.Contains(trimmed, "# turnkey:preserve-start") {
-			inPreserveSection = true
-			continue
-		}
-		if strings.Contains(trimmed, "# turnkey:preserve-end") {
-			inPreserveSection = false
-			continue
-		}
-
-		// Skip empty lines, brackets, and pure comments
-		if trimmed == "" || trimmed == "[" || trimmed == "]" || trimmed == "]," {
-			continue
-		}
-		if strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-
-		// Extract the dep string
-		dep := extractDepFromLine(trimmed)
-		if dep == "" {
-			continue
-		}
-
+		dep := lit.Value.(string)
 		if inAutoSection {
 			depsValue.AutoDeps = append(depsValue.AutoDeps, dep)
-		} else if inPreserveSection {
+		} else {
 			depsValue.PreservedDeps = append(depsValue.PreservedDeps, dep)
 		}
-		// Deps outside markers are ignored (they'll be in one section or another after sync)
 	}
-
 	return depsValue
 }
 
-// extractDepFromLine extracts a dependency string from a line like `"//foo:bar",`
-func extractDepFromLine(line string) string {
-	// Remove trailing comma
-	line = strings.TrimSuffix(line, ",")
-	line = strings.TrimSpace(line)
+// marker is a turnkey section comment inside a deps list.
+type marker struct {
+	position syntax.Position
+	// opensAuto: turnkey:auto-start; every other marker ends the auto section
+	opensAuto bool
+}
 
-	// Remove inline comments
-	if idx := strings.Index(line, "#"); idx != -1 {
-		line = strings.TrimSpace(line[:idx])
-	}
-
-	// Unquote the string
-	if strings.HasPrefix(line, `"`) && strings.HasSuffix(line, `"`) {
-		s, err := strconv.Unquote(line)
-		if err == nil {
-			return s
+// listMarkers returns the turnkey markers among the comments inside list, in
+// source order, wherever the parser attached them.
+func listMarkers(list *syntax.ListExpr) []marker {
+	var markers []marker
+	syntax.Walk(list, func(n syntax.Node) bool {
+		// Walk calls f with nil once it has visited a node's children
+		if n == nil {
+			return false
 		}
-	}
+		comments := n.Comments()
+		if comments == nil {
+			return true
+		}
+		for _, group := range [][]syntax.Comment{comments.Before, comments.Suffix, comments.After} {
+			for _, c := range group {
+				switch strings.TrimSpace(strings.TrimPrefix(c.Text, "#")) {
+				case "turnkey:auto-start":
+					markers = append(markers, marker{c.Start, true})
+				case "turnkey:auto-end", "turnkey:preserve-start", "turnkey:preserve-end":
+					markers = append(markers, marker{c.Start, false})
+				}
+			}
+		}
+		return true
+	})
+	sort.Slice(markers, func(i, j int) bool { return precedes(markers[i].position, markers[j].position) })
+	return markers
+}
 
-	return ""
+// precedes reports whether position a comes before position b.
+func precedes(a, b syntax.Position) bool {
+	return a.Line < b.Line || (a.Line == b.Line && a.Col < b.Col)
 }
 
 // spanFromNode creates a Span from a syntax.Node.
