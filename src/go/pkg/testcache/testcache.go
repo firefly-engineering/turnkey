@@ -132,6 +132,19 @@ func (c *Config) Ensure() error {
 	if c.Reachable(probe) {
 		return nil
 	}
+
+	// Several tk test runs (other checkouts, other terminals) may find the
+	// cache down at once. Only the one holding the lock starts it; the others
+	// find it up once they get the lock.
+	unlock, err := lockStore()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	if c.Reachable(probe) {
+		return nil
+	}
+
 	exited, err := c.start()
 	if err != nil {
 		return err
@@ -149,6 +162,30 @@ func (c *Config) Ensure() error {
 		}
 	}
 	return fmt.Errorf("test result cache did not come up at %s", c.Address)
+}
+
+// lockStore takes an exclusive lock on the store, waiting for any other
+// holder, and returns the function that releases it.
+func lockStore() (func(), error) {
+	store, err := StoreDir()
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		return nil, fmt.Errorf("creating the test result store: %w", err)
+	}
+	lock, err := os.OpenFile(filepath.Join(store, "server.lock"), os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return nil, fmt.Errorf("opening the test result cache lock: %w", err)
+	}
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		lock.Close()
+		return nil, fmt.Errorf("locking the test result store: %w", err)
+	}
+	return func() {
+		_ = syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+		lock.Close()
+	}, nil
 }
 
 // start launches the server and returns a channel closed when it exits.

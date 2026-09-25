@@ -3,7 +3,9 @@ package testcache
 import (
 	"io"
 	"net"
+	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -121,5 +123,78 @@ func TestRunnerArgs(t *testing.T) {
 	want := []string{"--turnkey-test-cache=on", "--turnkey-test-cache-address=grpc://127.0.0.1:47301"}
 	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
 		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+// TestMain lets the test binary stand in for bazel-remote: run with
+// TESTCACHE_FAKE_SERVER set, it records its start and serves HTTP/2 prefaces
+// on --grpc_address until killed.
+func TestMain(m *testing.M) {
+	if starts := os.Getenv("TESTCACHE_FAKE_SERVER"); starts != "" {
+		fakeServer(starts)
+		return
+	}
+	os.Exit(m.Run())
+}
+
+func fakeServer(startsFile string) {
+	f, _ := os.OpenFile(startsFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	f.WriteString("start\n")
+	f.Close()
+	var address string
+	for i, arg := range os.Args {
+		if arg == "--grpc_address" && i+1 < len(os.Args) {
+			address = os.Args[i+1]
+		}
+	}
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		os.Exit(1)
+	}
+	// Serve for long enough to outlive the test, then exit on our own.
+	go func() { time.Sleep(10 * time.Second); os.Exit(0) }()
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			os.Exit(0)
+		}
+		go http2Server(conn)
+	}
+}
+
+func TestConcurrentEnsureStartsOneServer(t *testing.T) {
+	t.Setenv(CacheDirEnv, t.TempDir())
+	starts := filepath.Join(t.TempDir(), "starts")
+	t.Setenv("TESTCACHE_FAKE_SERVER", starts)
+	probe, _ := net.Listen("tcp", "127.0.0.1:0")
+	address := probe.Addr().String()
+	probe.Close()
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := &Config{Server: executable, Address: "grpc://" + address}
+
+	var wg sync.WaitGroup
+	errs := make([]error, 4)
+	for i := range errs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs[i] = c.Ensure()
+		}()
+	}
+	wg.Wait()
+	for _, err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	data, err := os.ReadFile(starts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(data) / len("start\n"); n != 1 {
+		t.Fatalf("started %d servers, want 1", n)
 	}
 }
