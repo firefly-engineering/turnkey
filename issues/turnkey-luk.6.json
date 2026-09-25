@@ -14,9 +14,15 @@
     "wayfinder:task"
   ],
   "parent": "turnkey-luk",
+  "comments": [
+    {
+      "text": "Implement the interface settled in turnkey-luk.4 (see its resolution comment): buck2.shells list + master buck2.enable, read-only buck2.version in both modules, standalone devenv module resolves the pin itself.",
+      "timestamp": "2026-09-25T15:23:58Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "Replace toolchain.toml buck2 declarations with the per-shell option",
   "type": "task",
-  "updated_at": "2026-09-25T15:11:23Z"
+  "updated_at": "2026-09-25T15:23:58Z"
 }
