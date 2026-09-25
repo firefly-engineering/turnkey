@@ -6,14 +6,16 @@
   "blocks": [
     "turnkey-pru.3"
   ],
+  "closed_at": "2026-09-25T20:53:09Z",
+  "close_reason": "Landed as ntorlmto: deleted src/go/pkg/rules, unused staleness checks, and the five unpackaged *-deps-extract commands (-11k lines); rulessync calls go list directly.",
   "created": "2026-09-25T20:29:52Z",
   "description": "src/go/pkg/rules (no importers), the unused parts of src/go/pkg/staleness (only IsStale is called), and the unpackaged regex src/cmd/*-deps-extract commands. tk rules sync uses rulessync+mapper+starlark+deps-extract only.",
   "id": "turnkey-pru.2",
   "labels": [],
   "parent": "turnkey-pru",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Delete dead rules.star sync code",
   "type": "task",
-  "updated_at": "2026-09-25T20:51:30Z"
+  "updated_at": "2026-09-25T20:53:09Z"
 }
