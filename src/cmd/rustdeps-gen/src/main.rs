@@ -164,18 +164,12 @@ fn prefetch_crate(name: &str, version: &str) -> Result<String> {
         name, version
     );
 
-    // Use nix-prefetch-cached for automatic caching
-    // Falls back to nix-prefetch-url if wrapper not available
+    // nix-prefetch-cached keeps turnkey's prefetch cache and returns an SRI
+    // hash; rustdeps-gen's wrapper puts it on PATH
     let output = Command::new("nix-prefetch-cached")
         .args(["--unpack", &url])
         .output()
-        .or_else(|_| {
-            // Fallback to nix-prefetch-url if cached version not available
-            Command::new("nix-prefetch-url")
-                .args(["--type", "sha256", "--unpack", &url])
-                .output()
-        })
-        .context("Failed to run nix-prefetch-cached or nix-prefetch-url")?;
+        .context("Failed to run nix-prefetch-cached")?;
 
     if !output.status.success() {
         anyhow::bail!(
@@ -184,31 +178,10 @@ fn prefetch_crate(name: &str, version: &str) -> Result<String> {
         );
     }
 
-    let hash = String::from_utf8(output.stdout)
-        .context("Invalid UTF-8 from prefetch")?
+    Ok(String::from_utf8(output.stdout)
+        .context("Invalid UTF-8 from nix-prefetch-cached")?
         .trim()
-        .to_string();
-
-    // nix-prefetch-cached already returns SRI format
-    // If using fallback nix-prefetch-url, we need to convert
-    if hash.starts_with("sha256-") {
-        Ok(hash)
-    } else {
-        // Convert base32 to SRI format
-        let sri_output = Command::new("nix")
-            .args(["hash", "to-sri", "--type", "sha256", &hash])
-            .output()
-            .context("Failed to run nix hash to-sri")?;
-
-        if !sri_output.status.success() {
-            return Ok(hash);
-        }
-
-        Ok(String::from_utf8(sri_output.stdout)
-            .context("Invalid UTF-8 from nix hash")?
-            .trim()
-            .to_string())
-    }
+        .to_string())
 }
 
 /// Write crates as TOML
