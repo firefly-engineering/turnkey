@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [],
   "blocks": [
     "turnkey-pru.2"
@@ -10,8 +10,8 @@
   "labels": [],
   "parent": "turnkey-pru",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "One language module owns 'language X is enabled'",
   "type": "task",
-  "updated_at": "2026-09-25T20:29:54Z"
+  "updated_at": "2026-09-25T20:29:59Z"
 }
