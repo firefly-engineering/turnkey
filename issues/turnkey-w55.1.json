@@ -4,6 +4,8 @@
   "blocks": [
     "turnkey-w55.7"
   ],
+  "closed_at": "2026-09-25T07:49:51Z",
+  "close_reason": "Researched; see resolution comment",
   "created": "2026-09-25T07:30:57Z",
   "description": "## Question\n\nTurnkey pins buck2-2026-04-15 (`toolchain.toml` sets `buck2-toolchain` version 3, resolved through the toolbox flake). Upstream work on test execution caching landed in Feb–Mar 2026, and further caching work continued after that. Establish exactly what this pinned binary supports, citing the buck2 source at the matching commit (the binary reports `2026-04-14-7600cb80…`):\n\n1. Does `ExternalRunnerTestInfo` accept `supports_test_execution_caching`? Are stable test output paths the default (upstream d2b7ecb171 / 91c4d7d109)?\n2. Does an executor with local execution on, remote off and remote cache on get cache lookups for tests? Are local test executions ever uploaded?\n3. For ordinary `run` actions: `allow_cache_uploads`, the local `LocalActionCache`/dep-file reuse, and whether `buck2.sqlite_dep_file_state` (upstream 2ca2802708, 2026-07-31) is present.\n4. Is the `[test] v2_test_executor` protocol (`test.proto`) at this commit identical to what quokka vendors? Note any differences.\n5. How the toolbox flake builds buck2: from source or prebuilt? Could turnkey carry a buck2 patch, and what would a buck2 bump cost?",
   "id": "turnkey-w55.1",
@@ -18,8 +20,8 @@
     }
   ],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "What test-caching support does our pinned buck2 have?",
   "type": "task",
-  "updated_at": "2026-09-25T07:49:50Z"
+  "updated_at": "2026-09-25T07:49:51Z"
 }
