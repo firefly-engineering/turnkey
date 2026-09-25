@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T10:54:23Z",
+  "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nStore location (`TURNKEY_CACHE_DIR`), store size (default 5 GiB, LRU) and port can be overridden per user through env or user-level config, never through the repo (spec §6).\n\n## Acceptance criteria\n\n- [ ] Each of the three settings can be overridden without touching the repo\n- [ ] The default size is 5 GiB\n- [ ] A port override is honoured by the server, the probe and the generated client address alike\n\n## Blocked by\n\n- turnkey-vnm.7\n",
+  "id": "turnkey-vnm.11",
+  "labels": [],
+  "parent": "turnkey-vnm",
+  "priority": 2,
+  "status": "open",
+  "title": "Per-user overrides for the test result cache",
+  "type": "task",
+  "updated_at": "2026-09-25T10:54:23Z"
+}
