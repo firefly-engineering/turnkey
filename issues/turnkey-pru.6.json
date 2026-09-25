@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [
     "turnkey-pru.5"
   ],
@@ -12,8 +12,8 @@
   "labels": [],
   "parent": "turnkey-pru",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "One test cache descriptor from Nix to tk to runner",
   "type": "task",
-  "updated_at": "2026-09-25T20:29:55Z"
+  "updated_at": "2026-09-25T21:06:22Z"
 }
