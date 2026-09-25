@@ -5,7 +5,9 @@
   "created": "2026-09-25T09:56:36Z",
   "description": "## Question\n\nThe runner from ADR 0001 speaks buck2's test-runner protocol (test.proto and a subset of data.proto, pinned to the exact buck2 version), talks REAPI to the local cache, and replaces the OSS runner. Rust or Go? Weigh: proto and gRPC tooling in each, how the tk/tw Go code and the Rust tools are built and shipped today, whether the OSS runner's code (Rust) or quokka's (Rust) can be reused or ported, and the Buck2 build of the tool itself.",
   "id": "turnkey-w55.11",
-  "labels": [],
+  "labels": [
+    "wayfinder:grilling"
+  ],
   "parent": "turnkey-w55",
   "priority": 2,
   "status": "open",
