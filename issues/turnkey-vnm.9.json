@@ -5,11 +5,13 @@
   "created": "2026-09-25T10:54:21Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nParallel `tk test` runs in several checkouts start at most one server, thanks to a lock in the cache dir (spec §6).\n\n## Acceptance criteria\n\n- [ ] Concurrent `tk test` runs from two checkouts leave exactly one bazel-remote running\n- [ ] Both runs use it\n\n## Blocked by\n\n- turnkey-vnm.7\n",
   "id": "turnkey-vnm.9",
-  "labels": [],
+  "labels": [
+    "ready-for-agent"
+  ],
   "parent": "turnkey-vnm",
   "priority": 2,
   "status": "open",
   "title": "Only one test result cache server per machine",
   "type": "task",
-  "updated_at": "2026-09-25T10:54:21Z"
+  "updated_at": "2026-09-25T10:54:22Z"
 }
