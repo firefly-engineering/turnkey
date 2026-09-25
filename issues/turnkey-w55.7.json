@@ -22,11 +22,15 @@
     {
       "text": "Input from turnkey-w55.6: buck2 at the pin has no console marker for a hit. For each hit, tk test's console output must show 'recorded' per target and a hit count in the summary. That means a buck2 patch, a test runner we own, or tk keeping buck2 as a child process instead of exec'ing it. For each result, the event log must show whether it was a hit, local vs remote, and the original duration.",
       "timestamp": "2026-09-25T09:16:59Z"
+    },
+    {
+      "text": "Resolution (grilled 2026-09-25). ADR: https://github.com/firefly-engineering/turnkey/blob/473895f224c0/docs/adr/0001-runner-recorded-native-test-caching.md . Facts: https://github.com/firefly-engineering/turnkey/blob/473895f224c0/docs/research/test-cache-mechanism-feasibility.md .\n\nMechanism (E): buck2's native test result lookup (supports_test_execution_caching) against a local cache-only REAPI server (bazel-remote), plus a test runner we own that replaces the OSS runner. For each passing local run, the runner writes an ActionResult under the action digest buck2 computed and reported to it (LocalCommand.action_digest). Hits come back as RemoteCommand{cache_hit:true}, with the original timestamps.\n\nDecisions:\n1. Rejected: (A) local RE workers, (B) tests as build actions (no read-skip-but-upload, failures become build failures, whole daemon env inherited), (C) a cache owned entirely by the runner (a second source of truth for the key). (D) a buck2 patch (~30-40 lines, facebook/buck2#183) is kept in reserve; if upstream uploads local test runs, the runner's write step goes away.\n2. A turnkey-managed local background service (bazel-remote) is acceptable.\n3. Cost ranking: owning a runner \u003c carrying a buck2 patch \u003c reshaping test rules.\n4. Caching build actions is out of scope. The mechanism only has to allow it later.\n5. The cache-reading executor goes on the test provider's default_executor, never the execution platform, so builds are unaffected.\n6. If the cache server is unreachable, tk makes sure it's up, or else runs the tests uncached and says so. The cache never fails a test.\n7. The runner is off (no reads, no writes) unless tk test turns it on per invocation. The signal must not invalidate buck2's build state when switching between tk test and plain buck2 test.\n8. v1 records local passes only into the local store. Uploading local passes to a shared cache stays with the shared-cache handover item.\n9. The runner matches the OSS runner (--env, --timeout, --test-arg, stdout/stderr details, exit 32) and adds the marker, the count, the reuse policy and the recording step. The timeout is derived deterministically, because it is part of the digest.\n10. Recorded entries: passes only, execution_metadata always set, buck2's instance_name, project-relative output paths.\n11. Cross-checkout hits still need project-relative test commands (use_project_relative_paths / run_from_project_root). That is per-language, in turnkey-w55.8.",
+      "timestamp": "2026-09-25T09:56:35Z"
     }
   ],
   "priority": 2,
   "status": "in_progress",
   "title": "Which mechanism makes test results cacheable locally and remotely?",
   "type": "task",
-  "updated_at": "2026-09-25T09:17:07Z"
+  "updated_at": "2026-09-25T09:56:35Z"
 }
