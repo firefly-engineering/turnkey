@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T17:24:07Z",
+  "description": "End mkShellConfig's field-by-field copy; defaults and descriptions in one place.",
+  "id": "turnkey-efx.6",
+  "labels": [],
+  "parent": "turnkey-efx",
+  "priority": 2,
+  "status": "open",
+  "title": "One owner for the Buck2 option tree (flake-parts -\u003e devenv)",
+  "type": "task",
+  "updated_at": "2026-09-25T17:24:07Z"
+}
