@@ -360,6 +360,15 @@ ${generateTargets finalToolchains}
     else
       null;
 
+  # Shown on shell entry when caching is wanted but the declared buck2
+  # release isn't supported yet (no source revision in buck2-source.nix, so
+  # no runner built for it): tests then run uncached under buck2's own runner.
+  testCacheUnsupportedNotice =
+    if cfg.testCache.enable && buck2Version != null && !(buck2Source.isSupported buck2Version) then
+      "turnkey: test result caching is off: buck2 ${buck2Version} isn't supported yet (tests run uncached)"
+    else
+      null;
+
   # The local test result cache listens on a fixed loopback port. buck2's RE
   # client can't use Unix sockets, and the address must not be passed with -c,
   # which would change the daemon's startup config.
@@ -1135,7 +1144,9 @@ in
       };
 
     # Create symlinks on shell entry
-    enterShell = ''
+    enterShell = lib.optionalString (testCacheUnsupportedNotice != null) ''
+      echo "${testCacheUnsupportedNotice}" >&2
+    '' + ''
       # Add tk completions to XDG_DATA_DIRS for fish/bash/zsh completion discovery
       if [ -n "''${TURNKEY_TK_SHARE:-}" ]; then
         export XDG_DATA_DIRS="''${TURNKEY_TK_SHARE}:''${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
