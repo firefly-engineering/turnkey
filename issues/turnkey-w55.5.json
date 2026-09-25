@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-w55.4"
+  ],
   "blocks": [],
   "created": "2026-09-25T07:30:58Z",
   "description": "## Question\n\nWhat is the reuse policy, independent of the mechanism?\n- Are failing results cached and replayed, or always re-run? (Bazel re-runs failures. Meta's buck2 stance is to cache \"usually only passing tests\".)\n- Which labels opt a target out of caching (quokka's set, Bazel's `external` / `no-cache`)? Is caching on by default or opt-in per target?\n- How does a user force a re-run (a flag on `tk test`, a label, a per-invocation config)?\n- What else, beyond inputs, must invalidate a result: timeout changes, test args and filters, a new version of the tool itself?",
@@ -13,5 +15,5 @@
   "status": "open",
   "title": "When may a recorded test result be reused?",
   "type": "task",
-  "updated_at": "2026-09-25T07:30:59Z"
+  "updated_at": "2026-09-25T07:31:19Z"
 }
