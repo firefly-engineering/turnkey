@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T08:06:24Z",
+  "description": "## Question\n\nThe repo `CLAUDE.md` now says a turnkey-owned buck2 prelude is on the table (\"The Buck2 prelude is ours to change\"). What form should that ownership take?\n\n- **(a) Upstream as the source of truth.** Keep fetching the upstream prelude and carry turnkey's changes as `nix/patches/prelude/*.patch` plus `nix/buck2/prelude-extensions/`. This fits the \"Importing External Software\" rule in `CLAUDE.md` and is what `nix/buck2/prelude.nix` already does, though no patches exist yet.\n- **(b) A real fork,** e.g. a `firefly-engineering/buck2-prelude` repo fetched by Nix and rebased on upstream periodically. It's still not a copy inside this repo, but upstream stops being the source of truth.\n\n## Context\n\n- Turnkey already extends the prelude with languages upstream lacks (TypeScript, Solidity, Jsonnet, mdbook) by copying extension files over the upstream tree. Extensions can also overwrite upstream files.\n- The test result caching effort (turnkey-w55) will need upstream rule changes. Example: go_test/python_test only use project-relative paths under remote execution, which blocks cross-checkout reuse (see turnkey-w55.3). Per-language changes are decided in turnkey-w55.8. That effort starts with (a); this question doesn't block it.\n- Upgrade cost matters for either option. The turnkey prelude currently matches buck2 release 2026-03-15 while the binary is 2026-04-15, and upgrading past the pin removes `network_access` from `ExternalRunnerTestInfo` (turnkey-w55.1).\n\nDecide: which form, when (if ever) to move from (a) to (b), and how prelude upgrades are kept in step with the buck2 binary.",
+  "id": "turnkey-0d9",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "Should turnkey's buck2 prelude be a patch set on upstream or a real fork?",
+  "type": "question",
+  "updated_at": "2026-09-25T08:06:24Z"
+}
