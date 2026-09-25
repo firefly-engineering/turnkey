@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T19:18:09Z",
+  "description": "Only if CI wall time is still CPU-bound after the cache. Workers need the Nix store paths (buck2 does not upload symlink targets): Nix-built worker image or store-sharing worker, container-image/properties on the platform, hybrid config. See docs/research/remote-execution-and-caching.md (commit adc3619d) §5.",
+  "id": "turnkey-lbe.12",
+  "labels": [],
+  "parent": "turnkey-lbe",
+  "priority": 4,
+  "status": "open",
+  "title": "Remote execution with Nix-provisioned Linux workers (G11)",
+  "type": "task",
+  "updated_at": "2026-09-25T19:18:09Z"
+}
