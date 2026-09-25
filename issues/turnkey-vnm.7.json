@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [
     "turnkey-vnm.5"
   ],
@@ -18,8 +18,8 @@
   ],
   "parent": "turnkey-vnm",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "tk starts the local test result cache on demand",
   "type": "task",
-  "updated_at": "2026-09-25T10:54:26Z"
+  "updated_at": "2026-09-25T12:43:34Z"
 }
