@@ -257,10 +257,27 @@ func (c *Config) start() (<-chan struct{}, error) {
 	return exited, nil
 }
 
-// RunnerArgs are the turnkey-test-runner flags tk passes after `--`.
-func (c *Config) RunnerArgs(mode Mode) []string {
+// RunnerArgs are the turnkey-test-runner flags tk passes after `--`. The
+// runner writes the number of reused results to report when it's done.
+func (c *Config) RunnerArgs(mode Mode, report string) []string {
 	return []string{
 		"--turnkey-test-cache=" + string(mode),
 		"--turnkey-test-cache-address=" + c.Address,
+		"--turnkey-test-cache-report=" + report,
 	}
+}
+
+// ReadReport returns the number of reused results the runner reported, and
+// false when it reported nothing (for instance when the build failed before
+// any test ran).
+func ReadReport(report string) (int, bool) {
+	data, err := os.ReadFile(report)
+	if err != nil {
+		return 0, false
+	}
+	hits, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		return 0, false
+	}
+	return hits, true
 }

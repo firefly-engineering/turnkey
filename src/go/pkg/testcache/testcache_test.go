@@ -119,10 +119,30 @@ func TestReachableRejectsNonGrpcAddresses(t *testing.T) {
 
 func TestRunnerArgs(t *testing.T) {
 	c := &Config{Address: "grpc://127.0.0.1:47301"}
-	got := c.RunnerArgs(On)
-	want := []string{"--turnkey-test-cache=on", "--turnkey-test-cache-address=grpc://127.0.0.1:47301"}
-	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+	got := c.RunnerArgs(On, "/tmp/report")
+	want := []string{
+		"--turnkey-test-cache=on",
+		"--turnkey-test-cache-address=grpc://127.0.0.1:47301",
+		"--turnkey-test-cache-report=/tmp/report",
+	}
+	if len(got) != len(want) {
 		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	}
+}
+
+func TestReadReport(t *testing.T) {
+	report := filepath.Join(t.TempDir(), "report")
+	if _, ok := ReadReport(report); ok {
+		t.Fatal("expected a missing report to read as nothing")
+	}
+	os.WriteFile(report, []byte("3\n"), 0o644)
+	if hits, ok := ReadReport(report); !ok || hits != 3 {
+		t.Fatalf("got %d, %v", hits, ok)
 	}
 }
 

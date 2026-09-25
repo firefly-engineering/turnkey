@@ -63,6 +63,11 @@ pub struct Config {
     #[clap(long, default_value = "")]
     pub turnkey_test_cache_instance_name: String,
 
+    /// turnkey: file to write the number of hits to once all tests are done,
+    /// for `tk test`'s summary.
+    #[clap(long)]
+    pub turnkey_test_cache_report: Option<std::path::PathBuf>,
+
     /// Passthrough argments to test binary.
     /// Available as a workaround for when test features are available.
     #[clap(long, num_args=1.., allow_hyphen_values = true)]

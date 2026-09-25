@@ -5,6 +5,7 @@
 //! details text, same exit code.
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::{Context, Result};
 use futures_util::{StreamExt, TryStreamExt, stream};
@@ -37,6 +38,8 @@ pub struct Runner {
     orchestrator: TestOrchestratorClient<Channel>,
     config: Config,
     recorder: Option<Recorder>,
+    /// Tests whose result buck2 reused instead of running them.
+    hits: AtomicUsize,
 }
 
 impl Runner {
@@ -49,6 +52,7 @@ impl Runner {
             orchestrator,
             config,
             recorder,
+            hits: AtomicUsize::new(0),
         }
     }
 
@@ -67,6 +71,11 @@ impl Runner {
             })
             .await?;
         let exit_code = if all_passed { 0 } else { FAILURE_EXIT_CODE };
+        if let Some(report) = &self.config.turnkey_test_cache_report {
+            let hits = self.hits.load(Ordering::Relaxed);
+            std::fs::write(report, format!("{hits}\n"))
+                .with_context(|| format!("writing {}", report.display()))?;
+        }
         self.orchestrator
             .clone()
             .end_of_test_results(EndOfTestResultsRequest { exit_code })
@@ -97,6 +106,9 @@ impl Runner {
             execute_response2::Response::Cancelled(_) => return Ok(TestStatus::Omitted),
         };
 
+        if is_hit(&result) {
+            self.hits.fetch_add(1, Ordering::Relaxed);
+        }
         if let (Some(recorder), true) = (&self.recorder, mode.records()) {
             record_if_pass(recorder, &name, &result).await;
         }

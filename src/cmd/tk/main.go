@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"slices"
 	"strings"
 	"syscall"
@@ -519,12 +520,19 @@ func delegateToBuck2(args []string) {
 	// Tell turnkey's test runner to use the local test result cache. Added
 	// last, so the flags land first after `--`: the runner's --test-arg
 	// consumes every argument after it.
+	report := ""
 	if len(args) > 0 && args[0] == "test" {
-		args = withTestCache(args)
+		args, report = withTestCache(args)
 	}
 
 	if verbose {
 		fmt.Fprintf(os.Stderr, "tk: executing buck2 %v\n", args)
+	}
+
+	// With a test result cache, tk stays around to print how many results
+	// were reused once buck2's own summary is out.
+	if report != "" {
+		os.Exit(runTestsWithSummary(buck2Path, args, report))
 	}
 
 	// Use syscall.Exec to replace this process with buck2
@@ -537,12 +545,13 @@ func delegateToBuck2(args []string) {
 }
 
 // withTestCache makes sure the local test result cache is up and passes the
-// runner the flags to use it. Without a cache in this dev shell the args are
+// runner the flags to use it. It returns the file the runner reports its
+// number of reused results to. Without a cache in this dev shell the args are
 // unchanged, and the runner neither reads nor records.
-func withTestCache(args []string) []string {
+func withTestCache(args []string) ([]string, string) {
 	cache := testcache.FromEnv()
 	if cache == nil {
-		return args
+		return args, ""
 	}
 	mode := testcache.On
 	if noTestCache {
@@ -553,7 +562,55 @@ func withTestCache(args []string) []string {
 		fmt.Fprintf(os.Stderr, "tk: running tests without the test result cache: %v\n", err)
 		mode = testcache.Off
 	}
-	return injectArgsAfterSeparator(args, cache.RunnerArgs(mode))
+	report, err := os.CreateTemp("", "tk-test-report-*")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tk: not reporting reused test results: %v\n", err)
+		return injectArgsAfterSeparator(args, cache.RunnerArgs(mode, os.DevNull)), ""
+	}
+	report.Close()
+	return injectArgsAfterSeparator(args, cache.RunnerArgs(mode, report.Name())), report.Name()
+}
+
+// runTestsWithSummary runs buck2 as a child, then prints how many test
+// results were reused, and returns buck2's exit code.
+func runTestsWithSummary(buck2Path string, args []string, report string) int {
+	defer os.Remove(report)
+
+	cmd := exec.Command(buck2Path, args...)
+	cmd.Args[0] = "buck2"
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+
+	// Ctrl-C reaches buck2 directly through the terminal's process group;
+	// forwarding it too would read as a second Ctrl-C. Other termination
+	// signals are passed on.
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+	defer signal.Stop(signals)
+	if err := cmd.Start(); err != nil {
+		fmt.Fprintf(os.Stderr, "tk: failed to run buck2: %v\n", err)
+		return 1
+	}
+	go func() {
+		for sig := range signals {
+			if sig != syscall.SIGINT {
+				_ = cmd.Process.Signal(sig)
+			}
+		}
+	}()
+	_ = cmd.Wait()
+
+	if hits, ok := testcache.ReadReport(report); ok {
+		fmt.Fprintf(os.Stderr, "%d recorded (reused without running)\n", hits)
+	}
+	return exitCode(cmd.ProcessState)
+}
+
+// exitCode is the code a shell would report for the process.
+func exitCode(state *os.ProcessState) int {
+	if status, ok := state.Sys().(syscall.WaitStatus); ok && status.Signaled() {
+		return 128 + int(status.Signal())
+	}
+	return state.ExitCode()
 }
 
 // applyLocalOverrides loads local.toml and injects target-specific args.
