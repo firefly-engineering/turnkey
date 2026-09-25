@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T19:18:06Z",
+  "description": "Let CI (and later laptops) reuse buck2 action and test results through a shared REAPI cache, local execution first, remote execution only if CI stays CPU-bound. Research and gap analysis: docs/research/remote-execution-and-caching.md (commit adc3619d), §5 (gaps G0-G11) and §7 (phased plan).\n\nOpen decisions (§7 open questions): who may write (CI main only vs every PR; never laptops); hosted (BuildBuddy/BuildFetch) vs self-hosted bazel-remote + bucket; macOS CI writer in scope?; ship as turnkey module options for consumers or turnkey-CI only; coarseness of the env salt (whole shell vs per-toolchain); should tk own the buck2 daemon environment.",
+  "id": "turnkey-lbe",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "Share buck2 build and test results across machines via a remote cache",
+  "type": "epic",
+  "updated_at": "2026-09-25T19:18:06Z"
+}
