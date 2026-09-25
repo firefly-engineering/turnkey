@@ -11,9 +11,15 @@
     "wayfinder:grilling"
   ],
   "parent": "turnkey-w55",
+  "comments": [
+    {
+      "text": "Resolution (grilled 2026-09-25).\n1. The runner is written in Rust. Parity with buck2's OSS runner (app/buck2_test_runner, Rust) is the riskiest requirement, and quokka is Rust too. The REAPI side is only FindMissingBlobs, BatchUpdateBlobs and UpdateActionResult via tonic. Coupling to tk (Go) is a runtime signal and config, not shared code. This follows the repo's move to Rust tools (rustdeps-gen, hooks).\n2. Protocol code is generated at build time from pinned upstream sources, never hand-copied: buck2's test.proto and data.proto fetched by Nix at the same revision as the pinned buck2 binary (one Nix expression holds the revision, and both read it), and the REAPI protos from bazelbuild/remote-apis at a pinned revision. We reject quokka's hand-copied data.proto subset.\n3. A new crate in this repo that reimplements the OSS runner's behaviour, using it as a reference. We don't build or patch upstream's buck2_test_runner crate, because that brings back buck2's internal crates, its nightly toolchain and most of the from-source cost ADR 0001 avoided. A parity test suite runs the same targets under both runners and gates every buck2 bump.",
+      "timestamp": "2026-09-25T10:06:55Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "Which language is the caching test runner written in?",
   "type": "question",
-  "updated_at": "2026-09-25T10:03:35Z"
+  "updated_at": "2026-09-25T10:06:55Z"
 }
