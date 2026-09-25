@@ -16,6 +16,7 @@ _DEPS = [
     "rustdeps//vendor/hyper-util@0.1.21:hyper-util",
     "rustdeps//vendor/prost@0.14.4:prost",
     "rustdeps//vendor/prost-types@0.14.4:prost-types",
+    "rustdeps//vendor/serde_json:serde_json",
     "rustdeps//vendor/tokio@1.50.0:tokio",
     "rustdeps//vendor/tonic@0.14.6:tonic",
     "rustdeps//vendor/tonic-prost@0.14.6:tonic-prost",

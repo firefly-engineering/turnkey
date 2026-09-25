@@ -24,7 +24,7 @@ use crate::proto::buck::test::{
     ExecutionResult2, ExecutionStream, ExternalRunnerSpec, ExternalRunnerSpecValue,
     ReportTestResultRequest, TestExecutable, TestResult, TestStage, TestStatus, Testing,
     arg_value_content, execute_response2, execution_status, execution_stream,
-    external_runner_spec_value, test_stage,
+    external_runner_spec_value, test_result, test_stage,
 };
 
 /// Label that opts a target out of test result caching: it always runs and is
@@ -40,6 +40,8 @@ pub struct Runner {
     recorder: Option<Recorder>,
     /// Tests whose result buck2 reused instead of running them.
     hits: AtomicUsize,
+    /// Where the cache in use lives, for reporting hits.
+    origin: Origin,
 }
 
 impl Runner {
@@ -48,9 +50,14 @@ impl Runner {
         config: Config,
         recorder: Option<Recorder>,
     ) -> Self {
+        let origin = config
+            .turnkey_test_cache_address
+            .as_deref()
+            .map_or(Origin::Local, Origin::of);
         Self {
             orchestrator,
             config,
+            origin,
             recorder,
             hits: AtomicUsize::new(0),
         }
@@ -113,7 +120,7 @@ impl Runner {
             record_if_pass(recorder, &name, &result).await;
         }
 
-        let result = test_result(name, handle, result)?;
+        let result = test_result(name, handle, result, self.origin)?;
         let status = result.status();
         self.orchestrator
             .clone()
@@ -233,8 +240,46 @@ async fn record_if_pass(recorder: &Recorder, name: &str, result: &ExecutionResul
     }
 }
 
+/// Where the test result cache in use lives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Origin {
+    /// This machine's cache, which the runner records into.
+    Local,
+    /// A shared cache elsewhere.
+    Remote,
+}
+
+impl Origin {
+    /// The origin of a cache at `address` (`grpc://host:port`).
+    pub fn of(address: &str) -> Origin {
+        let host = address
+            .strip_prefix("grpc://")
+            .unwrap_or(address)
+            .rsplit_once(':')
+            .map_or(address, |(host, _port)| host);
+        match host {
+            "127.0.0.1" | "localhost" | "[::1]" => Origin::Local,
+            _ => Origin::Remote,
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Origin::Local => "local",
+            Origin::Remote => "remote",
+        }
+    }
+}
+
 /// First line of a hit's details.
-pub const HIT_MARKER: &str = "recorded: reused the result of an earlier run with the same inputs\n";
+fn hit_marker(origin: Origin) -> &'static str {
+    match origin {
+        Origin::Local => "recorded: reused the result of an earlier run with the same inputs\n",
+        Origin::Remote => {
+            "recorded, remote: reused the result of an earlier run with the same inputs\n"
+        }
+    }
+}
 
 /// Whether buck2 served this result from the cache instead of running the test.
 fn is_hit(result: &ExecutionResult2) -> bool {
@@ -288,6 +333,7 @@ fn test_result(
     name: String,
     target: crate::proto::buck::test::ConfiguredTargetHandle,
     result: ExecutionResult2,
+    origin: Origin,
 ) -> Result<TestResult> {
     let status = match result
         .status
@@ -299,8 +345,29 @@ fn test_result(
         execution_status::Status::TimedOut(_) => TestStatus::Timeout,
     };
     // A hit is marked in the details, the part of a result buck2 prints
-    // under the test's line.
-    let marker = if is_hit(&result) { HIT_MARKER } else { "" };
+    // under the test's line. Its provenance goes in `msg`, which buck2 keeps
+    // in the event log but doesn't print, and its duration (the original
+    // run's) moves there too: the console shows no duration for a test that
+    // didn't run.
+    let hit = is_hit(&result);
+    let (marker, msg, duration) = if hit {
+        let provenance = serde_json::json!({
+            "turnkey_test_cache": {
+                "hit": true,
+                "origin": origin.as_str(),
+                "original_duration_us": duration(result.execution_time.as_ref()).as_micros() as u64,
+            }
+        });
+        (
+            hit_marker(origin),
+            Some(test_result::OptionalMsg {
+                msg: provenance.to_string(),
+            }),
+            None,
+        )
+    } else {
+        ("", None, result.execution_time)
+    };
     let details = format!(
         "{marker}---- STDOUT ----\n{}\n---- STDERR ----\n{}\n",
         stream_text(result.stdout),
@@ -309,9 +376,9 @@ fn test_result(
     Ok(TestResult {
         name,
         status: status as i32,
-        msg: None,
+        msg,
         target: Some(target),
-        duration: result.execution_time,
+        duration,
         details,
         max_memory_used_bytes: result.max_memory_used_bytes,
     })
@@ -341,9 +408,66 @@ mod tests {
     }
 
     fn details(result: ExecutionResult2) -> String {
-        test_result("t".into(), ConfiguredTargetHandle { id: 1 }, result)
-            .unwrap()
-            .details
+        test_result(
+            "t".into(),
+            ConfiguredTargetHandle { id: 1 },
+            result,
+            Origin::Local,
+        )
+        .unwrap()
+        .details
+    }
+
+    fn hit() -> ExecutionResult2 {
+        let mut result = pass_with(command_execution_kind::Command::RemoteCommand(
+            RemoteCommand {
+                cache_hit: true,
+                ..Default::default()
+            },
+        ));
+        result.execution_time = Some(prost_types::Duration {
+            seconds: 1,
+            nanos: 500_000_000,
+        });
+        result
+    }
+
+    #[test]
+    fn hits_carry_provenance_in_msg_and_no_duration() {
+        let reported = test_result(
+            "t".into(),
+            ConfiguredTargetHandle { id: 1 },
+            hit(),
+            Origin::Local,
+        )
+        .unwrap();
+        assert_eq!(reported.duration, None);
+        let msg: serde_json::Value = serde_json::from_str(&reported.msg.unwrap().msg).unwrap();
+        assert_eq!(
+            msg,
+            serde_json::json!({"turnkey_test_cache": {
+                "hit": true, "origin": "local", "original_duration_us": 1_500_000u64
+            }})
+        );
+    }
+
+    #[test]
+    fn remote_hits_say_so() {
+        let reported = test_result(
+            "t".into(),
+            ConfiguredTargetHandle { id: 1 },
+            hit(),
+            Origin::Remote,
+        )
+        .unwrap();
+        assert!(reported.details.starts_with("recorded, remote: "));
+    }
+
+    #[test]
+    fn origin_follows_the_address() {
+        assert_eq!(Origin::of("grpc://127.0.0.1:47301"), Origin::Local);
+        assert_eq!(Origin::of("grpc://localhost:47301"), Origin::Local);
+        assert_eq!(Origin::of("grpc://cache.example.com:443"), Origin::Remote);
     }
 
     #[tokio::test]
