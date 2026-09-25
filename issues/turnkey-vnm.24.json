@@ -2,6 +2,7 @@
   "assignee": "",
   "blocked_by": [
     "turnkey-vnm.22",
+    "turnkey-vnm.23",
     "turnkey-vnm.5"
   ],
   "blocks": [],
@@ -16,5 +17,5 @@
   "status": "open",
   "title": "Solidity tests are cached",
   "type": "task",
-  "updated_at": "2026-09-25T10:54:31Z"
+  "updated_at": "2026-09-25T10:54:32Z"
 }
