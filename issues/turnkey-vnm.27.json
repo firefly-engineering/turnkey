@@ -6,6 +6,8 @@
     "turnkey-vnm.25"
   ],
   "blocks": [],
+  "closed_at": "2026-09-25T13:35:57Z",
+  "close_reason": "User-manual page covering options, label, flag, per-user settings, remote endpoint, event log and custom rules; mdbook build ok.",
   "created": "2026-09-25T10:54:33Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nA user-manual page covering the `buck2.testCache` options, the `no-test-cache` label, `tk --no-test-cache`, per-user overrides, and how a consumer's own test rule opts in through the helper (spec §1, §6, §7).\n\n## Acceptance criteria\n\n- [ ] The page documents every user-facing option, flag and label\n- [ ] It shows a consumer test rule calling the helper\n- [ ] It explains what `recorded` means and when tests run uncached\n\n## Blocked by\n\n- turnkey-vnm.14\n- turnkey-vnm.15\n- turnkey-vnm.25\n",
   "id": "turnkey-vnm.27",
@@ -14,8 +16,8 @@
   ],
   "parent": "turnkey-vnm",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "User manual: test result caching",
   "type": "task",
-  "updated_at": "2026-09-25T13:34:08Z"
+  "updated_at": "2026-09-25T13:35:57Z"
 }
