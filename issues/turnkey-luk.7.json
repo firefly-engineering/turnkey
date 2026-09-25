@@ -11,9 +11,15 @@
     "wayfinder:task"
   ],
   "parent": "turnkey-luk",
+  "comments": [
+    {
+      "text": "From turnkey-luk.6: the evaluation error links to docs/user-manual/src/configuration/buck2-integration.md#the-buck2-version, so that page needs a section headed 'The buck2 version' holding the migration note. Also: e2e/tests/05-brownfield-adoption.sh, docs/user-manual/src/configuration/toolchain-toml.md and getting-started/quick-start.md still declare buck2-toolchain; ADR 0001's 'unreachable cache =\u003e tests fail' consequence predates buck2 2026-09-15 (not ours to rewrite, but the manual must not repeat it).",
+      "timestamp": "2026-09-25T16:12:01Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "Update docs, e2e and the migration note for the bundled buck2",
   "type": "task",
-  "updated_at": "2026-09-25T15:11:23Z"
+  "updated_at": "2026-09-25T16:12:01Z"
 }
