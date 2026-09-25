@@ -2,7 +2,7 @@
 //!
 //! This tool parses Foundry's foundry.toml for git dependencies and optionally
 //! package.json/pnpm-lock.yaml for npm Solidity packages (like @openzeppelin/contracts).
-//! It generates a unified TOML file for use with turnkey's solidity-deps-cell.nix.
+//! It generates a unified TOML file for use with turnkey's Solidity deps cell (nix/buck2/languages.nix).
 
 /// Package version from VERSION.txt (works with both Cargo and Buck2)
 const VERSION: &str = {

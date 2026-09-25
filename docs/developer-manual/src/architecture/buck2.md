@@ -261,6 +261,6 @@ See [Prelude Extensions](../extending/prelude-extensions.md) for adding custom r
 | `nix/buck2/mappings.nix` | Toolchain-to-Buck2 rule mappings |
 | `nix/buck2/prelude.nix` | Prelude derivation with patches/extensions |
 | `nix/buck2/toolchains-cell.nix` | Toolchains cell generator |
-| `nix/buck2/go-deps-cell.nix` | Go dependency cell generator |
-| `nix/buck2/rust-deps-cell.nix` | Rust dependency cell generator |
+| `nix/buck2/languages.nix` | One record per language: its deps cell, generator and sync rules |
+| `nix/lib/deps-cell/` | Dependency cell builders, one adapter per language |
 | `nix/devenv/turnkey/buck2.nix` | Devenv integration module |

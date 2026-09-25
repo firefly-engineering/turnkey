@@ -46,7 +46,7 @@ The intermediate TOML file (`go-deps.toml`, `rust-deps.toml`, etc.) contains:
 Dependencies are assembled into Buck2 cells by Nix:
 
 ```
-go-deps.toml  →  go-deps-cell.nix  →  .turnkey/godeps/  (symlink to Nix store)
+go-deps.toml  →  Go deps cell builder  →  .turnkey/godeps/  (symlink to Nix store)
 ```
 
 The cell contains:
@@ -89,7 +89,7 @@ The cell contains:
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                        Nix Cell Builders                                │
 │                                                                         │
-│   go-deps-cell.nix         rust-deps-cell.nix      python-deps-cell.nix │
+│   nix/lib/deps-cell/adapters/{go,rust,python,javascript,solidity}.nix   │
 │                                                                         │
 │   - Reads TOML, fetches each module via fetchFromGitHub/fetchurl        │
 │   - Assembles into directory structure                                  │

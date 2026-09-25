@@ -1,7 +1,7 @@
 //! rustdeps-gen: Generate rust-deps.toml from Cargo.lock
 //!
 //! This tool parses Cargo.lock and generates a TOML file with Nix-compatible
-//! hashes for use with turnkey's rust-deps-cell.nix.
+//! hashes for use with turnkey's Rust deps cell (nix/buck2/languages.nix).
 //!
 //! The checksums in Cargo.lock are for the .crate tarball, but Nix's fetchzip
 //! computes hashes of the unpacked contents. Therefore, this tool prefetches

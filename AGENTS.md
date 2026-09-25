@@ -85,7 +85,7 @@ tk test //...
 ```
 
 **When to run quality gates:**
-- After modifying any `.nix` files (especially `rust-deps-cell.nix`, `go-deps-cell.nix`)
+- After modifying any `.nix` files (especially `nix/buck2/languages.nix` and `nix/lib/deps-cell/`)
 - After modifying any Rust, Go, or Python code
 - After changing dependency declarations (`rust-deps.toml`, `go-deps.toml`, etc.)
 - Before pushing ANY code changes

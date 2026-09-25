@@ -1,7 +1,7 @@
 // godeps-gen generates go-deps.toml from go.mod and go.sum files.
 //
 // This tool parses Go module files and outputs dependency declarations
-// in the format expected by turnkey's go-deps-cell.nix.
+// in the format expected by turnkey's Go deps cell (nix/buck2/languages.nix).
 //
 // Usage:
 //

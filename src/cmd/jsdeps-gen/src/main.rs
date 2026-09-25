@@ -1,7 +1,7 @@
 //! jsdeps-gen: Generate js-deps.toml from pnpm-lock.yaml
 //!
 //! This tool parses pnpm-lock.yaml and generates a TOML file with package
-//! information for use with turnkey's js-deps-cell.nix.
+//! information for use with turnkey's JavaScript deps cell (nix/buck2/languages.nix).
 //!
 //! pnpm lockfiles contain integrity hashes (SHA512) which we convert to
 //! the format expected by Nix's fetchurl with SRI hashes.

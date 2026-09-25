@@ -67,7 +67,7 @@ mylang = {
 
 ## Go Dependency Cell
 
-Built by `nix/buck2/go-deps-cell.nix`.
+Built by the Go adapter, `nix/lib/deps-cell/adapters/go.nix`.
 
 ### Cell Structure
 
@@ -161,7 +161,7 @@ The `go_library` rule's `importpath = "github.com/spf13/cobra"` makes this work.
 ### Nix Integration
 
 ```nix
-# nix/buck2/go-deps-cell.nix
+# Simplified: the real builder is nix/lib/deps-cell/adapters/go.nix
 { pkgs, lib, goDepsFile }:
 
 let
@@ -210,7 +210,7 @@ pkgs.runCommand "go-deps-cell" {} ''
 
 ## Rust Dependency Cell
 
-Built by `nix/buck2/rust-deps-cell.nix`.
+Built by the Rust adapter, `nix/lib/deps-cell/adapters/rust.nix`.
 
 ### Process
 
@@ -230,7 +230,7 @@ See [Dependency Generators](../extending/dependency-generators.md) for handling 
 
 ## Python Dependency Cell
 
-Built by `nix/buck2/python-deps-cell.nix`.
+Built by the Python adapter, `nix/lib/deps-cell/adapters/python.nix`.
 
 ### Process
 
@@ -274,9 +274,9 @@ This is achieved by:
 To add support for a new language:
 
 1. **Create deps generator** (e.g., `newlang-deps-gen`)
-2. **Create cell builder** (`nix/buck2/newlang-deps-cell.nix`)
-3. **Add to devenv module** (`nix/devenv/turnkey/buck2.nix`)
-4. **Add configuration options** for deps file path
+2. **Create cell builder** (an adapter in `nix/lib/deps-cell/adapters/`)
+3. **Add the language's record** to `nix/buck2/languages.nix`
+4. **Add configuration options** to `nix/buck2/options.nix`
 
 ## Debugging
 

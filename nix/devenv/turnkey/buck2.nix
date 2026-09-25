@@ -90,14 +90,13 @@ let
     turnkeyLib.resolveTool turnkeyCfg.registry name (declaredToolchains.${name} or { })
   ) turnkeyCfg.registry;
 
+  # The languages turnkey manages dependencies for (nix/buck2/languages.nix)
+  languages = import ../../buck2/languages.nix { inherit pkgs lib; };
+  enabledLanguages = builtins.filter (language: cfg.${language.name}.enable) languages;
+
   # Internal generator packages (not exposed through registry, added to shell automatically)
   # These are turnkey implementation details, not user-configurable toolchains
   internalPackages = let
-    godepsGen = import ../../packages/godeps-gen.nix { inherit pkgs lib; };
-    rustdepsGen = import ../../packages/rustdeps-gen.nix { inherit pkgs lib; };
-    pydepsGen = import ../../packages/pydeps-gen.nix { inherit pkgs lib; };
-    jsdepsGen = import ../../packages/jsdeps-gen.nix { inherit pkgs lib; };
-    soldepsGen = import ../../packages/soldeps-gen.nix { inherit pkgs lib; };
     # deps-extract is the unified tree-sitter based import extractor for rules.star sync
     # Built with only the features needed for enabled languages
     depsExtract = import ../../packages/deps-extract.nix {
@@ -111,12 +110,8 @@ let
     # editable installs are visible to the test runner.
     pytestShim = import ../../packages/pytest-uv-shim.nix { inherit pkgs lib; };
   in
-    lib.optional cfg.go.enable godepsGen
-    ++ lib.optional cfg.rust.enable rustdepsGen
-    ++ lib.optional cfg.python.enable pydepsGen
+    map (language: language.generator) enabledLanguages
     ++ lib.optional cfg.python.enable pytestShim
-    ++ lib.optional cfg.javascript.enable jsdepsGen
-    ++ lib.optional cfg.solidity.enable soldepsGen
     # Always include deps-extract (used by tk rules sync for all non-Go languages)
     ++ [ depsExtract ];
 
@@ -224,15 +219,8 @@ ${generateTargets finalToolchains}
     cfg.prelude.path != null;
   prelude = if customPrelude then cfg.prelude.path else cfg.prelude.package;
 
-  # A language's deps file by name, as the sync rules and hooks use it:
-  # depsFile is a path from the flake-parts module, or a file name.
-  depsFileName =
-    lang: default:
-    let
-      file = cfg.${lang}.depsFile;
-    in
-    if file != null then baseNameOf (toString file) else default;
-  goDepsFile = depsFileName "go" "go-deps.toml";
+  # go-deps.toml by name, as the shell-entry check and the hook use it
+  goDepsFile = if cfg.go.depsFile != null then baseNameOf (toString cfg.go.depsFile) else "go-deps.toml";
 
   # Toolchains cell is accessed via a symlink at .turnkey/toolchains
   toolchainsCellPath = ".turnkey/toolchains";
@@ -252,44 +240,27 @@ ${generateTargets finalToolchains}
   #   - Symlink creation in enterShell
   # ==========================================================================
 
-  nixCells = lib.filterAttrs (_: cell: cell.derivation != null) ({
-    godeps = {
-      name = "godeps";
-      path = ".turnkey/godeps";
-      derivation = if cfg.go.enable then cfg.go.cell else null;
-      description = "Go deps";
-    };
-    rustdeps = {
-      name = "rustdeps";
-      path = ".turnkey/rustdeps";
-      derivation = if cfg.rust.enable then cfg.rust.cell else null;
-      description = "Rust deps";
-    };
-    pydeps = {
-      name = "pydeps";
-      path = ".turnkey/pydeps";
-      derivation = if cfg.python.enable then cfg.python.cell else null;
-      description = "Python deps";
-    };
-    jsdeps = {
-      name = "jsdeps";
-      path = ".turnkey/jsdeps";
-      derivation = if cfg.javascript.enable then cfg.javascript.cell else null;
-      description = "JavaScript deps";
-    };
-    soldeps = {
-      name = "soldeps";
-      path = ".turnkey/soldeps";
-      derivation = if cfg.solidity.enable then cfg.solidity.cell else null;
-      description = "Solidity deps";
-    };
-    prelude = {
-      name = "prelude";
-      path = preludeCellPath;
-      derivation = prelude;
-      description = "Prelude";
-    };
-  });
+  nixCells = lib.filterAttrs (_: cell: cell.derivation != null) (
+    lib.listToAttrs (
+      map (
+        language:
+        lib.nameValuePair language.cellName {
+          name = language.cellName;
+          path = ".turnkey/${language.cellName}";
+          derivation = if cfg.${language.name}.enable then cfg.${language.name}.cell else null;
+          inherit (language) description;
+        }
+      ) languages
+    )
+    // {
+      prelude = {
+        name = "prelude";
+        path = preludeCellPath;
+        derivation = prelude;
+        description = "Prelude";
+      };
+    }
+  );
 
   # Generate [cells] config entries for all Nix-backed cells
   nixCellsConfig = lib.concatStringsSep "\n" (
@@ -430,53 +401,8 @@ ${generateTargets finalToolchains}
   # Rules are generated based on which deps files are configured.
   # ==========================================================================
 
-  # Build the list of sync rules based on what's enabled
-  syncRules = lib.filter (r: r != null) [
-    # Go deps rule
-    (if cfg.go.enable && (cfg.go.cell != null || goDepsFile != null) then {
-      name = "go";
-      sources = [ cfg.go.modFile cfg.go.sumFile ];
-      target = goDepsFile;
-      generator = [ "godeps-gen" "--go-mod" cfg.go.modFile "--go-sum" cfg.go.sumFile "--prefetch" ];
-    } else null)
-
-    # Rust deps rule
-    (if cfg.rust.enable && (cfg.rust.cell != null || cfg.rust.depsFile != null) then {
-      name = "rust";
-      sources = [ cfg.rust.cargoTomlFile cfg.rust.cargoLockFile ];
-      target = depsFileName "rust" "rust-deps.toml";
-      generator = [ "rustdeps-gen" "--cargo-lock" cfg.rust.cargoLockFile ];
-    } else null)
-
-    # Python deps rule
-    (if cfg.python.enable && (cfg.python.cell != null || cfg.python.depsFile != null) then {
-      name = "python";
-      sources = if cfg.python.lockFile != null
-        then [ cfg.python.lockFile ]
-        else [ cfg.python.pyprojectFile ];
-      target = depsFileName "python" "python-deps.toml";
-      generator = if cfg.python.lockFile != null
-        then [ "pydeps-gen" "--lock" cfg.python.lockFile ]
-        else [ "pydeps-gen" "--pyproject" cfg.python.pyprojectFile ];
-    } else null)
-
-    # JavaScript deps rule
-    (if cfg.javascript.enable && (cfg.javascript.cell != null || cfg.javascript.depsFile != null) then {
-      name = "javascript";
-      sources = [ cfg.javascript.lockFile ];
-      target = depsFileName "javascript" "js-deps.toml";
-      generator = [ "jsdeps-gen" "--lock" cfg.javascript.lockFile ]
-        ++ lib.optionals cfg.javascript.includeDevDependencies [ "--include-dev" ];
-    } else null)
-
-    # Solidity deps rule
-    (if cfg.solidity.enable && (cfg.solidity.cell != null || cfg.solidity.depsFile != null) then {
-      name = "solidity";
-      sources = [ cfg.solidity.foundryTomlFile ];
-      target = depsFileName "solidity" "solidity-deps.toml";
-      generator = [ "soldeps-gen" "--foundry" cfg.solidity.foundryTomlFile ];
-    } else null)
-  ];
+  # Each language's sync rules, in language order
+  syncRules = builtins.concatMap (language: language.syncRules cfg.${language.name}) languages;
 
   # Format a single rule as TOML
   formatSyncRule = rule: ''

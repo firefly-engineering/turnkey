@@ -1,7 +1,8 @@
 # gen-rust-buck Nix package
 #
 # Builds the gen-rust-buck tool that generates rules.star files for Rust crates.
-# This tool is used by rust-deps-cell.nix to create Buck2 build files
+# This tool is used by the Rust deps cell builder (nix/buck2/languages.nix,
+# nix/lib/deps-cell/adapters/rust.nix) to create Buck2 build files
 # for vendored Rust dependencies.
 { pkgs, lib }:
 

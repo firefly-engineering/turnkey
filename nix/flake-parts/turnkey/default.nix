@@ -265,9 +265,6 @@ in
         else
           baseRegistry;
 
-      # Build buckgen for generating BUCK files
-      buckgen = import ../../packages/buckgen.nix { inherit pkgs lib; };
-
       # Resolve user patches directory (only if it exists)
       userPatchesDir =
         if cfg.buck2.tk.userPatchesDir != null && builtins.pathExists cfg.buck2.tk.userPatchesDir then
@@ -275,83 +272,28 @@ in
         else
           null;
 
-      # Build godeps cell from go.depsFile if specified and exists
-      # The file may not exist on first run (before .envrc generates it)
-      # Only built if go.enable is true
-      godepsCell =
-        if cfg.buck2.go.enable then
-          if cfg.buck2.go.depsFile != null && builtins.pathExists cfg.buck2.go.depsFile then
-            import ../../buck2/go-deps-cell.nix {
-              inherit pkgs lib buckgen userPatchesDir;
-              depsFile = cfg.buck2.go.depsFile;
-            }
-          else
-            cfg.buck2.go.cell
-        else
-          null;
+      # The languages turnkey manages dependencies for (nix/buck2/languages.nix)
+      languages = import ../../buck2/languages.nix { inherit pkgs lib; };
 
-      # Build rustdeps cell from rust.depsFile if specified and exists
-      # Only built if rust.enable is true
-      rustdepsCell =
-        if cfg.buck2.rust.enable then
-          if cfg.buck2.rust.depsFile != null && builtins.pathExists cfg.buck2.rust.depsFile then
-            import ../../buck2/rust-deps-cell.nix {
-              inherit pkgs lib userPatchesDir;
-              depsFile = cfg.buck2.rust.depsFile;
-              featuresFile =
-                if cfg.buck2.rust.featuresFile != null && builtins.pathExists cfg.buck2.rust.featuresFile then
-                  cfg.buck2.rust.featuresFile
-                else
-                  null;
-              rustcFlagsRegistry = cfg.buck2.rust.rustcFlagsRegistry;
-              buildScriptFixups = cfg.buck2.rust.buildScriptFixups;
-            }
-          else
-            cfg.buck2.rust.cell
-        else
-          null;
-
-      # Build pydeps cell from python.depsFile if specified and exists
-      # Only built if python.enable is true
-      pydepsCell =
-        if cfg.buck2.python.enable then
-          if cfg.buck2.python.depsFile != null && builtins.pathExists cfg.buck2.python.depsFile then
-            import ../../buck2/python-deps-cell.nix {
-              inherit pkgs lib userPatchesDir;
-              depsFile = cfg.buck2.python.depsFile;
-            }
-          else
-            cfg.buck2.python.cell
-        else
-          null;
-
-      # Build jsdeps cell from javascript.depsFile if specified and exists
-      # Only built if javascript.enable is true
-      jsdepsCell =
-        if cfg.buck2.javascript.enable then
-          if cfg.buck2.javascript.depsFile != null && builtins.pathExists cfg.buck2.javascript.depsFile then
-            import ../../buck2/js-deps-cell.nix {
-              inherit pkgs lib userPatchesDir;
-              depsFile = cfg.buck2.javascript.depsFile;
-            }
-          else
-            cfg.buck2.javascript.cell
-        else
-          null;
-
-      # Build soldeps cell from solidity.depsFile if specified and exists
-      # Only built if solidity.enable is true
-      soldepsCell =
-        if cfg.buck2.solidity.enable then
-          if cfg.buck2.solidity.depsFile != null && builtins.pathExists cfg.buck2.solidity.depsFile then
-            import ../../buck2/solidity-deps-cell.nix {
-              inherit pkgs lib;
-              depsFile = cfg.buck2.solidity.depsFile;
-            }
-          else
-            cfg.buck2.solidity.cell
-        else
-          null;
+      # Each enabled language's cell: built from its deps file, or the cell
+      # the consumer set. The deps file may not exist on first run, before
+      # tk sync generates it.
+      languageCells = lib.listToAttrs (
+        map (
+          language:
+          let
+            langCfg = cfg.buck2.${language.name};
+          in
+          lib.nameValuePair language.name (
+            if !langCfg.enable then
+              null
+            else if langCfg.depsFile != null && builtins.pathExists langCfg.depsFile then
+              language.mkCell { inherit langCfg userPatchesDir; }
+            else
+              langCfg.cell
+          )
+        ) languages
+      );
 
       # Create a shell configuration for each declaration file
       mkShellConfig = shellName: declarationFile:
@@ -395,22 +337,8 @@ in
             prelude = cfg.buck2.prelude // {
               package = turnkeyPrelude;
             };
-            go = cfg.buck2.go // {
-              cell = godepsCell;
-            };
-            rust = cfg.buck2.rust // {
-              cell = rustdepsCell;
-            };
-            python = cfg.buck2.python // {
-              cell = pydepsCell;
-            };
-            javascript = cfg.buck2.javascript // {
-              cell = jsdepsCell;
-            };
-            solidity = cfg.buck2.solidity // {
-              cell = soldepsCell;
-            };
-          };
+          }
+          // lib.mapAttrs (name: cell: cfg.buck2.${name} // { inherit cell; }) languageCells;
         };
       };
 
@@ -425,14 +353,14 @@ in
           lib.mapAttrs mkShellConfig cfg.declarationFiles;
 
       # Collect all non-null cells into an attrset for exposure
-      allCells = lib.filterAttrs (_: v: v != null && builtins.isPath v || lib.isDerivation v) {
-        godeps = godepsCell;
-        rustdeps = rustdepsCell;
-        pydeps = pydepsCell;
-        jsdeps = jsdepsCell;
-        soldeps = soldepsCell;
-        prelude = if cfg.buck2.prelude.path != null then cfg.buck2.prelude.path else turnkeyPrelude;
-      };
+      allCells = lib.filterAttrs (_: v: v != null && builtins.isPath v || lib.isDerivation v) (
+        lib.listToAttrs (
+          map (language: lib.nameValuePair language.cellName languageCells.${language.name}) languages
+        )
+        // {
+          prelude = if cfg.buck2.prelude.path != null then cfg.buck2.prelude.path else turnkeyPrelude;
+        }
+      );
 
     in
     lib.mkIf cfg.enable {
