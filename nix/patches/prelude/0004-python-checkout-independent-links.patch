@@ -1,0 +1,33 @@
+python: link-tree links independent of the checkout.
+
+make_py_package_modules linked each module into the link tree relative
+to the link's directory, after resolving symlinks on both ends. The
+resolved paths depend on the checkout: a source reached through a
+symlink into the Nix store (a prelude or toolchain file) resolves
+outside the checkout, so its relative link climbs to / and depends on
+the checkout's depth; and whether an artifact resolves there depends on
+how buck2 materialized it. Two checkouts of the same revision then build
+different link trees, and a cached python_test never hits across them.
+
+Compute the link from the paths as given instead. buck2 passes the same
+project-relative paths in every checkout, and the links still resolve
+through the same symlinks at run time.
+
+--- a/python/tools/make_py_package_modules.py
++++ b/python/tools/make_py_package_modules.py
+@@ -251,7 +251,14 @@
+     if copy_files:
+         link_path = os.path.realpath(src)
+     else:
+-        link_path = os.path.relpath(_realpath(src), _realpath(new_dest.parent))
++        # Relative to the paths as given, without resolving symlinks: buck2
++        # passes the same project-relative paths in every checkout, so the
++        # link is the same everywhere. Resolving first made it depend on how
++        # an artifact was materialized (a copy, or a symlink into the Nix
++        # store) and on how deep the checkout is.
++        link_path = os.path.relpath(
++            os.path.abspath(src), os.path.abspath(new_dest.parent)
++        )
+     if new_dest in path_mapping:
+         prev, prev_origin = path_mapping[new_dest]
+         if prev != link_path and not (

@@ -38,11 +38,17 @@ def test_caching_enabled() -> bool:
     """Whether this repo has test result caching turned on."""
     return read_root_config("turnkey", "test_cache", "false") == "true"
 
-def test_caching_kwargs(kwargs: dict[str, typing.Any], extra_path: list[str] = []) -> dict[str, typing.Any]:
+def test_caching_kwargs(
+        kwargs: dict[str, typing.Any],
+        extra_path: list[str] = [],
+        extra_env: dict[str, str] = {}) -> dict[str, typing.Any]:
     """Return ExternalRunnerTestInfo keyword arguments with caching enabled.
 
     `extra_path` lists additional Nix store `bin` directories the rule's test
     needs on PATH, beyond the shared base (bash, coreutils, diffutils).
+    `extra_env` adds variables the rule's tests need when cached, such as
+    ones that stop them writing into their inputs. Like the pinned PATH and
+    HOME, they apply only when caching is on, and a target's own env wins.
     """
     if not test_caching_enabled():
         return kwargs
@@ -50,7 +56,7 @@ def test_caching_kwargs(kwargs: dict[str, typing.Any], extra_path: list[str] = [
     path = read_root_config("turnkey", "test_path", "")
     if not path:
         fail("turnkey.test_cache is enabled but turnkey.test_path is not set")
-    pinned_env = {
+    pinned_env = extra_env | {
         "HOME": _HOMELESS,
         "PATH": ":".join(extra_path + [path]),
     }

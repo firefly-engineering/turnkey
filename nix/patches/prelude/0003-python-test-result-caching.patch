@@ -1,0 +1,56 @@
+python_test: opt into turnkey's test result caching.
+
+Routes python_test's ExternalRunnerTestInfo arguments through
+test_caching_kwargs (nix/buck2/prelude-extensions/test_caching). When the
+repo enables test result caching, that forces project-relative paths (so
+the .pex path and PYTHON_SOURCE_MAP no longer embed the checkout), pins
+PATH and HOME (closing user site-packages), and sets
+PYTHONDONTWRITEBYTECODE so tests don't write .pyc files into their
+inputs. When caching is off the arguments are unchanged. See
+docs/specs/test-result-caching.md.
+
+--- a/python/compute_providers.bzl
++++ b/python/compute_providers.bzl
+@@ -7,6 +7,7 @@
+ # above-listed licenses.
+ 
+ load("@prelude//test:inject_test_run_info.bzl", "inject_test_run_info")
++load("@prelude//test_caching:test_caching.bzl", "test_caching_kwargs")
+ load(
+     "@prelude//tests:re_utils.bzl",
+     "get_re_executors_from_props",
+@@ -43,17 +44,21 @@
+ 
+     return inject_test_run_info(
+         ctx,
+-        ExternalRunnerTestInfo(
+-            type = "pyunit",
+-            command = [test_cmd],
+-            env = test_env,
+-            labels = ctx.attrs.labels,
+-            contacts = ctx.attrs.contacts,
+-            default_executor = re_executor,
+-            executor_overrides = executor_overrides,
+-            # We implicitly make this test via the project root, instead of
+-            # the cell root (e.g. fbcode root).
+-            run_from_project_root = re_executor != None,
+-            use_project_relative_paths = re_executor != None,
+-        ),
++        ExternalRunnerTestInfo(**test_caching_kwargs(
++            {
++                "type": "pyunit",
++                "command": [test_cmd],
++                "env": test_env,
++                "labels": ctx.attrs.labels,
++                "contacts": ctx.attrs.contacts,
++                "default_executor": re_executor,
++                "executor_overrides": executor_overrides,
++                # We implicitly make this test via the project root, instead of
++                # the cell root (e.g. fbcode root).
++                "run_from_project_root": re_executor != None,
++                "use_project_relative_paths": re_executor != None,
++            },
++            # A cached test must not write bytecode into its own inputs.
++            extra_env = {"PYTHONDONTWRITEBYTECODE": "1"},
++        )),
+     ) + [make_default_info(exe)]
