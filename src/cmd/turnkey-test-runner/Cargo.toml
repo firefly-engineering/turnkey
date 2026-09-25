@@ -1,0 +1,11 @@
+[package]
+name = "turnkey-test-runner"
+version = "0.1.0"
+edition.workspace = true
+description = "Turnkey's buck2 test runner, with test result caching"
+
+[dependencies]
+prost.workspace = true
+prost-types.workspace = true
+tonic.workspace = true
+tonic-prost.workspace = true

@@ -1,0 +1,10 @@
+[package]
+name = "test-runner-codegen"
+version = "0.1.0"
+edition.workspace = true
+description = "Generates turnkey-test-runner's protocol code from buck2 and REAPI protos"
+
+[dependencies]
+anyhow.workspace = true
+protox.workspace = true
+tonic-prost-build.workspace = true

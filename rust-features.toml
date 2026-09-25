@@ -28,3 +28,9 @@ syn = { add = ["printing"] }
 # inotify default features include "stream" which requires tokio/futures-core
 # We use synchronous file watching via notify, so disable the async feature
 inotify = { remove = ["default", "stream"] }
+
+# futures-util's default features include async-await-macro, which needs the
+# optional futures-macro dependency. Its dependents here (tonic's stack) use
+# default-features = false, so Cargo leaves it off and futures-macro isn't
+# vendored. The unifier adds every crate's defaults regardless (turnkey-lg5).
+futures-util = { remove = ["default", "async-await-macro"] }

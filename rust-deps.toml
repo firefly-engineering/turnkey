@@ -67,15 +67,40 @@ name = "arraydeque"
 version = "0.5.1"
 hash = "sha256-dLn5xL4hzk60R3JMwqBsEC0hgv8OAnGZSu5ODYaQxvs="
 
+[deps."async-trait@0.1.92"]
+name = "async-trait"
+version = "0.1.92"
+hash = "sha256-7SLlt1UgE9GYy0xgphrYSOm0ds/8vF1846kWXqCjcj8="
+
+[deps."atomic-waker@1.1.2"]
+name = "atomic-waker"
+version = "1.1.2"
+hash = "sha256-lE9lB5cdz7j7rLhGiSxCIeOH1NNSKsvFyZAvOkTvFuI="
+
 [deps."autocfg@1.5.0"]
 name = "autocfg"
 version = "1.5.0"
 hash = "sha256-NhFHtHDmMRNf86xuOOMYXVv4DHdN0dBi9JzOQQDysEY="
 
+[deps."axum@0.8.9"]
+name = "axum"
+version = "0.8.9"
+hash = "sha256-fSYdeK3Sed2x0ltyWIAWXAE5fY0j8X+WUYnyFJM7NCs="
+
+[deps."axum-core@0.5.6"]
+name = "axum-core"
+version = "0.5.6"
+hash = "sha256-6uJfaKR6uZxAuBS3nsfoSAtGidlweDqfJHXm5Ah82+0="
+
 [deps."base64@0.22.1"]
 name = "base64"
 version = "0.22.1"
 hash = "sha256-Rbg3/6Ixc0vx6y62Qcd/OxGYQ8G2w0UKBurtTZ02Z5c="
+
+[deps."beef@0.5.2"]
+name = "beef"
+version = "0.5.2"
+hash = "sha256-vlgwddgL80zRVHvGM7BaU8bL6Haq9/u4ueYro7dAp+Y="
 
 [deps."bitflags@1.3.2"]
 name = "bitflags"
@@ -101,6 +126,11 @@ hash = "sha256-kkE2Czga4etUPz+QyejVUwto9SuX/2wrYZsMGp1VZCQ="
 name = "bumpalo"
 version = "3.19.1"
 hash = "sha256-r7Ronebq8NWz3SUDjIF7HcceBkaLb7kQ+Mv6HIMDwek="
+
+[deps."bytes@1.12.1"]
+name = "bytes"
+version = "1.12.1"
+hash = "sha256-BkpJLrOrIgp7/5TIzvnCkHmT4eoLaq1TGnTXGi4jq5g="
 
 [deps."cargo-lock@10.1.0"]
 name = "cargo-lock"
@@ -202,6 +232,11 @@ name = "displaydoc"
 version = "0.2.5"
 hash = "sha256-8oyaH88aXETb78VOTS2AzrdHAcq5QTGaLwn41AUH1cM="
 
+[deps."either@1.18.0"]
+name = "either"
+version = "1.18.0"
+hash = "sha256-QijDXSfg1+kRzwMNE5JOTLZ8efK478gG7Vm1NBfs8hc="
+
 [deps."encoding_rs@0.8.35"]
 name = "encoding_rs"
 version = "0.8.35"
@@ -242,10 +277,25 @@ name = "find-msvc-tools"
 version = "0.1.9"
 hash = "sha256-CAXurpZL1ltJrnUbTwp7EX5MKxL4gNTYKOyYnG8YrrQ="
 
+[deps."fixedbitset@0.5.7"]
+name = "fixedbitset"
+version = "0.5.7"
+hash = "sha256-e8HxadgEn8OTciLJ4SYtu/xY8fLdayoa2xEoy9lL9Zk="
+
 [deps."flate2@1.1.8"]
 name = "flate2"
 version = "1.1.8"
 hash = "sha256-uKeWsdp+m9DjEL42zoAO8taa8oMJ6ZTWHPr9YGa8i7w="
+
+[deps."fnv@1.0.7"]
+name = "fnv"
+version = "1.0.7"
+hash = "sha256-4NB+NjHwsbGXmwW47AQSZV3ouVdRfbrz8JxLZPDDDwg="
+
+[deps."foldhash@0.1.5"]
+name = "foldhash"
+version = "0.1.5"
+hash = "sha256-YeUwrWYpIzQrO1ImmpWyKj9VZU925YwAmgm0JFdRPls="
 
 [deps."form_urlencoded@1.2.2"]
 name = "form_urlencoded"
@@ -261,6 +311,31 @@ hash = "sha256-PfLMG85SQoXBtucyODxK3LazK9hTC4GDf8SQy9fF3ZQ="
 name = "fuser"
 version = "0.17.0"
 hash = "sha256-guEdsUZUbNogjzuFPxZLmtj13vLULirdkA0gcEocLL4="
+
+[deps."futures-channel@0.3.34"]
+name = "futures-channel"
+version = "0.3.34"
+hash = "sha256-cnZspQsloVGtKN1lzq3ajiwF6SXIKgwohexIOxX3TM0="
+
+[deps."futures-core@0.3.34"]
+name = "futures-core"
+version = "0.3.34"
+hash = "sha256-jiEPPgLxiZ3Kh0ZYoayNxzMyFX2KR5dpg81R3121PfE="
+
+[deps."futures-sink@0.3.34"]
+name = "futures-sink"
+version = "0.3.34"
+hash = "sha256-qfAYAH/obxoW+06X+fjIC3Lxh5hbammIY85SMHqZEbE="
+
+[deps."futures-task@0.3.34"]
+name = "futures-task"
+version = "0.3.34"
+hash = "sha256-aFiUUYjfHlCGhSkZqGXrsuKSEgyuQ4X5BvEDi0j321o="
+
+[deps."futures-util@0.3.34"]
+name = "futures-util"
+version = "0.3.34"
+hash = "sha256-6/oDDeCL+l2JOnVC6s32dOVj3pu94+d7xPNqfGAMd64="
 
 [deps."generic-array@0.14.7"]
 name = "generic-array"
@@ -282,6 +357,16 @@ name = "glob"
 version = "0.3.3"
 hash = "sha256-Y8vm15P3U4ryxWPODuxRcjGIN8niH6z2RGe7r0aZIT0="
 
+[deps."h2@0.4.19"]
+name = "h2"
+version = "0.4.19"
+hash = "sha256-ZgofMQ4dde07KQapDPntgWqGQjtHEEU6zVTvfD8ji1Q="
+
+[deps."hashbrown@0.15.5"]
+name = "hashbrown"
+version = "0.15.5"
+hash = "sha256-cmKiV8U6bDL5j6e2N5ZJwrs1tlQTVzIgoLNyfQSPjbg="
+
 [deps."hashbrown@0.16.1"]
 name = "hashbrown"
 version = "0.16.1"
@@ -291,6 +376,46 @@ hash = "sha256-dhLYAziGLEmhzYA83KUAStUVt3iIDf6dFG1HcI+0QKg="
 name = "heck"
 version = "0.5.0"
 hash = "sha256-vVMnzH1Jabhj7DZIjmlhH1Jdvp9NLxoSyb5eEhFQafU="
+
+[deps."http@1.5.0"]
+name = "http"
+version = "1.5.0"
+hash = "sha256-sVSaYUbwSqSUpAqMZgyPHx/c5oZSlCYsBmsIjQHvKUw="
+
+[deps."http-body@1.1.0"]
+name = "http-body"
+version = "1.1.0"
+hash = "sha256-s1sMNNAPq3DU6oVi5m5Oj9lTgI3/piUVQJP8XT+1Eu8="
+
+[deps."http-body-util@0.1.5"]
+name = "http-body-util"
+version = "0.1.5"
+hash = "sha256-8VZzJmi6FUP93qRlEDD0/M0OYduAYuh5/9jXcwzR1og="
+
+[deps."httparse@1.10.1"]
+name = "httparse"
+version = "1.10.1"
+hash = "sha256-M9Efi3GO/PZdF3QzC7wcc/sEa08GokXJFUVBwK+BfC4="
+
+[deps."httpdate@1.0.3"]
+name = "httpdate"
+version = "1.0.3"
+hash = "sha256-F/aESFhBbC+M1KWz8nWOeh28sig6RNbi0f6j0+1zrGI="
+
+[deps."hyper@1.11.1"]
+name = "hyper"
+version = "1.11.1"
+hash = "sha256-Z2j4vaCDPVzH/S8eyVIk+MLSbqI/cTn+NofYX4marb4="
+
+[deps."hyper-timeout@0.5.2"]
+name = "hyper-timeout"
+version = "0.5.2"
+hash = "sha256-hT75OynQ17AXCjf4cGF7TCmWt4MQ5hVwhs9aFBYRaQQ="
+
+[deps."hyper-util@0.1.21"]
+name = "hyper-util"
+version = "0.1.21"
+hash = "sha256-zSe1X7gKTe+2mf10UIwfoj9sfNl5HJdNUg396ds5qEU="
 
 [deps."iana-time-zone@0.1.65"]
 name = "iana-time-zone"
@@ -367,6 +492,11 @@ name = "is_terminal_polyfill"
 version = "1.70.2"
 hash = "sha256-Vu3w/R5fOvlv74BYClKfP+q03lxvPlIaufJC0+OnwhE="
 
+[deps."itertools@0.14.0"]
+name = "itertools"
+version = "0.14.0"
+hash = "sha256-L26Ekkhr/dxmYumdiGlnRKkAJfh0M59CovpmD1vXnQ4="
+
 [deps."itoa@1.0.17"]
 name = "itoa"
 version = "1.0.17"
@@ -396,6 +526,11 @@ hash = "sha256-SkiQ9h9bMX0mSsJnTiDqv5FJdlUo2t5jsYaJ/IiHzTI="
 name = "kqueue-sys"
 version = "1.0.4"
 hash = "sha256-yW8jyrmEtxjaEgJZHoDyVh7CEid5Eq9BhKkKFLIf1Xo="
+
+[deps."lazy_static@1.5.0"]
+name = "lazy_static"
+version = "1.5.0"
+hash = "sha256-rrDk3t4baHeO3OgBRhS/7cGBtLJvRDg3AXMfSbMUFWs="
 
 [deps."libc@0.2.180"]
 name = "libc"
@@ -427,6 +562,41 @@ name = "log"
 version = "0.4.29"
 hash = "sha256-YMp2un3Gy++ePbjMSCy0Or79C5iipZUPiXWuqGsMYdE="
 
+[deps."logos@0.15.1"]
+name = "logos"
+version = "0.15.1"
+hash = "sha256-/Xe0RdgaRKgDQNYk0jGO0d07iSKnBTv675HR78qlqMM="
+
+[deps."logos@0.16.1"]
+name = "logos"
+version = "0.16.1"
+hash = "sha256-uq/y6yRT0m31of9ciW1kzBSH9tPzt5wLQIvoNz0wxVA="
+
+[deps."logos-codegen@0.15.1"]
+name = "logos-codegen"
+version = "0.15.1"
+hash = "sha256-/AimLEwiSqNYdO3dVW0t4Y9OV7gRh8X5xniqkFdIxQU="
+
+[deps."logos-codegen@0.16.1"]
+name = "logos-codegen"
+version = "0.16.1"
+hash = "sha256-BAxA1dUn1ZU/THXhhSQPypfwQxyXTrMq1L6/NWnYS/s="
+
+[deps."logos-derive@0.15.1"]
+name = "logos-derive"
+version = "0.15.1"
+hash = "sha256-CHHBuGV2d5ugv28+KAK0rJ8Oi4kamI+3oUGeXhrb5r8="
+
+[deps."logos-derive@0.16.1"]
+name = "logos-derive"
+version = "0.16.1"
+hash = "sha256-jFQhL/w413AEZK+xxQzg0WKQguqcH1RfgAmnLx37BRI="
+
+[deps."matchit@0.8.4"]
+name = "matchit"
+version = "0.8.4"
+hash = "sha256-baUQCtAPhuBjsD3aPI2P1QxDdUlffnKATk9SVks1InI="
+
 [deps."memchr@2.7.6"]
 name = "memchr"
 version = "2.7.6"
@@ -437,6 +607,21 @@ name = "memoffset"
 version = "0.9.1"
 hash = "sha256-/5eTGh6ascAzNMo+VFCgGja8NNE6zFd/aZuFruMxjA4="
 
+[deps."miette@7.6.0"]
+name = "miette"
+version = "7.6.0"
+hash = "sha256-eZWA04EA8gVciIxhJk6nsTKYp2v/oR92lOV4+KJNNYQ="
+
+[deps."miette-derive@7.6.0"]
+name = "miette-derive"
+version = "7.6.0"
+hash = "sha256-G6Q4OOnxybzmpJn0O5Lp5MhZIWwTGHY/m7dMp9tk44c="
+
+[deps."mime@0.3.17"]
+name = "mime"
+version = "0.3.17"
+hash = "sha256-zbhP548/ky3U6EIubMfeQA8hhZZlR0D2NbZeupW0g14="
+
 [deps."miniz_oxide@0.8.9"]
 name = "miniz_oxide"
 version = "0.8.9"
@@ -446,6 +631,11 @@ hash = "sha256-5qDEpg82Ff7UyOP7Cjw98hIVqavGlO/+0Zf1PPvuKWg="
 name = "mio"
 version = "1.1.1"
 hash = "sha256-60gbal4SlMmbkNbQneSWVEDj7oenMeHW+vOFVrB6aSA="
+
+[deps."multimap@0.10.1"]
+name = "multimap"
+version = "0.10.1"
+hash = "sha256-3fh0GPrcusRbKDK6Y8KMqyg4jTo1XVrSDJQczXCUCZs="
 
 [deps."nix@0.30.1"]
 name = "nix"
@@ -537,6 +727,26 @@ name = "percent-encoding"
 version = "2.3.2"
 hash = "sha256-ZnFfa0N7wX+lUIIVdhW01XiDZRJuwapkhV0s0TRLyMo="
 
+[deps."petgraph@0.8.3"]
+name = "petgraph"
+version = "0.8.3"
+hash = "sha256-T7BraMB5x5IndUaqr5JtG32/X8XxBbYJFmWFXXJa0v4="
+
+[deps."pin-project@1.1.13"]
+name = "pin-project"
+version = "1.1.13"
+hash = "sha256-8R4WIo1/7ILu7CArH+uei26ebdoiBhanS4D6LjMUSdA="
+
+[deps."pin-project-internal@1.1.13"]
+name = "pin-project-internal"
+version = "1.1.13"
+hash = "sha256-b3wwgfQdWGC0kln1SIXtQ8BclUCtbD9jIyDKdBMvVMU="
+
+[deps."pin-project-lite@0.2.17"]
+name = "pin-project-lite"
+version = "0.2.17"
+hash = "sha256-AHE+rKJhLXKKHwVRyu7DpP8czhYJMTbIdgpHicpTJlQ="
+
 [deps."pkg-config@0.3.33"]
 name = "pkg-config"
 version = "0.3.33"
@@ -557,6 +767,11 @@ name = "potential_utf"
 version = "0.1.4"
 hash = "sha256-un3YCqmuyU79UA2sg3wwyrnnOeihDOkCuFubat6BcjU="
 
+[deps."prettyplease@0.2.37"]
+name = "prettyplease"
+version = "0.2.37"
+hash = "sha256-n8CjW/W4yvufu09Dv54vHtDWmA0mnR8l+GMvBRbzTg8="
+
 [deps."proc-macro-crate@3.5.0"]
 name = "proc-macro-crate"
 version = "3.5.0"
@@ -566,6 +781,41 @@ hash = "sha256-hPue0gIQMas4ULaS9uY7z4p67f2U7LuWF/rdSk0zLt0="
 name = "proc-macro2"
 version = "1.0.106"
 hash = "sha256-q07CrHFPnYwuSZwRZPC9E5xtdGtxTfbzEhWH5y75DXU="
+
+[deps."prost@0.14.4"]
+name = "prost"
+version = "0.14.4"
+hash = "sha256-RBxPbykXqI1edhvEsdg9jnsGocFyXCWjjbDWgWoz8Hg="
+
+[deps."prost-build@0.14.4"]
+name = "prost-build"
+version = "0.14.4"
+hash = "sha256-CBsaFHr78Z4VPSPP/trQhMq0b+5zFTXtMejWfaTme+E="
+
+[deps."prost-derive@0.14.4"]
+name = "prost-derive"
+version = "0.14.4"
+hash = "sha256-ncK2pCXSIq5W9GG603e3sxFh/FcPCSK4nyxgdlIRecE="
+
+[deps."prost-reflect@0.16.5"]
+name = "prost-reflect"
+version = "0.16.5"
+hash = "sha256-DaevBjbG14oj12TSoAD5oqQhXe0MK6Nvi/r8vPSitbY="
+
+[deps."prost-types@0.14.4"]
+name = "prost-types"
+version = "0.14.4"
+hash = "sha256-dcVBwIdACv8mvZQvLkjoIV6g3lPANiXAbYS3EdvSTPc="
+
+[deps."protox@0.9.1"]
+name = "protox"
+version = "0.9.1"
+hash = "sha256-3Bh+VDSsol2Pz3UVDSxx8KNJbzKParU/OoNcSNgVTJM="
+
+[deps."protox-parse@0.9.0"]
+name = "protox-parse"
+version = "0.9.0"
+hash = "sha256-cGTYGPY8+9zqFsR73FTJSpAAdrSkP1OuBD9gIFdu7mE="
 
 [deps."quote@1.0.44"]
 name = "quote"
@@ -616,6 +866,11 @@ hash = "sha256-rTxBddikxOgSWef/GwuAde6hYexxco4yy+/W4gZoE68="
 name = "ring"
 version = "0.17.14"
 hash = "sha256-futu7T06hlsGEpEqoKMW35GJC7Srz8C3OH4Sw+7XBDw="
+
+[deps."rustc_version@0.4.1"]
+name = "rustc_version"
+version = "0.4.1"
+hash = "sha256-YcfFMAg5XKFI+SYndhzy7sNI2uUCrIwP8kLy7lbdnJQ="
 
 [deps."rustix@1.1.3"]
 name = "rustix"
@@ -707,6 +962,11 @@ name = "simd-adler32"
 version = "0.3.8"
 hash = "sha256-YTBWX3eVXQ31J2Gde/WmcOoC6W/TXgQqAZ7NBmt8FPQ="
 
+[deps."slab@0.4.12"]
+name = "slab"
+version = "0.4.12"
+hash = "sha256-lmYIBXDcJh7sxnh47aSMbJgX6NJq1JWggCqnpmeWCdM="
+
 [deps."smallvec@1.15.1"]
 name = "smallvec"
 version = "1.15.1"
@@ -716,6 +976,11 @@ hash = "sha256-0kSPelZydAJqnfaFuhf+aa3UJ1tZWa9+PA57XrSO0Uw="
 name = "smallvec"
 version = "2.0.0-alpha.12"
 hash = "sha256-xFwZ9Wb2nb6E7S7N5wsYA9TYYNyoCs97OyBFvTf8oXg="
+
+[deps."socket2@0.6.5"]
+name = "socket2"
+version = "0.6.5"
+hash = "sha256-ZhvzZjaCa2COKq3Ao9zUC/VbMfde/0uOGI9txk/FZAs="
 
 [deps."stable_deref_trait@1.2.1"]
 name = "stable_deref_trait"
@@ -741,6 +1006,16 @@ hash = "sha256-XYfBfa+RQxNkl+Clpr1j9/F9LwH0j594iphbdbZy6jk="
 name = "syn"
 version = "2.0.114"
 hash = "sha256-gbWfQTLTS6LQvWBBc1lvsgoIb8voveppUu4ROu/0ujw="
+
+[deps."syn@3.0.6"]
+name = "syn"
+version = "3.0.6"
+hash = "sha256-MHbtRhhvzxvAVf622FFT6TqCjP09DMsWG4noNMWl6eQ="
+
+[deps."sync_wrapper@1.0.2"]
+name = "sync_wrapper"
+version = "1.0.2"
+hash = "sha256-VjNgzutbhlwFWRALMc7g32Pxf0EHaNQCM8l0crCtcu4="
 
 [deps."synstructure@0.13.2"]
 name = "synstructure"
@@ -777,6 +1052,26 @@ name = "tinystr"
 version = "0.8.2"
 hash = "sha256-YIe1pHzVoPa9xrYSj8HdCmsT7N+FCjnwbnjlhLa8i2o="
 
+[deps."tokio@1.50.0"]
+name = "tokio"
+version = "1.50.0"
+hash = "sha256-hRrqzLdW4FBKI3AtIwMYsILLAUXKsShWxqWM/Yt5fAs="
+
+[deps."tokio-macros@2.6.1"]
+name = "tokio-macros"
+version = "2.6.1"
+hash = "sha256-ytvsddG5RdLAul7RxFf/h0mVkjLTq4JdaAdjMdnVXtg="
+
+[deps."tokio-stream@0.1.19"]
+name = "tokio-stream"
+version = "0.1.19"
+hash = "sha256-0v53LO0KModP0A+axvyB90Mr9IuhYqb7M+Om1ydn4cQ="
+
+[deps."tokio-util@0.7.19"]
+name = "tokio-util"
+version = "0.7.19"
+hash = "sha256-EqfJWcfXERgZXSh3j6ICyjjITlP0lh3f6bP5WVJTrCA="
+
 [deps."toml@0.8.23"]
 name = "toml"
 version = "0.8.23"
@@ -811,6 +1106,56 @@ hash = "sha256-yscDp7RzbUlBHfqO46yWDgE02C5UFS3Ar+jquJVKEqU="
 name = "toml_write"
 version = "0.1.2"
 hash = "sha256-dlmBPtel5EIlOeOxRPt4pOodNkg52WniCRh83K8AXIE="
+
+[deps."tonic@0.14.6"]
+name = "tonic"
+version = "0.14.6"
+hash = "sha256-HUTLLNLIEebjzTqbgIee4h1/DVaYUlABTbRk7vrUCjI="
+
+[deps."tonic-build@0.14.6"]
+name = "tonic-build"
+version = "0.14.6"
+hash = "sha256-Is3qzQASCGd1TBNWxKkpRK2CgfpGZHtrzR0/1YFUcy0="
+
+[deps."tonic-prost@0.14.6"]
+name = "tonic-prost"
+version = "0.14.6"
+hash = "sha256-0VAVWLDMirwyUiaQRxxH0oAdwquFNGrGbO5uYHbhjOs="
+
+[deps."tonic-prost-build@0.14.6"]
+name = "tonic-prost-build"
+version = "0.14.6"
+hash = "sha256-ebuNaaLCLsZ3mt2g6u0oJ4C7XepMmbQHI7w/Fra8lSg="
+
+[deps."tower@0.5.3"]
+name = "tower"
+version = "0.5.3"
+hash = "sha256-ifFg3HcLs0xraS9uBGdDH3ycm9LUvtEvVCxBCpjgJVE="
+
+[deps."tower-layer@0.3.3"]
+name = "tower-layer"
+version = "0.3.3"
+hash = "sha256-Y0euED89DHrvcp+y8dd4dSGOOkH0lWV8P3s8nOWZTkM="
+
+[deps."tower-service@0.3.3"]
+name = "tower-service"
+version = "0.3.3"
+hash = "sha256-wMPFFvexVadOAOFDv9thLFOCbR3zhmJNRa7gqqB1srk="
+
+[deps."tracing@0.1.44"]
+name = "tracing"
+version = "0.1.44"
+hash = "sha256-O4pr/KIiobS07Iw/n3m5RSLWZHqnYNYrDde4n5OAD90="
+
+[deps."tracing-attributes@0.1.31"]
+name = "tracing-attributes"
+version = "0.1.31"
+hash = "sha256-rTygwwyuC4K1DTQ0lbStDSoQ4d/JwIjP4k5jrEfZLoE="
+
+[deps."tracing-core@0.1.36"]
+name = "tracing-core"
+version = "0.1.36"
+hash = "sha256-UfDzHxe1WdQ49wdkTQO18lkm6FNCJUbhCT1NMUtw59Q="
 
 [deps."tree-sitter@0.25.10"]
 name = "tree-sitter"
@@ -852,6 +1197,11 @@ name = "tree-sitter-typescript"
 version = "0.23.2"
 hash = "sha256-V5bl0InyQymx1vSoRwEJ6SCEUnFoOu9jaoogtofIXxI="
 
+[deps."try-lock@0.2.5"]
+name = "try-lock"
+version = "0.2.5"
+hash = "sha256-gv4yBB+mOVLqkVWItJ/x0XNE+C/8AY9NXDtS9tRheZI="
+
 [deps."typenum@1.19.0"]
 name = "typenum"
 version = "1.19.0"
@@ -861,6 +1211,11 @@ hash = "sha256-5vBPNc316ZUAoQrSrL4wVapBpqOrjjvN5OWHmBL+mVY="
 name = "unicode-ident"
 version = "1.0.22"
 hash = "sha256-rc3TZsoOsLwiWa37mfR9Vdz19t0/ZLov6YMaItqsf4s="
+
+[deps."unicode-width@0.1.14"]
+name = "unicode-width"
+version = "0.1.14"
+hash = "sha256-O6Ek9u1SfD8neszlS2Zc5AV7HXh+A7q1jLFoI2iHVkU="
 
 [deps."unicode-width@0.2.2"]
 name = "unicode-width"
@@ -901,6 +1256,11 @@ hash = "sha256-tQZZutDs8hU+nNvD5jUzLJMyp3OcblIinn2y52wIA6c="
 name = "walkdir"
 version = "2.5.0"
 hash = "sha256-mNo0SgS03VMXXhZBEwzjBkCvSaTIuXQdnWO7ukZVl5Y="
+
+[deps."want@0.3.1"]
+name = "want"
+version = "0.3.1"
+hash = "sha256-ri1SJy2Z5F2USzTZITXJhioajZUNXnxBHuRFgG0/KVQ="
 
 [deps."wasi@0.11.1+wasi-snapshot-preview1"]
 name = "wasi"

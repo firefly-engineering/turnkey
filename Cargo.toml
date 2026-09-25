@@ -15,7 +15,9 @@ members = [
     "src/cmd/rustdeps-gen",
     "src/cmd/rustfeatures-gen",
     "src/cmd/soldeps-gen",
+    "src/cmd/test-runner-codegen",
     "src/cmd/turnkey-composed",
+    "src/cmd/turnkey-test-runner",
     "src/examples/rust-hello",
     "src/examples/rust-hello-deps",
     "src/rust/composition",
@@ -56,6 +58,17 @@ tempfile = "3.10"
 toml = "0.8"
 ureq = { version = "2", features = ["json"] }
 walkdir = "2.5"
+
+# gRPC and protobuf (turnkey-test-runner speaks buck2's test-runner protocol
+# and the Remote Execution API)
+prost = "0.14"
+prost-types = "0.14"
+protox = "0.9"
+tonic = "0.14"
+tonic-prost = "0.14"
+# Without cleanup-markdown: doc comments are kept as written, and
+# pulldown-cmark stays out of the build.
+tonic-prost-build = { version = "0.14", default-features = false, features = ["transport"] }
 
 # Tree-sitter for source code parsing
 tree-sitter = "0.25"

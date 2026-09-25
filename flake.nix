@@ -204,6 +204,16 @@
             tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
           }).tw-uv;
 
+          # turnkey-test-runner, built for the buck2 release this repo declares
+          packages.turnkey-test-runner =
+            let
+              registry = self.lib.defaultTellerRegistry system;
+              declared = (builtins.fromTOML (builtins.readFile ./toolchain.toml)).toolchains.buck2-toolchain;
+              buck2Toolchain = self.lib.defaultTellerLib.resolveTool registry "buck2-toolchain" declared;
+              buck2Version = (import ./nix/buck2/buck2-source.nix { inherit pkgs lib; }).versionOf buck2Toolchain;
+            in
+            import ./nix/packages/turnkey-test-runner.nix { inherit pkgs lib buck2Version; };
+
           # Expose turnkey-prelude for CI builds
           packages.turnkey-prelude =
             let

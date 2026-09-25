@@ -337,6 +337,21 @@ ${generateTargets finalToolchains}
   # Helper for Go deps enabled
   hasGodeps = cfg.go.enable && cfg.go.cell != null;
 
+  # turnkey-test-runner's protocol code, generated for the declared buck2
+  # release. null when buck2 isn't declared, or when turnkey knows no source
+  # revision for that release.
+  buck2Source = import ../../buck2/buck2-source.nix { inherit pkgs lib; };
+  declaredBuck2 =
+    if declaredToolchains ? buck2-toolchain then resolvedRegistry.buck2-toolchain
+    else if declaredToolchains ? buck2 then resolvedRegistry.buck2
+    else null;
+  buck2Version = if declaredBuck2 == null then null else buck2Source.versionOf declaredBuck2;
+  testRunnerProtocol =
+    if buck2Source.isSupported buck2Version then
+      import ../../packages/test-runner-protocol.nix { inherit pkgs lib buck2Version; }
+    else
+      null;
+
   # Generate buckconfig content
   # Note: isolation_dir is set via BUCK_ISOLATION_DIR env var, not here
   # (Buck2 ignores the config file setting for isolation_dir)
@@ -367,6 +382,10 @@ ${generateTargets finalToolchains}
 
     [build]
         execution_platforms = prelude//platforms:default
+  '' + lib.optionalString (testRunnerProtocol != null) ''
+
+    [turnkey]
+        test_runner_protocol = ${testRunnerProtocol}
   '';
 
   # Buckconfig file derivation
@@ -1043,6 +1062,10 @@ in
       TURNKEY_BUCK2_TOOLCHAINS = lib.concatStringsSep "," finalToolchains;
       TURNKEY_BUCK2_RUNTIME_DEPS = lib.concatStringsSep "," runtimeDeps;
     } // nixCellsEnvVars
+      # Generated protocol code for Cargo builds of turnkey-test-runner
+      // lib.optionalAttrs (testRunnerProtocol != null) {
+        TURNKEY_TEST_RUNNER_PROTOCOL = "${testRunnerProtocol}";
+      }
       # Store tk's share path for shell completion setup
       // lib.optionalAttrs (turnkeyCfg.registry ? tk) {
         TURNKEY_TK_SHARE = "${resolvedRegistry.tk}/share";

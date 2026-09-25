@@ -55,6 +55,10 @@ def main():
     proc_macro = is_proc_macro(cargo)
     env = get_cargo_env(cargo, crate_name)
     rustc_flags = get_build_script_cfg_flags(crate_name, version, rustc_flags_registry)
+    # Cap lints for vendored crates, as Cargo does for every non-local
+    # dependency: a crate's own #![deny(...)] must not break the build when a
+    # newer rustc adds lints.
+    rustc_flags.common = ["--cap-lints", "allow"] + rustc_flags.common
 
     # Get native library info for crates with pre-built native code
     # First check versioned key (name@version), then unversioned
