@@ -7,6 +7,17 @@
 
 load(":providers.bzl", "SolidityLibraryInfo", "SolidityToolchainInfo", "merge_remappings")
 
+def _fuzz_seed(label: str) -> int:
+    """A fixed fuzz seed derived from the target label (32-bit FNV-1a).
+
+    The same target always fuzzes the same cases, so a recorded pass certifies
+    exactly the runs that produced it. Different targets get different seeds.
+    """
+    h = 2166136261
+    for c in label.elems():
+        h = ((h ^ ord(c)) * 16777619) % 4294967296
+    return h
+
 def _solidity_test_impl(ctx: AnalysisContext) -> list[Provider]:
     """Implementation of solidity_test rule.
 
@@ -55,6 +66,12 @@ def _solidity_test_impl(ctx: AnalysisContext) -> list[Provider]:
     if ctx.attrs.fuzz_runs:
         forge_args.append("--fuzz-runs")
         forge_args.append(str(ctx.attrs.fuzz_runs))
+
+    # Seed fuzzing from the label unless the target opts out of test result
+    # caching, which is how a target asks for stochastic fuzzing.
+    if "no-test-cache" not in ctx.attrs.labels:
+        forge_args.append("--fuzz-seed")
+        forge_args.append(str(_fuzz_seed(str(ctx.label.raw_target()))))
     if ctx.attrs.fork_url:
         forge_args.append("--fork-url")
         forge_args.append(ctx.attrs.fork_url)
@@ -250,6 +267,11 @@ solidity_test = rule(
         "gas_report": attrs.bool(
             default = False,
             doc = "Print gas usage report",
+        ),
+        "labels": attrs.list(
+            attrs.string(),
+            default = [],
+            doc = "Target labels. `no-test-cache` also turns off the fixed fuzz seed.",
         ),
         "verbosity": attrs.int(
             default = 0,
