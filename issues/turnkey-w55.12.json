@@ -13,9 +13,15 @@
     "wayfinder:grilling"
   ],
   "parent": "turnkey-w55",
+  "comments": [
+    {
+      "text": "Resolution (grilled 2026-09-25).\n\nFacts: buck2's OSS RE client at the pin rejects unix:// (only grpc/dns/ipv4/ipv6, over TCP: remote_execution/oss/re_grpc/src/client.rs L193-L210), so the server listens on a loopback TCP port. Args after '--' in buck2 test reach the runner's argv (app/buck2_test/src/unix/executor.rs L50-L66). The runner is spawned by the daemon and inherits the daemon's env, not tk's. bazel-remote 2.6.2 has --idle_timeout (off by default; gRPC traffic resets it). --max_size is in GiB with no default. Turnkey precedents: prefetch-cache uses dirs::cache_dir()/turnkey with a TURNKEY_CACHE_DIR override; turnkey-composed has start/stop/status plus an optional launchd/systemd install.\n\nDecisions:\n1. Store: one per user per machine at \u003cplatform cache dir\u003e/turnkey/test-results/, honouring TURNKEY_CACHE_DIR. Shared by all checkouts and all turnkey repos (different repos produce different digests).\n2. Eviction: bazel-remote LRU only, default 5 GiB, overridable per user (env var or a user-level config, never the repo's .turnkey/). No manual GC in v1.\n3. Lifecycle: tk starts bazel-remote on demand, detached, the first time a cached tk test needs it. A lock in the cache dir prevents two servers. It runs with --idle_timeout (e.g. 24h), so an explicit stop command is optional. A launchd/systemd user service is a possible later add-on, not v1. devenv processes are rejected.\n4. Before handing over to buck2, tk test probes the server with a sub-second timeout. If it is unreachable and the on-demand start fails, the run goes ahead uncached with a one-line warning. This avoids buck2's ~45s-then-Fail outage behaviour (turnkey-w55.10).\n5. Turning the runner on: the runner defaults to off (sends disable_test_execution_caching, records nothing). tk adds a runner flag after '--' (on / record-only for tk --no-test-cache / off when the probe fails). The runner consumes it, so it never reaches the test or the result key. There is no buckconfig change and no env dependence, so switching between tk test and plain buck2 test invalidates nothing.\n6. Hit count: the runner marks each hit in the per-test result it reports to buck2. For the test subcommand only, tk runs buck2 as a child process and prints 'N recorded' after it exits, from a count the runner leaves behind. Exit codes pass through unchanged. Other subcommands still hand over the process.\n7. Address: one fixed loopback port chosen by turnkey, written into the generated .buckconfig. It must not be passed per invocation with -c, because that changes the daemon's startup config. The port is overridable in the user-level setting. A port held by something else fails the probe, which means an uncached run plus the warning.",
+      "timestamp": "2026-09-25T10:42:33Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "How does tk run the local test result cache?",
   "type": "question",
-  "updated_at": "2026-09-25T10:35:02Z"
+  "updated_at": "2026-09-25T10:42:33Z"
 }
