@@ -44,7 +44,7 @@ RE_PROFILE = ["-c", "turnkey.check_test_caching_re_profile=true"]
 # target -> (executor with caching on, executor with caching off)
 EXPECTED_EXECUTORS: dict[str, tuple[str, str]] = {
     "root//src/examples/rust-hello:rust-hello-test": ("cache", "local"),
-    "root//src/go/pkg/rules:rules_test": ("cache", "local"),
+    "root//src/go/pkg/syncconfig:syncconfig_test": ("cache", "local"),
     "root//src/python/cfg:test": ("cache", "local"),
     "root//src/examples/jsonnet-config:common-test": ("cache", "none"),
     "root//src/examples/solidity-hello:counter_test": ("cache", "none"),

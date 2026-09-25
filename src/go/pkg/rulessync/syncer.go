@@ -22,10 +22,6 @@ type Config struct {
 	// ProjectRoot is the root directory of the project.
 	ProjectRoot string
 
-	// GoExtractorPath is the path to the go-deps-extract binary.
-	// If empty, uses "go-deps-extract" from PATH.
-	GoExtractorPath string
-
 	// DryRun if true, doesn't write changes.
 	DryRun bool
 
@@ -462,37 +458,9 @@ func (s *Syncer) runExtractor(language, pkgDir string) (*extraction.Result, erro
 	}
 }
 
-// runGoExtractor runs go-deps-extract on a directory.
+// runGoExtractor lists a directory's Go imports with go list.
 func (s *Syncer) runGoExtractor(pkgDir string) (*extraction.Result, error) {
-	extractorPath := s.config.GoExtractorPath
-	if extractorPath == "" {
-		extractorPath = "go-deps-extract"
-	}
-
-	// Check if extractor exists, fall back to go run
-	_, err := exec.LookPath(extractorPath)
-	if err != nil {
-		// Fall back to using go list directly
-		return s.extractGoImportsDirectly(pkgDir)
-	}
-
-	cmd := exec.Command(extractorPath, pkgDir)
-	cmd.Dir = s.config.ProjectRoot
-
-	output, err := cmd.Output()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return nil, fmt.Errorf("extractor failed: %s", string(exitErr.Stderr))
-		}
-		return nil, fmt.Errorf("running extractor: %w", err)
-	}
-
-	var result extraction.Result
-	if err := json.Unmarshal(output, &result); err != nil {
-		return nil, fmt.Errorf("parsing extractor output: %w", err)
-	}
-
-	return &result, nil
+	return s.extractGoImportsDirectly(pkgDir)
 }
 
 // runRustExtractor runs deps-extract for Rust on a directory.
@@ -544,7 +512,7 @@ func (s *Syncer) runDepsExtract(lang, pkgDir string) (*extraction.Result, error)
 	return &result, nil
 }
 
-// extractGoImportsDirectly uses go list directly when extractor isn't available.
+// extractGoImportsDirectly lists a directory's imports with go list.
 func (s *Syncer) extractGoImportsDirectly(pkgDir string) (*extraction.Result, error) {
 	result := extraction.NewResult("go")
 

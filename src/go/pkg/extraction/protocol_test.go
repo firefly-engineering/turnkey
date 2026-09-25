@@ -65,7 +65,7 @@ func TestWriteAndParse(t *testing.T) {
 		Imports: []Import{
 			{Path: "fmt", Kind: ImportKindStdlib},
 			{Path: "github.com/foo/bar", Kind: ImportKindExternal},
-			{Path: "github.com/firefly-engineering/turnkey/src/go/pkg/rules", Kind: ImportKindInternal},
+			{Path: "github.com/firefly-engineering/turnkey/src/go/pkg/syncer", Kind: ImportKindInternal},
 		},
 		TestImports: []Import{
 			{Path: "testing", Kind: ImportKindStdlib},

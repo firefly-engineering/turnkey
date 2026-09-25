@@ -20,7 +20,7 @@
 //	      "files": ["main.go", "sync.go"],
 //	      "imports": [
 //	        {"path": "github.com/foo/bar", "kind": "external"},
-//	        {"path": "github.com/firefly-engineering/turnkey/src/go/pkg/rules", "kind": "internal"}
+//	        {"path": "github.com/firefly-engineering/turnkey/src/go/pkg/syncer", "kind": "internal"}
 //	      ]
 //	    }
 //	  ]

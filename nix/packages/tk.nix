@@ -33,7 +33,6 @@ pkgs.buildGoModule {
       (root + "/src/go/pkg/syncconfig")
       (root + "/src/go/pkg/syncer")
       (root + "/src/go/pkg/staleness")
-      (root + "/src/go/pkg/rules")
       # rulessync and its dependencies
       (root + "/src/go/pkg/rulessync")
       (root + "/src/go/pkg/mapper")
