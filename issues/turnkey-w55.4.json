@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T07:30:58Z",
+  "description": "## Question\n\nBazel caches test results by default, and it is the reference model for what a user expects. Document from Bazel's official docs and source:\n\n1. What goes into the test action's key: test env, `--test_env`, `--test_arg`, runfiles, timeout, sharding, `--runs_per_test`.\n2. When `--cache_test_results=auto` re-runs a test: failed previously, `external` tag, `--runs_per_test`, and the rest.\n3. Tags and flags that opt out: `external`, `no-cache`, `no-remote-cache`, `--nocache_test_results`.\n4. How cached results are reported: `(cached) PASSED`, and where logs and `test.xml` come from on a hit.\n5. Whether failing results are stored in, or served from, the remote cache, and how flaky tests (`flaky` attribute) interact with caching.\n6. Known pitfalls reported by Bazel users (non-hermetic tests, stale hits).",
+  "id": "turnkey-w55.4",
+  "labels": [],
+  "parent": "turnkey-w55",
+  "priority": 2,
+  "status": "open",
+  "title": "How does Bazel decide when a test result is reusable?",
+  "type": "task",
+  "updated_at": "2026-09-25T07:30:58Z"
+}
