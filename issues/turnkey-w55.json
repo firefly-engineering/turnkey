@@ -8,9 +8,15 @@
   "labels": [
     "wayfinder:map"
   ],
+  "comments": [
+    {
+      "text": "Destination reached 2026-09-25. Spec: https://github.com/firefly-engineering/turnkey/blob/5c64cfb91815/docs/specs/test-result-caching.md . ADR: https://github.com/firefly-engineering/turnkey/blob/5c64cfb91815/docs/adr/0001-runner-recorded-native-test-caching.md . Next step: /to-tickets on the spec. Shared-cache handover was ruled out of scope as a follow-up effort.",
+      "timestamp": "2026-09-25T10:47:38Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "Test result caching for turnkey's buck2 tests",
   "type": "epic",
-  "updated_at": "2026-09-25T10:46:43Z"
+  "updated_at": "2026-09-25T10:47:38Z"
 }
