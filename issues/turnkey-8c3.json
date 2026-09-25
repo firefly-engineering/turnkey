@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T21:21:19Z",
+  "description": "From the 2026-09-25 architecture review (turnkey-pru.9): mapper.go repeats seven functions per language, rulessync switches on language three times (sourcePatterns, detectLanguage, runExtractor), and isTestTarget treats any rule name containing 'test' as a test. Not done in turnkey-pru.9 because rules sync is disabled in turnkey's own sync.toml, so nothing here exercises it; pick up when a consumer enables rules sync.",
+  "id": "turnkey-8c3",
+  "labels": [],
+  "priority": 4,
+  "status": "open",
+  "title": "Per-language plug-in for mapper/rulessync",
+  "type": "task",
+  "updated_at": "2026-09-25T21:21:19Z"
+}
