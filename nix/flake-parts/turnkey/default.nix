@@ -115,7 +115,37 @@ in
           enable = mkOption {
             type = types.bool;
             default = false;
-            description = "Enable Buck2 toolchain generation from toolchain.toml";
+            description = ''
+              Enable the Buck2 integration (the pinned buck2, the prelude,
+              toolchain generation from toolchain.toml and the dependency
+              cells) in the shells listed in `buck2.shells`.
+            '';
+          };
+
+          shells = mkOption {
+            type = types.listOf types.str;
+            default = [ "default" ];
+            example = [
+              "default"
+              "ci"
+            ];
+            description = ''
+              Names of the shells (keys of `declarationFiles`) that get the
+              Buck2 integration when `buck2.enable` is set. Other shells get
+              only the toolchains their declaration file lists.
+            '';
+          };
+
+          version = mkOption {
+            type = types.str;
+            default = (import ../../buck2/buck2-source.nix { inherit pkgs lib; }).version;
+            readOnly = true;
+            description = ''
+              The pinned buck2 release (a release date). Read-only: each
+              turnkey revision ships exactly one buck2 release, and a consumer
+              moves to another by moving to another turnkey revision
+              (docs/adr/0002-turnkey-owns-the-buck2-version.md).
+            '';
           };
 
           prelude = {
@@ -741,10 +771,11 @@ in
           mergeRegistries (mergeRegistries defaultRegistry builtinExtensions) cfg.registryExtensions
       );
 
-      # The upstream prelude of the pinned buck2 release, from turnkey's own
-      # registry (never the consumer's, so it can't drift from the binary),
-      # with turnkey's patches and extensions applied
+      # The pinned buck2 release and its upstream prelude, from turnkey's own
+      # registry (never the consumer's, so neither can drift from the other),
+      # with turnkey's patches and extensions applied to the prelude
       buck2Source = import ../../buck2/buck2-source.nix { inherit pkgs lib; };
+      pinnedBuck2 = buck2Source.buck2 (turnkeyFlakeLib.defaultTellerRegistry system);
       turnkeyPrelude = import ../../buck2/prelude.nix {
         inherit pkgs lib;
         upstreamPrelude = buck2Source.upstreamPrelude (turnkeyFlakeLib.defaultTellerRegistry system);
@@ -890,11 +921,8 @@ in
       # Create a shell configuration for each declaration file
       mkShellConfig = shellName: declarationFile:
         let
-          # Parse the shell's toolchain file to check what it declares
-          shellDecl = builtins.fromTOML (builtins.readFile declarationFile);
-          shellToolchains = if shellDecl ? toolchains then builtins.attrNames shellDecl.toolchains else [];
-          # Only enable buck2 if the shell's toolchain actually declares it
-          shellNeedsBuck2 = cfg.buck2.enable && (builtins.elem "buck2" shellToolchains || builtins.elem "buck2-toolchain" shellToolchains);
+          # Only the shells listed in buck2.shells get the Buck2 integration
+          shellNeedsBuck2 = cfg.buck2.enable && builtins.elem shellName cfg.buck2.shells;
         in
         {
         imports = [ ../../devenv/turnkey ];
@@ -926,6 +954,7 @@ in
           # Pass through Buck2 configuration with new language-specific namespaces
           buck2 = {
             enable = shellNeedsBuck2;
+            package = pinnedBuck2;
             prelude = {
               strategy = cfg.buck2.prelude.strategy;
               path = resolvedPreludePath;
@@ -1017,7 +1046,14 @@ in
       };
 
       # Generate shell configurations from declarationFiles
-      shellConfigs = lib.mapAttrs mkShellConfig cfg.declarationFiles;
+      shellConfigs =
+        let
+          unknownShells = builtins.filter (name: !(cfg.declarationFiles ? ${name})) cfg.buck2.shells;
+        in
+        if cfg.buck2.enable && unknownShells != [ ] then
+          throw "turnkey: turnkey.toolchains.buck2.shells names ${lib.concatStringsSep ", " unknownShells}, which declarationFiles doesn't define"
+        else
+          lib.mapAttrs mkShellConfig cfg.declarationFiles;
 
       # Collect all non-null cells into an attrset for exposure
       # Filter out non-derivation values (e.g., "bundled://" for prelude)

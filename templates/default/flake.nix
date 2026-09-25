@@ -28,9 +28,9 @@
           declarationFiles.default = ./toolchain.toml;
 
           # The default registry — provided by the turnkey flake-parts
-          # module — ships with toolbox: buck2, nix, go, python, clang,
-          # rust, uv, and more (all version-pinned). 'tk' is included as
-          # a built-in extension. Add project-specific tools here:
+          # module — ships with toolbox: nix, go, python, clang, rust, uv,
+          # and more (all version-pinned). 'tk' is included as a built-in
+          # extension. Add project-specific tools here:
           #
           # registryExtensions = {
           #   my-tool = {
@@ -39,9 +39,11 @@
           #   };
           # };
 
-          # Enable Buck2 integration. Each language flag wires the
-          # corresponding deps-gen tool into PATH and registers the deps
-          # cell with Buck2 — no need to list it in toolchain.toml.
+          # Enable Buck2 integration. turnkey adds its pinned buck2
+          # release to the shell (don't declare buck2 in toolchain.toml).
+          # Each language flag wires the corresponding deps-gen tool into
+          # PATH and registers the deps cell with Buck2 — no need to list
+          # it in toolchain.toml.
           buck2 = {
             enable = true;
             prelude.strategy = "bundled";

@@ -272,17 +272,6 @@
   # Non-Buck2 Tools (skipped)
   # ==========================================================================
 
-  # Buck2 itself - not a language toolchain
-  buck2 = {
-    skip = true;
-    reason = "Buck2 binary itself, not a language toolchain";
-  };
-
-  buck2-toolchain = {
-    skip = true;
-    reason = "Buck2 + reindeer meta-package, not a language toolchain";
-  };
-
   # Nix package manager
   nix = {
     skip = true;

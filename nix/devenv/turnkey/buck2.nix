@@ -337,6 +337,9 @@ ${generateTargets finalToolchains}
   # Helper for Go deps enabled
   hasGodeps = cfg.go.enable && cfg.go.cell != null;
 
+  # The pinned buck2 release (docs/adr/0002-turnkey-owns-the-buck2-version.md)
+  buck2Source = import ../../buck2/buck2-source.nix { inherit pkgs lib; };
+
   # turnkey-test-runner's protocol code, generated for the pinned buck2
   # release (nix/buck2/buck2-source.nix)
   testRunnerProtocol = import ../../packages/test-runner-protocol.nix { inherit pkgs lib; };
@@ -519,6 +522,24 @@ ${generateTargets finalToolchains}
 in
 {
   options.turnkey.buck2 = {
+    version = lib.mkOption {
+      type = lib.types.str;
+      default = buck2Source.version;
+      readOnly = true;
+      description = ''
+        The pinned buck2 release this shell gets (a release date). Read-only:
+        each turnkey revision ships exactly one buck2 release, and a consumer
+        moves to another by moving to another turnkey revision
+        (docs/adr/0002-turnkey-owns-the-buck2-version.md).
+      '';
+    };
+
+    package = lib.mkOption {
+      type = lib.types.package;
+      internal = true;
+      description = "The pinned buck2 binary, resolved from turnkey's own registry (injected by the flake-parts module).";
+    };
+
     testCache = {
       enable = lib.mkOption {
         type = lib.types.bool;
@@ -526,8 +547,7 @@ in
         description = ''
           Run tests through turnkey's test runner, which can reuse recorded
           results for unchanged tests (docs/specs/test-result-caching.md).
-          When false, or when turnkey doesn't support the declared buck2
-          release, tests run under buck2's bundled runner.
+          When false, tests run under buck2's bundled runner.
         '';
       };
 
@@ -1111,9 +1131,10 @@ in
 
   config = lib.mkIf (cfg.enable && turnkeyCfg.enable) {
     # Add runtime dependencies and internal tools to shell
+    # - cfg.package: the pinned buck2 binary
     # - runtimePackages: tools needed in PATH for Buck2 actions (e.g., clang for cxx)
     # - internalPackages: turnkey generators (godeps-gen, etc.) based on enabled languages
-    packages = runtimePackages ++ internalPackages;
+    packages = [ cfg.package ] ++ runtimePackages ++ internalPackages;
 
     # Export paths for debugging and inspection
     env = {
@@ -1280,7 +1301,7 @@ in
 
       # Welcome message (if configured)
       ${lib.optionalString (cfg.welcomeMessage != null) ''
-        echo "${cfg.welcomeMessage}"
+        echo "${cfg.welcomeMessage} (buck2 ${cfg.version})"
       ''}
 
       # Verbose output (shown when quiet=false or TURNKEY_VERBOSE=1)
