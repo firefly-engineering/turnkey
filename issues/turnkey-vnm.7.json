@@ -10,6 +10,8 @@
     "turnkey-vnm.8",
     "turnkey-vnm.9"
   ],
+  "closed_at": "2026-09-25T12:46:44Z",
+  "close_reason": "tk test starts bazel-remote on demand (store under cache dir/test-results), passes on mode; second plain tk test is a recorded hit.",
   "created": "2026-09-25T10:54:20Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nA plain `tk test` just works. If the server isn't running, tk starts bazel-remote (pinned, by store path) detached. It listens on the fixed loopback port, with the per-user store under the platform cache dir. tk then passes the runner's `on` mode after `--` (spec §6).\n\n## Acceptance criteria\n\n- [ ] A first `tk test` with no server running starts one and runs cached\n- [ ] The store lives under the platform cache dir (turnkey/test-results/)\n- [ ] A second `tk test` on unchanged Rust tests shows hits\n- [ ] The mode flag never reaches the test and never enters the result key\n\n## Blocked by\n\n- turnkey-vnm.5\n",
   "id": "turnkey-vnm.7",
@@ -18,8 +20,8 @@
   ],
   "parent": "turnkey-vnm",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "tk starts the local test result cache on demand",
   "type": "task",
-  "updated_at": "2026-09-25T12:43:34Z"
+  "updated_at": "2026-09-25T12:46:44Z"
 }
