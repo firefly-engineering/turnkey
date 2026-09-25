@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T17:24:08Z",
+  "description": "turnkey's pinned release module checks buck2.passthru.rev against its record when present (like buck2-prelude's preludeRev). toolbox's buck2 has no passthru today. Change lives in the toolbox repo.",
+  "id": "turnkey-s2a",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "toolbox: expose buck2's source commit as passthru.rev",
+  "type": "task",
+  "updated_at": "2026-09-25T17:24:08Z"
+}
