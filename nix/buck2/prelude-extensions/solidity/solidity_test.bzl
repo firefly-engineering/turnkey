@@ -5,6 +5,7 @@
 
 """Solidity test rule implementation using Foundry's forge."""
 
+load("@prelude//test_caching:test_caching.bzl", "test_caching_kwargs")
 load(":providers.bzl", "SolidityLibraryInfo", "SolidityToolchainInfo", "merge_remappings")
 
 def _fuzz_seed(label: str) -> int:
@@ -215,12 +216,20 @@ cd "$WORK_DIR"
     # Create run info for test execution
     run_info = RunInfo(args = test_cmd)
 
+    test_info_kwargs = {
+        "type": "solidity",
+        "command": [test_cmd],
+    }
+
     return [
         DefaultInfo(),
-        ExternalRunnerTestInfo(
-            type = "solidity",
-            command = [test_cmd],
-        ),
+        # Cacheable: forge runs the toolchain's solc offline, reads its
+        # dependencies from the declared soldeps bundle, and fuzzes with a
+        # seed fixed by the label. A fork test reads chain state over the
+        # network, so it always runs.
+        ExternalRunnerTestInfo(**(
+            test_info_kwargs if ctx.attrs.fork_url else test_caching_kwargs(test_info_kwargs)
+        )),
         run_info,
     ]
 
