@@ -17,11 +17,15 @@
     {
       "text": "Resolution. Findings are in docs/research/local-re-api-servers.md on local jj bookmark research/re-servers-local (commit e94112597afe; workspace turnkey-research-re-servers-local). This was desk research only; no server was run. buck2 citations are at HEAD b8ae22e6.\n\n- Local WORKERS that run natively on darwin: only NativeLink and Buildbarn.\n  - NativeLink: single process, but FSL-1.1 (source-available), not in nixpkgs, darwin barely CI-tested.\n  - Buildbarn: 4-5 processes, and its scheduler ignores buck2's platform properties (buck2 sends them only on the deprecated Command.platform; PR #1366 is open). Workaround: an empty worker platform (untested).\n  - BuildBuddy: its executor needs an enterprise licence.\n  - buildbox-casd: local execution on macOS unconfirmed.\n- CACHE-ONLY: bazel-remote fits best. It's in nixpkgs (darwin and Linux), a single binary, has a size-capped LRU, validates that cache hits' outputs exist by default (avoids buck2#862 dangling-hit failures), and can gRPC-proxy to a shared backend.\n- buck2 client constraints: TCP only (no unix sockets; one loopback port per user), tls must be set false, engine_address required even for cache-only (must answer GetCapabilities), use SHA256.\n- Isolation: no candidate sandboxes on darwin. Workers stage only declared inputs and clear env, but /nix/store and $HOME stay readable.\n- Cache-only caveat: local build actions run in the repo root with the daemon env, so uploaded results can depend on unkeyed files and env.\n- Swapping backends: buck2 computes the keys, so they're stable across backends if hash, platform properties, output-path mode and instance name match. bazel-remote proxy, NativeLink fast_slow, Buildbarn readCaching and casd --ac-remote can all front a shared store.\n- Failures: NativeLink caches only exit 0; casd caches failures by default.\n- Ruled out: justbuild (rejects buck2 uploads, Linux-only) and EngFlow single-node (proprietary Linux Docker).",
       "timestamp": "2026-09-25T07:51:58Z"
+    },
+    {
+      "text": "Research branch pushed: research/re-servers-local. Permalink: https://github.com/firefly-engineering/turnkey/blob/e94112597afe428c35943c32e24685769f7b38e5/docs/research/local-re-api-servers.md",
+      "timestamp": "2026-09-25T08:08:41Z"
     }
   ],
   "priority": 2,
   "status": "closed",
   "title": "Which remote-execution-API servers can run on a developer machine?",
   "type": "task",
-  "updated_at": "2026-09-25T07:51:58Z"
+  "updated_at": "2026-09-25T08:08:41Z"
 }
