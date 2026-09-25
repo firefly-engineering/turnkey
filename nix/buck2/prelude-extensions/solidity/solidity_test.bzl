@@ -185,11 +185,11 @@ cd "$WORK_DIR"
     for artifact in dep_artifacts:
         test_cmd.add(artifact)
 
-    # Add soldeps cell path for auto-remapping (resolved from .buckconfig)
-    soldeps_cell_path = read_root_config("cells", "soldeps", None)
-    if soldeps_cell_path:
+    # Add the soldeps bundle for auto-remapping. It is a declared dependency,
+    # so the remappings and every dependency source are inputs of the test.
+    if ctx.attrs.soldeps:
         test_cmd.add("--soldeps-cell")
-        test_cmd.add(soldeps_cell_path)
+        test_cmd.add(ctx.attrs.soldeps[DefaultInfo].default_outputs[0])
 
     # Create run info for test execution
     run_info = RunInfo(args = test_cmd)
@@ -215,6 +215,11 @@ solidity_test = rule(
             attrs.dep(),
             default = [],
             doc = "Dependencies (solidity_library targets or filegroups from soldeps)",
+        ),
+        "soldeps": attrs.option(
+            attrs.dep(),
+            default = None,
+            doc = "The soldeps cell's bundle (remappings.txt plus every vendor package). Set automatically by the solidity_test macro when the repo has a soldeps cell.",
         ),
         "remappings": attrs.dict(
             key = attrs.string(),

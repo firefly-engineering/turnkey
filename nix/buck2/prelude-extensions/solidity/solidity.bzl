@@ -59,7 +59,15 @@ SolidityContractInfo = _SolidityContractInfo
 system_solidity_toolchain = _system_solidity_toolchain
 solidity_library = _solidity_library
 solidity_contract = _solidity_contract
-solidity_test = _solidity_test
+def solidity_test(**kwargs):
+    """solidity_test, with the soldeps bundle as a declared dependency.
+
+    When the repo has a soldeps cell, the test depends on its bundle so every
+    dependency source it can import is an input of the test action.
+    """
+    if "soldeps" not in kwargs and read_root_config("cells", "soldeps", None) != None:
+        kwargs["soldeps"] = "soldeps//:bundle"
+    _solidity_test(**kwargs)
 
 # Rule implementations for registration with prelude
 implemented_rules = {
