@@ -10,9 +10,15 @@
   "labels": [
     "wayfinder:map"
   ],
+  "comments": [
+    {
+      "text": "Landed on main 2026-09-25: a38b5748..37065860 (5685c90c, 13740c55, 385c53d0, ae5362d9, 37065860).",
+      "timestamp": "2026-09-25T16:32:37Z"
+    }
+  ],
   "priority": 2,
   "status": "closed",
   "title": "Bundle buck2 inside turnkey",
   "type": "epic",
-  "updated_at": "2026-09-25T16:28:42Z"
+  "updated_at": "2026-09-25T16:32:37Z"
 }
