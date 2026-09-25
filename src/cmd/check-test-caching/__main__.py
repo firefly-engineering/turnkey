@@ -49,9 +49,15 @@ EXPECTED_EXECUTORS: dict[str, tuple[str, str]] = {
     "root//src/examples/jsonnet-config:common-test": ("cache", "none"),
     "root//src/examples/solidity-hello:counter_test": ("cache", "none"),
     "root//src/cmd/check-test-caching:re-disabled-test": ("cache", "local"),
+    # Labelled no-test-cache: never cached, so the same either way.
+    "root//src/cmd/check-test-caching:no-test-cache-test": ("local", "local"),
     # A remote_execution profile's executor is kept either way.
     "root//src/cmd/check-test-caching:re-profile-test": ("other", "other"),
 }
+
+# Targets the helper keeps out of caching: with caching on, they get what
+# they get with it off.
+OPTED_OUT = {"root//src/cmd/check-test-caching:no-test-cache-test"}
 
 CACHING_FIELDS = (
     "supports_test_execution_caching",
@@ -94,13 +100,14 @@ def mismatches(caching: bool, actual: dict[str, dict]) -> list[str]:
         expected = on if caching else off
         if info["executor"] != expected:
             found.append(f"{target}: executor {info['executor']}, expected {expected}")
+        cached = caching and target not in OPTED_OUT
         for name in CACHING_FIELDS:
-            if caching and info[name] is not True:
+            if cached and info[name] is not True:
                 found.append(f"{target}: {name} is {info[name]}, expected True")
-        if not caching and info["supports_test_execution_caching"] is True:
-            found.append(f"{target}: declared cacheable with caching off")
-        if not caching and info["cacheable_label"]:
-            found.append(f"{target}: labelled {CACHEABLE_LABEL} with caching off")
+        if not cached and info["supports_test_execution_caching"] is True:
+            found.append(f"{target}: declared cacheable, but not cached")
+        if not cached and info["cacheable_label"]:
+            found.append(f"{target}: labelled {CACHEABLE_LABEL}, but not cached")
     return found
 
 

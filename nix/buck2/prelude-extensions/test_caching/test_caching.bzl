@@ -19,11 +19,15 @@ RemoteTestExecutorConfig it got from `get_re_executors_from_props`, through
     }, re_executors))
 
 Calling it is what makes a rule cache-safe (see CONTEXT.md); every decision
-about what caching changes is made here, so a prelude patch only wraps
-upstream's arguments.
+about what caching changes, and for which targets, is made here, so a
+prelude patch only wraps upstream's arguments.
+
+A target labelled `no-test-cache` is kept out of caching altogether: its
+arguments are returned unchanged, so it runs on upstream's executor, which
+never reads a recorded result, and turnkey's test runner never records it.
 
 When the repo enables test result caching (the generated .buckconfig sets
-`turnkey.test_cache = true`), the returned arguments:
+`turnkey.test_cache = true`), every other target's arguments:
 
 - declare the test cacheable (`supports_test_execution_caching`), and label
   it `turnkey-cacheable`, the only way turnkey's test runner can tell it
@@ -53,12 +57,19 @@ load("@prelude//tests:re_utils.bzl", "RemoteTestExecutorConfig")
 # (src/go/pkg/testcache/testdata/runner-contract.json).
 _CACHEABLE_LABEL = "turnkey-cacheable"
 
+# Keeps a target out of test result caching (docs/specs/test-result-caching.md).
+_NO_TEST_CACHE_LABEL = "no-test-cache"
+
 # Nix's convention for "no home directory".
 _HOMELESS = "/homeless-shelter"
 
 def test_caching_enabled() -> bool:
     """Whether this repo has test result caching turned on."""
     return read_root_config("turnkey", "test_cache", "false") == "true"
+
+def test_caching_opted_out(labels: list[str] | None) -> bool:
+    """Whether a target with these labels is kept out of test result caching."""
+    return _NO_TEST_CACHE_LABEL in (labels or [])
 
 def test_caching_kwargs(
         kwargs: dict[str, typing.Any],
@@ -74,7 +85,7 @@ def test_caching_kwargs(
     ones that stop them writing into their inputs. Like the pinned PATH and
     HOME, they apply only when caching is on, and a target's own env wins.
     """
-    if not test_caching_enabled():
+    if not test_caching_enabled() or test_caching_opted_out(kwargs.get("labels")):
         return kwargs
 
     path = read_root_config("turnkey", "test_path", "")

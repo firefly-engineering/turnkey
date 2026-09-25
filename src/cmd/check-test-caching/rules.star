@@ -33,3 +33,11 @@ rust_test(
     crate_root = "fixture.rs",
     remote_execution = "disabled",
 )
+
+# Kept out of test result caching: the helper returns its arguments unchanged
+rust_test(
+    name = "no-test-cache-test",
+    srcs = ["fixture.rs"],
+    crate_root = "fixture.rs",
+    labels = ["no-test-cache"],
+)

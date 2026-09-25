@@ -19,15 +19,12 @@ use buck2_test_executor::proto::buck::test::{
 };
 
 use crate::args::Config;
-use crate::cache::{ActionCache, Mode, Pass, Recorder};
+use crate::cache::{ActionCache, Pass, Recorder};
 
-/// Label that opts a target out of test result caching: it always runs and is
-/// never recorded (docs/specs/test-result-caching.md).
-pub const NO_TEST_CACHE_LABEL: &str = "no-test-cache";
-
-/// Label the test-caching helper gives every target of a cache-safe rule.
-/// Only such targets are recorded: buck2 reports an action digest for every
-/// local run, cacheable or not, so the label is the only way to tell.
+/// Label the test-caching helper gives every target it caches: the targets of
+/// cache-safe rules, minus those labelled `no-test-cache`. Only such targets
+/// are recorded: buck2 reports an action digest for every local run,
+/// cacheable or not, so the label is the only way to tell.
 pub const CACHEABLE_LABEL: &str = "turnkey-cacheable";
 
 pub struct Runner<O, C> {
@@ -83,7 +80,7 @@ impl<O: Orchestrator, C: ActionCache> Runner<O, C> {
         let target = spec.target.clone().context("spec without a target")?;
         let name = format!("{}//{}:{}", target.cell, target.package, target.target);
         let handle = target.handle.context("spec target without a handle")?;
-        let mode = self.mode_for(&spec);
+        let mode = self.config.turnkey_test_cache;
         let cacheable = spec.labels.iter().any(|label| label == CACHEABLE_LABEL);
 
         let response = self
@@ -115,16 +112,6 @@ impl<O: Orchestrator, C: ActionCache> Runner<O, C> {
         let status = result.status();
         self.orchestrator.report(result).await?;
         Ok(status)
-    }
-
-    /// The cache mode for one target: a target labelled `no-test-cache`
-    /// always runs and is never recorded.
-    fn mode_for(&self, spec: &ExternalRunnerSpec) -> Mode {
-        if spec.labels.iter().any(|label| label == NO_TEST_CACHE_LABEL) {
-            Mode::Off
-        } else {
-            self.config.turnkey_test_cache
-        }
     }
 }
 
@@ -656,22 +643,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_target_labelled_no_test_cache_is_never_recorded() {
-        let buck2 = buck2_answering(vec![("opted-out", local_run("opted-out", 0))]);
-        let cache = FakeCache::default();
-        let mut opted_out = cacheable(spec("opted-out", 1));
-        opted_out.labels.push(NO_TEST_CACHE_LABEL.to_owned());
-        run_recording(
-            &buck2,
-            Some(&cache),
-            config(&["--turnkey-test-cache=on"]),
-            vec![opted_out],
-        )
-        .await;
-        assert!(cache.digests().is_empty());
-    }
-
-    #[tokio::test]
     async fn reports_every_result_and_fails_the_run_on_any_failure() {
         let buck2 = FakeBuck2 {
             results: BTreeMap::from([
@@ -744,40 +715,6 @@ mod tests {
         };
         run(&buck2, config(&[]), vec![spec("t", 1)]).await;
         assert!(buck2.requests.lock().unwrap()[0].disable_test_execution_caching);
-    }
-
-    #[tokio::test]
-    async fn no_test_cache_label_turns_caching_off_for_that_target() {
-        let buck2 = FakeBuck2 {
-            results: BTreeMap::from([
-                ("opted-out".into(), finished(0)),
-                ("cached".into(), finished(0)),
-            ]),
-            ..Default::default()
-        };
-        let mut opted_out = spec("opted-out", 1);
-        opted_out.labels = vec![NO_TEST_CACHE_LABEL.to_owned()];
-        run(
-            &buck2,
-            config(&["--turnkey-test-cache=on"]),
-            vec![opted_out, spec("cached", 2)],
-        )
-        .await;
-
-        let requests = buck2.requests.lock().unwrap();
-        let caching_disabled = |target: &str| {
-            requests
-                .iter()
-                .find(|r| {
-                    r.test_executable.as_ref().and_then(|e| e.stage.as_ref()).is_some_and(|s| {
-                        matches!(&s.item, Some(test_stage::Item::Testing(t)) if t.suite == target)
-                    })
-                })
-                .unwrap()
-                .disable_test_execution_caching
-        };
-        assert!(caching_disabled("opted-out"));
-        assert!(!caching_disabled("cached"));
     }
 
     #[test]

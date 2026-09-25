@@ -80,10 +80,9 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_labels_the_test_caching_helper_sets() {
+    fn reads_the_label_the_test_caching_helper_sets() {
         let labels = &runner_contract()["labels"];
         assert_eq!(crate::runner::CACHEABLE_LABEL, labels["cacheable"]);
-        assert_eq!(crate::runner::NO_TEST_CACHE_LABEL, labels["no_test_cache"]);
     }
 
     #[test]

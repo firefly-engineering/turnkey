@@ -5,7 +5,7 @@
 
 """Solidity test rule implementation using Foundry's forge."""
 
-load("@prelude//test_caching:test_caching.bzl", "test_caching_kwargs")
+load("@prelude//test_caching:test_caching.bzl", "test_caching_kwargs", "test_caching_opted_out")
 load(":providers.bzl", "SolidityLibraryInfo", "SolidityToolchainInfo", "merge_remappings")
 
 def _fuzz_seed(label: str) -> int:
@@ -70,7 +70,7 @@ def _solidity_test_impl(ctx: AnalysisContext) -> list[Provider]:
 
     # Seed fuzzing from the label unless the target opts out of test result
     # caching, which is how a target asks for stochastic fuzzing.
-    if "no-test-cache" not in ctx.attrs.labels:
+    if not test_caching_opted_out(ctx.attrs.labels):
         forge_args.append("--fuzz-seed")
         forge_args.append(str(_fuzz_seed(str(ctx.label.raw_target()))))
     if ctx.attrs.fork_url:

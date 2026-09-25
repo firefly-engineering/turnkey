@@ -105,12 +105,11 @@ Accepted as negligible: G5, P6 and R1.
   - The REAPI protos come from `bazelbuild/remote-apis` at a pinned revision.
 - **REAPI calls:** it uses only FindMissingBlobs, BatchUpdateBlobs and UpdateActionResult.
 - **Deterministic timeout:** the timeout it sends is part of the digest, so it is derived deterministically from the rule and the flags.
-- **Mode flag:** the runner's mode comes from a flag after `--`: `on`, `record-only`, `read-only` or `off`. The runner consumes the flag, so it never reaches the test and never enters the result key. `tk` chooses the mode (§6); the runner obeys it and decides nothing about the reuse policy except the per-target labels.
+- **Mode flag:** the runner's mode comes from a flag after `--`: `on`, `record-only`, `read-only` or `off`. The runner consumes the flag, so it never reaches the test and never enters the result key. `tk` chooses the mode (§6); the runner obeys it and decides nothing about the reuse policy.
   - **Default is off.** It then sends `disable_test_execution_caching`, so buck2 never contacts the cache, and records nothing.
   - **record-only** skips reads and still records.
   - **read-only** reads and never records.
-  - The `no-test-cache` label means off for that target.
-  - Only a target labelled `turnkey-cacheable` is recorded. The test-caching helper adds that label to every target of a cache-safe rule when caching is on. buck2 reports an action digest for every local run, cacheable or not, so without the label the runner would record passes nothing ever looks up.
+  - Only a target labelled `turnkey-cacheable` is recorded. The test-caching helper adds that label to every target of a cache-safe rule when caching is on, except those labelled `no-test-cache`: it returns their arguments unchanged, so they run on upstream's executor, which never reads a recorded result, and are never recorded. buck2 reports an action digest for every local run, cacheable or not, so without the label the runner would record passes nothing ever looks up.
 - **Origin flag:** `tk` also passes whether the cache is `local` or `remote`, which the runner reports on each hit. The runner never infers it from the address.
 
 ## 6. `tk` and the local cache server
