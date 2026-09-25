@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-25T19:18:07Z",
+  "description": "Build actions inherit the dev-shell env (NIX_CFLAGS_COMPILE, NIX_LDFLAGS, SDKROOT, MACOSX_DEPLOYMENT_TARGET) outside the key, and buck2 has no setting to clear it. Needed variables must become declared action env via the toolchain. Invasive: tk is also the interactive wrapper. See docs/research/remote-execution-and-caching.md (commit adc3619d) §5.",
+  "id": "turnkey-lbe.5",
+  "labels": [],
+  "parent": "turnkey-lbe",
+  "priority": 2,
+  "status": "open",
+  "title": "tk starts the buck2 daemon with a minimal pinned environment (G4)",
+  "type": "task",
+  "updated_at": "2026-09-25T19:18:07Z"
+}
