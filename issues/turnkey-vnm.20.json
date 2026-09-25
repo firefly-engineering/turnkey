@@ -4,6 +4,8 @@
   "blocks": [
     "turnkey-vnm.21"
   ],
+  "closed_at": "2026-09-25T11:08:21Z",
+  "close_reason": "Python toolchains use the declared python-toolchain's store-path python3; .pex shebangs name it; dynamicAttrs now honour declared versions. User site-packages close with vnm.4's HOME pin.",
   "created": "2026-09-25T10:54:29Z",
   "description": "## Parent\n\nturnkey-vnm\n\n## What to build\n\nThe Python toolchain's interpreter is a Nix store path, not `python3` resolved from PATH, so a toolchain bump changes the result key (hazards P1 and P3, spec §4).\n\n## Acceptance criteria\n\n- [ ] python_test targets run under the store-path interpreter whatever the host PATH\n- [ ] Host and user site-packages are not visible to tests\n\n## Blocked by\n\nNone — can start immediately.\n",
   "id": "turnkey-vnm.20",
@@ -12,8 +14,8 @@
   ],
   "parent": "turnkey-vnm",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Python toolchain uses a store-path interpreter",
   "type": "task",
-  "updated_at": "2026-09-25T11:01:45Z"
+  "updated_at": "2026-09-25T11:08:21Z"
 }
