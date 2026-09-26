@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-26T12:01:47Z",
+  "description": "## Question\n\nDo we accept the Nix sandbox-escape risk of sharing outputs built for untrusted requests, or split the Nix cache (and possibly the action cache) into tiers so that trusted builds never substitute an untrusted-built input-addressed output?\n\n## Context\n\nSurfaced by turnkey-wit.5 (docs/research/remote-derivation-builds.md on bookmark research/remote-derivation-builds, e7c909ed). The map's trust rule says an honest sandboxed build of an untrusted derivation can be shared. That holds only while the Nix sandbox resists a hostile derivation. Nothing checks an input-addressed output against its content. So a sandbox escape lets an attacker plant a bad output for a `.drv` that trunk will build next, for example the dependency cell of a lock-file bump in their PR. That output is then signed and substituted by everyone. Nix's advisories still recommend \"no untrusted builds on shared infrastructure\"; the latest escape gave root to anyone who could submit a build (CVE-2026-39860, April 2026). The same question applies to the REAPI executor, which depends on its per-action sandbox (see turnkey-wit.1 once resolved). Darwin's sandbox is weaker still.\n\n## Decide (grilling; /grilling + /domain-modeling)\n\n1. **Accepted risk with mitigations**: signing key off the build host; a fresh VM or instance per build; `sandbox = true` and `sandbox-fallback = false`; a builder identity without write rights (fixed-output derivations can reach the metadata server); no `ca-derivations`; fast patching, with a record of who requested each build so affected outputs can be evicted after an advisory.\n2. **Two tiers**: untrusted-built outputs serve only untrusted consumers, and trusted (trunk/release) consumers rebuild. This reintroduces something like **Scope** for Nix, and maybe for action results. What does it cost in hit rate for landing builds?\n3. **Staged**: accept the risk for Linux with the mitigations, and use tiers for darwin.\n4. How the answer feeds the ADR (turnkey-wit.7), result sharing (turnkey-wit.9) and the building blocks (turnkey-wit.12).\n\n## Output\n\nResolution comment; a `docs/specs/build-service.md` section \"Sandbox-escape risk\"; the map Notes' trust rule restated to match.",
+  "id": "turnkey-wit.15",
+  "labels": [],
+  "parent": "turnkey-wit",
+  "priority": 2,
+  "status": "open",
+  "title": "Do we accept the sandbox-escape risk of sharing untrusted-built outputs?",
+  "type": "question",
+  "updated_at": "2026-09-26T12:01:47Z"
+}
