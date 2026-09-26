@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [],
   "blocks": [
     "turnkey-wit.10",
@@ -13,8 +13,8 @@
   ],
   "parent": "turnkey-wit",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "How can a client ask a remote service to build a derivation?",
   "type": "task",
-  "updated_at": "2026-09-26T11:51:57Z"
+  "updated_at": "2026-09-26T11:53:14Z"
 }
