@@ -5,7 +5,9 @@
     "turnkey-wit.3",
     "turnkey-wit.5"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-wit.12"
+  ],
   "created": "2026-09-26T11:51:48Z",
   "description": "## Question\n\nWhat does the executor need from an action to run it — the contract between turnkey's buck2 side (execution platform, toolchains, prelude) and the executor — including how store paths are named and how action keys are salted?\n\n## Context\n\nMap turnkey-wit: programmable base image = generic executor image; per action, needed store paths are fetched from the Nix cache (built by the service if missing), cached per instance, mounted read-only into the action sandbox. Inputs from research tickets: request-driven REAPI executor, Nix paths on RE workers, remote derivation builds. Absorbs turnkey-lbe's open question \"how coarse may the environment salt be (whole shell vs per-toolchain)\" (research note §5 G3: `remote_execution_properties` on a turnkey-owned execution platform enter the key even without RE). Related lbe gaps that make keys honest and RE possible: G1 (store-path rustc, turnkey-lbe.2), G2 (GOROOT as keyed input, turnkey-lbe.3), G5 (turnkey-owned execution platform, turnkey-lbe.6).\n\n## Decide (grilling; /grilling + /domain-modeling; /prototype if behaviour is unclear)\n\n1. How the executor learns the store paths to provide: symlink targets in the input root, argv scanning, and/or an explicit platform property (which closure roots: toolchains cell? whole dev shell?).\n2. Platform properties: OS/arch, the salt (whole-shell hash vs per-toolchain vs none beyond store paths), executor image version, anything the executor schedules on.\n3. When a needed store path is missing from the Nix cache: executor triggers the build (derivation must be known — how?), or client guarantees it beforehand.\n4. Environment the action sees on the executor (PATH? HOME? TMPDIR?) and what must be declared action env.\n5. Which actions stay local (`local_only`: Nix steps, darwin) and the hybrid policy.\n6. Consequences for turnkey-lbe.4 (salt) and turnkey-lbe.6 (execution platform): keep/rewrite.\n\n## Output\n\nResolution comment; `docs/specs/build-service.md` section \"Executor contract\"; update turnkey-lbe.4/.6 descriptions.",
   "id": "turnkey-wit.10",
@@ -17,5 +19,5 @@
   "status": "open",
   "title": "What does the executor need from an action to run it?",
   "type": "question",
-  "updated_at": "2026-09-26T11:51:55Z"
+  "updated_at": "2026-09-26T11:51:58Z"
 }
