@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [],
   "blocks": [
     "turnkey-wit.11",
@@ -14,8 +14,8 @@
   ],
   "parent": "turnkey-wit",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "What can GitHub vouch for, and how does it become a credential?",
   "type": "task",
-  "updated_at": "2026-09-26T11:51:58Z"
+  "updated_at": "2026-09-26T11:53:17Z"
 }
