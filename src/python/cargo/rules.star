@@ -5,6 +5,7 @@ python_library(
     srcs = [
         "turnkey/cargo/__init__.py",
         "turnkey/cargo/features.py",
+        "turnkey/cargo/semver.py",
         "turnkey/cargo/toml.py",
     ],
     base_module = "",
@@ -24,6 +25,13 @@ python_test(
 python_test(
     name = "test_features",
     srcs = ["tests/test_features.py"],
+    base_module = "tests",
+    deps = [":cargo"],
+)
+
+python_test(
+    name = "test_semver",
+    srcs = ["tests/test_semver.py"],
     base_module = "tests",
     deps = [":cargo"],
 )

@@ -1582,3 +1582,179 @@ name = "zmij"
 version = "1.0.18"
 hash = "sha256-Fh6EiQt0ZIxRxW2h01SDmsZXtRJVmDA4CPVw5rS/mFc="
 
+# The workspace members' registry dependency specs, from
+# their Cargo.toml files: where feature unification starts.
+
+[[requested]]
+name = "anyhow"
+version = "1.0"
+
+[[requested]]
+name = "base64"
+version = "0.22"
+
+[[requested]]
+name = "cargo-lock"
+version = "10"
+
+[[requested]]
+name = "chrono"
+version = "0.4"
+features = ["serde"]
+
+[[requested]]
+name = "clap"
+version = "4.5"
+features = ["derive"]
+
+[[requested]]
+name = "ctrlc"
+version = "3.4"
+
+[[requested]]
+name = "dirs"
+version = "5.0"
+
+[[requested]]
+name = "env_logger"
+version = "0.11"
+
+[[requested]]
+name = "fuser"
+version = "0.17"
+features = ["libfuse"]
+
+[[requested]]
+name = "futures-util"
+version = "0.3"
+
+[[requested]]
+name = "glob"
+version = "0.3"
+
+[[requested]]
+name = "hyper-util"
+version = "0.1"
+features = ["tokio"]
+
+[[requested]]
+name = "itoa"
+version = "1.0"
+
+[[requested]]
+name = "libc"
+version = "0.2"
+
+[[requested]]
+name = "log"
+version = "0.4"
+
+[[requested]]
+name = "notify"
+version = "8.0"
+
+[[requested]]
+name = "notify-debouncer-mini"
+version = "0.6"
+
+[[requested]]
+name = "prost"
+version = "0.14"
+
+[[requested]]
+name = "prost-types"
+version = "0.14"
+
+[[requested]]
+name = "protox"
+version = "0.9"
+
+[[requested]]
+name = "serde"
+version = "1.0"
+features = ["derive"]
+
+[[requested]]
+name = "serde-saphyr"
+version = "0.0.15"
+
+[[requested]]
+name = "serde_json"
+version = "1.0"
+
+[[requested]]
+name = "sha2"
+version = "0.10"
+
+[[requested]]
+name = "tempfile"
+version = "3.10"
+
+[[requested]]
+name = "thiserror"
+version = "2.0"
+
+[[requested]]
+name = "tokio"
+version = "1"
+features = ["macros", "net", "rt-multi-thread", "sync"]
+
+[[requested]]
+name = "toml"
+version = "0.8"
+
+[[requested]]
+name = "tonic"
+version = "0.14"
+
+[[requested]]
+name = "tonic-prost"
+version = "0.14"
+
+[[requested]]
+name = "tonic-prost-build"
+version = "0.14"
+default-features = false
+features = ["transport"]
+
+[[requested]]
+name = "tower"
+version = "0.5"
+features = ["util"]
+
+[[requested]]
+name = "tree-sitter"
+version = "0.25"
+
+[[requested]]
+name = "tree-sitter-go"
+version = "0.25"
+
+[[requested]]
+name = "tree-sitter-python"
+version = "0.23"
+
+[[requested]]
+name = "tree-sitter-rust"
+version = "0.23"
+
+[[requested]]
+name = "tree-sitter-solidity"
+version = "1.2.13"
+
+[[requested]]
+name = "tree-sitter-starlark"
+version = "1.3"
+
+[[requested]]
+name = "tree-sitter-typescript"
+version = "0.23"
+
+[[requested]]
+name = "ureq"
+version = "2"
+features = ["json"]
+
+[[requested]]
+name = "walkdir"
+version = "2.5"

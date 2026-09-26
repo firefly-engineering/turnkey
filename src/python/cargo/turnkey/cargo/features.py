@@ -1,29 +1,41 @@
 """Feature unification for Rust crates.
 
-This module implements Cargo-style feature unification:
-1. Parse all Cargo.toml files to find dependency feature requirements
-2. Compute the union of all features requested by any dependent
-3. Output mapping of crate names to their unified feature sets
+This module implements Cargo-style feature unification over a vendor
+directory. Starting from what the workspace members request (their
+dependency specs, recorded in rust-deps.toml by rustdeps-gen), it walks the
+dependency graph the way Cargo's resolver does:
 
-This matches Cargo's behavior where if any crate requires feature X on crate Y,
-crate Y is built with feature X enabled.
+- a dependency spec resolves to the vendored version its requirement
+  matches, so each version of a crate unifies separately;
+- a crate's default features are on only when some requirer asks for them
+  (default-features is not false);
+- an optional dependency counts as a requirer only when an enabled feature
+  activates it, and "dep/feature" forwarding requests features on it.
+
+The result maps each vendored crate ("name@version") to the features it is
+built with.
 """
 
 import tomllib
 from collections import defaultdict
+from collections.abc import Collection, Iterable
+from dataclasses import dataclass, field
 from pathlib import Path
 
+from .semver import best_match
 from .toml import (
     parse_cargo_toml,
     get_crate_name,
+    get_version_req,
     normalize_crate_name,
     extract_dep_features,
     get_dep_package_name,
+    is_optional,
 )
 try:
-    from cfg import is_linux_compatible_target
+    from cfg import classify_target_platforms
 except ImportError:
-    from turnkey.cfg import is_linux_compatible_target
+    from turnkey.cfg import classify_target_platforms
 
 
 def parse_feature_forwarding(feature_item: str) -> tuple[str, str] | None:
@@ -45,266 +57,242 @@ def parse_feature_forwarding(feature_item: str) -> tuple[str, str] | None:
     return (dep_name, feature)
 
 
-def collect_feature_requirements(
-    vendor_dir: Path,
-) -> tuple[dict[str, set[str]], dict[str, dict]]:
+def dependency_tables(cargo: dict) -> list[dict]:
+    """A crate's [dependencies] and every [target.*.dependencies] table."""
+    tables = [cargo.get("dependencies", {})]
+    for target_config in cargo.get("target", {}).values():
+        tables.append(target_config.get("dependencies", {}))
+    return tables
+
+
+@dataclass
+class Activation:
+    """What a set of requested features turns on in one crate.
+
+    features: the enabled features, transitively expanded ("default" is
+        expanded but not reported, and dep:/forwarding items are not features)
+    optional_deps: the optional dependencies (by their key in the manifest)
+        the features activate
+    dep_features: features to request on dependencies (by manifest key),
+        from "dep/feature" items and from "dep?/feature" items whose
+        dependency is active
     """
-    Scan all crates and collect feature requirements from their dependents.
 
-    Returns:
-        - Dict mapping normalized crate names to sets of required features
-        - Dict mapping crate names to their Cargo.toml data (for feature expansion)
+    features: set[str] = field(default_factory=set)
+    optional_deps: set[str] = field(default_factory=set)
+    dep_features: dict[str, set[str]] = field(default_factory=dict)
+
+
+def activate(
+    cargo: dict, requested: Iterable[str], remove: Collection[str] = frozenset()
+) -> Activation:
+    """Expand `requested` features of a crate as Cargo does.
+
+    Features in `remove` are treated as absent, so what only they would turn
+    on stays off; removing "default" drops the crate's default set.
     """
-    # Map: normalized_crate_name -> set of features required by dependents
-    required_features: dict[str, set[str]] = defaultdict(set)
-    # Map: crate_name -> Cargo.toml data
-    crate_cargo_data: dict[str, dict] = {}
+    defs = cargo.get("features", {})
+    optional: set[str] = set()
+    required: set[str] = set()
+    for table in dependency_tables(cargo):
+        for key, spec in table.items():
+            if is_optional(spec):
+                optional.add(key)
+            else:
+                required.add(key)
+    # An optional dependency named with "dep:" anywhere has no implicit
+    # feature of its own name.
+    named_with_dep = {
+        item[len("dep:") :]
+        for items in defs.values()
+        for item in items
+        if item.startswith("dep:")
+    }
 
-    # Find all crate directories (both versioned and unversioned)
-    crate_dirs = []
-    for item in vendor_dir.iterdir():
-        if item.is_dir() and not item.is_symlink():
-            crate_dirs.append(item)
+    result = Activation()
+    enabled: set[str] = set()
+    forwards: list[tuple[str, str, bool]] = []
+    to_process = list(requested)
+    while to_process:
+        feature = to_process.pop()
+        if feature in remove or feature in enabled:
+            continue
+        if feature.startswith("dep:"):
+            result.optional_deps.add(feature[len("dep:") :])
+            continue
+        fwd = parse_feature_forwarding(feature)
+        if fwd:
+            dep, dep_feature = fwd
+            weak = feature.split("/", 1)[0].endswith("?")
+            forwards.append((dep, dep_feature, weak))
+            if not weak and dep in optional:
+                result.optional_deps.add(dep)
+                # ...and turns on the feature of the dependency's name, if
+                # there is one (explicit, or implicit)
+                if dep in defs or dep not in named_with_dep:
+                    to_process.append(dep)
+            continue
+        enabled.add(feature)
+        if feature in defs:
+            to_process.extend(defs[feature])
+        elif feature in optional and feature not in named_with_dep:
+            result.optional_deps.add(feature)
 
-    # First pass: Parse all Cargo.toml files and collect direct feature requirements
-    for crate_dir in crate_dirs:
+    active = required | result.optional_deps
+    for dep, dep_feature, weak in forwards:
+        if weak and dep not in active:
+            continue
+        result.dep_features.setdefault(dep, set()).add(dep_feature)
+
+    enabled.discard("default")
+    result.features = enabled
+    return result
+
+
+def load_vendored_crates(vendor_dir: Path) -> dict[str, dict]:
+    """Parse every crate in a vendor dir, keyed by "name@version".
+
+    Symlinks (the unversioned "name" aliases) are skipped.
+    """
+    crates: dict[str, dict] = {}
+    for crate_dir in sorted(vendor_dir.iterdir()):
+        if not crate_dir.is_dir() or crate_dir.is_symlink():
+            continue
         cargo = parse_cargo_toml(crate_dir)
         if not cargo:
             continue
-
-        # Store cargo data for later feature expansion
-        dir_name = crate_dir.name
-        if "@" in dir_name:
-            fallback_name = dir_name.split("@")[0]
-        else:
-            fallback_name = dir_name
-        crate_name = get_crate_name(cargo, fallback_name)
-        crate_cargo_data[crate_name] = cargo
-
-        # Process regular dependencies
-        for dep_name, dep_spec in cargo.get("dependencies", {}).items():
-            pkg_name = get_dep_package_name(dep_name, dep_spec)
-            features = extract_dep_features(dep_spec)
-            normalized = normalize_crate_name(pkg_name)
-            required_features[normalized].update(features)
-
-        # Note: dev-dependencies are NOT processed since they don't affect
-        # library builds - only tests/examples which we don't build
-
-        # Process target-specific dependencies (filtered for Linux compatibility)
-        for target_spec, target_config in cargo.get("target", {}).items():
-            if not is_linux_compatible_target(target_spec):
-                continue
-            for dep_name, dep_spec in target_config.get("dependencies", {}).items():
-                pkg_name = get_dep_package_name(dep_name, dep_spec)
-                features = extract_dep_features(dep_spec)
-                normalized = normalize_crate_name(pkg_name)
-                required_features[normalized].update(features)
-
-    return required_features, crate_cargo_data
+        dir_name, _, dir_version = crate_dir.name.partition("@")
+        name = get_crate_name(cargo, dir_name)
+        version = cargo.get("package", {}).get("version", dir_version)
+        crates[f"{name}@{version}"] = cargo
+    return crates
 
 
-def collect_forwarded_features(
-    crate_cargo_data: dict[str, dict],
-    required_features: dict[str, set[str]],
-) -> dict[str, set[str]]:
+def supported_dependency_specs(cargo: dict) -> dict[str, list]:
+    """A crate's normal dependency specs by manifest key.
+
+    Covers [dependencies] and the target tables that apply on any supported
+    platform: a crate is built with one feature set everywhere, so it must
+    hold what each platform's dependents ask for (dev-dependencies don't
+    affect library builds, and build scripts are not built from
+    build-dependencies).
     """
-    Second pass: Collect features that are forwarded to dependencies.
-
-    When a crate has: alloc = ["zerovec/alloc"]
-    And alloc is enabled, zerovec should get the "alloc" feature.
-
-    This iterates until no new features are discovered (fixed point).
-    """
-    forwarded: dict[str, set[str]] = defaultdict(set)
-
-    # Iterate until no changes (feature forwarding can be transitive)
-    changed = True
-    iterations = 0
-    max_iterations = 100  # Safety limit
-
-    while changed and iterations < max_iterations:
-        changed = False
-        iterations += 1
-
-        for crate_name, cargo in crate_cargo_data.items():
-            normalized_crate = normalize_crate_name(crate_name)
-            crate_features_def = cargo.get("features", {})
-
-            # Get all features that will be enabled for this crate
-            default_features = set(crate_features_def.get("default", []))
-            requested = required_features.get(normalized_crate, set())
-            all_enabled = (
-                default_features | requested | forwarded.get(normalized_crate, set())
-            )
-
-            # Expand features to find forwarding
-            to_process = list(all_enabled)
-            processed = set()
-
-            while to_process:
-                feature = to_process.pop()
-                if feature in processed:
-                    continue
-                processed.add(feature)
-
-                # Handle "default" specially
-                if feature == "default" and "default" in crate_features_def:
-                    to_process.extend(crate_features_def["default"])
-                    continue
-
-                # Check what this feature enables
-                if feature in crate_features_def:
-                    for sub in crate_features_def[feature]:
-                        # Check for feature forwarding
-                        fwd = parse_feature_forwarding(sub)
-                        if fwd:
-                            dep_name, dep_feature = fwd
-                            normalized_dep = normalize_crate_name(dep_name)
-                            if dep_feature not in forwarded[normalized_dep]:
-                                forwarded[normalized_dep].add(dep_feature)
-                                changed = True
-                        elif not sub.startswith("dep:") and sub not in processed:
-                            to_process.append(sub)
-
-    return forwarded
-
-
-def expand_features(
-    crate_name: str,
-    requested: set[str],
-    crate_features: dict[str, list[str]],
-) -> set[str]:
-    """
-    Expand feature set by following feature dependencies.
-
-    In Cargo, features can enable other features:
-        [features]
-        full = ["parsing", "printing"]
-
-    This expands "full" to include "parsing" and "printing".
-    """
-    expanded = set()
-    to_process = list(requested)
-
-    while to_process:
-        feature = to_process.pop()
-        if feature in expanded:
+    specs: dict[str, list] = defaultdict(list)
+    for key, spec in cargo.get("dependencies", {}).items():
+        specs[key].append(spec)
+    for target_spec, target_config in cargo.get("target", {}).items():
+        if not classify_target_platforms(target_spec):
             continue
-
-        # Handle "default" specially
-        if feature == "default":
-            if "default" in crate_features:
-                to_process.extend(crate_features["default"])
-            continue
-
-        expanded.add(feature)
-
-        # If this feature enables other features, add them
-        if feature in crate_features:
-            for sub_feature in crate_features[feature]:
-                # Skip dep: syntax and feature forwarding (dep/feature)
-                if sub_feature.startswith("dep:") or "/" in sub_feature:
-                    continue
-                if sub_feature not in expanded:
-                    to_process.append(sub_feature)
-
-    return expanded
+        for key, spec in target_config.get("dependencies", {}).items():
+            specs[key].append(spec)
+    return specs
 
 
-def compute_unified_features(vendor_dir: Path, overrides: dict) -> dict[str, list[str]]:
+class _Unifier:
+    """Worklist resolution of features from a set of requests."""
+
+    def __init__(self, crates: dict[str, dict], overrides: dict):
+        self.crates = crates
+        # normalized name -> version -> "name@version"
+        self.versions: dict[str, dict[str, str]] = defaultdict(dict)
+        for key in crates:
+            name, _, version = key.rpartition("@")
+            self.versions[normalize_crate_name(name)][version] = key
+        self.replaced: dict[str, list[str]] = {}
+        self.added: dict[str, list[str]] = {}
+        self.removed: dict[str, set[str]] = {}
+        for key in crates:
+            override = overrides.get(key.rpartition("@")[0])
+            if isinstance(override, list):
+                self.replaced[key] = override
+            elif isinstance(override, dict):
+                self.added[key] = override.get("add", [])
+                self.removed[key] = set(override.get("remove", []))
+        self.requested: dict[str, set[str]] = {}
+        self.pending: list[str] = []
+
+    def resolve(self, pkg_name: str, version_req: str | None) -> str | None:
+        """The vendored "name@version" a dependency on pkg_name resolves to."""
+        versions = self.versions.get(normalize_crate_name(pkg_name), {})
+        match = best_match(version_req, versions)
+        return versions[match] if match else None
+
+    def request(self, key: str, features) -> None:
+        """Ask for features on a crate; an empty request still reaches it."""
+        features = set(features)
+        requested = self.requested.get(key)
+        if requested is not None and features <= requested:
+            return
+        self.requested[key] = (requested or set()) | features
+        if key not in self.pending:
+            self.pending.append(key)
+
+    def activation(self, key: str, requested) -> Activation:
+        features = self.replaced.get(key, set(requested) | set(self.added.get(key, [])))
+        return activate(self.crates[key], features, self.removed.get(key, frozenset()))
+
+    def run(self) -> None:
+        while self.pending:
+            key = self.pending.pop()
+            activation = self.activation(key, self.requested[key])
+            specs = supported_dependency_specs(self.crates[key])
+            for dep_key, dep_specs in specs.items():
+                forwarded = activation.dep_features.get(dep_key, set())
+                for spec in dep_specs:
+                    # A key can be optional in one table and required in
+                    # another (per platform)
+                    if is_optional(spec) and dep_key not in activation.optional_deps:
+                        continue
+                    pkg_name = get_dep_package_name(dep_key, spec)
+                    target = self.resolve(pkg_name, get_version_req(spec))
+                    if target:
+                        self.request(target, [*extract_dep_features(spec), *forwarded])
+
+    def features(self, key: str) -> list[str]:
+        if key in self.replaced:
+            return sorted(self.replaced[key])
+        # A crate nothing reaches (a build-dependency, a dependency on an
+        # unsupported platform) is not built from the graph; give it its
+        # defaults.
+        requested = self.requested.get(key, {"default"})
+        return sorted(self.activation(key, requested).features)
+
+
+def compute_unified_features(
+    vendor_dir: Path, overrides: dict, requested: list[dict] | None = None
+) -> dict[str, list[str]]:
     """
     Compute unified features for all crates.
 
     Args:
         vendor_dir: Path to vendor directory containing crate sources
-        overrides: Manual feature overrides from rust-features.toml
+        overrides: Manual feature overrides from rust-features.toml, by crate
+            name: a list replaces the computed features, a dict's "add" is
+            requested on top and its "remove" is never enabled
+        requested: The workspace members' dependency specs ({"name",
+            "version", "features", "default-features"}). None when unknown
+            (a rust-deps.toml from before rustdeps-gen recorded them): every
+            crate is then requested with its defaults.
 
     Returns:
-        Dict mapping crate names to sorted lists of features
+        Dict mapping "name@version" to sorted lists of features
     """
-    # Collect what features are requested by dependents
-    required_features, crate_cargo_data = collect_feature_requirements(vendor_dir)
+    crates = load_vendored_crates(vendor_dir)
+    unifier = _Unifier(crates, overrides)
 
-    # Collect features forwarded through feature definitions
-    forwarded_features = collect_forwarded_features(crate_cargo_data, required_features)
+    if requested is None:
+        for key in crates:
+            unifier.request(key, ["default"])
+    else:
+        for spec in requested:
+            key = unifier.resolve(spec["name"], get_version_req(spec))
+            if key:
+                unifier.request(key, extract_dep_features(spec))
+    for key in unifier.added:
+        unifier.request(key, [])
+    unifier.run()
 
-    # Merge forwarded features into required features
-    for crate_name, features in forwarded_features.items():
-        required_features[crate_name].update(features)
-
-    # Build a map of crate features definitions for expansion
-    crate_feature_defs: dict[str, dict[str, list[str]]] = {}
-    crate_dirs = [d for d in vendor_dir.iterdir() if d.is_dir() and not d.is_symlink()]
-
-    for crate_dir in crate_dirs:
-        cargo = parse_cargo_toml(crate_dir)
-        if not cargo:
-            continue
-
-        dir_name = crate_dir.name
-        if "@" in dir_name:
-            fallback_name = dir_name.split("@")[0]
-        else:
-            fallback_name = dir_name
-
-        crate_name = get_crate_name(cargo, fallback_name)
-        normalized = normalize_crate_name(crate_name)
-        crate_feature_defs[normalized] = cargo.get("features", {})
-
-    # Compute final unified features for each crate
-    unified: dict[str, list[str]] = {}
-
-    for crate_dir in crate_dirs:
-        cargo = parse_cargo_toml(crate_dir)
-        if not cargo:
-            continue
-
-        dir_name = crate_dir.name
-        if "@" in dir_name:
-            fallback_name = dir_name.split("@")[0]
-        else:
-            fallback_name = dir_name
-
-        crate_name = get_crate_name(cargo, fallback_name)
-        normalized = normalize_crate_name(crate_name)
-
-        # Check for manual override first
-        if crate_name in overrides:
-            override = overrides[crate_name]
-            if isinstance(override, list):
-                # Complete replacement
-                unified[crate_name] = sorted(override)
-                continue
-            elif isinstance(override, dict):
-                # Additive/subtractive - apply after computing base
-                pass
-
-        # Start with default features
-        default_features = set(cargo.get("features", {}).get("default", []))
-
-        # Add features required by dependents
-        requested = required_features.get(normalized, set())
-        all_requested = default_features | requested
-
-        # Expand feature dependencies
-        feature_defs = crate_feature_defs.get(normalized, {})
-        expanded = expand_features(crate_name, all_requested, feature_defs)
-
-        # Apply additive/subtractive overrides if present
-        if crate_name in overrides and isinstance(overrides[crate_name], dict):
-            override = overrides[crate_name]
-            if "add" in override:
-                expanded.update(override["add"])
-            if "remove" in override:
-                expanded -= set(override["remove"])
-
-        # Filter out feature forwarding syntax (not valid rustc flags)
-        expanded = {f for f in expanded if "/" not in f and not f.startswith("dep:")}
-
-        unified[crate_name] = sorted(expanded)
-
-    return unified
+    return {key: unifier.features(key) for key in crates}
 
 
 def load_overrides(overrides_file: Path | None) -> dict:
@@ -316,3 +304,17 @@ def load_overrides(overrides_file: Path | None) -> dict:
         data = tomllib.load(f)
 
     return data.get("overrides", {})
+
+
+def load_requested(deps_file: Path | None) -> list[dict] | None:
+    """Load the workspace's dependency requests from rust-deps.toml.
+
+    Returns None when the file predates rustdeps-gen recording them.
+    """
+    if deps_file is None or not deps_file.exists():
+        return None
+
+    with open(deps_file, "rb") as f:
+        data = tomllib.load(f)
+
+    return data.get("requested")

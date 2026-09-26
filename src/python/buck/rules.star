@@ -1,4 +1,4 @@
-load("@prelude//:rules.bzl", "python_library")
+load("@prelude//:rules.bzl", "python_library", "python_test")
 
 python_library(
     name = "buck",
@@ -13,4 +13,11 @@ python_library(
         "//src/python/cfg:cfg",
     ],
     visibility = ["PUBLIC"],
+)
+
+python_test(
+    name = "test_generator",
+    srcs = ["tests/test_generator.py"],
+    base_module = "tests",
+    deps = [":buck"],
 )

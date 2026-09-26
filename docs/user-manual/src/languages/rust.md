@@ -63,15 +63,36 @@ deps = [
 ]
 ```
 
+## Features
+
+Each vendored crate is built with the features Cargo would give it. `tk sync`
+records your workspace members' dependency specs (version, `features`,
+`default-features`) in `rust-deps.toml` as `[[requested]]` entries, and the
+rustdeps cell resolves features from them the way Cargo does:
+
+- a crate's default features are on only if some dependent asks for them
+  (it does not set `default-features = false`);
+- an optional dependency is part of the build only when an enabled feature
+  activates it;
+- when several versions of a crate are vendored, each gets its own features,
+  and a dependency resolves to the version its requirement matches.
+
+Declare what you need in `Cargo.toml` as you would for Cargo; there is
+nothing to repeat for Buck2.
+
 ## Feature Overrides
 
-Use `rust-features.toml` for manual feature control:
+Use `rust-features.toml` where the result must differ from Cargo's:
 
 ```toml
 [overrides]
-serde = ["derive", "std"]
-tokio = ["full"]
+serde = ["derive", "std"]          # Complete replacement
+tokio = { add = ["full"] }         # Requested on top, with what it enables
+inotify = { remove = ["stream"] }  # Never enabled, nor what only it enables
 ```
+
+Overrides are keyed by crate name and apply to every vendored version.
+Removing `"default"` drops the crate's default feature set.
 
 ## Auto-Sync
 

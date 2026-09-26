@@ -110,6 +110,11 @@ def is_proc_macro(cargo: dict) -> bool:
     return cargo.get("lib", {}).get("proc-macro", False)
 
 
+def is_optional(dep_spec) -> bool:
+    """Whether a dependency spec is `optional = true`."""
+    return isinstance(dep_spec, dict) and dep_spec.get("optional", False)
+
+
 def get_optional_deps(cargo: dict) -> set[str]:
     """Get names of optional dependencies from Cargo.toml."""
     optional = set()

@@ -167,7 +167,7 @@ rec {
       # Compute unified features (if tool provided)
       ${if computeUnifiedFeatures != null then ''
         echo "Computing unified features..."
-        UNIFIED_FEATURES=$(compute-unified-features "$out/vendor" ${featuresFileArg})
+        UNIFIED_FEATURES=$(compute-unified-features "$out/vendor" ${featuresFileArg} --deps-file ${depsFile})
         export UNIFIED_FEATURES
       '' else ''
         UNIFIED_FEATURES="{}"

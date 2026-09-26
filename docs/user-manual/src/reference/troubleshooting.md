@@ -61,9 +61,14 @@ git add go-deps.toml
 
 ### Rust feature conflicts
 
-**Cause:** Conflicting feature requirements across crates.
+**Cause:** A vendored crate is built with features that differ from what
+Cargo would pick. Features are resolved from the `[[requested]]` entries in
+`rust-deps.toml`, so first make sure it is current (`tk sync`; editing only a
+dependency's `features` in a member `Cargo.toml` does not change `Cargo.lock`,
+so `touch Cargo.lock` before syncing).
 
-**Solution:** Create `rust-features.toml` with explicit overrides:
+**Solution:** If it still differs, create `rust-features.toml` with explicit
+overrides:
 ```toml
 [overrides]
 problematic-crate = ["feature1", "feature2"]

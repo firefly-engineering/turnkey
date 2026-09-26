@@ -216,8 +216,17 @@ Built by the Rust adapter, `nix/lib/deps-cell/adapters/rust.nix`.
 
 1. Reads rust-deps.toml
 2. Fetches crates from crates.io
-3. Computes unified features across dependency graph
-4. Generates rules.star with features and deps
+3. Computes unified features (`compute-unified-features`): starting from the
+   workspace members' dependency specs, the `[[requested]]` entries
+   rustdeps-gen records in rust-deps.toml, it walks the vendored crates the
+   way Cargo's feature resolver does. Each `name@version` gets its own
+   features, defaults are on only when a dependent asks for them, and optional
+   dependencies count only when a feature activates them. A rust-deps.toml
+   without `[[requested]]` (from an older rustdeps-gen) makes every crate
+   request its defaults.
+4. Generates rules.star with features and deps (`gen-rust-buck`), resolving
+   each dependency to the vendored version its requirement matches and
+   leaving out optional dependencies the crate's features don't activate
 
 ### Special Handling
 

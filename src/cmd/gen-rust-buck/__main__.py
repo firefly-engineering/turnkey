@@ -51,7 +51,6 @@ def main():
     version = cargo.get("package", {}).get("version", "0.0.0")
     edition = get_edition(cargo, crate_dir=crate_dir)
     crate_root = get_lib_path(cargo, crate_dir)
-    platform_deps, platform_named_deps = get_dependencies(cargo, available_crates)
     proc_macro = is_proc_macro(cargo)
     env = get_cargo_env(cargo, crate_name)
     rustc_flags = get_build_script_cfg_flags(crate_name, version, rustc_flags_registry)
@@ -65,14 +64,20 @@ def main():
     versioned_key = f"{crate_name}@{version}"
     native_lib_info = native_libraries_registry.get(versioned_key) or native_libraries_registry.get(crate_name)
 
-    # Use unified features if available, otherwise fall back to default features
-    if crate_name in unified_features:
-        features = unified_features[crate_name]
+    # Use unified features (keyed by name@version) if available, otherwise
+    # fall back to default features
+    unified = unified_features.get(versioned_key)
+    if unified is not None:
         # Still need to filter for availability (unified features may include
         # features that enable deps we don't have)
-        features = filter_features_for_availability(features, cargo, available_crates)
+        features = filter_features_for_availability(unified, cargo, available_crates)
     else:
         features = get_default_features(cargo, available_crates)
+
+    # Optional deps are only included when these features activate them
+    platform_deps, platform_named_deps = get_dependencies(
+        cargo, available_crates, features
+    )
 
     # Add OUT_DIR for crates that have build script fixups
     if crate_name in fixup_crates:

@@ -1,26 +1,33 @@
 #!/usr/bin/env python3
 """Compute unified features for all Rust crates in a vendor directory."""
 
+import argparse
 import json
-import sys
 from pathlib import Path
 
-from turnkey.cargo import compute_unified_features, load_overrides
+from turnkey.cargo import compute_unified_features, load_overrides, load_requested
 
 
 def main():
-    if len(sys.argv) < 2:
-        print(
-            "Usage: compute-unified-features <vendor_dir> [overrides_file]",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        prog="compute-unified-features",
+        description="Compute unified features for all Rust crates in a vendor directory.",
+    )
+    parser.add_argument("vendor_dir", type=Path)
+    parser.add_argument(
+        "overrides_file", type=Path, nargs="?", help="rust-features.toml"
+    )
+    parser.add_argument(
+        "--deps-file",
+        type=Path,
+        help="rust-deps.toml, whose [[requested]] entries are the workspace "
+        "members' dependency specs to resolve features from",
+    )
+    args = parser.parse_args()
 
-    vendor_dir = Path(sys.argv[1])
-    overrides_file = Path(sys.argv[2]) if len(sys.argv) > 2 else None
-
-    overrides = load_overrides(overrides_file)
-    unified = compute_unified_features(vendor_dir, overrides)
+    overrides = load_overrides(args.overrides_file)
+    requested = load_requested(args.deps_file)
+    unified = compute_unified_features(args.vendor_dir, overrides, requested)
 
     # Output as JSON
     print(json.dumps(unified, indent=2, sort_keys=True))

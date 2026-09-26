@@ -1,5 +1,6 @@
 """rules.star file generation for Rust crates."""
 
+import sys
 from dataclasses import dataclass, field
 
 from turnkey.cargo.toml import (
@@ -8,7 +9,10 @@ from turnkey.cargo.toml import (
     get_version_req,
     get_optional_deps,
     feature_enables_unavailable_dep,
+    is_optional,
 )
+from turnkey.cargo.features import activate
+from turnkey.cargo.semver import best_match
 from turnkey.buildsystem.native_library import NativeLibrarySpec
 from turnkey.buildsystem.buck2 import buck2_generator
 
@@ -72,59 +76,18 @@ class PlatformRustcFlags:
 def find_matching_version(
     pkg_name: str, version_req: str | None, available_crates: set[str]
 ) -> str | None:
-    """Find a versioned crate that matches the version requirement.
+    """Find the vendored "name@version" a dependency on `pkg_name` resolves to.
 
-    When multiple versions exist, we need to select the right one based on semver.
+    Picks the highest vendored version satisfying `version_req` (any version
+    when it is None), or None when no vendored version does.
     """
-    if not version_req:
-        return None
-
-    # Parse version requirement (simple parsing for common cases)
-    # Handle formats like "0.2.10", "^0.2", ">=1.0", "=1.2.3"
-    req = version_req.lstrip("^~>=<= ")
-    req_parts = req.split(".")
-    if not req_parts:
-        return None
-
-    major = req_parts[0]
-    minor = req_parts[1] if len(req_parts) > 1 else None
-
-    # Look for versioned crates matching this requirement
-    # Try exact match first, then compatible versions
-    candidates = []
+    versions: dict[str, str] = {}
     for crate in available_crates:
-        if "@" not in crate:
-            continue
-        name, version = crate.rsplit("@", 1)
-        if (
-            name != pkg_name
-            and name != pkg_name.replace("-", "_")
-            and name != pkg_name.replace("_", "-")
-        ):
-            continue
-
-        v_parts = version.split(".")
-        v_major = v_parts[0] if len(v_parts) > 0 else "0"
-        v_minor = v_parts[1] if len(v_parts) > 1 else "0"
-
-        # For 0.x versions, minor version must match (0.2 != 0.3)
-        # For 1.x+, major version must match
-        if major == "0":
-            if v_major == major and (minor is None or v_minor == minor):
-                candidates.append((crate, version))
-        else:
-            if v_major == major:
-                candidates.append((crate, version))
-
-    if not candidates:
-        return None
-
-    # Return the highest matching version
-    # Sort by version parts (simple string sort works for most cases)
-    candidates.sort(
-        key=lambda x: [int(p) for p in x[1].split(".")[:3] if p.isdigit()], reverse=True
-    )
-    return candidates[0][0]
+        name, sep, version = crate.rpartition("@")
+        if sep and normalize_crate_name(name) == normalize_crate_name(pkg_name):
+            versions[version] = crate
+    match = best_match(version_req, versions)
+    return versions[match] if match else None
 
 
 def resolve_dep(
@@ -132,33 +95,35 @@ def resolve_dep(
 ) -> str | None:
     """Resolve a package name to a Buck target if it exists in available crates.
 
-    When version_req is provided and multiple versions exist, selects the right version.
+    When versioned crates ("name@version") are available for the package, the
+    dependency resolves to the highest one satisfying version_req, and to
+    nothing if none does: the unversioned "name" symlink points at one of
+    them and must not stand in for a version the dependency did not ask for.
     """
-    # First, try to find a versioned match if version requirement is specified
-    if version_req:
-        versioned = find_matching_version(pkg_name, version_req, available_crates)
-        if versioned:
-            # Use the versioned crate name but the unversioned target name
-            # e.g., getrandom@0.2.17 has target name "getrandom"
-            return f'rustdeps//vendor/{versioned}:' + versioned.split("@")[0]
+    versioned = find_matching_version(pkg_name, version_req, available_crates)
+    if versioned:
+        # Use the versioned crate name but the unversioned target name
+        # e.g., getrandom@0.2.17 has target name "getrandom"
+        return f"rustdeps//vendor/{versioned}:" + versioned.split("@")[0]
+    if find_matching_version(pkg_name, None, available_crates):
+        return None
 
-    # Fall back to unversioned symlink
-    if pkg_name in available_crates:
-        return f"rustdeps//vendor/{pkg_name}:{pkg_name}"
-    elif pkg_name.replace("-", "_") in available_crates:
-        normalized = pkg_name.replace("-", "_")
-        return f"rustdeps//vendor/{normalized}:{normalized}"
-    elif pkg_name.replace("_", "-") in available_crates:
-        normalized = pkg_name.replace("_", "-")
-        return f"rustdeps//vendor/{normalized}:{normalized}"
+    # Only unversioned names are available: resolve by name
+    for name in (pkg_name, pkg_name.replace("-", "_"), pkg_name.replace("_", "-")):
+        if name in available_crates:
+            return f"rustdeps//vendor/{name}:{name}"
     return None
 
 
 def extract_deps_from_section(
     section_deps: dict,
     available_crates: set[str],
+    active_optional: set[str],
 ) -> tuple[list[str], dict[str, str]]:
     """Extract dependencies from a Cargo.toml dependency section.
+
+    Optional dependencies are included only when named in active_optional
+    (by their key in the section).
 
     Returns:
         - List of regular dependency targets
@@ -168,6 +133,9 @@ def extract_deps_from_section(
     named_deps = {}
 
     for dep_name, dep_spec in section_deps.items():
+        if is_optional(dep_spec) and dep_name not in active_optional:
+            continue
+
         # Get the actual package name (may be different from dependency key)
         if isinstance(dep_spec, dict) and "package" in dep_spec:
             pkg_name = dep_spec["package"]
@@ -179,6 +147,14 @@ def extract_deps_from_section(
         # Get version requirement for proper version selection
         version_req = get_version_req(dep_spec)
         target = resolve_dep(pkg_name, available_crates, version_req)
+        if target is None and find_matching_version(pkg_name, None, available_crates):
+            # Vendored, but not in a version the requirement matches: say so
+            # here rather than leave a missing crate for rustc to report
+            print(
+                f"warning: {dep_name} = {pkg_name} {version_req!r} matches no "
+                "vendored version; leaving it out",
+                file=sys.stderr,
+            )
         if target:
             if is_renamed:
                 # Use normalized local name (hyphens -> underscores) as the crate alias
@@ -191,12 +167,15 @@ def extract_deps_from_section(
 
 
 def get_dependencies(
-    cargo: dict, available_crates: set[str]
+    cargo: dict, available_crates: set[str], features: list[str]
 ) -> tuple[PlatformDeps, PlatformNamedDeps]:
     """Extract dependencies that exist in our vendored crates.
 
     Note: We only include regular dependencies, not build-dependencies.
     Build scripts require separate rust_build_script rules in Buck2.
+
+    Optional dependencies are included only when the crate's enabled
+    features activate them.
 
     Target-specific dependencies are classified by platform and emitted
     using Buck2 select() so the right deps are used on each OS.
@@ -207,11 +186,12 @@ def get_dependencies(
     """
     platform_deps = PlatformDeps()
     platform_named = PlatformNamedDeps()
+    active_optional = activate(cargo, features).optional_deps
 
     # Standard dependencies (not build-dependencies) - always common
     section_deps = cargo.get("dependencies", {})
     common_deps, common_named = extract_deps_from_section(
-        section_deps, available_crates
+        section_deps, available_crates, active_optional
     )
     platform_deps.common.extend(common_deps)
     platform_named.common.update(common_named)
@@ -224,7 +204,7 @@ def get_dependencies(
 
         section_deps = target_config.get("dependencies", {})
         section_deps_list, section_named = extract_deps_from_section(
-            section_deps, available_crates
+            section_deps, available_crates, active_optional
         )
         if not section_deps_list and not section_named:
             continue

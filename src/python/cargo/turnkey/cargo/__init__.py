@@ -18,13 +18,14 @@ from .toml import (
     get_dep_package_name,
 )
 from .features import (
+    Activation,
+    activate,
     parse_feature_forwarding,
-    collect_feature_requirements,
-    collect_forwarded_features,
-    expand_features,
     compute_unified_features,
     load_overrides,
+    load_requested,
 )
+from .semver import best_match, matches
 
 __all__ = [
     # toml.py
@@ -44,10 +45,13 @@ __all__ = [
     "extract_dep_features",
     "get_dep_package_name",
     # features.py
+    "Activation",
+    "activate",
     "parse_feature_forwarding",
-    "collect_feature_requirements",
-    "collect_forwarded_features",
-    "expand_features",
     "compute_unified_features",
     "load_overrides",
+    "load_requested",
+    # semver.py
+    "best_match",
+    "matches",
 ]

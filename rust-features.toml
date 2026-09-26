@@ -4,33 +4,10 @@
 #   [overrides]
 #   crate-name = ["feature1", "feature2"]     # Complete replacement
 #   crate-name = { add = ["feature"] }        # Add to computed features
-#   crate-name = { remove = ["feature"] }     # Remove from computed features
+#   crate-name = { remove = ["feature"] }     # Never enable (with what it enables)
+#
+# The unifier resolves features from the workspace members' own dependency
+# specs (recorded in rust-deps.toml as [[requested]]), so an override is only
+# needed where it and Cargo disagree.
 
 [overrides]
-# clap needs derive feature for our local Rust binaries that use #[derive(Parser)]
-clap = { add = ["derive"] }
-
-# chrono needs serde feature for DateTime<Utc> serialization in local crates
-chrono = { add = ["serde"] }
-
-# rustls crypto backend - need ring feature on rustls-webpki
-rustls-webpki = { add = ["ring"] }
-
-# rustls-pki-types needs std for UnixTime::now()
-rustls-pki-types = { add = ["std"] }
-
-# ureq needs json feature for Response::into_json()
-ureq = { add = ["json"] }
-
-# syn needs printing feature for serde_derive (quote! macro to generate tokens)
-syn = { add = ["printing"] }
-
-# inotify default features include "stream" which requires tokio/futures-core
-# We use synchronous file watching via notify, so disable the async feature
-inotify = { remove = ["default", "stream"] }
-
-# futures-util's default features include async-await-macro, which needs the
-# optional futures-macro dependency. Its dependents here (tonic's stack) use
-# default-features = false, so Cargo leaves it off and futures-macro isn't
-# vendored. The unifier adds every crate's defaults regardless (turnkey-lg5).
-futures-util = { remove = ["default", "async-await-macro"] }

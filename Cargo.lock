@@ -1833,6 +1833,9 @@ dependencies = [
  "base64",
  "cargo-lock",
  "clap",
+ "glob",
+ "tempfile",
+ "toml",
 ]
 
 [[package]]
