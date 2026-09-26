@@ -5,11 +5,13 @@
   "created": "2026-09-26T11:51:46Z",
   "description": "## Question\n\nRecord the trust rule \"clients submit work, never results\" as an ADR, and add its glossary terms to CONTEXT.md.\n\n## Context\n\nSettled while charting map turnkey-wit (see its Notes). It is hard to reverse, surprising without context (\"why can't CI write to the cache?\"), and the result of a real trade-off — so it earns an ADR (/domain-modeling ADR format, next number in `docs/adr/`).\n\n## What to write\n\n- **ADR** \"Clients submit work, never results\": clients may upload content-store blobs (hash-verified) and submit Nix derivations; only the build service's executor writes action results and only its Nix builder produces signed store paths; trust root = the service and its operators; the code under build is irrelevant to integrity; results computed by the executor are shared across all clients, with the fallback (per-trust-level services, requester scopes) if Cloud Run cannot isolate successive actions; PR results are never promoted.\n  - Considered options: **scoped writes** (the original \"virtual buckets\": each build writes its own scope, trunk written by builds of reviewed code — rejected as the destination; explain the forged-entry scenario: a PR iteration uploads a forged result under a legitimate key, a later clean iteration hits it); **CI-only writer** (research note §4a; rejected: laptops and PRs can't contribute, and CI jobs run untrusted PR code); **trusted executors** (chosen).\n  - Consequences: remote execution becomes the core; the Nix cache needs no scopes; `turnkey-lbe.8`'s \"test runner writes to a remote cache\" is superseded; local execution remains for darwin/offline, and its results are never shared.\n- **CONTEXT.md** (glossary only, no implementation): new section (e.g. \"Build service\") with **Build service**, **Executor** (_Avoid_: worker, runner, RBE), **Client** (_Avoid_: builder), **Client-computed result**. Check the existing **Reuse policy** entry (\"written only into the local cache\") and note any tension rather than silently rewriting it.\n\n## Output\n\nThe ADR file and CONTEXT.md edits, committed (jj) with a message referencing this ticket; add the ADR link to `docs/specs/build-service.md` (create the spec skeleton if absent: title, destination paragraph from the map, empty sections per map ticket).",
   "id": "turnkey-wit.7",
-  "labels": [],
+  "labels": [
+    "wayfinder:task"
+  ],
   "parent": "turnkey-wit",
   "priority": 2,
   "status": "open",
   "title": "Record the trust rule \"clients submit work, never results\" as an ADR",
   "type": "docs",
-  "updated_at": "2026-09-26T11:51:46Z"
+  "updated_at": "2026-09-26T11:51:47Z"
 }
