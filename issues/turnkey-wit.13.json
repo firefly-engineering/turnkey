@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-26T11:51:49Z",
+  "description": "## Question\n\nHow does a consumer deploy and assemble the building blocks?\n\n## Context\n\nMap turnkey-wit: turnkey is a Nix flake framework (flake-parts + devenv modules); consumers are turnkey-managed repos on GitHub; GCP first; scale to zero; every artifact should be reproducible (images built by Nix). Depends on \"What are the building blocks…\".\n\n## Decide (grilling)\n\n1. Infrastructure-as-code vehicle for GCP resources: OpenTofu/Terraform modules shipped by turnkey, generated from Nix (terranix), gcloud scripts, or something else; how it stays provider-swappable.\n2. How service images are built (nix2container / dockerTools) and published (registry, tags pinned to turnkey revision — cf. ADR 0002's \"pin together, bump together\").\n3. How the consumer's flake/turnkey options connect to a deployment (endpoint, keys, public/private repo) — flake-parts options vs a separate \"infra\" flake output.\n4. GitHub App installation and secret-free bootstrap; upgrade path when turnkey bumps.\n5. What a new consumer does end to end (a checklist the user manual will carry).\n\n## Output\n\nResolution comment; `docs/specs/build-service.md` section \"Deployment\".",
+  "id": "turnkey-wit.13",
+  "labels": [],
+  "parent": "turnkey-wit",
+  "priority": 2,
+  "status": "open",
+  "title": "How does a consumer deploy and assemble the blocks?",
+  "type": "question",
+  "updated_at": "2026-09-26T11:51:49Z"
+}
