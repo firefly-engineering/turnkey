@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-wit.6"
+  ],
   "blocks": [],
   "created": "2026-09-26T11:51:48Z",
   "description": "## Question\n\nWhat gates a merge, and what (if anything) runs after landing?\n\n## Context\n\nMap turnkey-wit: with a trusted executor, a PR build's results are honest whoever asked, so a PR's check could be the merge gate without a clean-room rebuild — **unless** part of it was client-computed (local actions on the CI runner). Inputs: \"Which results are shared…\" (sharing model and client-computed results) and the GitHub identity research (merge queue availability, `merge_group`, OIDC per event). Consumers may be public or private repos, with or without merge queue.\n\n## Decide (grilling)\n\n1. Which build's status is the required check (PR head, merge commit, merge group), and what makes it trustworthy (all-remote? client-computed parts acceptable?).\n2. Whether consumers must use merge queue, or both modes are supported.\n3. Post-merge build on the trunk commit: needed at all (cache warming for the exact trunk commit, catching semantic merge conflicts), or optional.\n4. Stacked PRs: anything special now that results are shared?\n5. Flaky tests and failures: passes only are recorded (CONTEXT.md **Recorded result**) — confirm it carries over to executor-run tests.\n\n## Output\n\nResolution comment; `docs/specs/build-service.md` section \"Merge gating\".",
@@ -13,5 +15,5 @@
   "status": "open",
   "title": "What gates a merge, and what runs after landing?",
   "type": "question",
-  "updated_at": "2026-09-26T11:51:48Z"
+  "updated_at": "2026-09-26T11:51:55Z"
 }
