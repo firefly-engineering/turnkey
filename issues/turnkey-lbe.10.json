@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "turnkey-wit.14"
+  ],
   "blocks": [
     "turnkey-lbe.1"
   ],
@@ -13,5 +15,5 @@
   "status": "open",
   "title": "Push CI shell closure (cells, toolchains cell, prelude) to Cachix (G9)",
   "type": "task",
-  "updated_at": "2026-09-25T19:18:10Z"
+  "updated_at": "2026-09-26T11:52:00Z"
 }
