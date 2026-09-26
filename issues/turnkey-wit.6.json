@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-26T11:51:46Z",
+  "description": "## Question\n\nWhat can GitHub vouch for about who is asking — CI jobs for PRs (incl. forks), landing commits, merge queue, and individual developers — and how does each become a credential the build service can check without long-lived secrets?\n\n## Context\n\nMap turnkey-wit: every client is untrusted for integrity (clients never write results), so credentials no longer decide *who may write shared results*. They still decide: who may consume compute (cost/abuse; fork PRs from non-members need approval before anything runs), who may read (private repos: exactly the repo's readers), and where client-computed results go (developer-private). Clients: GitHub Actions runners (default), laptops, a service-owned client host (Cloud Run job) for fork PRs and developer-requested builds. GCP first. The repo `firefly-engineering/turnkey` is public; consumer repos may be private.\n\n## What to find (GitHub and GCP docs; cite and date)\n\n1. **Actions OIDC**: token claims per event (`pull_request`, `pull_request_target`, `push`, `merge_group`, `workflow_dispatch`), incl. `ref`, `sub`, `job_workflow_ref`, `repository_owner_id`, actor; can a same-repo branch forge a trusted-looking claim (e.g. by editing workflows)? **Fork PRs**: confirm whether `id-token: write` is unavailable, and what alternatives exist (approval gates, `pull_request_target` risks).\n2. **GitHub App**: signed webhooks, installation tokens, checking a user's permission on a repo (for private-repo reads), Checks API for reporting.\n3. **Developer identity** from a laptop: OAuth device flow / GitHub App user tokens; mapping to \"may read this repo\".\n4. **Verifying on the service side**: verifying GitHub OIDC JWTs directly in a Cloud Run service vs GCP Workload Identity Federation (attribute conditions) vs short-lived tokens minted by a broker; what REAPI clients (buck2 `http_headers` with `$VAR`, `tls_client_cert`) and Nix clients (netrc, `access-tokens`, S3 creds) can present.\n5. **Merge queue**: availability (public vs private repos, plan requirements), `merge_group` semantics.\n6. **Stacked PRs**: detecting that a PR's base is another PR's head via the API.\n\n## Output\n\n`docs/research/github-identity-for-build-service.md`: per client kind → what GitHub proves → how the service verifies → what the client presents. Resolution comment gists it.\n\n## Unblocks\n\n\"What gates a merge, and what runs after landing?\" and \"How do `tk` and `nix` on a client reach the build service?\".",
+  "id": "turnkey-wit.6",
+  "labels": [],
+  "parent": "turnkey-wit",
+  "priority": 2,
+  "status": "open",
+  "title": "What can GitHub vouch for, and how does it become a credential?",
+  "type": "task",
+  "updated_at": "2026-09-26T11:51:46Z"
+}
