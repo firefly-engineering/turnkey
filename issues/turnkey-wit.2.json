@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "unknown",
   "blocked_by": [],
   "blocks": [
     "turnkey-wit.10",
@@ -13,8 +13,8 @@
   ],
   "parent": "turnkey-wit",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Which REAPI implementations or components fit a request-driven executor?",
   "type": "task",
-  "updated_at": "2026-09-26T11:51:56Z"
+  "updated_at": "2026-09-26T11:52:52Z"
 }
