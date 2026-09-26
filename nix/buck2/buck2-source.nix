@@ -51,18 +51,16 @@ let
     in
     if rev == expected then
       pkg
+    else if rev == null then
+      throw "turnkey: toolbox's ${name} ${pinned.version} records no commit (passthru.${attr}), but the pinned buck2 release records ${expected}"
     else
-      throw "turnkey: toolbox's ${name} ${pinned.version} is commit ${toString rev}, but the pinned buck2 release records ${expected}";
+      throw "turnkey: toolbox's ${name} ${pinned.version} is commit ${rev}, but the pinned buck2 release records ${expected}";
 
-  # toolbox's buck2 doesn't record its source commit yet (turnkey-s2a), so
-  # the binary is checked only once it does
-  buck2 =
-    let
-      pkg = fromRegistry "buck2";
-    in
-    if pkg.passthru ? rev then checkRev "buck2" pkg "rev" pinned.rev else pkg;
+  buck2 = checkRev "buck2" (fromRegistry "buck2") "rev" pinned.rev;
 
-  upstreamPrelude = checkRev "buck2-prelude" (fromRegistry "buck2-prelude") "preludeRev" pinned.preludeRev;
+  upstreamPrelude =
+    checkRev "buck2-prelude" (fromRegistry "buck2-prelude") "preludeRev"
+      pinned.preludeRev;
 in
 {
   inherit (pinned) version;
