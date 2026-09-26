@@ -21,11 +21,15 @@
     {
       "text": "Input from turnkey-wit.2: Cloud Run caps a request at 60 min and buck2 does not retry or resume a failed Execute stream, so decide which actions (long tests, huge links) must stay local or go elsewhere. buck2 needs a Tree uploaded for each output directory, and execution metadata on every result.",
       "timestamp": "2026-09-26T12:01:09Z"
+    },
+    {
+      "text": "Input from turnkey-wit.3: in OSS buck2, platform properties are per execution platform and part of every key, so don't name closure roots there (a toolchain change would re-key everything); read paths from the action instead. A miss must be a precondition failure listing the paths, since the executor can't find a derivation from an output path.",
+      "timestamp": "2026-09-26T12:04:06Z"
     }
   ],
   "priority": 2,
   "status": "open",
   "title": "What does the executor need from an action to run it?",
   "type": "question",
-  "updated_at": "2026-09-26T12:01:09Z"
+  "updated_at": "2026-09-26T12:04:06Z"
 }
