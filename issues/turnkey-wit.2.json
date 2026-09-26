@@ -12,9 +12,15 @@
     "wayfinder:research"
   ],
   "parent": "turnkey-wit",
+  "comments": [
+    {
+      "text": "No off-the-shelf REAPI server fits: only justbuild and buildbox-casd run the action inside Execute (C++, local disk, not libraries), and every GCS-capable one (NativeLink, BuildBuddy enterprise, BuildGrid) is queue/scheduler-based. buck2 at 6507dd15 asks little of Execute: one stream per action, never WaitExecution or GetTree, its own GetActionResult first, only max_batch_total_size_bytes and compressors from Capabilities; execution_metadata and Tree blobs are mandatory, mid-stream failure is not retried (so the 60-min Cloud Run request cap bounds action length). Recommendation: write our own thin Execute handler in Go on Buildbarn's libraries: bb-storage grpcservers (hash-verified CAS/ByteStream, per-store put_authorizer denying client UpdateActionResult, JWT, AC-\u003eCAS completeness) plus bb-remote-execution's LocalBuildExecutor without the scheduler; we write a GCS BlobAccess (Buildbarn removed its cloud backend over latency/FindMissing cost, so add a per-instance cache tier). No public prior art runs REAPI Execute inside a serverless request; bazel-cache and please-servers' Elan prove CAS/AC on GCS (+Cloud Run). Findings: docs/research/request-driven-reapi-executor.md on bookmark research/request-driven-reapi-executor (commit cdf17416)",
+      "timestamp": "2026-09-26T12:00:34Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "Which REAPI implementations or components fit a request-driven executor?",
   "type": "task",
-  "updated_at": "2026-09-26T11:52:52Z"
+  "updated_at": "2026-09-26T12:00:34Z"
 }
