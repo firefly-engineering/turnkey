@@ -142,7 +142,9 @@ func (s *Syncer) run(regenerate bool) (*Result, bool, error) {
 			}
 			continue
 		case state == fresh:
-			if !s.Quiet {
+			// Up-to-date files are the common case: say so only when asked,
+			// so a sync before every build stays silent.
+			if s.Verbose {
 				s.printf("Checking %s... ok\n", rule.Target)
 			}
 			continue

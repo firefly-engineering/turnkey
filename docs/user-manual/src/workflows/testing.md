@@ -50,15 +50,20 @@ tk test //... -- --print-passing-details
 
 ## Filtering Tests
 
-Pass arguments after `--` to the test runner:
+Arguments after `--` go to the test runner, not the test binary. Pass them
+on to the binary with `--test-arg`, which takes every argument after it, so
+it comes last:
 
 ```bash
 # Run specific test function (Go)
-tk test //pkg:pkg_test -- -run TestSpecificFunction
+tk test //pkg:pkg_test -- --test-arg -test.run=TestSpecificFunction
 
 # Run specific test (Rust)
-tk test //crate:crate-test -- specific_test_name
+tk test //crate:crate-test -- --test-arg specific_test_name
 ```
+
+A filtered run has its own result key, so it doesn't reuse the unfiltered
+run's result.
 
 ## Continuous Testing
 

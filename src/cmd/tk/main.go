@@ -99,7 +99,7 @@ func main() {
 		if verbose {
 			fmt.Fprintf(os.Stderr, "tk: syncing before %s...\n", buck2Subcommand)
 		}
-		if exitCode := runSync(); exitCode != 0 {
+		if exitCode := runDeps(true, nil, false); exitCode != 0 {
 			os.Exit(exitCode)
 		}
 	}
@@ -195,18 +195,20 @@ func shouldSync(subcommand string) bool {
 // rule when none is named. Returns exit code (0 for success, non-zero for
 // failure).
 func runSync(only ...string) int {
-	return runDeps(true, only)
+	return runDeps(true, only, true)
 }
 
 // runCheck checks if the named deps rules' files (or every rule's, when
 // none is named) are stale without regenerating them.
 // Returns exit code (0 if all up-to-date, 1 if stale).
 func runCheck(only ...string) int {
-	return runDeps(false, only)
+	return runDeps(false, only, true)
 }
 
-// runDeps syncs or checks the deps rules in .turnkey/sync.toml.
-func runDeps(regenerate bool, only []string) int {
+// runDeps syncs or checks the deps rules in .turnkey/sync.toml. explicit is
+// whether the user asked for it (tk sync, tk check) rather than tk running
+// it before a buck2 command, which says nothing when there's nothing to do.
+func runDeps(regenerate bool, only []string, explicit bool) int {
 	root, err := findProjectRoot()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tk: %v\n", err)
@@ -247,14 +249,10 @@ func runDeps(regenerate bool, only []string) int {
 	switch {
 	case regenerate && result.Synced > 0:
 		fmt.Fprintf(os.Stderr, "tk: synced %d file(s)\n", result.Synced)
-	case regenerate:
-		if verbose && !quiet {
-			fmt.Fprintln(os.Stderr, "tk: nothing to sync, all files up-to-date")
-		}
 	case stale:
 		fmt.Fprintln(os.Stderr, "tk: some files are stale, run 'tk sync' to update")
 		return 1
-	case !quiet:
+	case !quiet && (explicit || verbose):
 		fmt.Fprintln(os.Stderr, "tk: all files up-to-date")
 	}
 	return 0
