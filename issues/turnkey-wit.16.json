@@ -12,9 +12,15 @@
     "wayfinder:task"
   ],
   "parent": "turnkey-wit",
+  "comments": [
+    {
+      "text": "Input from turnkey-wit.3: also test (a) running the action as a separate non-root uid, with the store owned by another uid (works without mount privileges), (b) whether bubblewrap or mounts work inside a gen2 container, and (c) whether /dev/fuse is available (lazy FUSE stores were deferred on this). Ephemeral disk (Preview) is the intended location for the store cache.",
+      "timestamp": "2026-09-26T12:04:06Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "Do Cloud Run sandboxes isolate successive actions, and does the Nix sandbox run on Cloud Run?",
   "type": "task",
-  "updated_at": "2026-09-26T12:02:40Z"
+  "updated_at": "2026-09-26T12:04:06Z"
 }
