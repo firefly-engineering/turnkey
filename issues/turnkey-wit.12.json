@@ -11,7 +11,8 @@
     "turnkey-wit.9"
   ],
   "blocks": [
-    "turnkey-wit.13"
+    "turnkey-wit.13",
+    "turnkey-wit.14"
   ],
   "created": "2026-09-26T11:51:49Z",
   "description": "## Question\n\nWhat are the build service's building blocks, and where are the seams between them — which does turnkey ship, which are swappable, and what is each block's interface?\n\n## Context\n\nMap turnkey-wit: a product feature — consumers assemble turnkey-shipped blocks; turnkey's own repo is the first assembly. Candidate blocks (to confirm, merge or split): object storage (GCS) holding content store, action cache and Nix cache; REAPI frontend (CAS/AC/ByteStream/Capabilities); executor (Cloud Run, per-action sandbox, store-path provisioning); Nix builder (derivation builds, signing); Nix cache service (niks3-derived?); identity/credential verification; GitHub integration (App, checks, approvals for fork PRs); client host for fork PRs and developer builds; `tk`/Nix client configuration. Inputs: all six research tickets plus \"Which results are shared…\" and \"What does the executor need…\". Use /codebase-design (deep modules, seams).\n\n## Decide (grilling)\n\n1. The block list and each block's responsibility and interface (protocol, config, identity it trusts).\n2. Which blocks are swappable (provider, client host, storage) and which are fixed; where provider-specific code may live (clients speak only REAPI and the Nix binary-cache protocol).\n3. Build vs reuse per block (from research: request-driven executor, niks3 scale-to-zero, remote derivation builds).\n4. Scale-to-zero check per block (idle cost = stored bytes only).\n5. What turnkey's own repo assembles first (dogfood slice).\n\n## Output\n\nResolution comment; `docs/specs/build-service.md` section \"Building blocks\" with a diagram; ADR if a build-vs-reuse choice is hard to reverse.",
@@ -24,5 +25,5 @@
   "status": "open",
   "title": "What are the building blocks, and where are their seams?",
   "type": "question",
-  "updated_at": "2026-09-26T11:51:58Z"
+  "updated_at": "2026-09-26T11:51:59Z"
 }
