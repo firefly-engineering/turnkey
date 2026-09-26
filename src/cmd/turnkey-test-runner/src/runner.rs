@@ -2,7 +2,7 @@
 //!
 //! Each test is run and reported as buck2's bundled runner would
 //! (buck2_test_executor::bundled); on top, the runner applies the mode tk
-//! chose, marks hits, and records passes.
+//! chose, marks hits, records passes, and withholds passes' output.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -108,7 +108,13 @@ impl<O: Orchestrator, C: ActionCache> Runner<O, C> {
             record_if_pass(recorder, &name, &result).await;
         }
 
-        let result = test_result(name, handle, result, self.origin)?;
+        let result = test_result(
+            name,
+            handle,
+            result,
+            self.origin,
+            self.config.print_passing_details,
+        )?;
         let status = result.status();
         self.orchestrator.report(result).await?;
         Ok(status)
@@ -213,20 +219,29 @@ fn stream_bytes(stream: &Option<ExecutionStream>) -> &[u8] {
     }
 }
 
-/// The bundled runner's result for one test, with a hit marked as such. The
-/// marker goes in the details, the part of a result buck2 prints under the
-/// test's line. The hit's provenance goes in `msg`, which buck2 keeps in the
-/// event log but doesn't print, and its duration (the original run's) moves
-/// there too: the console shows no duration for a test that didn't run.
+/// The bundled runner's result for one test, with a hit marked as such and a
+/// pass's output withheld unless `print_passing_details`.
+///
+/// The details are the part of a result buck2 prints under the test's line,
+/// and buck2 prints a pass at all only when it has some: leaving them empty
+/// keeps passes off the console, as tpx does, and the summary counts them.
+/// A hit's marker goes in its details, so it shows only along with its
+/// output. Its provenance goes in `msg`, which buck2 keeps in the event log
+/// but doesn't print, and its duration (the original run's) moves there too:
+/// the console shows no duration for a test that didn't run.
 fn test_result(
     name: String,
     target: ConfiguredTargetHandle,
     result: ExecutionResult2,
     origin: Origin,
+    print_passing_details: bool,
 ) -> Result<TestResult> {
     let hit = is_hit(&result);
     let original_duration = duration(result.execution_time.as_ref());
     let mut reported = bundled::test_result(name, target, result)?;
+    if reported.status() == TestStatus::Pass && !print_passing_details {
+        reported.details.clear();
+    }
     if hit {
         let provenance = serde_json::json!({
             "turnkey_test_cache": {
@@ -235,7 +250,9 @@ fn test_result(
                 "original_duration_us": original_duration.as_micros() as u64,
             }
         });
-        reported.details = format!("{}{}", hit_marker(origin), reported.details);
+        if !reported.details.is_empty() {
+            reported.details = format!("{}{}", hit_marker(origin), reported.details);
+        }
         reported.msg = Some(test_result::OptionalMsg {
             msg: provenance.to_string(),
         });
@@ -277,12 +294,14 @@ mod tests {
         }
     }
 
+    /// The details reported for `result` with passing details printed.
     fn details(result: ExecutionResult2) -> String {
         test_result(
             "t".into(),
             ConfiguredTargetHandle { id: 1 },
             result,
             Origin::Local,
+            true,
         )
         .unwrap()
         .details
@@ -309,6 +328,7 @@ mod tests {
             ConfiguredTargetHandle { id: 1 },
             hit(),
             Origin::Local,
+            false,
         )
         .unwrap();
         assert_eq!(reported.duration, None);
@@ -328,6 +348,7 @@ mod tests {
             ConfiguredTargetHandle { id: 1 },
             hit(),
             Origin::Remote,
+            true,
         )
         .unwrap();
         assert!(reported.details.starts_with("recorded, remote: "));
@@ -726,6 +747,41 @@ mod tests {
             },
         ));
         assert!(details(hit).starts_with("recorded: "));
+    }
+
+    #[tokio::test]
+    async fn only_failures_show_output_unless_asked() {
+        for (args, pass_details) in [
+            (&[][..], ""),
+            (
+                &["--print-passing-details"][..],
+                "---- STDOUT ----\nout\n---- STDERR ----\n\n",
+            ),
+        ] {
+            let buck2 = buck2_answering(vec![
+                ("passes", finished(0)),
+                ("fails", finished(1)),
+                ("hit", execute_response2::Response::Result(hit())),
+            ]);
+            run(&buck2, config(args), specs(&["passes", "fails", "hit"])).await;
+            let reported: BTreeMap<_, _> = buck2
+                .reported
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|r| (r.name.clone(), r.details.clone()))
+                .collect();
+            assert_eq!(reported["root//pkg:passes"], pass_details, "{args:?}");
+            assert_eq!(
+                reported["root//pkg:fails"],
+                "---- STDOUT ----\nout\n---- STDERR ----\n\n"
+            );
+            assert_eq!(
+                reported["root//pkg:hit"].is_empty(),
+                pass_details.is_empty(),
+                "{args:?}"
+            );
+        }
     }
 
     #[test]

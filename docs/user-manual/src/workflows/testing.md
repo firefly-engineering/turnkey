@@ -41,10 +41,11 @@ tk test //src/python/mymodule:test
 
 ## Test Output
 
-Test results are displayed in the console. For detailed output:
+Only tests that didn't pass are listed, each with its stdout and stderr; the
+summary line counts the rest. To list passing tests with their output too:
 
 ```bash
-tk test //... -- --nocapture
+tk test //... -- --print-passing-details
 ```
 
 ## Filtering Tests

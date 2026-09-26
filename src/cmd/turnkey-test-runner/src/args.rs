@@ -30,6 +30,12 @@ pub struct Config {
     /// for `tk test`'s summary.
     #[clap(long)]
     pub turnkey_test_cache_report: Option<std::path::PathBuf>,
+
+    /// turnkey: print passing tests' output too. By default only tests that
+    /// did not pass show theirs, as with tpx, whose flag this is named after
+    /// (buck2's console prints a pass only when it has details).
+    #[clap(long)]
+    pub print_passing_details: bool,
 }
 
 #[cfg(test)]

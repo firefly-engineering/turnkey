@@ -2,8 +2,10 @@
 //!
 //! Speaks buck2's test-runner protocol (through buck2-test-executor, pinned
 //! to the buck2 release turnkey ships), and runs tests exactly as buck2's
-//! bundled runner does. Under `tk test` it also lets buck2 reuse recorded
-//! results and records fresh passes (docs/specs/test-result-caching.md).
+//! bundled runner does. Unlike it, it prints a passing test's output only
+//! with `-- --print-passing-details`. Under `tk test` it also lets buck2
+//! reuse recorded results and records fresh passes
+//! (docs/specs/test-result-caching.md).
 
 mod args;
 mod cache;

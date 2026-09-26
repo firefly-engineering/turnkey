@@ -6,17 +6,27 @@ test result caching extends that to test runs. It is on by default.
 
 ```console
 $ tk test //src/...
-✓ Pass: root//src/rust/starlark-parse:starlark-parse-test
-recorded: reused the result of an earlier run with the same inputs
-...
 Tests finished: Pass 42. Fail 0. Timeout 0. Fatal 0. Skip 0. Omit 0. Infra Failure 0. Build failure 0
 38 recorded (reused without running)
 ```
 
-A reused result is a **hit**. It is marked `recorded` under the test's line,
-shows no duration (the test didn't run), and prints the output of the run
-that recorded it. The last line counts the hits. Exit codes are the same as
-when every test runs: `0` if all tests pass, `32` if any fails.
+A reused result is a **hit**. The last line counts the hits. Exit codes are
+the same as when every test runs: `0` if all tests pass, `32` if any fails.
+
+Passing tests, hits included, aren't listed: only tests that didn't pass are,
+with their output. To list every test with its output, pass
+`--print-passing-details` to the test runner:
+
+```console
+$ tk test //src/... -- --print-passing-details
+✓ Pass: root//src/rust/starlark-parse:starlark-parse-test
+recorded: reused the result of an earlier run with the same inputs
+---- STDOUT ----
+...
+```
+
+A hit is then marked `recorded` under the test's line, shows no duration (the
+test didn't run), and prints the output of the run that recorded it.
 
 ## When a result is reused
 
