@@ -57,17 +57,25 @@ SolidityContractInfo = _SolidityContractInfo
 
 # Re-export rules
 system_solidity_toolchain = _system_solidity_toolchain
-solidity_library = _solidity_library
 solidity_contract = _solidity_contract
-def solidity_test(**kwargs):
-    """solidity_test, with the soldeps bundle as a declared dependency.
 
-    When the repo has a soldeps cell, the test depends on its bundle so every
-    dependency source it can import is an input of the test action.
+def _with_soldeps_bundle(kwargs):
+    """Default the `soldeps` attr to the soldeps cell's bundle, if the repo has one.
+
+    Depending on the bundle makes every dependency source the rule can import
+    an input of its action, instead of a file read through the cell's path.
     """
     if "soldeps" not in kwargs and read_root_config("cells", "soldeps", None) != None:
         kwargs["soldeps"] = "soldeps//:bundle"
-    _solidity_test(**kwargs)
+    return kwargs
+
+def solidity_library(**kwargs):
+    """solidity_library, with the soldeps bundle as a declared dependency."""
+    _solidity_library(**_with_soldeps_bundle(kwargs))
+
+def solidity_test(**kwargs):
+    """solidity_test, with the soldeps bundle as a declared dependency."""
+    _solidity_test(**_with_soldeps_bundle(kwargs))
 
 # Rule implementations for registration with prelude
 implemented_rules = {

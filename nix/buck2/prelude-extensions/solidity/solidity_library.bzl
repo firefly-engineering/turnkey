@@ -96,6 +96,17 @@ mkdir -p "$OUT_DIR"
 # Build remapping flags
 REMAPPING_FLAGS=()
 
+# The soldeps bundle is a tree of per-file symlinks. solc resolves a file's
+# symlinks before checking it against the allowed directories, which puts
+# every dependency source outside the remapped paths, so compile against a
+# dereferenced copy of the bundle instead.
+if [[ -n "$SOLDEPS_CELL" ]]; then
+    SOLDEPS_COPY=$(mktemp -d)
+    trap 'rm -rf "$SOLDEPS_COPY"' EXIT
+    cp -RL "$SOLDEPS_CELL/." "$SOLDEPS_COPY/"
+    SOLDEPS_CELL="$SOLDEPS_COPY"
+fi
+
 # Auto-generate remappings from soldeps cell's remappings.txt
 if [[ -n "$SOLDEPS_CELL" && -f "$SOLDEPS_CELL/remappings.txt" ]]; then
     while IFS= read -r line; do
@@ -149,11 +160,11 @@ done
     for src in ctx.attrs.srcs:
         compile_cmd.add(src)
 
-    # Add soldeps cell path for auto-remapping (resolved from .buckconfig)
-    soldeps_cell_path = read_root_config("cells", "soldeps", None)
-    if soldeps_cell_path:
+    # Add the soldeps bundle for auto-remapping. It is a declared dependency,
+    # so the remappings and every dependency source are inputs of the compile.
+    if ctx.attrs.soldeps:
         compile_cmd.add("--soldeps-cell")
-        compile_cmd.add(soldeps_cell_path)
+        compile_cmd.add(ctx.attrs.soldeps[DefaultInfo].default_outputs[0])
 
     # Add explicit remappings (these should be path-based, not Buck targets)
     if all_remappings:
@@ -201,6 +212,11 @@ solidity_library = rule(
             attrs.dep(),
             default = [],
             doc = "Dependencies (other solidity_library targets or filegroups from soldeps)",
+        ),
+        "soldeps": attrs.option(
+            attrs.dep(),
+            default = None,
+            doc = "The soldeps cell's bundle (remappings.txt plus every vendor package). Set automatically by the solidity_library macro when the repo has a soldeps cell.",
         ),
         "remappings": attrs.dict(
             key = attrs.string(),
