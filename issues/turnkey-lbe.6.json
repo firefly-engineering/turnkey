@@ -1,8 +1,6 @@
 {
   "assignee": "",
-  "blocked_by": [
-    "turnkey-wit.10"
-  ],
+  "blocked_by": [],
   "blocks": [
     "turnkey-lbe.4",
     "turnkey-lbe.7"
@@ -16,5 +14,5 @@
   "status": "open",
   "title": "Turnkey-owned execution platform replacing prelude//platforms:default (G5)",
   "type": "task",
-  "updated_at": "2026-09-26T11:51:59Z"
+  "updated_at": "2026-09-26T11:52:07Z"
 }

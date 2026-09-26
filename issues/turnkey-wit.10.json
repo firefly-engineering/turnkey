@@ -7,7 +7,6 @@
   ],
   "blocks": [
     "turnkey-lbe.4",
-    "turnkey-lbe.6",
     "turnkey-wit.12",
     "turnkey-wit.14"
   ],
@@ -22,5 +21,5 @@
   "status": "open",
   "title": "What does the executor need from an action to run it?",
   "type": "question",
-  "updated_at": "2026-09-26T11:51:59Z"
+  "updated_at": "2026-09-26T11:52:07Z"
 }
