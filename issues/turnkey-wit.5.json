@@ -12,9 +12,15 @@
     "wayfinder:research"
   ],
   "parent": "turnkey-wit",
+  "comments": [
+    {
+      "text": "Nix already enforces 'clients submit work, never results' for non-trusted daemon clients: they may add .drv files and CA sources (self-verifying) and build derivations already in the store, but cannot import unsigned input-addressed paths, BuildDerivation input-addressed drvs inline, or override sandbox/substituters. The worker protocol only runs over unix socket, ssh/ssh-ng or stdio (nix daemon --stdio trusts the peer unless --force-untrusted), and remote builders are SSH-only and documented as needing trusted-users, so Cloud Run needs either a tunnelled daemon protocol (prototype) or, recommended, a narrow gRPC realise API (upload .drv closure + sources -\u003e Realise -\u003e Watch) in front of a disposable builder that is itself an untrusted client of a stock nix-daemon, with signing/upload outside the builder and no write rights on the builder's cloud identity. No existing service (nixbuild.net, Hydra incl. its experimental hydra-ad-hoc, garnix, ofborg, FlakeHub) offers an HTTP build API to untrusted callers; Hydra's gRPC builder protocol is the closest design. Caveat: sharing input-addressed outputs of untrusted derivations is sound only while the sandbox holds; Nix advisories (e.g. critical CVE-2026-39860, 2026-04) still say 'do not allow untrusted builds on shared infrastructure', so the ADR must record it as an accepted risk with mitigations (key off-host, fresh VM per build, sandbox-fallback=false, FOD access to the metadata server neutered, no ca-derivations, fast patching). Findings: docs/research/remote-derivation-builds.md on bookmark research/remote-derivation-builds (commit e7c909ed)",
+      "timestamp": "2026-09-26T12:01:16Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "How can a client ask a remote service to build a derivation?",
   "type": "task",
-  "updated_at": "2026-09-26T11:53:14Z"
+  "updated_at": "2026-09-26T12:01:16Z"
 }
