@@ -7,6 +7,7 @@
 #   - pypi: Python packages from PyPI
 #   - goproxy: Go modules from proxy.golang.org
 #   - url/npm: Direct URL download (for npm tarballs, etc.)
+#   - zip: Unpacked archive download (for prefetched git archives, etc.)
 
 { pkgs, lib }:
 
@@ -26,6 +27,8 @@ rec {
       fetchGoProxy fetchSpec
     else if fetchSpec.type == "url" || fetchSpec.type == "npm" then
       fetchUrl fetchSpec
+    else if fetchSpec.type == "zip" then
+      fetchZip fetchSpec
     else
       throw "Unknown fetch type: ${fetchSpec.type}";
 
@@ -73,6 +76,14 @@ rec {
     pkgs.fetchurl {
       inherit (fetchSpec) url;
       hash = fetchSpec.hash;
+    };
+
+  # Fetch and unpack an archive
+  # fetchSpec: { type, url, hash }
+  # The hash is the SRI hash of the unpacked contents (nix-prefetch-url --unpack)
+  fetchZip = fetchSpec:
+    pkgs.fetchzip {
+      inherit (fetchSpec) url hash;
     };
 
   # Fetch from Go module proxy

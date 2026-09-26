@@ -10,6 +10,7 @@
 let
   root = ../..;
   cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
+  nix-prefetch-cached = import ./nix-prefetch-cached.nix { inherit pkgs lib; };
 in
 pkgs.rustPlatform.buildRustPackage {
   pname = "soldeps-gen";
@@ -27,6 +28,15 @@ pkgs.rustPlatform.buildRustPackage {
   # Only build soldeps-gen, not other workspace members
   cargoBuildFlags = [ "-p" "soldeps-gen" ];
   cargoTestFlags = [ "-p" "soldeps-gen" ];
+
+  nativeBuildInputs = [ pkgs.makeWrapper ];
+
+  # Wrap the binary with what --prefetch runs: git for ls-remote, and
+  # nix-prefetch-cached (plus the nix it calls) for hashes
+  postInstall = ''
+    wrapProgram $out/bin/soldeps-gen \
+      --prefix PATH : ${lib.makeBinPath [ pkgs.git pkgs.nix nix-prefetch-cached ]}
+  '';
 
   meta = {
     description = "Generate solidity-deps.toml from foundry.toml and package.json for Buck2 integration";

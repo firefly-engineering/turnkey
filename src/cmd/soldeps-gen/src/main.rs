@@ -53,7 +53,9 @@ struct Args {
     #[arg(short = 'o', long)]
     output: Option<PathBuf>,
 
-    /// Prefetch git commit hashes and resolve tags to commits
+    /// Pin every dependency for Nix: resolve git refs to commits, and fetch
+    /// the Nix hashes of GitHub archives and of npm tarballs the pnpm lock
+    /// has no integrity for (through nix-prefetch-cached)
     #[arg(long, default_value = "false")]
     prefetch: bool,
 }
@@ -72,6 +74,9 @@ struct OutputPackage {
     repo: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rev: Option<String>,
+    /// Nix SRI hash of the unpacked `url` archive (git packages only)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hash: Option<String>,
     /// Auto-generated remapping for this package
     #[serde(skip_serializing_if = "Option::is_none")]
     remapping: Option<String>,
@@ -172,7 +177,23 @@ fn parse_foundry_dep(name: &str, spec: &str) -> OutputPackage {
         integrity: None,
         repo: Some(full_repo),
         rev,
+        hash: None,
         remapping: Some(remapping),
+    }
+}
+
+/// Build the output entry for an npm package at a resolved version
+fn npm_package(name: &str, version: &str, integrity: Option<String>) -> OutputPackage {
+    OutputPackage {
+        name: name.to_string(),
+        version: version.to_string(),
+        source: "npm".to_string(),
+        url: Some(npm_tarball_url(name, version)),
+        integrity,
+        repo: None,
+        rev: None,
+        hash: None,
+        remapping: Some(format!("{}/=node_modules/{}/", name, name)),
     }
 }
 
@@ -239,20 +260,24 @@ fn parse_pnpm_lock(path: &PathBuf) -> Result<BTreeMap<String, String>> {
     Ok(integrity_map)
 }
 
-/// Resolve a git tag/ref to a commit hash using git ls-remote
-fn resolve_git_ref(repo_url: &str, git_ref: &str) -> Result<String> {
-    eprintln!("  resolving {}@{}...", repo_url, git_ref);
+/// The network lookups prefetching needs
+trait Prefetcher {
+    /// Resolve a git ref (tag, branch or HEAD) of a repository to a commit
+    fn resolve_ref(&self, repo: &str, git_ref: &str) -> Result<String>;
 
-    let output = Command::new("git")
-        .args(["ls-remote", repo_url, git_ref])
-        .output()
-        .context("Failed to run git ls-remote")?;
+    /// Nix SRI hash of a URL, of its unpacked contents when `unpack` is set
+    fn prefetch_url(&self, url: &str, unpack: bool) -> Result<String>;
+}
 
-    if !output.status.success() {
-        // Try with refs/tags/ prefix
-        let tag_ref = format!("refs/tags/{}", git_ref);
+/// Prefetcher backed by `git ls-remote` and `nix-prefetch-cached`
+struct NixPrefetcher;
+
+impl Prefetcher for NixPrefetcher {
+    fn resolve_ref(&self, repo: &str, git_ref: &str) -> Result<String> {
+        // Asking for `<ref>^{}` too makes ls-remote list the commit an
+        // annotated tag points to, next to the tag object itself
         let output = Command::new("git")
-            .args(["ls-remote", repo_url, &tag_ref])
+            .args(["ls-remote", repo, git_ref, &format!("{}^{{}}", git_ref)])
             .output()
             .context("Failed to run git ls-remote")?;
 
@@ -263,23 +288,136 @@ fn resolve_git_ref(repo_url: &str, git_ref: &str) -> Result<String> {
             );
         }
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        if let Some(line) = stdout.lines().next() {
-            if let Some(commit) = line.split_whitespace().next() {
-                return Ok(commit.to_string());
+        peeled_commit(&String::from_utf8_lossy(&output.stdout), git_ref)
+            .ok_or_else(|| anyhow::anyhow!("Could not resolve {} in {}", git_ref, repo))
+    }
+
+    fn prefetch_url(&self, url: &str, unpack: bool) -> Result<String> {
+        // nix-prefetch-cached keeps turnkey's prefetch cache and returns an SRI
+        // hash; soldeps-gen's wrapper puts it on PATH
+        let mut cmd = Command::new("nix-prefetch-cached");
+        if unpack {
+            cmd.arg("--unpack");
+        }
+        let output = cmd
+            .arg(url)
+            .output()
+            .context("Failed to run nix-prefetch-cached")?;
+
+        if !output.status.success() {
+            anyhow::bail!(
+                "prefetch failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+
+        Ok(String::from_utf8(output.stdout)
+            .context("Invalid UTF-8 from nix-prefetch-cached")?
+            .trim()
+            .to_string())
+    }
+}
+
+/// Pick the commit `git_ref` names out of `git ls-remote` output
+///
+/// Each line is `<object>\t<refname>`. ls-remote matches patterns by path
+/// suffix, so the output can hold refs that merely end in `git_ref`; only
+/// the ref itself counts, a tag before a branch as in `git rev-parse`. An
+/// annotated tag lists both the tag object and, as `<refname>^{}`, the
+/// commit it points to; the commit wins.
+fn peeled_commit(ls_remote_output: &str, git_ref: &str) -> Option<String> {
+    let entries: BTreeMap<&str, &str> = ls_remote_output
+        .lines()
+        .filter_map(|line| line.split_once('\t'))
+        .map(|(object, refname)| (refname, object))
+        .collect();
+
+    [
+        format!("refs/tags/{}^{{}}", git_ref),
+        format!("refs/tags/{}", git_ref),
+        format!("refs/heads/{}", git_ref),
+        format!("{}^{{}}", git_ref),
+        git_ref.to_string(),
+    ]
+    .iter()
+    .find_map(|refname| entries.get(refname.as_str()))
+    .map(|object| object.to_string())
+}
+
+/// Whether a git rev is already a full commit hash
+fn is_commit_hash(rev: &str) -> bool {
+    rev.len() == 40 && rev.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+/// URL of GitHub's source archive of a commit, if the repository is on GitHub
+fn github_archive_url(repo: &str, commit: &str) -> Option<String> {
+    let path = repo.strip_prefix("https://github.com/")?;
+    let path = path.trim_end_matches('/');
+    let path = path.strip_suffix(".git").unwrap_or(path);
+    let (owner, name) = path.split_once('/')?;
+    if owner.is_empty() || name.is_empty() || name.contains('/') {
+        return None;
+    }
+    Some(format!(
+        "https://github.com/{}/{}/archive/{}.tar.gz",
+        owner, name, commit
+    ))
+}
+
+/// Pin a package for Nix, leaving it as it was on any lookup failure
+///
+/// A git package gets its ref resolved to a commit and, on GitHub, the
+/// archive of that commit and its hash, which the soldeps cell fetches as a
+/// fixed-output derivation. An npm package the pnpm lock gave no integrity
+/// gets the hash of its tarball.
+fn prefetch_package(pkg: &mut OutputPackage, prefetcher: &dyn Prefetcher) {
+    match pkg.source.as_str() {
+        "git" => {
+            let Some(repo) = pkg.repo.clone() else { return };
+            let git_ref = pkg.rev.clone().unwrap_or_else(|| "HEAD".to_string());
+
+            let commit = if is_commit_hash(&git_ref) {
+                git_ref
+            } else {
+                eprintln!("  resolving {}@{}...", repo, git_ref);
+                match prefetcher.resolve_ref(&repo, &git_ref) {
+                    Ok(commit) => {
+                        eprintln!("  {} -> {}", git_ref, &commit[..12.min(commit.len())]);
+                        commit
+                    }
+                    Err(e) => {
+                        eprintln!("  warning: failed to resolve {}: {}", git_ref, e);
+                        return;
+                    }
+                }
+            };
+            pkg.rev = Some(commit.clone());
+
+            let Some(url) = github_archive_url(&repo, &commit) else {
+                eprintln!("  {}: not on GitHub, pinned by commit only", pkg.name);
+                return;
+            };
+            match prefetcher.prefetch_url(&url, true) {
+                Ok(hash) => {
+                    pkg.url = Some(url);
+                    pkg.hash = Some(hash);
+                }
+                Err(e) => eprintln!("  warning: failed to prefetch {}: {}", url, e),
             }
         }
-        anyhow::bail!("Could not resolve {} in {}", git_ref, repo_url);
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    if let Some(line) = stdout.lines().next() {
-        if let Some(commit) = line.split_whitespace().next() {
-            return Ok(commit.to_string());
+        "npm" => {
+            if pkg.integrity.is_some() {
+                return;
+            }
+            let Some(url) = pkg.url.clone() else { return };
+            eprintln!("  prefetching {}...", url);
+            match prefetcher.prefetch_url(&url, false) {
+                Ok(hash) => pkg.integrity = Some(hash),
+                Err(e) => eprintln!("  warning: failed to prefetch {}: {}", url, e),
+            }
         }
+        _ => {}
     }
-
-    anyhow::bail!("Could not resolve {} in {}", git_ref, repo_url);
 }
 
 fn main() -> Result<()> {
@@ -317,24 +455,7 @@ fn main() -> Result<()> {
         );
 
         for (name, spec) in &foundry_config.dependencies {
-            let mut pkg = parse_foundry_dep(name, spec);
-
-            // If prefetch is enabled, resolve git refs to commit hashes
-            if args.prefetch {
-                if let (Some(repo), Some(git_ref)) = (&pkg.repo, &pkg.rev) {
-                    match resolve_git_ref(repo, git_ref) {
-                        Ok(commit) => {
-                            eprintln!("  {} -> {}", git_ref, &commit[..12]);
-                            pkg.rev = Some(commit);
-                        }
-                        Err(e) => {
-                            eprintln!("  warning: failed to resolve {}: {}", git_ref, e);
-                        }
-                    }
-                }
-            }
-
-            output_packages.push(pkg);
+            output_packages.push(parse_foundry_dep(name, spec));
         }
     } else {
         eprintln!(
@@ -397,25 +518,20 @@ fn main() -> Result<()> {
                     eprintln!("  {} -> no integrity hash found in lock file", name);
                 }
 
-                // Generate remapping for npm package
-                let remapping = format!("{}/=node_modules/{}/", name, name);
-
-                output_packages.push(OutputPackage {
-                    name: name.clone(),
-                    version: resolved_version.clone(),
-                    source: "npm".to_string(),
-                    url: Some(npm_tarball_url(name, &resolved_version)),
-                    integrity,
-                    repo: None,
-                    rev: None,
-                    remapping: Some(remapping),
-                });
+                output_packages.push(npm_package(name, &resolved_version, integrity));
             }
         } else {
             eprintln!(
                 "Note: {} not found, skipping npm deps",
                 package_json_path.display()
             );
+        }
+    }
+
+    if args.prefetch {
+        eprintln!("Prefetching...");
+        for pkg in &mut output_packages {
+            prefetch_package(pkg, &NixPrefetcher);
         }
     }
 
@@ -492,6 +608,207 @@ mod tests {
         assert!(is_solidity_package("@chainlink/contracts"));
         assert!(!is_solidity_package("lodash"));
         assert!(!is_solidity_package("typescript"));
+    }
+
+    /// Records every call and answers from fixed tables.
+    #[derive(Default)]
+    struct FakePrefetcher {
+        commits: BTreeMap<(String, String), String>,
+        hashes: BTreeMap<(String, bool), String>,
+        calls: std::cell::RefCell<Vec<String>>,
+    }
+
+    impl Prefetcher for FakePrefetcher {
+        fn resolve_ref(&self, repo: &str, git_ref: &str) -> Result<String> {
+            self.calls.borrow_mut().push(format!("resolve {repo} {git_ref}"));
+            self.commits
+                .get(&(repo.to_string(), git_ref.to_string()))
+                .cloned()
+                .ok_or_else(|| anyhow::anyhow!("unknown ref {git_ref}"))
+        }
+
+        fn prefetch_url(&self, url: &str, unpack: bool) -> Result<String> {
+            self.calls.borrow_mut().push(format!("prefetch {url} unpack={unpack}"));
+            self.hashes
+                .get(&(url.to_string(), unpack))
+                .cloned()
+                .ok_or_else(|| anyhow::anyhow!("unknown url {url}"))
+        }
+    }
+
+    const COMMIT: &str = "b6a506db2262cad5ff982a87789ee6d1558ec861";
+
+    #[test]
+    fn test_prefetch_github_dep_pins_commit_and_archive_hash() {
+        let mut fake = FakePrefetcher::default();
+        fake.commits.insert(
+            ("https://github.com/foundry-rs/forge-std".into(), "v1.8.0".into()),
+            COMMIT.into(),
+        );
+        let archive = format!("https://github.com/foundry-rs/forge-std/archive/{COMMIT}.tar.gz");
+        fake.hashes.insert((archive.clone(), true), "sha256-forge".into());
+
+        let mut pkg = parse_foundry_dep("forge-std", "https://github.com/foundry-rs/forge-std@v1.8.0");
+        prefetch_package(&mut pkg, &fake);
+
+        assert_eq!(pkg.version, "v1.8.0");
+        assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
+        assert_eq!(pkg.url.as_deref(), Some(archive.as_str()));
+        assert_eq!(pkg.hash.as_deref(), Some("sha256-forge"));
+    }
+
+    #[test]
+    fn test_prefetch_git_dep_without_rev_resolves_head() {
+        let mut fake = FakePrefetcher::default();
+        fake.commits.insert(
+            ("https://github.com/vectorized/solady".into(), "HEAD".into()),
+            COMMIT.into(),
+        );
+        fake.hashes.insert(
+            (format!("https://github.com/vectorized/solady/archive/{COMMIT}.tar.gz"), true),
+            "sha256-solady".into(),
+        );
+
+        let mut pkg = parse_foundry_dep("solady", "https://github.com/vectorized/solady");
+        prefetch_package(&mut pkg, &fake);
+
+        assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
+        assert_eq!(pkg.hash.as_deref(), Some("sha256-solady"));
+    }
+
+    #[test]
+    fn test_prefetch_git_dep_already_at_commit_skips_resolution() {
+        let mut fake = FakePrefetcher::default();
+        fake.hashes.insert(
+            (format!("https://github.com/foundry-rs/forge-std/archive/{COMMIT}.tar.gz"), true),
+            "sha256-forge".into(),
+        );
+
+        let mut pkg = parse_foundry_dep(
+            "forge-std",
+            &format!("https://github.com/foundry-rs/forge-std@{COMMIT}"),
+        );
+        prefetch_package(&mut pkg, &fake);
+
+        assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
+        assert!(fake.calls.borrow().iter().all(|c| !c.starts_with("resolve")));
+    }
+
+    #[test]
+    fn test_prefetch_non_github_dep_pins_commit_without_hash() {
+        let mut fake = FakePrefetcher::default();
+        fake.commits.insert(
+            ("https://gitlab.com/acme/lib".into(), "v1".into()),
+            COMMIT.into(),
+        );
+
+        let mut pkg = parse_foundry_dep("lib", "https://gitlab.com/acme/lib@v1");
+        prefetch_package(&mut pkg, &fake);
+
+        assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
+        assert_eq!(pkg.url, None);
+        assert_eq!(pkg.hash, None);
+    }
+
+    #[test]
+    fn test_prefetch_git_dep_keeps_ref_when_resolution_fails() {
+        let fake = FakePrefetcher::default();
+
+        let mut pkg = parse_foundry_dep("forge-std", "https://github.com/foundry-rs/forge-std@v9");
+        prefetch_package(&mut pkg, &fake);
+
+        assert_eq!(pkg.rev.as_deref(), Some("v9"));
+        assert_eq!(pkg.hash, None);
+    }
+
+    #[test]
+    fn test_prefetch_npm_dep_without_integrity_hashes_tarball() {
+        let url = npm_tarball_url("@openzeppelin/contracts", "5.4.0");
+        let mut fake = FakePrefetcher::default();
+        fake.hashes.insert((url.clone(), false), "sha256-oz".into());
+
+        let mut pkg = npm_package("@openzeppelin/contracts", "5.4.0", None);
+        prefetch_package(&mut pkg, &fake);
+
+        assert_eq!(pkg.integrity.as_deref(), Some("sha256-oz"));
+    }
+
+    #[test]
+    fn test_prefetch_npm_dep_keeps_lockfile_integrity() {
+        let fake = FakePrefetcher::default();
+
+        let mut pkg = npm_package("@openzeppelin/contracts", "5.4.0", Some("sha512-lock".into()));
+        prefetch_package(&mut pkg, &fake);
+
+        assert_eq!(pkg.integrity.as_deref(), Some("sha512-lock"));
+        assert!(fake.calls.borrow().is_empty());
+    }
+
+    #[test]
+    fn test_peeled_commit_prefers_dereferenced_tag() {
+        let output = "\
+1111111111111111111111111111111111111111\trefs/tags/v1.8.0
+2222222222222222222222222222222222222222\trefs/tags/v1.8.0^{}
+";
+        assert_eq!(
+            peeled_commit(output, "v1.8.0").as_deref(),
+            Some("2222222222222222222222222222222222222222")
+        );
+    }
+
+    #[test]
+    fn test_peeled_commit_lightweight_ref() {
+        let output = "3333333333333333333333333333333333333333\tHEAD\n";
+        assert_eq!(
+            peeled_commit(output, "HEAD").as_deref(),
+            Some("3333333333333333333333333333333333333333")
+        );
+        assert_eq!(peeled_commit("", "HEAD"), None);
+    }
+
+    #[test]
+    fn test_peeled_commit_ignores_refs_that_only_share_a_suffix() {
+        // ls-remote matches patterns by path suffix, so `v1` also lists a
+        // nested tag `release/v1`; only the ref that was asked for counts
+        let output = "\
+4444444444444444444444444444444444444444\trefs/heads/v1
+5555555555555555555555555555555555555555\trefs/tags/release/v1
+6666666666666666666666666666666666666666\trefs/tags/release/v1^{}
+";
+        assert_eq!(
+            peeled_commit(output, "v1").as_deref(),
+            Some("4444444444444444444444444444444444444444")
+        );
+    }
+
+    #[test]
+    fn test_peeled_commit_prefers_tag_over_branch() {
+        // Like git rev-parse, a tag wins over a branch of the same name
+        let output = "\
+7777777777777777777777777777777777777777\trefs/heads/v2
+8888888888888888888888888888888888888888\trefs/tags/v2
+";
+        assert_eq!(
+            peeled_commit(output, "v2").as_deref(),
+            Some("8888888888888888888888888888888888888888")
+        );
+    }
+
+    #[test]
+    fn test_github_archive_url() {
+        for repo in [
+            "https://github.com/foundry-rs/forge-std",
+            "https://github.com/foundry-rs/forge-std/",
+            "https://github.com/foundry-rs/forge-std.git",
+        ] {
+            assert_eq!(
+                github_archive_url(repo, COMMIT).as_deref(),
+                Some(format!("https://github.com/foundry-rs/forge-std/archive/{COMMIT}.tar.gz").as_str()),
+                "{repo}"
+            );
+        }
+        assert_eq!(github_archive_url("https://gitlab.com/acme/lib", COMMIT), None);
+        assert_eq!(github_archive_url("https://github.com/acme", COMMIT), None);
     }
 
     #[test]

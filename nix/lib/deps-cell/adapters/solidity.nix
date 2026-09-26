@@ -46,6 +46,7 @@ rec {
     # For git packages
     repo ? null,        # Git repository URL
     rev ? null,         # Git revision/tag/branch
+    hash ? null,        # SRI hash of the unpacked `url` archive (soldeps-gen --prefetch)
 
     # Auto-generated remapping from soldeps-gen
     remapping ? null,
@@ -60,6 +61,12 @@ rec {
         type = "url";
         inherit url;
         hash = integrity;
+      }
+      # A prefetched git package: the archive of its pinned commit, fetched as
+      # a fixed-output derivation
+      else if source == "git" && url != null && hash != null then {
+        type = "zip";
+        inherit url hash;
       }
       else if source == "git" then {
         type = "git";
@@ -141,6 +148,7 @@ rec {
         integrity = pkg.integrity or null;
         repo = pkg.repo or null;
         rev = pkg.rev or null;
+        hash = pkg.hash or null;
         remapping = pkg.remapping or null;
         fixup = allFixups.${pkg.name} or null;
       };
@@ -271,6 +279,7 @@ rec {
       integrity = depSpec.integrity or null;
       repo = depSpec.repo or null;
       rev = depSpec.rev or null;
+      hash = depSpec.hash or null;
       remapping = depSpec.remapping or null;
       fixup = (config.userFixups or {}).${key} or null;
     };

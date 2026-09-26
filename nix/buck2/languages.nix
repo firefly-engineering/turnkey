@@ -276,6 +276,7 @@ in
           "soldeps-gen"
           "--foundry"
           langCfg.foundryTomlFile
+          "--prefetch"
         ];
       };
   }

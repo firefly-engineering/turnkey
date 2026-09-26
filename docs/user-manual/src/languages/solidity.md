@@ -119,9 +119,16 @@ Dependencies declared in `foundry.toml` are also supported:
 
 ```toml
 [dependencies]
-forge-std = "github:foundry-rs/forge-std"
-solady = "github:vectorized/solady"
+forge-std = "https://github.com/foundry-rs/forge-std@v1.8.0"
+solady = "vectorized/solady"   # GitHub shorthand; no @ref means HEAD
 ```
+
+`tk sync` regenerates `solidity-deps.toml` with `soldeps-gen --prefetch`, which
+pins each git dependency to the commit its ref resolves to. For a GitHub
+repository it also records that commit's source archive and its Nix hash, so the
+`soldeps` cell fetches it as a fixed-output derivation. An npm package that
+`pnpm-lock.yaml` gives no integrity for gets the hash of its tarball. Hashes go
+through `nix-prefetch-cached`, so a regeneration only fetches what changed.
 
 ## Compiler Version
 
