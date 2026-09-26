@@ -5,7 +5,9 @@
   "created": "2026-09-26T11:51:47Z",
   "description": "## Question\n\nShould `tk` own the buck2 daemon's environment — starting it with a minimal, pinned environment instead of the whole dev shell — and if so, how does it interact with `tk` being the interactive wrapper?\n\n## Context\n\nMoved from turnkey-lbe's open questions (research note `docs/research/remote-execution-and-caching.md` §3.2, §3.3, gap G4; lbe child turnkey-lbe.5). Local build actions inherit the daemon's whole environment (`NIX_CFLAGS_COMPILE`, `NIX_LDFLAGS`, `SDKROOT`, `MACOSX_DEPLOYMENT_TARGET`, `CC`, …) and none of it is in the action key; buck2 has no setting to clear it. `tk` execs buck2 with `os.Environ()` (`src/cmd/tk/main.go`). Remote actions get no inherited environment at all, so under map turnkey-wit (remote execution is the core; local execution remains for darwin actions and offline) the question becomes: do local actions need byte-identical outputs to remote ones (hybrid execution, racing), and are client-computed results (never shared) still worth protecting from env leaks?\n\n## Decide (grilling with the user; /grilling + /domain-modeling)\n\n1. Whether `tk` scrubs the daemon env at all, given clients' local results are never shared.\n2. If yes: the allowlist (store-path `PATH`, fixed `HOME`/`TMPDIR`, …), how toolchain-needed variables (`SDKROOT`, `MACOSX_DEPLOYMENT_TARGET`) become declared action env instead, and how a daemon started by plain `buck2` (not `tk`) is detected/handled.\n3. Interaction with existing daemons (restart on env change), `tk sync`, FUSE, and the test runner.\n4. What that means for turnkey-lbe.5 (keep, rewrite, or close).\n\n## Output\n\nResolution comment with the decision; section in `docs/specs/build-service.md` (\"Client: local execution hygiene\"); update turnkey-lbe.5's description accordingly.",
   "id": "turnkey-wit.8",
-  "labels": [],
+  "labels": [
+    "wayfinder:grilling"
+  ],
   "parent": "turnkey-wit",
   "priority": 2,
   "status": "open",
