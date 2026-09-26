@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "turnkey-wit.10"
+  ],
   "created": "2026-09-26T11:51:45Z",
   "description": "## Question\n\nHow can an untrusted client ask a remote service to **build a Nix derivation**, over a transport Cloud Run can serve (HTTP/gRPC, no SSH daemon), so that the service's Nix builder produces and signs the output store paths?\n\n## Context\n\nMap turnkey-wit trust rule: clients submit work, never results. For Nix that means clients may submit *derivations* (a `.drv` is identified by its hash and fixes its output path, so an honest sandboxed build of an untrusted derivation can be shared — the nix-daemon's multi-user model already allows this) but may never upload store paths. Typical case: a PR bumps `go.mod`/`Cargo.lock`/`flake.lock`, so the dependency cells (`godeps-cell`, `rustdeps-cell`, …) and maybe toolchains are new derivations the client needs built before buck2 can even evaluate.\n\n## What to find\n\n1. **Nix's own mechanisms**: remote builders (`ssh://`, `ssh-ng://`, build hook), `--store`/`--eval-store` with a remote store, `nix copy --derivation`, the daemon worker protocol (can it run over a non-SSH stream / TCP / WebSocket?), `nix build --json` outputs. Which ops does an untrusted (non-`trusted-users`) client get, and exactly what is refused (e.g. importing unsigned paths, `--option` overrides, `__noChroot`, `__impure`, fixed-output derivations' network access)?\n2. **Existing services**: nixbuild.net, Hercules CI, garnix, Hydra, ofborg, Cachix Deploy, Determinate's FlakeHub/remote build offerings — transport, trust model, whether they sign outputs of untrusted derivations and share them.\n3. **Minimal custom API sketch**: upload the `.drv` closure (derivations + sources only, which are content-addressed or text-hashed) → request realisation → poll/stream → outputs land in the Nix cache signed by the service. What must the builder verify?\n4. **Hazards**: fixed-output derivations (network, hash-checked), derivations whose sources are store paths the client claims (text/source paths are content-addressed — verify), `allowed-uris`, darwin sandbox weakness (for the later darwin builder).\n\n## Output\n\n`docs/research/remote-derivation-builds.md` with options, trust analysis and a recommendation. Resolution comment gists it.\n\n## Unblocks\n\n\"What does the executor need from an action to run it?\" and \"What are the building blocks…\".",
   "id": "turnkey-wit.5",
@@ -13,5 +15,5 @@
   "status": "open",
   "title": "How can a client ask a remote service to build a derivation?",
   "type": "task",
-  "updated_at": "2026-09-26T11:51:45Z"
+  "updated_at": "2026-09-26T11:51:55Z"
 }
