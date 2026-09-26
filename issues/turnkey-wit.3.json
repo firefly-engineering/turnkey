@@ -12,9 +12,15 @@
     "wayfinder:research"
   ],
   "parent": "turnkey-wit",
+  "comments": [
+    {
+      "text": "The executor should find the store paths from the action itself: input-root SymlinkNode targets, argv and declared env, parsed with a real store-path parser, then closed over narinfo References. Everything it finds is already in the action key. In OSS buck2, platform properties are per execution platform, not per action, and they sit in every key. So a closure-root property can only be a fallback: as the main channel it would re-key all actions on any toolchain bump. Fetching: a purpose-built fetcher (go-nix or nix-compat; about 50 lines of NAR unpack) verifies the service key, unpacks into a per-path, closure-complete, LRU cache on Cloud Run ephemeral disk (Preview), and needs no daemon. Store NARs as zstd: xz costs about 14 CPU-seconds per 1.7 GB rustc closure, zstd about 1.5. Cold Rust action is about 5-15 s (inferred); warm is about 0. Isolation: actions always run as a non-root uid other than the store owner; on top, closure-only read-only binds at the exact path /nix/store, via Cloud Run sandboxes (Preview, readonly binds) or namespaces (undocumented on gen2). Lazy FUSE stores (snix, nixbuild.net) are deferred: FUSE inside a Cloud Run container is undocumented. A path missing from the cache cannot be built from the path alone; the client must submit its derivation (turnkey-wit.5). Findings: docs/research/nix-paths-on-re-workers.md on bookmark research/nix-paths-on-re-workers (commit 1dbce221)",
+      "timestamp": "2026-09-26T12:03:40Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "How do remote-execution workers get Nix store paths on demand?",
   "type": "task",
-  "updated_at": "2026-09-26T11:53:01Z"
+  "updated_at": "2026-09-26T12:03:40Z"
 }
