@@ -3,12 +3,12 @@
   "blocked_by": [],
   "blocks": [],
   "created": "2026-09-25T19:18:06Z",
-  "description": "Let CI (and later laptops) reuse buck2 action and test results through a shared REAPI cache, local execution first, remote execution only if CI stays CPU-bound. Research and gap analysis: docs/research/remote-execution-and-caching.md (commit adc3619d), §5 (gaps G0-G11) and §7 (phased plan).\n\nOpen decisions (§7 open questions): who may write (CI main only vs every PR; never laptops); hosted (BuildBuddy/BuildFetch) vs self-hosted bazel-remote + bucket; macOS CI writer in scope?; ship as turnkey module options for consumers or turnkey-CI only; coarseness of the env salt (whole shell vs per-toolchain); should tk own the buck2 daemon environment.",
+  "description": "Let CI and laptops reuse buck2 action and test results across machines. Research and gap analysis: docs/research/remote-execution-and-caching.md (commit adc3619d), §5 (gaps G0-G11) and §7 (phased plan).\n\n**Design now lives in the wayfinder map turnkey-wit (\"Incremental builds everywhere for turnkey repos on GitHub\").** This epic is the execution epic downstream of it. The open questions formerly listed here moved into the map. Several were settled while charting (2026-09-26): clients submit work, never results (only the build service's executor writes shared results); remote execution on Cloud Run is the core; it ships as a product for consumers. The rest are map tickets (daemon environment, env salt, and others).\n\n- Honest-keys children (lbe.2, lbe.3, lbe.6, lbe.11) are valid under any design and proceed independently.\n- lbe.1 (CI runs tk build) stays unblocked: GitHub Actions runners are the default client host.\n- Children whose shape the map decides are blocked by map tickets and get rewritten once those resolve: lbe.4, lbe.5, lbe.7, lbe.8 (its \"test runner writes to a remote cache\" contradicts the trust rule), lbe.9, lbe.10, lbe.12.",
   "id": "turnkey-lbe",
   "labels": [],
   "priority": 2,
   "status": "open",
   "title": "Share buck2 build and test results across machines via a remote cache",
   "type": "epic",
-  "updated_at": "2026-09-25T19:18:06Z"
+  "updated_at": "2026-09-26T11:52:18Z"
 }
