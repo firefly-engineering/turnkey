@@ -6,6 +6,7 @@
     "turnkey-wit.5"
   ],
   "blocks": [
+    "turnkey-lbe.4",
     "turnkey-wit.12",
     "turnkey-wit.14"
   ],
