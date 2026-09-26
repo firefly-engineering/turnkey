@@ -65,7 +65,9 @@ fn extract_buck_editions(buck_path: &Path) -> Result<Vec<(String, String)>> {
 
     for target in targets {
         // Only check Rust targets
-        if target.rule == "rust_binary" || target.rule == "rust_library" || target.rule == "rust_test"
+        if target.rule == "rust_binary"
+            || target.rule == "rust_library"
+            || target.rule == "rust_test"
         {
             if let Some(edition) = target.args.get("edition") {
                 if let Some(edition_str) = edition.as_str() {
@@ -150,10 +152,15 @@ fn check_workspace_member(
     Ok(())
 }
 
-fn main() -> Result<()> {
-    // Find workspace root
-    let root = find_workspace_root().context("Could not find workspace root (Cargo.toml with [workspace])")?;
+/// The outcome of checking a workspace: the edition every member must use,
+/// and one message per member or target that doesn't
+struct Report {
+    workspace_edition: String,
+    errors: Vec<String>,
+}
 
+/// Check every workspace member under `root` against the workspace edition
+fn check_workspace(root: &Path) -> Result<Report> {
     let cargo_toml = root.join("Cargo.toml");
     let content = fs::read_to_string(&cargo_toml)
         .with_context(|| format!("Failed to read {}", cargo_toml.display()))?;
@@ -162,23 +169,17 @@ fn main() -> Result<()> {
         .with_context(|| format!("Failed to parse {}", cargo_toml.display()))?;
 
     // Get workspace edition
-    let workspace_edition = get_workspace_edition(&cargo)
-        .with_context(|| format!("{} missing [workspace.package] edition", cargo_toml.display()))?;
-
-    println!("Workspace edition: {}", workspace_edition);
-
-    // Get workspace members
-    let members = get_workspace_members(&cargo);
-
-    if members.is_empty() {
-        println!("No workspace members found");
-        return Ok(());
-    }
+    let workspace_edition = get_workspace_edition(&cargo).with_context(|| {
+        format!(
+            "{} missing [workspace.package] edition",
+            cargo_toml.display()
+        )
+    })?;
 
     let mut errors = Vec::new();
 
     // Check each member
-    for member_pattern in &members {
+    for member_pattern in &get_workspace_members(&cargo) {
         if member_pattern.contains('*') {
             // Handle glob patterns
             let pattern = root.join(member_pattern);
@@ -198,6 +199,24 @@ fn main() -> Result<()> {
         }
     }
 
+    Ok(Report {
+        workspace_edition,
+        errors,
+    })
+}
+
+fn main() -> Result<()> {
+    // Find workspace root
+    let root = find_workspace_root()
+        .context("Could not find workspace root (Cargo.toml with [workspace])")?;
+
+    let Report {
+        workspace_edition,
+        errors,
+    } = check_workspace(&root)?;
+
+    println!("Workspace edition: {}", workspace_edition);
+
     // Report results
     if !errors.is_empty() {
         println!("\nFound {} edition alignment issue(s):\n", errors.len());
@@ -215,4 +234,166 @@ fn main() -> Result<()> {
 
     println!("All editions are aligned");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn write(dir: &Path, rel: &str, content: &str) {
+        let path = dir.join(rel);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, content).unwrap();
+    }
+
+    const WORKSPACE: &str = r#"
+[workspace]
+members = ["crates/*", "tools/single"]
+
+[workspace.package]
+edition = "2024"
+"#;
+
+    const GOOD_MEMBER: &str = r#"
+[package]
+name = "good"
+edition.workspace = true
+"#;
+
+    fn workspace() -> TempDir {
+        let dir = TempDir::new().unwrap();
+        write(dir.path(), "Cargo.toml", WORKSPACE);
+        dir
+    }
+
+    #[test]
+    fn workspace_edition_is_read_from_workspace_package() {
+        let cargo: toml::Table = WORKSPACE.parse().unwrap();
+        assert_eq!(get_workspace_edition(&cargo).as_deref(), Some("2024"));
+    }
+
+    #[test]
+    fn workspace_edition_is_none_without_workspace_package() {
+        let cargo: toml::Table = "[workspace]\nmembers = []\n".parse().unwrap();
+        assert_eq!(get_workspace_edition(&cargo), None);
+    }
+
+    #[test]
+    fn workspace_members_are_listed_in_order() {
+        let cargo: toml::Table = WORKSPACE.parse().unwrap();
+        assert_eq!(
+            get_workspace_members(&cargo),
+            vec!["crates/*", "tools/single"]
+        );
+    }
+
+    #[test]
+    fn aligned_workspace_has_no_errors() {
+        let dir = workspace();
+        write(dir.path(), "crates/a/Cargo.toml", GOOD_MEMBER);
+        write(
+            dir.path(),
+            "crates/a/rules.star",
+            r#"rust_library(name = "a", srcs = [], edition = "2024")"#,
+        );
+        write(dir.path(), "tools/single/Cargo.toml", GOOD_MEMBER);
+
+        assert_eq!(
+            check_workspace(dir.path()).unwrap().errors,
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn literal_cargo_edition_is_reported() {
+        let dir = workspace();
+        write(
+            dir.path(),
+            "tools/single/Cargo.toml",
+            "[package]\nname = \"x\"\nedition = \"2021\"\n",
+        );
+
+        let errors = check_workspace(dir.path()).unwrap().errors;
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(
+            errors[0].contains("instead of 'edition = \"2021\"'"),
+            "{errors:?}"
+        );
+    }
+
+    #[test]
+    fn missing_cargo_edition_is_reported() {
+        let dir = workspace();
+        write(
+            dir.path(),
+            "crates/b/Cargo.toml",
+            "[package]\nname = \"b\"\n",
+        );
+
+        let errors = check_workspace(dir.path()).unwrap().errors;
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(errors[0].contains("no edition specified"), "{errors:?}");
+    }
+
+    #[test]
+    fn mismatched_rust_target_edition_is_reported_per_target() {
+        let dir = workspace();
+        write(dir.path(), "crates/c/Cargo.toml", GOOD_MEMBER);
+        write(
+            dir.path(),
+            "crates/c/rules.star",
+            r#"
+rust_binary(name = "c", srcs = [], edition = "2021")
+rust_test(name = "c-test", srcs = [], edition = "2021")
+rust_library(name = "c-lib", srcs = [], edition = "2024")
+"#,
+        );
+
+        let errors = check_workspace(dir.path()).unwrap().errors;
+        assert_eq!(errors.len(), 2, "{errors:?}");
+        assert!(
+            errors[0].contains("target 'c' has edition = \"2021\""),
+            "{errors:?}"
+        );
+        assert!(
+            errors[1].contains("target 'c-test' has edition = \"2021\""),
+            "{errors:?}"
+        );
+    }
+
+    #[test]
+    fn non_rust_targets_are_ignored() {
+        let dir = workspace();
+        write(dir.path(), "crates/d/Cargo.toml", GOOD_MEMBER);
+        write(
+            dir.path(),
+            "crates/d/rules.star",
+            r#"genrule(name = "d", out = "x", cmd = "true", edition = "2021")"#,
+        );
+
+        assert_eq!(
+            check_workspace(dir.path()).unwrap().errors,
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn glob_member_directories_without_cargo_toml_are_skipped() {
+        let dir = workspace();
+        write(dir.path(), "crates/not-a-crate/README.md", "");
+
+        assert_eq!(
+            check_workspace(dir.path()).unwrap().errors,
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn missing_workspace_edition_is_an_error() {
+        let dir = TempDir::new().unwrap();
+        write(dir.path(), "Cargo.toml", "[workspace]\nmembers = []\n");
+
+        assert!(check_workspace(dir.path()).is_err());
+    }
 }

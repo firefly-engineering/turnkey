@@ -146,10 +146,7 @@ fn expand_glob_pattern(base_dir: &Path, pattern: &str) -> HashSet<PathBuf> {
             };
 
             if search_dir.exists() {
-                for entry in WalkDir::new(&search_dir)
-                    .into_iter()
-                    .filter_map(|e| e.ok())
-                {
+                for entry in WalkDir::new(&search_dir).into_iter().filter_map(|e| e.ok()) {
                     let path = entry.path();
                     if path.is_file() {
                         // Check if the file matches the suffix pattern
@@ -231,28 +228,32 @@ fn expand_patterns(rules_dir: &Path, patterns: &[String]) -> HashSet<PathBuf> {
     files
 }
 
-fn main() -> Result<()> {
-    let args = Args::parse();
+/// Which source files under a scope the rules.star files in it cover
+struct Coverage {
+    rules_files: Vec<PathBuf>,
+    all_source_files: HashSet<PathBuf>,
+    covered_files: HashSet<PathBuf>,
+    /// Covered file -> the `rules.star:target` references that cover it
+    coverage_map: HashMap<PathBuf, Vec<String>>,
+}
 
-    // Allow override via environment variable
-    let scope = env::var("TURNKEY_SOURCE_SCOPE").unwrap_or(args.scope);
-
-    let project_root = find_project_root();
-    let scope_dir = project_root.join(&scope);
-
-    if !scope_dir.exists() {
-        anyhow::bail!("Scope directory does not exist: {}", scope_dir.display());
+impl Coverage {
+    fn uncovered(&self) -> HashSet<PathBuf> {
+        self.all_source_files
+            .difference(&self.covered_files)
+            .cloned()
+            .collect()
     }
+}
 
-    println!("Checking source coverage in: {}", scope_dir.display());
-
+/// Match every source file under `scope_dir` against the targets of the
+/// rules.star files there. Target references are relative to `project_root`.
+fn compute_coverage(project_root: &Path, scope_dir: &Path) -> Result<Coverage> {
     // Find all source files
-    let all_source_files = find_all_source_files(&scope_dir);
-    println!("Found {} source files", all_source_files.len());
+    let all_source_files = find_all_source_files(scope_dir);
 
     // Find all rules.star files
-    let rules_files = find_rules_star_files(&scope_dir);
-    println!("Found {} rules.star files", rules_files.len());
+    let rules_files = find_rules_star_files(scope_dir);
 
     // Track covered files
     let mut covered_files: HashSet<PathBuf> = HashSet::new();
@@ -286,24 +287,52 @@ fn main() -> Result<()> {
                     let target_files = expand_patterns(rules_dir, &patterns);
                     for f in target_files {
                         covered_files.insert(f.clone());
-                        let rel_rules = rules_file.strip_prefix(&project_root).unwrap_or(rules_file);
+                        let rel_rules = rules_file.strip_prefix(project_root).unwrap_or(rules_file);
                         let target_ref = format!("{}:{}", rel_rules.display(), target.name);
                         coverage_map.entry(f).or_default().push(target_ref);
                     }
                 }
             }
             Err(e) => {
-                eprintln!(
-                    "Warning: Failed to parse {}: {}",
-                    rules_file.display(),
-                    e
-                );
+                eprintln!("Warning: Failed to parse {}: {}", rules_file.display(), e);
             }
         }
     }
 
-    // Find uncovered files
-    let uncovered_files: HashSet<_> = all_source_files.difference(&covered_files).collect();
+    Ok(Coverage {
+        rules_files,
+        all_source_files,
+        covered_files,
+        coverage_map,
+    })
+}
+
+fn main() -> Result<()> {
+    let args = Args::parse();
+
+    // Allow override via environment variable
+    let scope = env::var("TURNKEY_SOURCE_SCOPE").unwrap_or(args.scope);
+
+    let project_root = find_project_root();
+    let scope_dir = project_root.join(&scope);
+
+    if !scope_dir.exists() {
+        anyhow::bail!("Scope directory does not exist: {}", scope_dir.display());
+    }
+
+    println!("Checking source coverage in: {}", scope_dir.display());
+
+    let coverage = compute_coverage(&project_root, &scope_dir)?;
+    println!("Found {} source files", coverage.all_source_files.len());
+    println!("Found {} rules.star files", coverage.rules_files.len());
+
+    let uncovered_files = coverage.uncovered();
+    let Coverage {
+        all_source_files,
+        covered_files,
+        coverage_map,
+        ..
+    } = coverage;
 
     if args.verbose {
         println!("\nCovered files: {}", covered_files.len());
@@ -311,7 +340,10 @@ fn main() -> Result<()> {
         sorted_covered.sort();
         for f in sorted_covered {
             let rel = f.strip_prefix(&project_root).unwrap_or(f);
-            let targets = coverage_map.get(f).map(|v| v.join(", ")).unwrap_or_default();
+            let targets = coverage_map
+                .get(f)
+                .map(|v| v.join(", "))
+                .unwrap_or_default();
             println!("  {} -> {}", rel.display(), targets);
         }
     }
@@ -341,4 +373,139 @@ fn main() -> Result<()> {
         all_source_files.len()
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn write(dir: &Path, rel: &str, content: &str) {
+        let path = dir.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, content).unwrap();
+    }
+
+    fn rel(root: &Path, files: &HashSet<PathBuf>) -> Vec<String> {
+        let mut out: Vec<_> = files
+            .iter()
+            .map(|f| f.strip_prefix(root).unwrap().display().to_string())
+            .collect();
+        out.sort();
+        out
+    }
+
+    #[test]
+    fn source_files_are_recognised_by_extension() {
+        assert!(is_source_file(Path::new("a/b.rs")));
+        assert!(is_source_file(Path::new("x.tsx")));
+        assert!(!is_source_file(Path::new("README.md")));
+        assert!(!is_source_file(Path::new("Makefile")));
+    }
+
+    #[test]
+    fn init_py_is_excluded() {
+        assert!(is_excluded_file(Path::new("pkg/__init__.py")));
+        assert!(!is_excluded_file(Path::new("pkg/main.py")));
+    }
+
+    #[test]
+    fn suffix_matches_extension_wildcards_and_exact_names() {
+        assert!(matches_suffix("lib.rs", "*.rs"));
+        assert!(!matches_suffix("lib.rsx", "*.rs"));
+        assert!(!matches_suffix("Makefile", "*.rs"));
+        assert!(matches_suffix("main.go", "main.go"));
+        assert!(!matches_suffix("other.go", "main.go"));
+    }
+
+    #[test]
+    fn source_walk_skips_excluded_directories_and_files() {
+        let dir = TempDir::new().unwrap();
+        write(dir.path(), "src/lib.rs", "");
+        write(dir.path(), "src/notes.md", "");
+        write(dir.path(), "target/debug/build.rs", "");
+        write(dir.path(), "web/node_modules/dep/index.js", "");
+        write(dir.path(), "py/__init__.py", "");
+        write(dir.path(), "py/mod.py", "");
+
+        let files = find_all_source_files(dir.path());
+        assert_eq!(rel(dir.path(), &files), vec!["py/mod.py", "src/lib.rs"]);
+    }
+
+    #[test]
+    fn patterns_expand_recursive_globs_simple_globs_and_literals() {
+        let dir = TempDir::new().unwrap();
+        write(dir.path(), "src/main.rs", "");
+        write(dir.path(), "src/nested/deep/mod.rs", "");
+        write(dir.path(), "src/nested/data.json", "");
+        write(dir.path(), "a.py", "");
+        write(dir.path(), "sub/b.py", "");
+        write(dir.path(), "main.go", "");
+
+        let patterns = |ps: &[&str]| ps.iter().map(|p| p.to_string()).collect::<Vec<_>>();
+
+        assert_eq!(
+            rel(
+                dir.path(),
+                &expand_patterns(dir.path(), &patterns(&["src/**/*.rs"]))
+            ),
+            vec!["src/main.rs", "src/nested/deep/mod.rs"]
+        );
+        assert_eq!(
+            rel(
+                dir.path(),
+                &expand_patterns(dir.path(), &patterns(&["*.py"]))
+            ),
+            vec!["a.py"]
+        );
+        assert_eq!(
+            rel(
+                dir.path(),
+                &expand_patterns(dir.path(), &patterns(&["main.go", "missing.go"]))
+            ),
+            vec!["main.go"]
+        );
+    }
+
+    #[test]
+    fn files_outside_every_target_are_uncovered() {
+        let dir = TempDir::new().unwrap();
+        write(
+            dir.path(),
+            "src/tool/rules.star",
+            r#"
+rust_binary(name = "tool", srcs = glob(["src/**/*.rs"]))
+python_binary(name = "script", main = "script.py")
+"#,
+        );
+        write(dir.path(), "src/tool/src/main.rs", "");
+        write(dir.path(), "src/tool/script.py", "");
+        write(dir.path(), "src/tool/stray.go", "");
+        write(dir.path(), "src/orphan/lonely.py", "");
+
+        let coverage = compute_coverage(dir.path(), &dir.path().join("src")).unwrap();
+        assert_eq!(
+            rel(dir.path(), &coverage.uncovered()),
+            vec!["src/orphan/lonely.py", "src/tool/stray.go"]
+        );
+        assert_eq!(
+            coverage.coverage_map[&dir.path().join("src/tool/src/main.rs")],
+            vec!["src/tool/rules.star:tool"]
+        );
+    }
+
+    #[test]
+    fn fully_covered_scope_has_nothing_uncovered() {
+        let dir = TempDir::new().unwrap();
+        write(
+            dir.path(),
+            "src/lib/rules.star",
+            r#"go_library(name = "lib", srcs = ["lib.go"])"#,
+        );
+        write(dir.path(), "src/lib/lib.go", "");
+
+        let coverage = compute_coverage(dir.path(), &dir.path().join("src")).unwrap();
+        assert!(coverage.uncovered().is_empty());
+        assert_eq!(coverage.all_source_files.len(), 1);
+    }
 }

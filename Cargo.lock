@@ -288,6 +288,7 @@ dependencies = [
  "anyhow",
  "glob",
  "starlark-parse",
+ "tempfile",
  "toml",
 ]
 
@@ -299,6 +300,7 @@ dependencies = [
  "clap",
  "glob",
  "starlark-parse",
+ "tempfile",
  "walkdir",
 ]
 

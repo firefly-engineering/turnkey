@@ -22,6 +22,7 @@ rust_test(
         "rustdeps//vendor/anyhow:anyhow",
         "rustdeps//vendor/glob:glob",
         "rustdeps//vendor/toml:toml",
+        "rustdeps//vendor/tempfile:tempfile",
         "//src/rust/starlark-parse:starlark-parse",
     ],
 )
