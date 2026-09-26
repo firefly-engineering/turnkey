@@ -24,6 +24,7 @@ rust_test(
         "rustdeps//vendor/clap:clap",
         "rustdeps//vendor/glob:glob",
         "rustdeps//vendor/walkdir:walkdir",
+        "rustdeps//vendor/tempfile:tempfile",
         "//src/rust/starlark-parse:starlark-parse",
     ],
 )

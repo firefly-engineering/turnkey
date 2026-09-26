@@ -10,3 +10,6 @@ clap.workspace = true
 glob.workspace = true
 walkdir.workspace = true
 starlark-parse = { path = "../../rust/starlark-parse" }
+
+[dev-dependencies]
+tempfile.workspace = true
