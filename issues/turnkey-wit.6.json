@@ -13,9 +13,15 @@
     "wayfinder:research"
   ],
   "parent": "turnkey-wit",
+  "comments": [
+    {
+      "text": "GitHub vouches for Actions jobs via OIDC JWTs (repo/owner numeric IDs, event_name, ref, actor, ref_protected); a same-repo writer cannot forge ref=refs/heads/main without pushing to main, but can forge workflow_ref, unrestricted environment subs and ref-less subs, so policy keys on (repository_owner_id, repository_id, event_name, ref). Fork PR runs get no OIDC (write perms downgraded to read; id-token is write|none) and no secrets, so fork builds go through the service-owned client host triggered by the service's GitHub App (HMAC-signed webhooks, 1h installation tokens, collaborator-permission API, Checks API; merge_group webhook is App-only); GitHub's 'require approval for all external contributors' must be chosen explicitly (default gates first-time contributors only). Developers sign in via the App's device flow (8h user token, intersection of user and app access). Verify GitHub JWTs in the service and mint a build-length service token: Cloud Run doesn't support WIF direct resource access (only SA impersonation, which erases GitHub claims), buck2 substitutes $VAR headers from the daemon's startup env (no rotation without restart; tls_client_cert file is re-read), and Nix substituters only take netrc Basic auth or tls-certificate mTLS (no bearer). Merge queue: free for public org repos, GHEC for private; native stacked PRs (preview) expose a stack object on PRs/webhooks. Findings: docs/research/github-identity-for-build-service.md on bookmark research/github-identity-for-build-service (commit f3422e4e)",
+      "timestamp": "2026-09-26T12:03:57Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "What can GitHub vouch for, and how does it become a credential?",
   "type": "task",
-  "updated_at": "2026-09-26T11:53:17Z"
+  "updated_at": "2026-09-26T12:03:57Z"
 }
