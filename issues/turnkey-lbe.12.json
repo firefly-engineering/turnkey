@@ -5,7 +5,8 @@
     "turnkey-lbe.3",
     "turnkey-lbe.4",
     "turnkey-lbe.5",
-    "turnkey-lbe.7"
+    "turnkey-lbe.7",
+    "turnkey-wit.12"
   ],
   "blocks": [],
   "created": "2026-09-25T19:18:09Z",
@@ -17,5 +18,5 @@
   "status": "open",
   "title": "Remote execution with Nix-provisioned Linux workers (G11)",
   "type": "task",
-  "updated_at": "2026-09-25T19:18:14Z"
+  "updated_at": "2026-09-26T11:52:01Z"
 }
