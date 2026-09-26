@@ -19,9 +19,15 @@
     "wayfinder:grilling"
   ],
   "parent": "turnkey-wit",
+  "comments": [
+    {
+      "text": "Input from turnkey-wit.6: the service issues a token for the whole build. Nix caches need netrc Basic auth or a client certificate (no bearer token), so Cloud Run's own IAM check must be off for the Nix cache. buck2 header tokens rotate only on a daemon restart, while certificates can rotate. The OIDC sub format changed for repos created after 2026-07-15. One real workflow that prints its decoded token for each event would settle the 5 unconfirmed token details.",
+      "timestamp": "2026-09-26T12:04:24Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "How do tk and nix on a client reach the build service?",
   "type": "question",
-  "updated_at": "2026-09-26T11:52:01Z"
+  "updated_at": "2026-09-26T12:04:24Z"
 }
