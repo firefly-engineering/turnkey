@@ -264,10 +264,10 @@
               declaringBuck2 = resolve {
                 tellerLib = self.lib.defaultTellerLib;
                 registry = self.lib.defaultTellerRegistry system;
-                declarationFile = builtins.toFile "toolchain.toml" ''
-                  [toolchains]
-                  buck2 = {}
-                '';
+                # A file in the flake source, not builtins.toFile: `nix flake
+                # check --no-build` evaluates in read-only mode, where a
+                # toFile path is never written and so cannot be read back.
+                declarationFile = ./nix/lib/testdata/declares-buck2.toml;
               };
               nixFiles = builtins.filter (lib.hasSuffix ".nix") (lib.filesystem.listFilesRecursive ./nix);
               reachesForBuck2 =
