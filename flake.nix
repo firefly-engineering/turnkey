@@ -494,10 +494,24 @@
                       lib.optional (lib.intersectLists wrapper.watch_files rule.sources == [ ])
                         "${language.wrapper.tool} watches ${toString wrapper.watch_files}, none of which ${rule.name} reads"
                   ) (builtins.filter (language: language ? wrapper) languages);
+                  # solidity-deps.toml comes from foundry.toml and from the
+                  # Solidity packages in package.json, pinned by the pnpm
+                  # lock, so the rule must both read and watch all three
+                  solidityRule = lib.findFirst (rule: rule.name == "solidity") null rules;
+                  solidityInputs = [
+                    options.solidity.foundryTomlFile
+                    options.solidity.packageJsonFile
+                    options.solidity.pnpmLockFile
+                  ];
+                  readAndWatched = file: lib.elem file solidityRule.sources && lib.elem file solidityRule.generator;
+                  solidityProblems = map (file: "solidity does not read and watch ${file}") (
+                    builtins.filter (file: !readAndWatched file) solidityInputs
+                  );
                 in
                 lib.optional (lib.unique names != names) "rule names repeat: ${toString names}"
                 ++ map (rule: "${rule.name} runs before the rule that writes its sources") misordered
-                ++ wrapperProblems;
+                ++ wrapperProblems
+                ++ solidityProblems;
               allProblems =
                 problems { }
                 ++ problems { lockFile = "pylock.toml"; }

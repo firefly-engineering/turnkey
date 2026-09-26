@@ -459,6 +459,24 @@ in
           Relative path to foundry.toml file (for staleness checking and regeneration).
         '';
       };
+
+      packageJsonFile = mkOption {
+        type = types.str;
+        default = "package.json";
+        description = ''
+          Relative path to the package.json declaring npm Solidity packages
+          (e.g. @openzeppelin/contracts), for staleness checking and regeneration.
+        '';
+      };
+
+      pnpmLockFile = mkOption {
+        type = types.str;
+        default = "pnpm-lock.yaml";
+        description = ''
+          Relative path to the pnpm-lock.yaml pinning the npm Solidity packages'
+          versions and integrity hashes, for staleness checking and regeneration.
+        '';
+      };
     };
 
     # ==========================================================================

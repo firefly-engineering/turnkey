@@ -270,12 +270,22 @@ in
       langCfg:
       lib.optional (hasCell langCfg) {
         name = "solidity";
-        sources = [ langCfg.foundryTomlFile ];
+        # Git deps come from foundry.toml, npm Solidity packages from
+        # package.json at the versions the pnpm lock pins
+        sources = [
+          langCfg.foundryTomlFile
+          langCfg.packageJsonFile
+          langCfg.pnpmLockFile
+        ];
         target = depsFileName langCfg "solidity-deps.toml";
         generator = [
           "soldeps-gen"
           "--foundry"
           langCfg.foundryTomlFile
+          "--package-json"
+          langCfg.packageJsonFile
+          "--pnpm-lock"
+          langCfg.pnpmLockFile
           "--prefetch"
         ];
       };
