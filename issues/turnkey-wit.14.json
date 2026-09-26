@@ -1,6 +1,7 @@
 {
   "assignee": "",
   "blocked_by": [
+    "turnkey-wit.10",
     "turnkey-wit.6",
     "turnkey-wit.9"
   ],
@@ -16,5 +17,5 @@
   "status": "open",
   "title": "How do tk and nix on a client reach the build service?",
   "type": "question",
-  "updated_at": "2026-09-26T11:51:58Z"
+  "updated_at": "2026-09-26T11:51:59Z"
 }
