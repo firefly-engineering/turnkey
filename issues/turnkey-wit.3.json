@@ -2,7 +2,8 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [
-    "turnkey-wit.10"
+    "turnkey-wit.10",
+    "turnkey-wit.12"
   ],
   "created": "2026-09-26T11:51:44Z",
   "description": "## Question\n\nHow can a remote-execution worker make the Nix store paths an action names available **on demand**, before running it — and how have others done it?\n\n## Context\n\nMap turnkey-wit settled the **programmable base image**: one generic executor image; per action, the store paths it names (absolute `/nix/store/...` symlink targets in the REAPI input tree — how turnkey's cells, prelude and toolchains cell reach buck2 — plus closure roots named in a platform property) are fetched from the service's Nix cache (or built by the service if missing), cached on the instance, and mounted read-only into the action's sandbox. buck2 never uploads what an external symlink points to (see `docs/research/remote-execution-and-caching.md` §3.2), and toolchain paths like clang appear as absolute strings in argv.\n\n## What to find\n\n1. Prior art and how each finds and provisions paths: NativeLink LRE (nix2container), rules_nixpkgs remote-execution tutorial and issue #180 (realise-before-execute hook), tweag/buck2.nix, MercuryTechnologies/snowydeer, nix-snapshotter, snix/tvix FUSE stores, Hercules/garnix/nixbuild.net internals if documented.\n2. **Discovering needed paths**: from symlink targets in the input root only? From argv/env strings (scan for `/nix/store/\u003chash\u003e-`)? From an explicit platform property listing closure roots? Pros/cons, including completeness (runtime closure via narinfo `References`).\n3. **Fetching**: substituting from a binary cache without a nix-daemon (e.g. `nix copy --from`, `nix-store --realise` single-user, a purpose-built NAR fetcher/unpacker), expected latency for a typical closure (rustc, go, clang, a godeps cell), per-instance caching and eviction on a memory-backed filesystem.\n4. **Mounting read-only** into a per-action sandbox so an action cannot modify the instance's store (bind mounts, overlay, uid separation), and whether `/nix/store` must be at that exact path.\n5. **Lazy alternatives**: FUSE-backed lazy stores (would they work on Cloud Run? cross-check with the Cloud Run research ticket).\n\n## Output\n\n`docs/research/nix-paths-on-re-workers.md`: options table with latency/complexity/security, recommendation. Resolution comment gists it.\n\n## Unblocks\n\n\"What does the executor need from an action to run it?\".",
@@ -15,5 +16,5 @@
   "status": "open",
   "title": "How do remote-execution workers get Nix store paths on demand?",
   "type": "task",
-  "updated_at": "2026-09-26T11:51:55Z"
+  "updated_at": "2026-09-26T11:51:56Z"
 }
