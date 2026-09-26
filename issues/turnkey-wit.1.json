@@ -13,9 +13,15 @@
     "wayfinder:research"
   ],
   "parent": "turnkey-wit",
+  "comments": [
+    {
+      "text": "Yes, with conditions. Cloud Run services can host the REAPI executor: gRPC server streaming over end-to-end HTTP/2 (h2c), 60-min request cap, no request size limit on HTTP/2, up to 8 vCPU/32 GiB, scale to zero with idle cost = stored bytes (in-region GCS traffic free). Functions don't fit (the executor needs a gRPC streaming server; event-driven functions cap at 9 min). Service instances are always reused, and no setting gives a fresh instance per request. Successive actions CAN be isolated with Cloud Run sandboxes (Preview since 2026-07-08): 'sandbox do' gives each run a fresh tmpfs overlay, a read-only host rootfs, bind mounts, no env/secrets/metadata server and no egress, and Google documents sandboxes as 'completely isolated from each other'. So shared results can stand, provided the isolation experiment passes; the fallback is per-trust-level services. Whether bwrap/nsjail/the Nix sandbox work on gen2 is unverified: the docs conflict (gen2 advertises 'all namespaces', but seccomp is Docker-like, with no host root caps and no in-container mounts). Nix builds need sandbox-fallback=false. Builds longer than 60 min go to Cloud Run jobs (7-day tasks, one fresh instance per task). Findings: docs/research/cloud-run-executor.md on bookmark research/cloud-run-executor (commit bca53006)",
+      "timestamp": "2026-09-26T12:02:05Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "Can Cloud Run host an REAPI executor and a Nix builder?",
   "type": "task",
-  "updated_at": "2026-09-26T12:01:49Z"
+  "updated_at": "2026-09-26T12:02:05Z"
 }
