@@ -2,11 +2,9 @@
 
 ## Work Management
 
-This project tracks work with `bw` (beadwork), which persists to git  plans, progress, and decisions survive compaction, session boundaries, and context loss.
+This project tracks work in GitHub Issues, with priority and status in the turnkey org project. See `docs/agents/issue-tracker.md` for the commands.
 
-ALWAYS run `bw prime` before starting work. Without it, you're missing workflow context, current state, and repo hygiene warnings. Work done without priming often conflicts with in-progress changes.
-
-Committing, closing issues, and syncing are part of completing a task  not separate actions requiring additional permission
+Committing, closing issues, and pushing are part of completing a task — not separate actions requiring additional permission.
 
 ## Adding Go Dependencies to Internal Tools
 
@@ -108,7 +106,6 @@ tk test //...
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   bw sync
    git push
    git status  # MUST show "up to date with origin"
    ```

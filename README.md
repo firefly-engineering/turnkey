@@ -18,10 +18,6 @@ Turnkey is a polyglot development environment and build system designed for seam
     ```
     This will automatically download and configure all necessary tools (Go, Rust, Python, Buck2, etc.) in a hermetic environment.
 
-3.  Initialize the issue tracker:
-    ```bash
-    bw onboard
-    ```
 
 ## Tools
 
@@ -48,10 +44,10 @@ Turnkey provides two main CLI tools to streamline development:
 
 ## Workflow
 
-This project uses **beadwork** (`bw`) for distributed issue tracking.
+Work is tracked in [GitHub Issues](https://github.com/firefly-engineering/turnkey/issues), prioritised in the [turnkey project](https://github.com/orgs/firefly-engineering/projects/3).
 
-- **Find work**: `bw ready`
-- **Claim work**: `bw start <id>`
-- **Submit work**: `bw close <id>` then `git push`
+- **Find work**: `gh issue list --search "-is:blocked no:assignee"`
+- **Claim work**: `gh issue edit <n> --add-assignee @me`
+- **Submit work**: commit with `Fixes #<n>`, then push
 
 See `AGENTS.md` for detailed workflow instructions.

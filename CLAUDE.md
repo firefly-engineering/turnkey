@@ -684,70 +684,28 @@ The goal is to make toolchain management in Nix flakes as simple as declaring wh
 
 ---
 
-## Beadwork Integration
+## Issue Tracking
 
-This project uses [beadwork](https://github.com/jallum/beadwork) (`bw`) for issue tracking. Run `bw prime` at the start of every session to load workflow context, current state, and repo hygiene warnings.
-
-### Essential Commands
+Work is tracked in [GitHub Issues](https://github.com/firefly-engineering/turnkey/issues), with priority (P0–P4) and status in the [turnkey org project](https://github.com/orgs/firefly-engineering/projects/3). Epics are issues labelled `epic` with sub-issues; blockers are GitHub issue dependencies. `docs/agents/issue-tracker.md` has the full command set.
 
 ```bash
-bw ready                       # Show issues ready to work (no blockers)
-bw list --status=open          # All open issues
-bw show <id>                   # Full issue details with dependencies
-bw create <title> --type=task --priority=2
-bw start <id>                  # Move issue to in_progress + assign to git user
-bw close <id> --reason="..."   # Close an issue
-bw sync                        # Fetch, rebase/replay, push
+gh issue list --search "-is:blocked no:assignee"   # Ready work: open, unclaimed, unblocked
+gh issue view <n> --comments                        # Full issue details
+gh issue edit <n> --add-assignee @me                # Claim
+gh issue comment <n> --body "..."                   # Breadcrumbs
 ```
 
-### Workflow Pattern
-
-1. **Prime**: Run `bw prime` at session start to load workflow context
-2. **Find work**: `bw ready` to see actionable, unblocked issues
-3. **Claim**: `bw start <id>` (refuses to start blocked issues)
-4. **Work**: Implement the task
-5. **Complete**: `bw close <id>`
-6. **Sync**: `bw sync` at session end
-
-### Key Concepts
-
-- **Dependencies**: Issues can block other issues. `bw ready` shows only unblocked work.
-- **Priority**: P0=critical, P1=high, P2=medium, P3=low, P4=backlog (use numbers, not words)
-- **Types**: task, bug, feature, epic, question, docs
-- **Blocking**: `bw dep add <id> blocks <id>` to add dependencies
-
-### Session Protocol
-
-Committing, closing issues, and syncing are part of completing a task — not separate actions requiring additional permission.
-
-**Before ending any session:**
-
-```bash
-git status              # Check what changed
-git add <files>         # Stage code changes
-git commit -m "..."     # Commit code
-bw sync                 # Fetch, rebase/replay, push beadwork state
-git push                # Push code to remote
-```
-
-### Best Practices
-
-- Run `bw prime` at session start — without it you're missing workflow context
-- Use `bw ready` to find available work
-- Use `bw start <id>` to claim work; it refuses blocked issues automatically
-- Create new issues with `bw create` when you discover follow-up tasks
-- Use descriptive titles and set appropriate priority/type
-- Always `bw sync` before ending a session
+A commit that finishes an issue carries `Fixes #<n>`. Issues from before 2026-09-26 carry their old beadwork ID (`turnkey-XYZ`, as seen in older commit messages) in their footer, and [#78](https://github.com/firefly-engineering/turnkey/issues/78) maps every migrated ID; the `beadwork` branch is a read-only archive of the old tracker.
 
 ## Agent skills
 
 ### Issue tracker
 
-Issues are tracked in beadwork (`bw`) on the `beadwork` branch, not GitHub Issues. See `docs/agents/issue-tracker.md`.
+Issues are tracked in GitHub Issues on `firefly-engineering/turnkey`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), applied with `bw label`. See `docs/agents/triage-labels.md`.
+Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), applied with `gh issue edit --add-label`. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
