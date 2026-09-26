@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-26T11:51:45Z",
+  "description": "## Question\n\nCan niks3 (github.com/Mic92/niks3, MIT) be refactored to run on a metadata store that **scales to zero** (idle cost = stored bytes only), with GCS as the object store — and if not, what else could be the Nix-cache half of the build service?\n\n## Context\n\nMap turnkey-wit: the Nix binary cache is one cache (no scopes), written only by the service's Nix builder, signed with a service-held key, read by every client (possibly anonymously for public repos, authenticated for private). Scale to zero is a hard requirement. niks3 today: server + **PostgreSQL** tracking upload references for GC; clients upload NAR/narinfo via presigned S3 URLs; reads go straight to S3/CDN; Ed25519 signing; API-token and OIDC (GitHub Actions) auth. Cloud SQL does not scale to zero.\n\n## What to find (read niks3's source at a pinned commit; cite file/line permalinks)\n\n1. **How niks3 uses Postgres**: schema, transactions, queries (esp. GC reachability and upload bookkeeping), concurrency assumptions. Is it SQL-heavy or a thin KV use?\n2. **Refactor candidates** and effort for each: Firestore (native mode), Cloud Spanner (scale-to-zero? check current pricing/granular instances), Bigtable (no), SQLite on GCS (litestream/LiteFS — single writer), a serverless Postgres outside GCP (Neon), or **no database** (derive GC roots from bucket listings / narinfo references at GC time). Which preserves correctness under concurrent uploads + GC?\n3. **Is niks3's upload design even needed** when the only uploader is the service itself (clients never upload store paths)? Which parts remain valuable: GC, signing, narinfo generation, read proxy for private buckets?\n4. **GCS**: does niks3 work against GCS's S3-compatible XML API (HMAC keys, V4 presigned URLs, multipart)? Or does it need a native GCS backend?\n5. **Alternatives** for comparison: Attic (Postgres/SQLite, chunk dedup), harmonia, nix-serve-ng, plain `nix copy --to s3://…` + a GC job. Upstream appetite: is a pluggable metadata backend something niks3's maintainer would accept (issues/PRs/discussions)?\n\n## Output\n\n`docs/research/niks3-scale-to-zero.md`: Postgres usage map, per-candidate effort/risk, recommendation (fork/patch per CLAUDE.md \"fetch and patch\" policy, upstream contribution, or alternative). Resolution comment gists it.\n\n## Unblocks\n\n\"What are the building blocks, and where are their seams?\".",
+  "id": "turnkey-wit.4",
+  "labels": [],
+  "parent": "turnkey-wit",
+  "priority": 2,
+  "status": "open",
+  "title": "Can niks3 run on a metadata store that scales to zero?",
+  "type": "task",
+  "updated_at": "2026-09-26T11:51:45Z"
+}
