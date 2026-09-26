@@ -5,11 +5,13 @@
   "created": "2026-09-26T11:51:43Z",
   "description": "## Question\n\nCan Cloud Run host (a) an REAPI executor that runs each buck2 action inside its own `Execute` request, and (b) a Nix builder that builds client-submitted derivations — while scaling to zero?\n\n## Context\n\nMap turnkey-wit settled that the backend is a remote executor deployed on Cloud Run (functions or services), idle cost = stored bytes only. Executor results are shared across all clients **only if** one action cannot tamper with the next action run on the same (reused) instance; otherwise we fall back to one service per trust level writing into requester scopes. This ticket supplies the facts that decide which. Background: `docs/research/remote-execution-and-caching.md` §4b/§4f, `docs/research/local-re-api-servers.md`.\n\n## What to find (cite primary sources: Cloud Run docs, gVisor/gen2 docs, release notes; date everything)\n\n1. **Request model**: max request duration (services vs functions vs jobs); gRPC support incl. server streaming and HTTP/2 end-to-end (REAPI `Execute` returns a stream of `google.longrunning.Operation`; `WaitExecution`); max request/response sizes on HTTP/2; idle timeouts on long streams.\n2. **Resources**: max vCPU / memory per instance; filesystem is memory-backed? writable paths; volume options (emptyDir in-memory, Cloud Storage FUSE, NFS/Filestore, ephemeral disk if any) and whether each scales to zero in cost.\n3. **Isolation**: gen1 (gVisor) vs gen2 execution environment — are user, mount and PID namespaces available (needed for a per-action sandbox such as bubblewrap/nsjail, and for the Nix sandbox)? Can we run as a non-root uid? seccomp limits? Does anything guarantee a fresh instance per request (e.g. concurrency=1 + max requests per instance), or are instances always reused?\n4. **Nix inside Cloud Run**: any evidence of `nix build` with `sandbox = true` working on gen2; single-user vs daemon; `/nix/store` location constraints.\n5. **Scaling**: cold-start latency for a large image; concurrency settings; max instances; min-instances=0 behaviour; CPU allocation outside requests (CPU throttled after response → background work impossible?).\n6. **Long work**: Cloud Run jobs limits (task timeout, parallelism, start latency) for Nix builds that exceed a request's max duration.\n7. **Cost model** at zero and at load; egress between Cloud Run and GCS in-region.\n\n## Output\n\n`docs/research/cloud-run-executor.md`: a fit table (requirement → supported? → source), explicit verdict on \"can successive actions on one instance be isolated\", blockers and workarounds. Resolution comment gists the verdict.\n\n## Unblocks\n\n\"Which results are shared, and where do client-computed results go?\" and \"What are the building blocks…\".",
   "id": "turnkey-wit.1",
-  "labels": [],
+  "labels": [
+    "wayfinder:research"
+  ],
   "parent": "turnkey-wit",
   "priority": 2,
   "status": "open",
   "title": "Can Cloud Run host an REAPI executor and a Nix builder?",
   "type": "task",
-  "updated_at": "2026-09-26T11:51:43Z"
+  "updated_at": "2026-09-26T11:51:44Z"
 }
