@@ -11,9 +11,15 @@
     "wayfinder:research"
   ],
   "parent": "turnkey-wit",
+  "comments": [
+    {
+      "text": "No refactor, no fork. niks3's data is KV-shaped (key -\u003e direct refs), but its GC correctness under concurrent pushes rests on Postgres itself: recursive CTEs, PL/pgSQL commit_push, row and session advisory locks, and a tombstone/grace protocol that upstream models in Quint. Spanner can't scale to zero (100 PU minimum, no suspend). Firestore is weeks of re-derivation. SQLite+Litestream needs a single writer, which Cloud Run's soft max-instances can't guarantee. Upstream niks3 on Neon (direct connection, not pooled) works with zero code but lives outside GCP. niks3's upload machinery (presigned URLs, pending pushes, server-side signing) serves remote credential-less uploaders; our only writer is the service's builder, and Nix's own S3 store already writes the NAR, then signs and writes the narinfo last. Recommendation: builder runs nix copy to GCS via the XML interop API (HMAC key; untested end to end); reads go direct for public caches or through a stateless proxy for private ones; GC is a Cloud Run job doing mark-and-sweep over narinfos, serialised against uploads by a create-if-absent GCS lease. No database. niks3 on GCS should work via minio-go (it falls back to single DELETEs for storage.googleapis.com), but needs HMAC keys, not IAM. Findings: docs/research/niks3-scale-to-zero.md on bookmark research/niks3-scale-to-zero (commit d8be99d2)",
+      "timestamp": "2026-09-26T12:00:28Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "Can niks3 run on a metadata store that scales to zero?",
   "type": "task",
-  "updated_at": "2026-09-26T11:53:06Z"
+  "updated_at": "2026-09-26T12:00:28Z"
 }
