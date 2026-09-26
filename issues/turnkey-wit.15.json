@@ -16,9 +16,15 @@
     "wayfinder:grilling"
   ],
   "parent": "turnkey-wit",
+  "comments": [
+    {
+      "text": "Input from turnkey-wit.1: the Nix sandbox inside Cloud Run is doubtful (Docker-like seccomp blocks the namespace calls, and containers can't mount), so 'built in the Nix sandbox' may become 'built in an isolated Cloud Run sandbox or job task'. Builders must set sandbox-fallback = false. The experiment ticket turnkey-wit.16 settles it.",
+      "timestamp": "2026-09-26T12:02:41Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "Do we accept the sandbox-escape risk of sharing untrusted-built outputs?",
   "type": "question",
-  "updated_at": "2026-09-26T12:02:40Z"
+  "updated_at": "2026-09-26T12:02:41Z"
 }
