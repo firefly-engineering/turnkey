@@ -28,7 +28,8 @@ The snippets assume `R=firefly-engineering/turnkey`.
 - **List issues**: `gh issue list` (open). Filter with `--label`, `--search`, `--assignee`, `--state all`.
 - **Ready work** (open, unassigned, not blocked by an open issue): `gh issue list --search "-is:blocked no:assignee"`. `is:blocked`, `is:blocking` and `parent-issue:` only work in GitHub's advanced issue search, which `gh issue list` uses; the REST `search/issues` endpoint silently ignores them unless you pass `-f advanced_search=true`. By priority: `gh project item-list 3 --owner firefly-engineering --format json --limit 500 --jq '.items[]|select(.status=="Todo")|"\(.priority) #\(.content.number) \(.title)"' | sort`.
 - **Comment**: `gh issue comment <n> --body "<text>"`
-- **Labels**: `gh issue edit <n> --add-label <l> --remove-label <l>`
+- **Labels**: `gh issue edit <n> --add-label <l> --remove-label <l>`. Give every issue at least one area label: `area:go`, `area:rust`, `area:solidity`, `area:rules-sync`, `area:fuse`, `area:buck2`, `area:tw`, `area:ci`, `area:remote-build` (or `documentation` for docs-only work); create a new `area:` label rather than stretching one that doesn't fit. Triage labels are in [triage-labels.md](triage-labels.md).
+- **Grouping**: put related issues under an `epic` as sub-issues rather than leaving them top-level; an epic can itself be a sub-issue. An epic's priority is the highest of its open sub-issues'.
 - **Start work**: check it has no open blockers, then `gh issue edit <n> --add-assignee @me` and set Status to `In Progress`.
 - **Close**: commit with `Fixes #<n>` so the merge closes it. To close without a commit: `gh issue close <n> --comment "<why>"` (add `--reason "not planned"` for wontfix).
 - **Sub-issue**: `gh api -X POST repos/$R/issues/<parent>/sub_issues -F sub_issue_id=$(gh api repos/$R/issues/<child> --jq .id)`
