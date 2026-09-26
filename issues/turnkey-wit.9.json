@@ -3,7 +3,9 @@
   "blocked_by": [
     "turnkey-wit.1"
   ],
-  "blocks": [],
+  "blocks": [
+    "turnkey-wit.11"
+  ],
   "created": "2026-09-26T11:51:47Z",
   "description": "## Question\n\nWhich results are shared, and where do client-computed results go? In particular: does the **Scope** concept survive, and in what form?\n\n## Context\n\nMap turnkey-wit settled that executor-computed results are shared across everyone (Google model), falling back to per-trust-level executor services writing into requester scopes if Cloud Run cannot isolate successive actions on one instance — the Cloud Run research ticket gives that verdict. Clients never write shared results; results a client computes itself (darwin actions on a Mac, offline work, `local_only` actions) are **client-computed results** and are never shared. The original wish was per-PR and per-developer \"virtual buckets\"; the glossary term **Scope** is on hold until this ticket.\n\n## Decide (grilling; /grilling + /domain-modeling)\n\n1. Given the Cloud Run isolation verdict: shared namespace, or the fallback? If fallback: which trust levels, which services, which scopes each writes and reads (PR, stacked PR, developer, trunk), scope keys and lifetime.\n2. Client-computed results: stay in the client's local cache only, or go to a per-developer remote scope (cross-machine reuse for one person)? Who may read it (never others)? Does the existing per-user bazel-remote test cache (ADR 0001) become that local tier?\n3. Mixed builds: a local action's outputs feeding a remote action (inputs are hash-verified — confirm nothing client-computed leaks into shared results).\n4. Darwin before a darwin executor exists: what a Mac laptop reads and writes.\n5. Glossary: define or drop **Scope** in CONTEXT.md.\n\n## Output\n\nResolution comment; `docs/specs/build-service.md` section \"Result sharing\"; CONTEXT.md update for Scope.",
   "id": "turnkey-wit.9",
@@ -15,5 +17,5 @@
   "status": "open",
   "title": "Which results are shared, and where do client-computed results go?",
   "type": "question",
-  "updated_at": "2026-09-26T11:51:54Z"
+  "updated_at": "2026-09-26T11:51:56Z"
 }

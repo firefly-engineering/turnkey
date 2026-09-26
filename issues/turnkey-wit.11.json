@@ -1,7 +1,8 @@
 {
   "assignee": "",
   "blocked_by": [
-    "turnkey-wit.6"
+    "turnkey-wit.6",
+    "turnkey-wit.9"
   ],
   "blocks": [],
   "created": "2026-09-26T11:51:48Z",
@@ -15,5 +16,5 @@
   "status": "open",
   "title": "What gates a merge, and what runs after landing?",
   "type": "question",
-  "updated_at": "2026-09-26T11:51:55Z"
+  "updated_at": "2026-09-26T11:51:56Z"
 }
