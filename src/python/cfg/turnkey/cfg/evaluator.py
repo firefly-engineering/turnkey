@@ -18,6 +18,21 @@ class TargetSpec:
     family: str
 
     @classmethod
+    def from_platform(cls, os: str, cpu: str) -> "TargetSpec":
+        """Create the spec of a platform named as Buck2 does (e.g. macos, arm64).
+
+        Raises ValueError for an OS or CPU turnkey doesn't know.
+        """
+        arches = {"x86_64": "x86_64", "arm64": "aarch64"}
+        if cpu not in arches:
+            raise ValueError(f"unknown CPU {cpu!r}")
+        if os == "linux":
+            return cls(arch=arches[cpu], vendor="unknown", os="linux", env="gnu", family="unix")
+        if os == "macos":
+            return cls(arch=arches[cpu], vendor="apple", os="macos", env=None, family="unix")
+        raise ValueError(f"unknown OS {os!r}")
+
+    @classmethod
     def linux_x86_64(cls) -> "TargetSpec":
         """Create a spec for x86_64-unknown-linux-gnu."""
         return cls(

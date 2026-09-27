@@ -18,3 +18,12 @@ python_test(
     base_module = "tests",
     deps = [":cfg"],
 )
+
+# The cfg() cases src/go/pkg/cargocfg runs too
+python_test(
+    name = "test-vectors",
+    srcs = ["tests/test_vectors.py"],
+    base_module = "tests",
+    env = {"TURNKEY_CFG_VECTORS": "$(location //src/go/pkg/cargocfg:cfg-vectors)"},
+    deps = [":cfg"],
+)
