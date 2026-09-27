@@ -10,12 +10,11 @@
 
 use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
-use serde::Deserialize;
+use deps_gen_kit::{OutputArgs, PrefetchArgs, Prefetcher};
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::Write;
 use std::path::PathBuf;
-use std::process::Command;
 
 mod pep508;
 
@@ -40,13 +39,11 @@ struct Args {
     #[arg(long, conflicts_with_all = ["lock", "pyproject"])]
     requirements: Option<PathBuf>,
 
-    /// Output file path (default: stdout)
-    #[arg(short, long)]
-    output: Option<PathBuf>,
+    #[command(flatten)]
+    output: OutputArgs,
 
-    /// Skip prefetching (produces placeholder hashes)
-    #[arg(long, default_value = "false")]
-    no_prefetch: bool,
+    #[command(flatten)]
+    prefetch: PrefetchArgs,
 
     /// Include dev dependencies (from pyproject.toml optional-dependencies.dev)
     #[arg(long, default_value = "false")]
@@ -222,9 +219,12 @@ fn main() -> Result<()> {
         bail!("Must specify one of: --lock, --pyproject, or --requirements");
     }
 
+    let mut prefetcher = args.prefetch.prefetcher();
+    let prefetcher = prefetcher.as_mut().map(|p| p as &mut dyn Prefetcher);
+
     // Handle pylock.toml (recommended path - has exact versions and URLs)
     if let Some(path) = &args.lock {
-        let mut resolved = parse_pylock(path, args.no_prefetch)?;
+        let mut resolved = parse_pylock(path, prefetcher)?;
         if let Some(uv_lock) = &args.uv_lock {
             add_uv_graph(&mut resolved, uv_lock)?;
         }
@@ -235,20 +235,9 @@ fn main() -> Result<()> {
         }
 
         eprintln!("Found {} dependencies", resolved.len());
-
-        let output = generate_toml(&resolved, "pylock.toml");
-
-        // Write output
-        if let Some(out_path) = &args.output {
-            let mut file = fs::File::create(out_path)
-                .with_context(|| format!("Failed to create output file: {}", out_path.display()))?;
-            file.write_all(output.as_bytes())?;
-            eprintln!("Wrote {}", out_path.display());
-        } else {
-            print!("{}", output);
-        }
-
-        return Ok(());
+        return args
+            .output
+            .write("pydeps-gen", "pylock.toml", &python_deps(&resolved));
     }
 
     // Parse dependencies from input file (legacy path - version ranges)
@@ -268,27 +257,15 @@ fn main() -> Result<()> {
     eprintln!("Found {} dependencies", deps.len());
 
     // Resolve versions and fetch hashes
-    let resolved = resolve_dependencies(&deps, args.no_prefetch)?;
+    let resolved = resolve_dependencies(&deps, prefetcher)?;
 
-    // Generate output
     let source = if args.pyproject.is_some() {
         "pyproject.toml"
     } else {
         "requirements.txt"
     };
-    let output = generate_toml(&resolved, source);
-
-    // Write output
-    if let Some(path) = &args.output {
-        let mut file = fs::File::create(path)
-            .with_context(|| format!("Failed to create output file: {}", path.display()))?;
-        file.write_all(output.as_bytes())?;
-        eprintln!("Wrote {}", path.display());
-    } else {
-        print!("{}", output);
-    }
-
-    Ok(())
+    args.output
+        .write("pydeps-gen", source, &python_deps(&resolved))
 }
 
 /// Parse a dependency specifier (PEP 508) into (name, version_constraint).
@@ -425,7 +402,10 @@ fn parse_requirements(path: &PathBuf) -> Result<Vec<(String, Option<String>)>> {
 
 /// Parse pylock.toml (PEP 751 lock file) and extract resolved dependencies
 /// This is the recommended path for reproducible builds since it has exact versions and URLs
-fn parse_pylock(path: &PathBuf, no_prefetch: bool) -> Result<Vec<PythonDep>> {
+fn parse_pylock(
+    path: &PathBuf,
+    mut prefetcher: Option<&mut dyn Prefetcher>,
+) -> Result<Vec<PythonDep>> {
     let content =
         fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
 
@@ -473,16 +453,15 @@ fn parse_pylock(path: &PathBuf, no_prefetch: bool) -> Result<Vec<PythonDep>> {
 
         // Get the Nix hash (for unpacked content)
         // Note: pylock.toml hash is for the archive file, but Nix needs hash of unpacked content
-        let hash = if no_prefetch {
-            "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string()
-        } else {
-            match prefetch_url(&url) {
+        let hash = match prefetcher.as_deref_mut() {
+            None => PLACEHOLDER_HASH.to_string(),
+            Some(prefetcher) => match prefetcher.prefetch(&url, true) {
                 Ok(h) => h,
                 Err(e) => {
                     eprintln!("  Warning: Failed to prefetch {}: {}", pkg.name, e);
                     continue;
                 }
-            }
+            },
         };
 
         resolved.push(PythonDep {
@@ -557,7 +536,7 @@ fn add_uv_graph(resolved: &mut [PythonDep], path: &PathBuf) -> Result<()> {
 /// Resolve dependencies: fetch version info from PyPI and compute hashes
 fn resolve_dependencies(
     deps: &[(String, Option<String>)],
-    no_prefetch: bool,
+    mut prefetcher: Option<&mut dyn Prefetcher>,
 ) -> Result<Vec<PythonDep>> {
     let mut resolved = Vec::new();
 
@@ -570,7 +549,11 @@ fn resolve_dependencies(
             version_constraint.as_deref().unwrap_or("")
         );
 
-        match resolve_single_dep(name, version_constraint.as_deref(), no_prefetch) {
+        match resolve_single_dep(
+            name,
+            version_constraint.as_deref(),
+            prefetcher.as_mut().map(|p| &mut **p as &mut dyn Prefetcher),
+        ) {
             Ok(dep) => resolved.push(dep),
             Err(e) => {
                 eprintln!("Warning: Failed to resolve {}: {}", name, e);
@@ -588,7 +571,7 @@ fn resolve_dependencies(
 fn resolve_single_dep(
     name: &str,
     version_constraint: Option<&str>,
-    no_prefetch: bool,
+    prefetcher: Option<&mut dyn Prefetcher>,
 ) -> Result<PythonDep> {
     // Query PyPI API
     let url = format!("https://pypi.org/pypi/{}/json", name);
@@ -625,12 +608,10 @@ fn resolve_single_dep(
         .ok_or_else(|| anyhow!("No source distribution found for {} {}", name, version))?;
 
     // Get hash
-    let hash = if no_prefetch {
-        // Use placeholder
-        "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string()
-    } else {
+    let hash = match prefetcher {
+        None => PLACEHOLDER_HASH.to_string(),
         // Prefetch with nix to get correct hash for unpacked content
-        prefetch_url(&release.url)?
+        Some(prefetcher) => prefetcher.prefetch(&release.url, true)?,
     };
 
     Ok(PythonDep {
@@ -642,114 +623,86 @@ fn resolve_single_dep(
     })
 }
 
-/// Prefetch a URL and return its Nix SRI hash
-fn prefetch_url(url: &str) -> Result<String> {
-    // nix-prefetch-cached keeps turnkey's prefetch cache and returns an SRI
-    // hash; pydeps-gen's wrapper puts it on PATH
-    let output = Command::new("nix-prefetch-cached")
-        .args(["--unpack", url])
-        .output()
-        .context("Failed to run nix-prefetch-cached")?;
+/// The hash --no-prefetch writes: one no archive has
+const PLACEHOLDER_HASH: &str = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("prefetch failed: {}", stderr);
-    }
-
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+/// python-deps.toml
+#[derive(Debug, Serialize)]
+struct PythonDeps {
+    /// Schema version for forward compatibility: 2 records markers and
+    /// extras (docs/user-manual/src/languages/python.md)
+    schema_version: u32,
+    /// Keyed by each package's name in the pydeps cell
+    deps: BTreeMap<String, DepRecord>,
 }
 
-/// Generate python-deps.toml content
-fn generate_toml(deps: &[PythonDep], source: &str) -> String {
-    let mut output = String::new();
+/// A package in python-deps.toml
+#[derive(Debug, Serialize)]
+struct DepRecord {
+    version: String,
+    hash: String,
+    url: String,
+    /// The lock's environment marker for installing the package at all
+    #[serde(skip_serializing_if = "Option::is_none")]
+    marker: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    dependencies: Vec<EdgeRecord>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    requested_extras: Vec<String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    extras: BTreeMap<String, Vec<EdgeRecord>>,
+}
 
-    output.push_str("# Auto-generated by pydeps-gen\n");
-    output.push_str(&format!("# Source: {}\n", source));
-    output.push_str("#\n");
+/// A dependency edge in python-deps.toml: the package by its key, with its
+/// marker and the extras it asks for, if any
+#[derive(Debug, Serialize)]
+struct EdgeRecord {
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    marker: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    extras: Vec<String>,
+}
 
-    // Show appropriate regeneration command based on source
-    let regen_cmd = match source {
-        "pylock.toml" => "pydeps-gen --lock pylock.toml -o python-deps.toml",
-        "pyproject.toml" => "pydeps-gen --pyproject pyproject.toml -o python-deps.toml",
-        "requirements.txt" => "pydeps-gen --requirements requirements.txt -o python-deps.toml",
-        _ => "pydeps-gen --lock pylock.toml -o python-deps.toml",
+/// The python-deps.toml record of the resolved packages
+fn python_deps(deps: &[PythonDep]) -> PythonDeps {
+    let edges = |deps: &[UvDep]| -> Vec<EdgeRecord> {
+        deps.iter()
+            .map(|d| EdgeRecord {
+                name: dep_key(&d.name),
+                marker: d.marker.clone(),
+                extras: d.extra.iter().map(|e| normalize_name(e)).collect(),
+            })
+            .collect()
     };
-    output.push_str(&format!("# To regenerate: {}\n", regen_cmd));
-    output.push('\n');
-
-    // Schema version for forward compatibility: 2 records markers and
-    // extras (docs/user-manual/src/languages/python.md)
-    output.push_str("schema_version = 2\n");
-    output.push('\n');
-
-    for dep in deps {
-        let key = dep_key(&dep.name);
-        output.push_str(&format!("[deps.{key}]\n"));
-        output.push_str(&format!("version = \"{}\"\n", dep.version));
-        output.push_str(&format!("hash = \"{}\"\n", dep.hash));
-        output.push_str(&format!("url = \"{}\"\n", dep.url));
-        if let Some(marker) = &dep.marker {
-            output.push_str(&format!("marker = {}\n", toml_string(marker)));
-        }
-        if !dep.dependencies.is_empty() {
-            output.push_str(&format!(
-                "dependencies = {}\n",
-                format_deps(&dep.dependencies)
-            ));
-        }
-        if !dep.requested_extras.is_empty() {
-            let extras: Vec<String> = dep
-                .requested_extras
-                .iter()
-                .map(|e| toml_string(e))
-                .collect();
-            output.push_str(&format!("requested_extras = [{}]\n", extras.join(", ")));
-        }
-        if !dep.extras.is_empty() {
-            output.push_str(&format!("\n[deps.{key}.extras]\n"));
-            for (extra, deps) in &dep.extras {
-                output.push_str(&format!("{} = {}\n", toml_string(extra), format_deps(deps)));
-            }
-        }
-        output.push('\n');
+    PythonDeps {
+        schema_version: 2,
+        deps: deps
+            .iter()
+            .map(|dep| {
+                let record = DepRecord {
+                    version: dep.version.clone(),
+                    hash: dep.hash.clone(),
+                    url: dep.url.clone(),
+                    marker: dep.marker.clone(),
+                    dependencies: edges(&dep.dependencies),
+                    requested_extras: dep.requested_extras.clone(),
+                    extras: dep
+                        .extras
+                        .iter()
+                        .map(|(extra, deps)| (extra.clone(), edges(deps)))
+                        .collect(),
+                };
+                (dep_key(&dep.name), record)
+            })
+            .collect(),
     }
-
-    output
 }
 
 /// A package's key in python-deps.toml, and its name in the pydeps cell:
 /// its normalized name with _ for -
 fn dep_key(name: &str) -> String {
     normalize_name(name).replace('-', "_")
-}
-
-/// A TOML string literal
-fn toml_string(s: &str) -> String {
-    toml::Value::String(s.to_string()).to_string()
-}
-
-/// Dependency edges as a TOML array of inline tables: each package by its
-/// key, with its marker and the extras it asks for, if any
-fn format_deps(deps: &[UvDep]) -> String {
-    let items: Vec<String> = deps
-        .iter()
-        .map(|d| {
-            let mut fields = vec![format!("name = {}", toml_string(&dep_key(&d.name)))];
-            if let Some(marker) = &d.marker {
-                fields.push(format!("marker = {}", toml_string(marker)));
-            }
-            if !d.extra.is_empty() {
-                let extras: Vec<String> = d
-                    .extra
-                    .iter()
-                    .map(|e| toml_string(&normalize_name(e)))
-                    .collect();
-                fields.push(format!("extras = [{}]", extras.join(", ")));
-            }
-            format!("{{ {} }}", fields.join(", "))
-        })
-        .collect();
-    format!("[{}]", items.join(", "))
 }
 
 #[cfg(test)]
@@ -793,29 +746,64 @@ socks = [{ name = "PySocks", marker = "python_version >= '3.8'" }]
             ..Default::default()
         }];
         add_uv_graph(&mut resolved, &path).unwrap();
-        let toml = generate_toml(&resolved, "pylock.toml");
+        let toml =
+            deps_gen_kit::render("pydeps-gen", "pylock.toml", &python_deps(&resolved)).unwrap();
         fs::remove_dir_all(&dir).unwrap();
 
-        assert!(toml.contains("schema_version = 2"), "{toml}");
-        assert!(
-            toml.contains(r#"marker = 'python_version >= "3.8"'"#),
-            "{toml}"
-        );
-        assert!(
-            toml.contains(r#"dependencies = [{ name = "urllib3" }, { name = "colorama", marker = "sys_platform == 'win32'" }]"#),
-            "{toml}"
-        );
-        assert!(toml.contains(r#"requested_extras = ["socks"]"#), "{toml}");
-        assert!(
-            toml.contains("[deps.requests.extras]\n\"socks\" = [{ name = \"pysocks\", marker = \"python_version >= '3.8'\" }]"),
-            "{toml}"
-        );
-        // It is TOML
         let parsed: toml::Value = toml::from_str(&toml).unwrap();
+        let requests = &parsed["deps"]["requests"];
+        assert_eq!(parsed["schema_version"].as_integer(), Some(2));
         assert_eq!(
-            parsed["deps"]["requests"]["dependencies"][1]["name"].as_str(),
-            Some("colorama")
+            requests["marker"].as_str(),
+            Some(r#"python_version >= "3.8""#)
         );
+        let deps = requests["dependencies"].as_array().unwrap();
+        assert_eq!(deps[0]["name"].as_str(), Some("urllib3"));
+        assert_eq!(deps[0].get("marker"), None);
+        assert_eq!(deps[1]["name"].as_str(), Some("colorama"));
+        assert_eq!(deps[1]["marker"].as_str(), Some("sys_platform == 'win32'"));
+        assert_eq!(
+            requests["requested_extras"].as_array().unwrap(),
+            &vec![toml::Value::from("socks")]
+        );
+        let socks = &requests["extras"]["socks"][0];
+        assert_eq!(socks["name"].as_str(), Some("pysocks"));
+        assert_eq!(socks["marker"].as_str(), Some("python_version >= '3.8'"));
+    }
+
+    #[test]
+    fn prefetches_each_sdist_unpacked() {
+        let dir = std::env::temp_dir().join(format!("pydeps-gen-lock-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("pylock.toml");
+        fs::write(
+            &path,
+            r#"
+lock-version = "1.0"
+
+[[packages]]
+name = "six"
+version = "1.17.0"
+sdist = { url = "https://example.com/six-1.17.0.tar.gz" }
+
+[[packages]]
+name = "member"
+directory = { path = "." }
+"#,
+        )
+        .unwrap();
+        let mut fake = deps_gen_kit::MemoryPrefetcher::default().with(
+            "https://example.com/six-1.17.0.tar.gz",
+            true,
+            "sha256-six",
+        );
+
+        let resolved = parse_pylock(&path, Some(&mut fake)).unwrap();
+        fs::remove_dir_all(&dir).unwrap();
+
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(resolved[0].hash, "sha256-six");
+        assert_eq!(fake.calls.len(), 1);
     }
 
     #[test]

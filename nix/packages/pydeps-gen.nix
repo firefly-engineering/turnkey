@@ -10,7 +10,6 @@
 let
   root = ../..;
   cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
-  nix-prefetch-cached = import ./nix-prefetch-cached.nix { inherit pkgs lib; };
 in
 pkgs.rustPlatform.buildRustPackage {
   pname = "pydeps-gen";
@@ -18,7 +17,11 @@ pkgs.rustPlatform.buildRustPackage {
 
   src = cargoLib.prunedCargoSource {
     inherit root;
-    members = [ "src/cmd/pydeps-gen" ];
+    members = [
+      "src/cmd/pydeps-gen"
+      "src/rust/deps-gen-kit"
+      "src/rust/prefetch-cache"
+    ];
   };
 
   cargoLock = {
@@ -26,8 +29,14 @@ pkgs.rustPlatform.buildRustPackage {
   };
 
   # Only build pydeps-gen, not examples
-  cargoBuildFlags = [ "-p" "pydeps-gen" ];
-  cargoTestFlags = [ "-p" "pydeps-gen" ];
+  cargoBuildFlags = [
+    "-p"
+    "pydeps-gen"
+  ];
+  cargoTestFlags = [
+    "-p"
+    "pydeps-gen"
+  ];
 
   # The PEP 508 cases src/go/pkg/pep508 runs too
   preCheck = ''
@@ -36,10 +45,11 @@ pkgs.rustPlatform.buildRustPackage {
 
   nativeBuildInputs = [ pkgs.makeWrapper ];
 
-  # Wrap the binary to include nix and nix-prefetch-cached in PATH for prefetching
+  # Wrap the binary to include nix in PATH: deps-gen-kit prefetches with
+  # nix-prefetch-url and nix hash
   postInstall = ''
     wrapProgram $out/bin/pydeps-gen \
-      --prefix PATH : ${lib.makeBinPath [ pkgs.nix nix-prefetch-cached ]}
+      --prefix PATH : ${lib.makeBinPath [ pkgs.nix ]}
   '';
 
   meta = {

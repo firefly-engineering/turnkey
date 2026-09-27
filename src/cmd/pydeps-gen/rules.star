@@ -7,6 +7,7 @@ rust_binary(
     edition = "2024",
     deps = [
         # turnkey:auto-start
+        "//src/rust/deps-gen-kit:deps-gen-kit",
         "rustdeps//vendor/anyhow:anyhow",
         "rustdeps//vendor/clap:clap",
         "rustdeps//vendor/serde:serde",
@@ -15,7 +16,6 @@ rust_binary(
         "rustdeps//vendor/ureq:ureq",
         # turnkey:auto-end
         # turnkey:preserve-start
-        # Native library for ring (TLS crypto) - Buck2 doesn't propagate native deps through Rust libs
         "rustdeps//vendor/ring@0.17.14:ring_core_0_17_14__",
         # turnkey:preserve-end
     ],
@@ -29,6 +29,7 @@ rust_test(
     edition = "2024",
     deps = [
         # turnkey:auto-start
+        "//src/rust/deps-gen-kit:deps-gen-kit",
         "rustdeps//vendor/anyhow:anyhow",
         "rustdeps//vendor/clap:clap",
         "rustdeps//vendor/serde:serde",
@@ -37,7 +38,6 @@ rust_test(
         "rustdeps//vendor/ureq:ureq",
         # turnkey:auto-end
         # turnkey:preserve-start
-        # Native library for ring (TLS crypto) - Buck2 doesn't propagate native deps through Rust libs
         "rustdeps//vendor/ring@0.17.14:ring_core_0_17_14__",
         # turnkey:preserve-end
     ],
