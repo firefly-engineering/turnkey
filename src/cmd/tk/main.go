@@ -26,6 +26,7 @@ import (
 	"github.com/firefly-engineering/turnkey/src/go/pkg/buck2args"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/cellfresh"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/localconfig"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncer"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/testcache"
 )
@@ -459,28 +460,17 @@ complete -c tk -n "__fish_seen_subcommand_from check" -s v -l verbose -d 'Show v
 	return script
 }
 
-// findProjectRoot walks up from cwd to find the project root.
-// The project root is identified by the presence of .buckconfig.
+// findProjectRoot returns the project root above cwd (syncconfig.FindRoot),
+// or cwd itself outside a project: buck2 then reports the missing
+// .buckconfig, and sync finds no sync.toml and so nothing to do.
 func findProjectRoot() (string, error) {
-	dir, err := os.Getwd()
+	cwd, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("failed to get working directory: %w", err)
 	}
-
-	for {
-		if _, err := os.Stat(dir + "/.buckconfig"); err == nil {
-			return dir, nil
-		}
-
-		parent := dir[:max(0, len(dir)-len("/"+dir[strings.LastIndex(dir, "/")+1:]))]
-		if parent == dir || parent == "" {
-			break
-		}
-		dir = parent
+	if root, ok := syncconfig.FindRoot(cwd); ok {
+		return root, nil
 	}
-
-	// Fallback to current directory
-	cwd, _ := os.Getwd()
 	return cwd, nil
 }
 

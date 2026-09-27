@@ -299,32 +299,16 @@ func findRealTool(name string) string {
 	return path
 }
 
-// findProjectRoot walks up from cwd to find the project root.
-// The project root is identified by the presence of .buckconfig or .turnkey/sync.toml.
+// findProjectRoot returns the project root above cwd (syncconfig.FindRoot).
 func findProjectRoot() (string, error) {
-	dir, err := os.Getwd()
+	cwd, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("failed to get working directory: %w", err)
 	}
-
-	for {
-		// Check for .buckconfig
-		if _, err := os.Stat(dir + "/.buckconfig"); err == nil {
-			return dir, nil
-		}
-		// Check for .turnkey/sync.toml
-		if _, err := os.Stat(dir + "/.turnkey/sync.toml"); err == nil {
-			return dir, nil
-		}
-
-		parent := dir[:max(0, len(dir)-len("/"+dir[strings.LastIndex(dir, "/")+1:]))]
-		if parent == dir || parent == "" {
-			break
-		}
-		dir = parent
+	if root, ok := syncconfig.FindRoot(cwd); ok {
+		return root, nil
 	}
-
-	return "", fmt.Errorf("no project root found (looking for .buckconfig or .turnkey/sync.toml)")
+	return "", fmt.Errorf("no project root found (looking for .buckconfig or %s)", syncconfig.DefaultConfigPath)
 }
 
 func printHelp() {
