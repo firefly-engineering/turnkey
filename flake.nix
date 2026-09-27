@@ -633,6 +633,10 @@
                 depsFile = ./solidity-deps.toml;
               };
 
+              # Keep rules.star deps in step with the sources: tk syncs them
+              # before build, test and the other build-graph commands
+              rules.enabled = true;
+
               # Pre-commit checks
               tk = {
                 jsTestConfigCheck = true;
