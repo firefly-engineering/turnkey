@@ -29,6 +29,7 @@
 - [Running Tests](./workflows/testing.md)
 - [Test Result Caching](./workflows/test-result-caching.md)
 - [Managing Dependencies](./workflows/dependencies.md)
+- [Dependency Fixups](./workflows/fixups.md)
 - [Python Workspaces](./workflows/python-workspace.md)
 
 # Language Support

@@ -111,16 +111,30 @@ Cargo.lock → rust-deps.toml → Rust deps cell (nix/lib/deps-cell) → .turnke
 - **Edition**: Read from `package.edition` (defaults to 2015)
 - **Crate root**: Detected from `[lib] path` or standard locations
 
-### What Requires Manual Handling
+### What Requires a Fixup
 
-| Build Script Output | Example Crate | Solution |
-|---------------------|---------------|----------|
-| `cargo:rustc-cfg=...` | serde_json, rustix | `rustcFlagsRegistry` |
-| Generated `.rs` files | serde, serde_core | `buildScriptFixups` |
-| Compiled native code | ring | `buildScriptFixups` with compilation |
-| Environment variables | Various | Generally auto-handled via `CARGO_*` |
+Buck2 never runs a crate's `build.rs`. What a build script would produce comes from a **fixup** instead: a record for the crate in a **fixup set**, a module of class `turnkeyFixups` ([ADR 0003](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0003-fixup-sets-are-modules.md)). A repository brings fixup sets through `turnkey.toolchains.buck2.fixups`; the user manual's [Dependency Fixups](../../../user-manual/src/workflows/fixups.md) page covers bringing and publishing them. This section covers writing one and how turnkey applies it.
+
+| Build Script Output | Example Crate | Fixup field |
+|---------------------|---------------|-------------|
+| `cargo:rustc-cfg=...` | serde_json, rustix | `rustcFlags` (per OS or CPU: `os.<name>`, `cpu.<name>`) |
+| Generated `.rs` files | serde, thiserror | `buildScript.generate` |
+| Compiled native code | ring, tree-sitter | `buildScript.generate` plus `nativeLibraries` |
+| Nothing the build needs | proc-macro2, libc | `buildScript.skip = true` |
+
+Every locked crate that has a build script needs a fixup whose `buildScript` either generates its output or says `skip = true`, even when its `rustcFlags` stand in for everything it does. Otherwise the cell fails to build, naming the crate. When one of turnkey's published families accounts for it, the error names the module to import.
 
 ### Diagnosing Problems
+
+#### Symptom: A crate has a build.rs, and no fixup says what stands in for it
+
+The cell build fails with:
+
+```
+error: turnkey: zerocopy 0.8.37 has a build.rs, and no fixup says what stands in for it; give it one in turnkey.toolchains.buck2.fixups: ...
+```
+
+**Diagnosis:** read the crate's `build.rs`. If it only probes the rustc version or the target, or emits cfgs for features you don't use, the build needs nothing from it: `rust.zerocopy.buildScript.skip = true`. Otherwise, give it the fixup the symptoms below describe.
 
 #### Symptom: Undefined cfg Flag
 
@@ -133,8 +147,9 @@ error[E0425]: cannot find value `fast_arithmetic` in this scope
 
 **Solution:**
 ```nix
-rustcFlagsRegistry = {
-  serde_json = ["--cfg" ''fast_arithmetic=\"64\"''];
+rust.serde_json = {
+  buildScript.skip = true; # the flag is all it produces
+  rustcFlags = [ "--cfg" ''fast_arithmetic="64"'' ];
 };
 ```
 
@@ -149,18 +164,17 @@ error[E0432]: unresolved import `crate::private`
 
 **Solution:**
 ```nix
-buildScriptFixups = {
-  serde = { patchVersion, vendorPath, ... }: ''
-    mkdir -p "$out/${vendorPath}/out_dir"
-    cat > "$out/${vendorPath}/out_dir/private.rs" << 'EOF'
-#[doc(hidden)]
-pub mod __private${patchVersion} {
-    pub use crate::private::*;
-}
-EOF
-  '';
-};
+rust.serde.buildScript.generate = ctx: ''
+  cat > "$OUT_DIR/private.rs" << 'EOF'
+  #[doc(hidden)]
+  pub mod __private${ctx.versionParts.patch} {
+      pub use crate::private::*;
+  }
+  EOF
+'';
 ```
+
+A crate whose fixup generates output gets `OUT_DIR = "out_dir"` in its rules.
 
 #### Symptom: Linker Error for Native Symbols
 
@@ -172,125 +186,97 @@ error: linking with `cc` failed: exit status: 1
 
 **Diagnosis:** The crate has C/assembly code that `build.rs` compiles.
 
-**Solution:** Complex fixup that compiles the native code (see ring example in defaults).
+**Solution:** a build script that compiles it into `$OUT_DIR`, and the library it produces in `nativeLibraries`. See `nix/fixups/rust/ring.nix` and `nix/fixups/rust/tree-sitter.nix`.
 
-### The Registry System
+### The Fixup Record
 
-Configuration lives in your `flake.nix` under `turnkey.toolchains.buck2`:
-
-```nix
-{
-  turnkey.toolchains = {
-    buck2 = {
-      enable = true;
-      rustDepsFile = ./rust-deps.toml;
-
-      # Rustc flags for build scripts that emit cfg directives
-      rustcFlagsRegistry = {
-        my_crate = ["--cfg" "my_flag"];
-        "my_crate@1.2.3" = ["--cfg" "version_specific_flag"];
-      };
-
-      # Build script fixups for generated files
-      buildScriptFixups = {
-        my_crate = { patchVersion, vendorPath, ... }: ''
-          mkdir -p "$out/${vendorPath}/out_dir"
-          echo "// generated" > "$out/${vendorPath}/out_dir/generated.rs"
-        '';
-      };
-
-      # Feature overrides (in separate file)
-      rustFeaturesFile = ./rust-features.toml;
-    };
-  };
-}
-```
-
-### Version-Aware Lookup
-
-Both registries support version-specific keys:
+A Rust fixup, as `nix/lib/fixups/schema.nix` declares it:
 
 ```nix
-rustcFlagsRegistry = {
-  # Catch-all for any version
-  rustix = ["--cfg" "libc" "--cfg" "linux_like" "--cfg" "linux_kernel"];
+rust.my_crate = {
+  # What stands in for build.rs: exactly one of generate or skip
+  buildScript.generate = ctx: "...";   # or a string; or: buildScript.skip = true;
 
-  # Specific version override (takes precedence)
-  "rustix@0.38.0" = ["--cfg" "libc" "--cfg" "linux_like"];
+  rustcFlags = [ "--cfg" "my_flag" ];  # every platform
+  env.MY_VAR = "value";                # the crate's compile environment
+  patches = [ ./fix.patch ];           # -p1, relative to the crate's root
+  nativeLibraries = [
+    {
+      name = ctx: "my_lib_${ctx.versionParts.patch}"; # a string, or a function of the context
+      staticLib = "out_dir/libmy_lib.a";              # relative to the crate
+      linkSearchPath = "out_dir";                     # the default
+    }
+  ];
+
+  # Declarative per-OS and per-CPU additions, as select()s in the rules.
+  # No build script here: a crate has one, branching on ctx.platform.
+  os.linux.rustcFlags = [ "--cfg" "linux_like" ];
+  cpu.arm64.env.MY_ARCH = "arm64";
+
+  # Fields for the locked versions whose bounds hold; every match applies
+  versions = [
+    {
+      when = { atLeast = "0.17"; below = "0.18"; };
+      rustcFlags = [ "--cfg" "v017" ];
+    }
+  ];
+
+  enable = true; # false drops a fixup an imported set brings
 };
 ```
 
-**Resolution order:**
-1. `"crate@version"` - Exact versioned key
-2. `"crate"` - Catch-all for any version
-3. Default registry (if exists)
-4. Empty (no flags/fixup)
+Every language's fixups have `enable`, `patches`, `env` and `versions`, keyed by the dependency's name in its own ecosystem (`go."github.com/foo/bar"`, `python.requests`, …). Patches apply in every language; `env` is Rust-only for now, and an error elsewhere.
 
-### Fixup Function Context
+Merging is the module system's: lists concatenate in import order, and two sets giving one crate different build scripts, or one env variable different values, fail evaluation naming both files. Resolve it with `lib.mkForce`, `disabledModules`, or `enable = false`.
 
-Fixup functions receive context about the crate:
+### The Fixup Context
+
+`buildScript.generate` and native library fields that are functions receive:
 
 ```nix
-buildScriptFixups = {
-  my_crate = { crateName, version, patchVersion, key, vendorPath }: ''
-    # crateName: "my_crate"
-    # version: "1.2.3"
-    # patchVersion: "3" (last component)
-    # key: "my_crate@1.2.3"
-    # vendorPath: "vendor/my_crate@1.2.3"
-
-    echo "Building fixup for ${crateName} version ${version}"
-    mkdir -p "$out/${vendorPath}/out_dir"
-  '';
+ctx = {
+  name = "my_crate";
+  version = "1.2.3-rc.1";
+  versionParts = { major = "1"; minor = "2"; patch = "3"; pre = "rc.1"; };
+  platform = { system = "aarch64-darwin"; os = "macos"; cpu = "arm64"; };
+  pkgs = <nixpkgs>;
+  lib = <nixpkgs lib>;
 };
 ```
+
+`platform` is the platform the cell is built on, which is the only one a native library the build script compiles exists for. turnkey links `nativeLibraries` on that platform only: building the crate for another platform fails in Buck2 ("no condition matched") rather than linking a missing library.
+
+The build script runs in the crate's derivation, after its patches, with `$CRATE_SRC` its root and `$OUT_DIR` (created) its build script output directory.
 
 ### Nix Interpolation vs Shell Escaping
 
 In Nix multiline strings (`'' ... ''`):
 
 ```nix
-buildScriptFixups = {
-  my_crate = { patchVersion, vendorPath, ... }: ''
-    # CORRECT: ${patchVersion} is Nix interpolation
-    MY_VAR="${patchVersion}"
+rust.my_crate.buildScript.generate = ctx: ''
+  # CORRECT: ${ctx.versionParts.patch} is Nix interpolation
+  MY_VAR="${ctx.versionParts.patch}"
 
-    # WRONG: ''${patchVersion} escapes the $ for shell
-    # This becomes literal ${patchVersion}, which is undefined
-    MY_VAR="''${patchVersion}"  # Results in empty string!
+  # WRONG: ''${ctx.versionParts.patch} escapes the $ for the shell,
+  # where it is undefined
+  MY_VAR="''${ctx.versionParts.patch}"
 
-    # CORRECT: $out is a shell variable (set by Nix's runCommand)
-    echo "Output: $out"
-  '';
-};
+  # CORRECT: $OUT_DIR is a shell variable
+  echo "Output: $OUT_DIR"
+'';
 ```
 
-**Rule:** Use `${var}` for Nix variables, `$var` for shell variables.
+**Rule:** Use `${var}` for Nix values, `$var` for shell variables.
 
-### Default Registries
+### turnkey's Own Fixups
 
-Turnkey includes defaults for known problematic crates:
-
-**Default `rustcFlagsRegistry`:**
-```nix
-{
-  serde_json = ["--cfg" ''fast_arithmetic=\"64\"''];
-  rustix = ["--cfg" "libc" "--cfg" "linux_like" "--cfg" "linux_kernel"];
-}
-```
-
-**Default `buildScriptFixups`:**
-- `serde_core` - Generates `out_dir/private.rs`
-- `serde` - Generates `out_dir/private.rs`
-- `ring` - Compiles native crypto library (~440 lines of build commands)
-
-User-provided values **override** defaults (same key) or **extend** them (new keys).
+turnkey's repository brings its own set, `nix/fixups`, one module per family: `build-script-skips`, `fuser`, `nix`, `ring`, `rustix`, `serde`, `thiserror` and `tree-sitter`. The flake publishes them as `modules.turnkeyFixups.<family>`, plus `default` importing them all. turnkey imports `default` itself; no other repository gets them unless it imports them.
 
 ### Best Practices
 
 1. **Check build.rs first** - Read the crate's build.rs to understand what it does
-2. **Start simple** - Try rustcFlagsRegistry before complex fixups
-3. **Version your fixups** - Use versioned keys if build.rs changes between versions
+2. **Start simple** - `skip`, then `rustcFlags`, before a generating build script
+3. **Bound what is version-specific** - Put it in a `versions` entry, so a new version is unaccounted for rather than silently wrong
 4. **Document complex fixups** - Explain what the original build.rs does
 
 ### Debugging Tips
@@ -303,7 +289,7 @@ cat .turnkey/rustdeps/vendor/serde_json@1.0.140/rules.star
 
 Look for:
 - `rustc_flags` - Should include cfg flags
-- `env` - Should include `OUT_DIR` if fixup crate
+- `env` - Should include `OUT_DIR` if the fixup generates build script output
 - `deps` - Dependencies resolved correctly
 
 #### Check Fixup Output
