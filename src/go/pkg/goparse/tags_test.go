@@ -1,6 +1,8 @@
 package goparse
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -80,5 +82,41 @@ func TestConfigContextWithoutPlatform(t *testing.T) {
 		if env := ctx.Environ(); env != nil {
 			t.Errorf("Environ(%s) = %v, want none", config, env)
 		}
+	}
+}
+
+// A tree's constraint tags are its Go files' (test files and subpackages
+// included, go:build or +build), but not those of the directories go
+// list's ./... skips.
+func TestTreeConstraintTags(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"a.go":             "//go:build linux && !integration\n\npackage a\n",
+		"a_test.go":        "//go:build e2e\n\npackage a\n",
+		"old.go":           "// +build legacy\n\npackage a\n",
+		"plain.go":         "package a\n\n// +build ignored_after_package\n",
+		"sub/b.go":         "//go:build (cgo || netgo) && !arm64\n\npackage b\n",
+		"testdata/c.go":    "//go:build skipped_testdata\n\npackage c\n",
+		"vendor/v/v.go":    "//go:build skipped_vendor\n\npackage v\n",
+		".hidden/h.go":     "//go:build skipped_hidden\n\npackage h\n",
+		"_underscore/u.go": "//go:build skipped_underscore\n\npackage u\n",
+		"notgo.txt":        "//go:build skipped_notgo\n",
+	}
+	for name, content := range files {
+		path := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := TreeConstraintTags(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"arm64", "cgo", "e2e", "integration", "legacy", "linux", "netgo"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("TreeConstraintTags = %v, want %v", got, want)
 	}
 }

@@ -74,3 +74,45 @@ func ScanPackage(dir, importPath string) (*GoPackage, error) {
 
 	return pkg, nil
 }
+
+// TreeConstraintTags returns the tags the build constraints of the Go
+// files under dir name (GoFile.ConstraintTags), sorted: those that can
+// change which files a build of a package there includes. It covers the
+// files go list's ./... does, test files included: testdata, vendor and
+// hidden or _-prefixed directories are skipped. A file that doesn't parse
+// names none.
+func TreeConstraintTags(dir string) ([]string, error) {
+	seen := make(map[string]bool)
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		name := d.Name()
+		if d.IsDir() {
+			if path != dir && (name == "testdata" || name == "vendor" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(name, ".go") {
+			return nil
+		}
+		f, err := ParseFile(path)
+		if err != nil {
+			return nil
+		}
+		for _, tag := range f.ConstraintTags() {
+			seen[tag] = true
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	tags := make([]string, 0, len(seen))
+	for tag := range seen {
+		tags = append(tags, tag)
+	}
+	sort.Strings(tags)
+	return tags, nil
+}

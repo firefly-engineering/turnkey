@@ -63,7 +63,7 @@ func newGoLanguage(mcfg Config, lang syncconfig.Language) Language {
 // constraints use.
 func (l *goLanguage) Dimensions(pkgDir string) (Dimensions, error) {
 	dims := Dimensions{Platform: platform.Platform}
-	tags, err := constraintTags(pkgDir)
+	tags, err := goparse.TreeConstraintTags(pkgDir)
 	if err != nil {
 		return Dimensions{}, err
 	}
