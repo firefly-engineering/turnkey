@@ -1098,10 +1098,10 @@ dependencies = [
  "anyhow",
  "base64",
  "clap",
+ "deps-gen-kit",
  "serde",
  "serde-saphyr",
  "sha2",
- "toml",
 ]
 
 [[package]]

@@ -16,7 +16,11 @@ pkgs.rustPlatform.buildRustPackage {
 
   src = cargoLib.prunedCargoSource {
     inherit root;
-    members = [ "src/cmd/jsdeps-gen" ];
+    members = [
+      "src/cmd/jsdeps-gen"
+      "src/rust/deps-gen-kit"
+      "src/rust/prefetch-cache"
+    ];
   };
 
   cargoLock = {
@@ -24,8 +28,14 @@ pkgs.rustPlatform.buildRustPackage {
   };
 
   # Only build jsdeps-gen, not other workspace members
-  cargoBuildFlags = [ "-p" "jsdeps-gen" ];
-  cargoTestFlags = [ "-p" "jsdeps-gen" ];
+  cargoBuildFlags = [
+    "-p"
+    "jsdeps-gen"
+  ];
+  cargoTestFlags = [
+    "-p"
+    "jsdeps-gen"
+  ];
 
   meta = {
     description = "Generate js-deps.toml from pnpm-lock.yaml for Buck2 integration";

@@ -27,10 +27,10 @@ const VERSION: &str = {
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use deps_gen_kit::OutputArgs;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::Write;
 use std::path::PathBuf;
 
 /// Generate js-deps.toml from pnpm-lock.yaml for Buck2/Nix integration
@@ -42,9 +42,8 @@ struct Args {
     #[arg(long, default_value = "pnpm-lock.yaml")]
     lock: PathBuf,
 
-    /// Output file path (default: stdout)
-    #[arg(short = 'o', long)]
-    output: Option<PathBuf>,
+    #[command(flatten)]
+    output: OutputArgs,
 
     /// Include dev dependencies
     #[arg(long, default_value = "false")]
@@ -292,20 +291,7 @@ fn main() -> Result<()> {
         packages: output_packages,
     };
 
-    // Serialize to TOML
-    let toml_str = toml::to_string_pretty(&output).context("Failed to serialize to TOML")?;
-
-    // Write output
-    if let Some(output_path) = args.output {
-        let mut file = fs::File::create(&output_path)
-            .with_context(|| format!("Failed to create {}", output_path.display()))?;
-        file.write_all(toml_str.as_bytes())?;
-        eprintln!("Wrote {}", output_path.display());
-    } else {
-        print!("{}", toml_str);
-    }
-
-    Ok(())
+    args.output.write("jsdeps-gen", "pnpm-lock.yaml", &output)
 }
 
 #[cfg(test)]
