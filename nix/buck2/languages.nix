@@ -29,11 +29,26 @@
 let
   depsCell = import ../lib/deps-cell { inherit pkgs lib; };
 
-  # A language's deps file by name, as sync.toml uses it: depsFile is a
-  # path from the flake-parts module, or a file name.
+  # A language's deps file as sync.toml names it: relative to the project
+  # root, where tk sync runs. depsFile is a relative file name, or a path in
+  # the flake (e.g. ./.turnkey/go-deps.toml), which evaluates to a file
+  # under the flake's source in the store: what follows the source's
+  # directory is its path in the project. A path outside the store has no
+  # such prefix, so only its name is kept.
   depsFileName =
     langCfg: default:
-    if langCfg.depsFile != null then baseNameOf (toString langCfg.depsFile) else default;
+    let
+      file = langCfg.depsFile;
+      inStore = lib.removePrefix "${builtins.storeDir}/" (toString file);
+    in
+    if file == null then
+      default
+    else if !builtins.isPath file then
+      file
+    else if inStore == toString file then
+      baseNameOf file
+    else
+      lib.concatStringsSep "/" (builtins.tail (lib.splitString "/" inStore));
 
   # Whether a language has a cell to keep in sync: a built one or a deps
   # file to build it from.

@@ -625,9 +625,18 @@
                   lockFile = "pylock.toml";
                   uvLockFile = "uv.lock";
                 };
+              # A deps file given as a path in the flake keeps its directory
+              # in the project
+              goRecord = lib.findFirst (language: language.name == "go") null languages;
+              nestedGoRule = builtins.head (
+                goRecord.syncRules ((buck2Options { }).go // { depsFile = ./.turnkey/go-deps.toml; })
+              );
             in
             assert lib.assertMsg (allProblems == [ ])
               "language records: ${lib.concatStringsSep "; " allProblems}";
+            assert lib.assertMsg (
+              nestedGoRule.target == ".turnkey/go-deps.toml"
+            ) "language records: depsFile ./.turnkey/go-deps.toml is synced to ${nestedGoRule.target}";
             pkgs.runCommand "language-records-check" { } "touch $out";
 
           # The soldeps cell's remappings.txt keeps the subdirectory of each
