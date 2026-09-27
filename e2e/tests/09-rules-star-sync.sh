@@ -52,12 +52,12 @@ external_cell = "godeps"
 name = "go"
 sources = ["go.mod", "go.sum"]
 target = "go-deps.toml"
-generator = ["godeps-gen", "--go-mod", "go.mod", "--go-sum", "go.sum", "--prefetch"]
+generator = ["godeps-gen", "--go-mod", "go.mod", "--go-sum", "go.sum"]
 EOF
 
 run_in_devshell_script << 'INIT'
   echo "Generating initial go-deps.toml..."
-  godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+  godeps-gen --go-mod go.mod --go-sum go.sum -o go-deps.toml
 INIT
 
 # Step 6: Commit initial state

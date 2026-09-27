@@ -76,11 +76,6 @@ pub struct PrefetchArgs {
     /// Always fetch from the network, bypassing turnkey's prefetch cache
     #[arg(long, conflicts_with = "no_prefetch")]
     pub no_cache: bool,
-
-    /// Prefetching is the default; accepted for scripts written when it
-    /// wasn't
-    #[arg(long, hide = true, conflicts_with = "no_prefetch")]
-    prefetch: bool,
 }
 
 impl PrefetchArgs {
@@ -180,10 +175,8 @@ mod tests {
         assert!(args.prefetch.prefetcher().is_none());
         assert_eq!(args.output.output, Some(PathBuf::from("x.toml")));
 
-        // The old opt-in flag is accepted, and means the default
-        let args = Args::try_parse_from(["gen", "--prefetch", "--output", "x.toml"]).unwrap();
-        assert!(!args.prefetch.no_prefetch);
-        assert!(Args::try_parse_from(["gen", "--prefetch", "--no-prefetch"]).is_err());
+        // The old opt-in flag is gone
+        assert!(Args::try_parse_from(["gen", "--prefetch"]).is_err());
         assert!(Args::try_parse_from(["gen", "--no-cache", "--no-prefetch"]).is_err());
     }
 

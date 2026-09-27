@@ -30,12 +30,11 @@ func main() {
 	flag.StringVar(&outputPath, "output", "", "output file path (default: stdout)")
 	noPrefetch := flag.Bool("no-prefetch", false, "skip fetching the Nix hashes of the modules' proxy.golang.org zips (the deps file gets go.sum hashes Nix can't fetch with)")
 	noCache := flag.Bool("no-cache", false, "always fetch from the network, bypassing turnkey's prefetch cache")
-	oldPrefetch := flag.Bool("prefetch", false, "prefetching is the default; accepted for scripts written when it wasn't")
 	includeIndirect := flag.Bool("indirect", true, "include indirect (transitive) dependencies")
 	flag.Parse()
 
-	if *noPrefetch && (*noCache || *oldPrefetch) {
-		fmt.Fprintln(os.Stderr, "error: --no-prefetch cannot be used with --no-cache or --prefetch")
+	if *noPrefetch && *noCache {
+		fmt.Fprintln(os.Stderr, "error: --no-prefetch cannot be used with --no-cache")
 		os.Exit(2)
 	}
 
