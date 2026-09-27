@@ -277,3 +277,104 @@ inotify = "0.11"
 		t.Errorf("rules.star:\n%s\nwant:\n%s", out, want)
 	}
 }
+
+// A Rust variant target with a select()'d cargo_features gets the features
+// and deps its request expands to, per OS; the primary target gets the
+// defaults' features.
+func TestSyncFileRustVariantTarget(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"Cargo.toml": "[workspace]\nmembers = [\"crates/*\"]\n",
+		"rust-deps.toml": `[deps."libc@0.2.0"]
+name = "libc"
+[deps."fuser@0.15.0"]
+name = "fuser"
+[deps."notify@8.0.0"]
+name = "notify"
+[deps."log@0.4.0"]
+name = "log"
+`,
+		"crates/comp/Cargo.toml": `[package]
+name = "comp"
+
+[features]
+default = ["std"]
+std = []
+fuse = ["dep:fuser", "dep:libc"]
+fuse-t = ["dep:libc"]
+watcher = ["dep:notify"]
+
+[dependencies]
+log = "0.4"
+fuser = { version = "0.15", optional = true }
+libc = { version = "0.2", optional = true }
+notify = { version = "8", optional = true }
+`,
+		"crates/comp/rules.star": `rust_library(
+    name = "comp",
+    deps = ["rustdeps//vendor/log:log"],
+)
+
+rust_library(
+    name = "comp-full",
+    cargo_features = ["watcher"] + select({
+        "config//os:linux": ["fuse"],
+        "config//os:macos": ["fuse-t"],
+    }),
+    deps = [],
+)
+`,
+	})
+	s, err := NewSyncer(Config{
+		ProjectRoot: root,
+		Force:       true,
+		Conditions:  &syncconfig.ConditionsConfig{Platforms: defaultPlatforms},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rulesPath := filepath.Join(root, "crates/comp/rules.star")
+	result, err := s.SyncFile(rulesPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Errors) != 0 {
+		t.Fatalf("sync errors: %v", result.Errors)
+	}
+	out, err := os.ReadFile(rulesPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `rust_library(
+    name = "comp",
+    deps = ["rustdeps//vendor/log:log"],
+    features = ["std"],
+)
+
+rust_library(
+    name = "comp-full",
+    cargo_features = ["watcher"] + select({
+        "config//os:linux": ["fuse"],
+        "config//os:macos": ["fuse-t"],
+    }),
+    deps = [
+        "rustdeps//vendor/libc:libc",
+        "rustdeps//vendor/log:log",
+        "rustdeps//vendor/notify:notify",
+    ] + select({
+        "config//os:linux": ["rustdeps//vendor/fuser:fuser"],
+        "config//os:macos": [],
+    }),
+    features = [
+        "std",
+        "watcher",
+    ] + select({
+        "config//os:linux": ["fuse"],
+        "config//os:macos": ["fuse-t"],
+    }),
+)
+`
+	if string(out) != want {
+		t.Errorf("rules.star:\n%s\nwant:\n%s", out, want)
+	}
+}

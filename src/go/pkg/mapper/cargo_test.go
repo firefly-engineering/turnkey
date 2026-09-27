@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
 )
 
 // writeTree writes files (relative path -> content) under root.
@@ -124,8 +127,9 @@ func TestMapRustCrate(t *testing.T) {
 		t.Errorf("UnmappedImports = %v, want %v", got, want)
 	}
 
+	// An optional dependency no feature activates isn't a dep; without a
+	// platform, a target-specific table isn't evaluated
 	wantUnsynced := []UnsyncedDep{
-		{Dep: MappedDep{Target: "rustdeps//vendor/libc:libc", Type: DependencyExternal, ImportPath: "libc"}, Reason: "optional"},
 		{Dep: MappedDep{Target: "//crates/lib:lib", Type: DependencyInternal, ImportPath: "my-lib"}, Reason: "target-specific (cfg(unix))"},
 	}
 	if !reflect.DeepEqual(mapping.UnsyncedDeps, wantUnsynced) {
@@ -257,15 +261,12 @@ tempfile = "3"
 		t.Errorf("without a platform: deps = %v, unsynced = %+v", mapping.Deps, mapping.UnsyncedDeps)
 	}
 
-	// A crate without target tables doesn't depend on the platform
-	if dims, _ := lang.Dimensions(filepath.Join(cargoWorkspaceFixture(t), "crates/lib")); dims != nil {
-		t.Errorf("dimensions without target tables = %v, want none", dims)
-	}
 }
 
-// A dependency on a member that asks for features is unmapped: the
-// member's primary target may not build them.
-func TestMapRustMemberWithFeatures(t *testing.T) {
+// featuresFixture is a workspace whose member lib has a primary target
+// and a variant, and whose member app depends on lib.
+func featuresFixture(t *testing.T, appDeps string) (string, Language) {
+	t.Helper()
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{
 		"Cargo.toml": `[workspace]
@@ -274,26 +275,154 @@ members = ["crates/*"]
 [workspace.dependencies]
 lib = { path = "crates/lib", features = ["base"] }
 `,
-		"crates/lib/Cargo.toml": "[package]\nname = \"lib\"\n\n[features]\nbase = []\nextra = []\n",
-		"crates/app/Cargo.toml": `[package]
-name = "app"
+		"rust-deps.toml": `[deps."libc@0.2.0"]
+name = "libc"
+[deps."notify@8.0.0"]
+name = "notify"
+[deps."log@0.4.0"]
+name = "log"
+`,
+		"crates/lib/Cargo.toml": `[package]
+name = "lib"
+
+[features]
+default = ["base"]
+base = []
+watch = ["dep:notify", "log/std"]
+fuse = ["dep:libc"]
 
 [dependencies]
-lib = { workspace = true, features = ["extra"] }
+log = "0.4"
+libc = { version = "0.2", optional = true }
+notify = { version = "8", optional = true }
 `,
+		"crates/lib/rules.star": `rust_library(
+    name = "lib",
+)
+
+rust_library(
+    name = "lib-full",
+    cargo_features = ["watch"] + select({
+        "config//os:linux": ["fuse"],
+        "config//os:macos": [],
+    }),
+)
+
+rust_library(
+    name = "lib-bare",
+    default_features = False,
+)
+`,
+		"crates/app/Cargo.toml": "[package]\nname = \"app\"\n\n[dependencies]\n" + appDeps,
 	})
 	m, err := New(Config{ProjectRoot: root})
 	if err != nil {
 		t.Fatal(err)
 	}
-	mapping, err := m.Language("rust").ResolveDeps(filepath.Join(root, "crates/app"), Request{})
+	return root, m.Language("rust")
+}
+
+var twoPlatforms = conditions.NewSpace([]conditions.Platform{{OS: "linux", CPU: "x86_64"}, {OS: "macos", CPU: "arm64"}}, "")
+
+func linux() conditions.Configuration {
+	return conditions.Configuration{"os": "linux", "cpu": "x86_64"}
+}
+func macos() conditions.Configuration { return conditions.Configuration{"os": "macos", "cpu": "arm64"} }
+
+// A primary target (no variant attributes) builds the crate's default
+// features, expanded, and the optional dependencies they activate.
+func TestRustPrimaryTargetBuildsDefaults(t *testing.T) {
+	root, lang := featuresFixture(t, "")
+	mapping, err := lang.ResolveDeps(filepath.Join(root, "crates/lib"), Request{Config: linux(), Space: twoPlatforms})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(mapping.Deps) != 0 {
-		t.Errorf("deps = %v, want none", targets(mapping.Deps))
+	if got, want := mapping.Attrs["features"], []string{"base"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("features = %v, want %v", got, want)
 	}
-	if want := []string{"lib (asks for features base, extra)"}; !reflect.DeepEqual(mapping.UnmappedImports, want) {
-		t.Errorf("unmapped = %v, want %v", mapping.UnmappedImports, want)
+	if got, want := targets(mapping.Deps), []string{"rustdeps//vendor/log:log"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("deps = %v, want %v", got, want)
+	}
+}
+
+// default_features = False leaves the defaults out of the request.
+func TestRustDefaultFeaturesFalse(t *testing.T) {
+	root, lang := featuresFixture(t, "")
+	mapping, err := lang.ResolveDeps(filepath.Join(root, "crates/lib"), Request{
+		Config:  linux(),
+		Variant: map[string]starlark.AttributeValue{"default_features": starlark.BoolValue{Value: false}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := mapping.Attrs["features"]; len(got) != 0 {
+		t.Errorf("features = %v, want none", got)
+	}
+}
+
+// cargo_features are expanded with the defaults: dep: activates optional
+// dependencies, and x/feat forwards.
+func TestRustCargoFeaturesExpand(t *testing.T) {
+	root, lang := featuresFixture(t, "")
+	mapping, err := lang.ResolveDeps(filepath.Join(root, "crates/lib"), Request{
+		Config:  linux(),
+		Variant: map[string]starlark.AttributeValue{"cargo_features": starlark.StringListValue{Values: []string{"watch", "fuse"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := mapping.Attrs["features"], []string{"base", "fuse", "watch"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("features = %v, want %v", got, want)
+	}
+	want := []string{"rustdeps//vendor/libc:libc", "rustdeps//vendor/log:log", "rustdeps//vendor/notify:notify"}
+	if got := targets(mapping.Deps); !reflect.DeepEqual(got, want) {
+		t.Errorf("deps = %v, want %v", got, want)
+	}
+}
+
+// A dependency asking for a member's features maps to the member target
+// whose request enables exactly those features, per configuration: its
+// cargo_features may be a select().
+func TestRustDependencyMapsToVariantTarget(t *testing.T) {
+	root, lang := featuresFixture(t, `lib = { workspace = true, features = ["watch"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+lib = { workspace = true, features = ["watch", "fuse"] }
+`)
+	for _, config := range []conditions.Configuration{linux(), macos()} {
+		mapping, err := lang.ResolveDeps(filepath.Join(root, "crates/app"), Request{Config: config, Space: twoPlatforms})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := targets(mapping.Deps), []string{"//crates/lib:lib-full"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: deps = %v, want %v (unmapped %v)", config, got, want, mapping.UnmappedImports)
+		}
+	}
+}
+
+// With no target building exactly the features asked for, or several, the
+// dependency is unmapped, and the report names the features.
+func TestRustDependencyWithoutMatchingTarget(t *testing.T) {
+	root, lang := featuresFixture(t, `lib = { workspace = true, features = ["fuse"] }`)
+	mapping, err := lang.ResolveDeps(filepath.Join(root, "crates/app"), Request{Config: linux(), Space: twoPlatforms})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"lib (needs features base, fuse: no rust_library of //crates/lib builds exactly them)"}
+	if len(mapping.Deps) != 0 || !reflect.DeepEqual(mapping.UnmappedImports, want) {
+		t.Errorf("deps = %v, unmapped = %v, want %v", targets(mapping.Deps), mapping.UnmappedImports, want)
+	}
+
+	// lib and lib-bare both build base only with default-features = false
+	// and features = ["base"]
+	root, lang = featuresFixture(t, `lib = { path = "../lib", default-features = false, features = ["base"] }`)
+	writeTree(t, root, map[string]string{"crates/lib/rules.star": "rust_library(name = \"lib\")\n\nrust_library(\n    name = \"lib-base\",\n    cargo_features = [\"base\"],\n    default_features = False,\n)\n"})
+	mapping, err = lang.ResolveDeps(filepath.Join(root, "crates/app"), Request{Config: linux(), Space: twoPlatforms})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = []string{"lib (needs features base: several rust_library targets of //crates/lib build them: lib, lib-base)"}
+	if len(mapping.Deps) != 0 || !reflect.DeepEqual(mapping.UnmappedImports, want) {
+		t.Errorf("deps = %v, unmapped = %v, want %v", targets(mapping.Deps), mapping.UnmappedImports, want)
 	}
 }

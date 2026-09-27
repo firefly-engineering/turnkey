@@ -6,6 +6,7 @@ go_library(
     srcs = glob(["*.go"], exclude = ["*_test.go"]),
     deps = [
         "//src/go/pkg/cargocfg:cargocfg",
+        "//src/go/pkg/cargofeatures:cargofeatures",
         "//src/go/pkg/conditions:conditions",
         "//src/go/pkg/extraction:extraction",
         "//src/go/pkg/starlark:starlark",
@@ -20,8 +21,10 @@ go_test(
     srcs = glob(["*_test.go"]),
     target_under_test = ":mapper",
     deps = [
+        "//src/go/pkg/conditions:conditions",
         "//src/go/pkg/extraction:extraction",
         "//src/go/pkg/godeps:godeps",
+        "//src/go/pkg/starlark:starlark",
     ],
     visibility = ["PUBLIC"],
 )

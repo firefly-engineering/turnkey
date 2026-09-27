@@ -198,11 +198,11 @@ problem, put a `# turnkey:no-sync` comment on its own line right before the
 rule:
 
 ```python
-# Built with platform-specific Cargo features, which sync doesn't resolve
+# Links a hand-built native library sync knows nothing about
 # turnkey:no-sync
 rust_library(
-    name = "my-lib-full",
-    deps = _COMMON_DEPS + (["//linux:only"] if _IS_LINUX else []),
+    name = "my-lib-native",
+    deps = _COMMON_DEPS + ["//third-party/native:lib"],
 )
 ```
 
@@ -282,11 +282,9 @@ expression.
   `target_os`, `target_family` (`unix`), `target_arch`,
   `target_pointer_width`, `target_env`, `target_vendor`, `target_endian`
   and `all`/`any`/`not`, as the rustdeps cell evaluates it for vendored
-  crates. A dependency on a workspace member that asks for features
-  (`features = [...]`, its own or the `[workspace.dependencies]` entry's) is
-  reported as an unmapped import naming them: the member's primary target
-  may not build them. Optional and build dependencies are not synced: sync
-  reports them and leaves any existing dep on them alone.
+  crates. Build dependencies are not synced: sync reports them and leaves
+  any existing dep on them alone. See [Rust Features](#rust-features) for
+  features, optional dependencies and dependencies on a member's variant.
 - **Python**: the imports found in the sources. An import of a package that a
   uv workspace member provides (`turnkey.cfg`, `from turnkey import cfg`)
   maps to that member's target. The packages come from the members listed in
@@ -311,6 +309,50 @@ Sync never removes a dep it can't account for:
   list of labels, or opt it out. (The sync before a build doesn't report
   it.)
 - Deps are only added or removed, never reordered.
+
+## Rust Features
+
+A Rust target builds what Cargo would, and sync keeps it that way: it
+writes the target's `features` (the literal list the prelude passes to
+rustc, one `--cfg feature="..."` each) as well as its `deps`.
+
+- A **primary** target, one that sets neither of the attributes below,
+  builds what `cargo build -p <crate>` builds: the crate's `default`
+  features, expanded. An optional dependency is a dep only when an enabled
+  feature activates it (`dep:x`, an implicit feature, `x/feat`).
+- A **variant** asks for features in Cargo's terms, on two attributes of
+  turnkey's prelude Rust rules that rustc never sees:
+
+  ```python
+  rust_library(
+      name = "composition-full",
+      crate = "composition",
+      cargo_features = ["watcher"] + select({
+          "config//os:linux": ["fuse"],
+          "config//os:macos": ["fuse-t"],
+      }),
+      # default_features = False,  # as Cargo's default-features
+  )
+  ```
+
+  Sync expands the request as Cargo would for a dependency asking for those
+  features (`dep:x`, `x/feat`, weak `x?/feat`, feature-to-feature, and
+  `default` unless `default_features = False`), and writes the `features`
+  and `deps` it gives, per platform when the request is a `select()`.
+- `features` is literal: `default` is written only when listed, and Buck2
+  adds nothing implicit.
+- A **dependency on a workspace member that asks for features** (its own
+  `features = [...]` with the `[workspace.dependencies]` entry's, those its
+  crate's features forward to it, and the member's defaults unless
+  `default-features = false`) maps to the member's `rust_library` whose
+  request enables exactly the same features, per platform. If none or
+  several do, the dependency is reported as an unmapped import naming the
+  features it needs, and nothing is removed.
+
+A crate that doesn't build under Buck2 is a bug to fix in the rustdeps
+cell, not a reason to make a target a variant.
+
+rust-analyzer sees a `select()`'d `features` through the host's branch.
 
 ## Troubleshooting
 

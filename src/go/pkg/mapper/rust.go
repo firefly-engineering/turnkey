@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -42,10 +43,11 @@ var rustRules = map[string]TargetKind{
 
 // rustLanguage resolves a Rust crate's deps from its Cargo.toml.
 type rustLanguage struct {
-	unconditional
-
 	projectRoot string
 	cfg         *RustConfig
+
+	// rules caches the members' parsed rules.star, by member directory
+	rules map[string]*starlark.File
 }
 
 func newRustLanguage(projectRoot string) Language {
@@ -64,21 +66,19 @@ func (l *rustLanguage) DepsAttribute() string { return "deps" }
 
 func (l *rustLanguage) SourcePatterns() []string { return []string{"*.rs", "Cargo.toml"} }
 
-// Dimensions: a crate with [target.'<spec>'.*] tables depends on the
-// platform.
-func (l *rustLanguage) Dimensions(crateDir string) ([]string, error) {
-	manifest, err := readCargoManifest(crateDir)
-	if err != nil {
-		return nil, fmt.Errorf("reading Cargo.toml: %w", err)
-	}
-	if len(manifest.Target) == 0 {
-		return nil, nil
-	}
+// Dimensions: a crate's target-specific tables, and its dependencies'
+// member targets' variants, depend on the platform.
+func (l *rustLanguage) Dimensions(string) ([]string, error) {
 	return []string{conditions.OS, conditions.CPU}, nil
 }
 
+// VariantAttributes: a Rust target can ask for features in Cargo's terms.
+func (l *rustLanguage) VariantAttributes(TargetKind) []string {
+	return cargoVariantAttributes
+}
+
 func (l *rustLanguage) ResolveDeps(crateDir string, req Request) (PackageMapping, error) {
-	mapping, err := l.resolveCrate(crateDir, req.Config)
+	mapping, err := l.resolveCrate(crateDir, req)
 	if err != nil {
 		return mapping, fmt.Errorf("reading Cargo.toml: %w", err)
 	}
