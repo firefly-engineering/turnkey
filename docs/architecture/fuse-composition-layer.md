@@ -319,7 +319,9 @@ Copy deps → Apply user patches → Create symlinks → Run merge commands → 
 ```
 
 Patch files use unified diff format with paths like `a/vendor/...` and `b/vendor/...`,
-enabling `-p1` stripping during application. Patch naming follows the pattern:
+enabling `-p1` stripping during application. A patch that doesn't apply (the
+dependency moved on under it, say) fails the cell's build rather than leaving the
+change out. Patch naming follows the pattern:
 `<cellName>/<path-with-slashes-as-dashes>.patch`
 
 Example: A patch to `vendor/serde@1.0.219/src/lib.rs` would be named:

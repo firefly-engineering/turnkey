@@ -112,10 +112,13 @@ let
         for patchFile in "$patchDir"/*.patch; do
           if [ -f "$patchFile" ]; then
             echo "  Applying: $(basename "$patchFile")"
-            # Use -p1 to strip the a/ or b/ prefix from patch paths
-            patch -d "$out" -p1 < "$patchFile" || {
-              echo "Warning: Failed to apply patch: $patchFile"
-              echo "Continuing anyway..."
+            # Use -p1 to strip the a/ or b/ prefix from patch paths.
+            # A patch that doesn't apply fails the cell: building it
+            # without the change the user asked for would be wrong.
+            patch -d "$out" -p1 --forward < "$patchFile" || {
+              echo "error: user patch $(basename "$patchFile") does not apply to the ${cellName} cell"
+              echo "  (from $patchDir; regenerate it with 'tk compose patch' or remove it)"
+              exit 1
             }
           fi
         done
