@@ -20,12 +20,17 @@ use crate::Error;
 /// Default debounce timeout for file changes
 const DEFAULT_DEBOUNCE_MS: u64 = 500;
 
-/// Known manifest file patterns
+/// Known manifest file patterns: each language's default deps file.
+///
+/// The deps files a project actually uses, possibly renamed or nested, are
+/// the `deps_file`s of `.turnkey/sync.toml`'s `[[languages]]`. Nothing uses
+/// this watcher yet; one that does should read them from there.
 const MANIFEST_PATTERNS: &[&str] = &[
     "go-deps.toml",
     "rust-deps.toml",
     "python-deps.toml",
     "js-deps.toml",
+    "solidity-deps.toml",
 ];
 
 /// Events that can be emitted by the watcher
@@ -305,6 +310,7 @@ mod tests {
         assert!(MANIFEST_PATTERNS.contains(&"rust-deps.toml"));
         assert!(MANIFEST_PATTERNS.contains(&"python-deps.toml"));
         assert!(MANIFEST_PATTERNS.contains(&"js-deps.toml"));
+        assert!(MANIFEST_PATTERNS.contains(&"solidity-deps.toml"));
     }
 
     #[test]
