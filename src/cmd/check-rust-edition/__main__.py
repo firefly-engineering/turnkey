@@ -9,11 +9,7 @@ This script verifies:
 import sys
 import re
 from pathlib import Path
-
-try:
-    import tomllib
-except ImportError:
-    import tomli as tomllib
+import tomllib
 
 
 def parse_toml(path: Path) -> dict:

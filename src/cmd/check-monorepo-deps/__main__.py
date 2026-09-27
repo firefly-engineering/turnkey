@@ -22,11 +22,7 @@ TypeScript/JavaScript:
 import json
 import sys
 from pathlib import Path
-
-try:
-    import tomllib
-except ImportError:
-    import tomli as tomllib
+import tomllib
 
 
 def parse_toml(path: Path) -> dict:
