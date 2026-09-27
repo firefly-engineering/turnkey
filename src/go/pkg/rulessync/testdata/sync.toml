@@ -29,7 +29,7 @@ cpu = "arm64"
 os = "macos"
 
 [[deps]]
-generator = ["godeps-gen", "--go-mod", "go.mod", "--go-sum", "go.sum", "--prefetch"]
+generator = ["godeps-gen", "--go-mod", "go.mod", "--go-sum", "go.sum"]
 name = "go"
 sources = ["go.mod", "go.sum"]
 target = "go-deps.toml"

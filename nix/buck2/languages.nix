@@ -94,7 +94,6 @@ in
           langCfg.modFile
           "--go-sum"
           langCfg.sumFile
-          "--prefetch"
         ];
       };
     wrapper = {

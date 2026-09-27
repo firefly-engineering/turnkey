@@ -3,6 +3,10 @@
 // This tool parses Go module files and outputs dependency declarations
 // in the format expected by turnkey's Go deps cell (nix/buck2/languages.nix).
 //
+// Its --output, --no-prefetch and --no-cache flags are the ones every deps
+// generator takes (src/rust/deps-gen-kit): prefetching is on by default.
+// tk sync runs it from the go sync rule (nix/buck2/languages.nix).
+//
 // Usage:
 //
 //	godeps-gen -o go-deps.toml
@@ -21,11 +25,19 @@ import (
 func main() {
 	goModPath := flag.String("go-mod", "go.mod", "path to go.mod file")
 	goSumPath := flag.String("go-sum", "go.sum", "path to go.sum file")
-	outputPath := flag.String("o", "", "output file path (default: stdout)")
-	prefetch := flag.Bool("prefetch", false, "fetch Nix hashes of the modules' proxy.golang.org zips (requires nix)")
-	noCache := flag.Bool("no-cache", false, "disable prefetch caching (always fetch from network)")
+	var outputPath string
+	flag.StringVar(&outputPath, "o", "", "output file path (default: stdout)")
+	flag.StringVar(&outputPath, "output", "", "output file path (default: stdout)")
+	noPrefetch := flag.Bool("no-prefetch", false, "skip fetching the Nix hashes of the modules' proxy.golang.org zips (the deps file gets go.sum hashes Nix can't fetch with)")
+	noCache := flag.Bool("no-cache", false, "always fetch from the network, bypassing turnkey's prefetch cache")
+	oldPrefetch := flag.Bool("prefetch", false, "prefetching is the default; accepted for scripts written when it wasn't")
 	includeIndirect := flag.Bool("indirect", true, "include indirect (transitive) dependencies")
 	flag.Parse()
+
+	if *noPrefetch && (*noCache || *oldPrefetch) {
+		fmt.Fprintln(os.Stderr, "error: --no-prefetch cannot be used with --no-cache or --prefetch")
+		os.Exit(2)
+	}
 
 	// Read go.mod
 	goModData, err := os.ReadFile(*goModPath)
@@ -69,8 +81,8 @@ func main() {
 	// This sets FetchPath for deps that are replaced by external forks
 	godeps.ApplyExternalReplaces(deps, replaces)
 
-	// Prefetch Nix hashes if requested
-	if *prefetch {
+	// Prefetch Nix hashes unless asked not to
+	if !*noPrefetch {
 		fmt.Fprintf(os.Stderr, "Prefetching %d dependencies...\n", len(deps))
 
 		prefetcher := godeps.DefaultPrefetcher(os.Stderr, *noCache)
@@ -81,8 +93,8 @@ func main() {
 
 	// Determine output destination
 	var output io.Writer = os.Stdout
-	if *outputPath != "" {
-		f, err := os.Create(*outputPath)
+	if outputPath != "" {
+		f, err := os.Create(outputPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error creating output file: %v\n", err)
 			os.Exit(1)
@@ -98,7 +110,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *outputPath != "" {
-		fmt.Fprintf(os.Stderr, "Wrote %s\n", *outputPath)
+	if outputPath != "" {
+		fmt.Fprintf(os.Stderr, "Wrote %s\n", outputPath)
 	}
 }
