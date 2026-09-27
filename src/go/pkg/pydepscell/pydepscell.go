@@ -101,8 +101,7 @@ func Render(w io.Writer, name string, deps *DepsFile, cfg Config) error {
 
 	var failed error
 	value := conditional.LabelsValue(space, func(config conditions.Configuration) []string {
-		env, ok := pep508.PlatformEnv(config[conditions.OS], config[conditions.CPU], cfg.PythonVersion)
-		if !ok && len(cfg.Platforms) > 0 {
+		if _, ok := pep508.EnvFor(config, cfg.PythonVersion, ""); !ok {
 			failed = fmt.Errorf("no marker environment for %s", config)
 			return nil
 		}
@@ -112,11 +111,8 @@ func Render(w io.Writer, name string, deps *DepsFile, cfg Config) error {
 			if _, vendored := deps.Deps[e.Name]; !vendored || e.Name == name || seen[e.Name] {
 				continue
 			}
-			if e.marker != nil {
-				env := withExtra(env, e.extra)
-				if !e.marker.Evaluate(env) {
-					continue
-				}
+			if env, _ := pep508.EnvFor(config, cfg.PythonVersion, e.extra); !e.marker.Evaluate(env) {
+				continue
 			}
 			seen[e.Name] = true
 			labels = append(labels, fmt.Sprintf("//vendor/%s:%s", e.Name, e.Name))
@@ -141,16 +137,6 @@ func Render(w io.Writer, name string, deps *DepsFile, cfg Config) error {
 	fmt.Fprintln(w, `    visibility = ["PUBLIC"],`)
 	fmt.Fprintln(w, ")")
 	return nil
-}
-
-// withExtra returns env with extra set.
-func withExtra(env pep508.Env, extra string) pep508.Env {
-	with := make(pep508.Env, len(env))
-	for k, v := range env {
-		with[k] = v
-	}
-	with["extra"] = extra
-	return with
 }
 
 // RenderCell writes the rules.star of every package in the cell's vendor

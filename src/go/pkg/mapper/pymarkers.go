@@ -200,33 +200,8 @@ func (l *pythonLanguage) pythonVersion() string {
 // variables aren't known (a platform one without a platform, a Python one
 // without python3) is taken to hold: sync can't tell, so it keeps the dep.
 func (l *pythonLanguage) markerHolds(marker *pep508.Marker, config conditions.Configuration, extra string) bool {
-	if marker == nil {
-		return true
-	}
-	version := l.pythonVersion()
-	env, hasPlatform := pep508.PlatformEnv(config[conditions.OS], config[conditions.CPU], version)
-	for _, v := range marker.Variables() {
-		if !hasPlatform && slices.Contains(pep508.PlatformVariables, v) {
-			return true
-		}
-		if version == "" && strings.Contains(v, "version") {
-			return true
-		}
-	}
-	if !hasPlatform {
-		env = pep508.Env{"python_version": majorMinorVersion(version), "python_full_version": version,
-			"implementation_name": "cpython", "platform_python_implementation": "CPython"}
-	}
-	env["extra"] = extra
-	return marker.Evaluate(env)
-}
-
-func majorMinorVersion(v string) string {
-	parts := strings.SplitN(v, ".", 3)
-	if len(parts) < 2 {
-		return v
-	}
-	return parts[0] + "." + parts[1]
+	env, _ := pep508.EnvFor(config, l.pythonVersion(), extra)
+	return !env.Decides(marker) || marker.Evaluate(env)
 }
 
 // targetExtras returns the extras a target's variant builds with,
