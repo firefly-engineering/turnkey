@@ -78,7 +78,6 @@ tonic-prost-build = { version = "0.14", default-features = false, features = ["t
 # Tree-sitter for source code parsing
 tree-sitter = "0.25"
 tree-sitter-language = "0.1"
-tree-sitter-go = "0.25"
 tree-sitter-python = "0.23"
 tree-sitter-rust = "0.23"
 tree-sitter-typescript = "0.23"

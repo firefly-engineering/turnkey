@@ -89,10 +89,6 @@ in
     '';
 
     # Language grammar fixups
-    tree-sitter-go = mkGrammarFixup {
-      name = "tree_sitter_go";
-    };
-
     tree-sitter-rust = mkGrammarFixup {
       name = "tree_sitter_rust";
       hasScanner = true;
@@ -160,7 +156,6 @@ in
     };
 
     # Language grammars
-    tree-sitter-go = mkGrammarNativeLib "tree_sitter_go";
     tree-sitter-rust = mkGrammarNativeLib "tree_sitter_rust";
     tree-sitter-python = mkGrammarNativeLib "tree_sitter_python";
     tree-sitter-solidity = mkGrammarNativeLib "tree_sitter_solidity";
