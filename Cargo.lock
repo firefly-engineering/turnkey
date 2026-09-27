@@ -1843,7 +1843,9 @@ dependencies = [
  "base64",
  "cargo-lock",
  "clap",
+ "deps-gen-kit",
  "glob",
+ "serde",
  "tempfile",
  "toml",
 ]

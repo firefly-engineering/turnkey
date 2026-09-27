@@ -9,7 +9,6 @@
 let
   root = ../..;
   cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
-  nix-prefetch-cached = import ./nix-prefetch-cached.nix { inherit pkgs lib; };
 in
 pkgs.rustPlatform.buildRustPackage {
   pname = "rustdeps-gen";
@@ -17,7 +16,11 @@ pkgs.rustPlatform.buildRustPackage {
 
   src = cargoLib.prunedCargoSource {
     inherit root;
-    members = [ "src/cmd/rustdeps-gen" ];
+    members = [
+      "src/cmd/rustdeps-gen"
+      "src/rust/deps-gen-kit"
+      "src/rust/prefetch-cache"
+    ];
   };
 
   cargoLock = {
@@ -25,15 +28,22 @@ pkgs.rustPlatform.buildRustPackage {
   };
 
   # Only build rustdeps-gen, not examples
-  cargoBuildFlags = [ "-p" "rustdeps-gen" ];
-  cargoTestFlags = [ "-p" "rustdeps-gen" ];
+  cargoBuildFlags = [
+    "-p"
+    "rustdeps-gen"
+  ];
+  cargoTestFlags = [
+    "-p"
+    "rustdeps-gen"
+  ];
 
   nativeBuildInputs = [ pkgs.makeWrapper ];
 
-  # Wrap the binary to include nix and nix-prefetch-cached in PATH for prefetching
+  # Wrap the binary to include nix in PATH: deps-gen-kit prefetches with
+  # nix-prefetch-url and nix hash
   postInstall = ''
     wrapProgram $out/bin/rustdeps-gen \
-      --prefix PATH : ${lib.makeBinPath [ pkgs.nix nix-prefetch-cached ]}
+      --prefix PATH : ${lib.makeBinPath [ pkgs.nix ]}
   '';
 
   meta = {

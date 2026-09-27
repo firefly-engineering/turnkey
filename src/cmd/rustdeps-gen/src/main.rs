@@ -10,9 +10,10 @@
 use anyhow::{Context, Result};
 use cargo_lock::{Lockfile, Package};
 use clap::Parser;
-use std::io::Write;
+use deps_gen_kit::{OutputArgs, PrefetchArgs, Prefetcher};
+use serde::Serialize;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::process::Command;
 
 mod requested;
 
@@ -30,20 +31,32 @@ struct Args {
     #[arg(long)]
     cargo_toml: Option<PathBuf>,
 
-    /// Output file path (default: stdout)
-    #[arg(short = 'o', long)]
-    output: Option<PathBuf>,
+    #[command(flatten)]
+    output: OutputArgs,
 
-    /// Skip prefetching (output will have incorrect hashes for fetchzip)
-    #[arg(long)]
-    no_prefetch: bool,
+    #[command(flatten)]
+    prefetch: PrefetchArgs,
 }
 
-/// Represents a crate with its Nix hash
+/// rust-deps.toml
+#[derive(Serialize)]
+struct RustDeps {
+    /// Schema version for forward compatibility
+    schema_version: u32,
+    /// Keyed "name@version", to hold several versions of a crate
+    deps: BTreeMap<String, Crate>,
+    /// The workspace members' registry dependency specs, from their
+    /// Cargo.toml files: where feature unification starts
+    requested: Vec<requested::Request>,
+}
+
+/// A crate with its Nix hash
+#[derive(Debug, PartialEq, Serialize)]
 struct Crate {
     name: String,
     version: String,
-    nix_hash: Option<String>,
+    /// Empty when prefetching failed
+    hash: String,
 }
 
 fn main() -> Result<()> {
@@ -58,7 +71,7 @@ fn main() -> Result<()> {
         .cargo_toml
         .clone()
         .unwrap_or_else(|| args.cargo_lock.with_file_name("Cargo.toml"));
-    let requests = requested::workspace_requests(&cargo_toml)?;
+    let requested = requested::workspace_requests(&cargo_toml)?;
 
     // Filter to crates.io packages only
     let crates_io_packages: Vec<&Package> = lockfile
@@ -72,79 +85,71 @@ fn main() -> Result<()> {
         crates_io_packages.len()
     );
 
-    // Build crate list with hashes
-    let mut crates: Vec<Crate> = Vec::new();
+    let mut prefetcher = args.prefetch.prefetcher();
+    let crates = collect_crates(
+        &crates_io_packages,
+        prefetcher.as_mut().map(|p| p as &mut dyn Prefetcher),
+    );
 
-    if args.no_prefetch {
+    let doc = RustDeps {
+        schema_version: 1,
+        deps: crates
+            .into_iter()
+            .map(|c| (format!("{}@{}", c.name, c.version), c))
+            .collect(),
+        requested,
+    };
+    args.output.write("rustdeps-gen", "Cargo.lock", &doc)
+}
+
+/// Each crate with its Nix hash: prefetched, or with no prefetcher, the
+/// Cargo.lock checksum
+fn collect_crates(
+    packages: &[&Package],
+    mut prefetcher: Option<&mut dyn Prefetcher>,
+) -> Vec<Crate> {
+    if prefetcher.is_none() {
         eprintln!("WARNING: --no-prefetch produces incorrect hashes for fetchzip");
         eprintln!("The Cargo.lock checksum is for the tarball, not unpacked contents");
+    } else {
+        eprintln!("Prefetching {} crates from crates.io...", packages.len());
+    }
 
-        for pkg in &crates_io_packages {
-            let nix_hash = pkg
+    let mut crates = Vec::new();
+    for (i, pkg) in packages.iter().enumerate() {
+        let name = pkg.name.as_str();
+        let version = pkg.version.to_string();
+
+        let hash = match prefetcher.as_deref_mut() {
+            None => pkg
                 .checksum
                 .as_ref()
-                .and_then(|cs| convert_checksum_to_sri(&cs.to_string()));
-
-            crates.push(Crate {
-                name: pkg.name.as_str().to_string(),
-                version: pkg.version.to_string(),
-                nix_hash,
-            });
-        }
-    } else {
-        eprintln!(
-            "Prefetching {} crates from crates.io...",
-            crates_io_packages.len()
-        );
-
-        for (i, pkg) in crates_io_packages.iter().enumerate() {
-            let name = pkg.name.as_str();
-            let version = pkg.version.to_string();
-
-            eprintln!(
-                "[{}/{}] prefetching {}@{}...",
-                i + 1,
-                crates_io_packages.len(),
-                name,
-                version
-            );
-
-            let nix_hash = match prefetch_crate(name, &version) {
-                Ok(hash) => Some(hash),
-                Err(e) => {
-                    eprintln!("    warning: failed to prefetch: {}", e);
-                    None
+                .and_then(|cs| convert_checksum_to_sri(&cs.to_string())),
+            Some(prefetcher) => {
+                eprintln!(
+                    "[{}/{}] prefetching {}@{}...",
+                    i + 1,
+                    packages.len(),
+                    name,
+                    version
+                );
+                match prefetcher.prefetch(&crate_url(name, &version), true) {
+                    Ok(hash) => Some(hash),
+                    Err(e) => {
+                        eprintln!("    warning: failed to prefetch: {}", e);
+                        None
+                    }
                 }
-            };
+            }
+        };
 
-            crates.push(Crate {
-                name: name.to_string(),
-                version,
-                nix_hash,
-            });
-        }
+        crates.push(Crate {
+            name: name.to_string(),
+            version,
+            hash: hash.unwrap_or_default(),
+        });
     }
-
-    // Sort by name for consistent output
-    crates.sort_by(|a, b| a.name.cmp(&b.name));
-
-    // Write output
-    let output: Box<dyn Write> = match &args.output {
-        Some(path) => {
-            let file = std::fs::File::create(path)
-                .with_context(|| format!("Failed to create {}", path.display()))?;
-            Box::new(file)
-        }
-        None => Box::new(std::io::stdout()),
-    };
-
-    write_toml(output, &crates, &requests)?;
-
-    if let Some(path) = &args.output {
-        eprintln!("Wrote {}", path.display());
-    }
-
-    Ok(())
+    crates
 }
 
 /// Check if a package is from crates.io
@@ -171,86 +176,81 @@ fn convert_checksum_to_sri(hex: &str) -> Option<String> {
     })
 }
 
-/// Prefetch a crate from crates.io and return its Nix hash (SRI format)
-fn prefetch_crate(name: &str, version: &str) -> Result<String> {
-    let url = format!(
+/// The crates.io download URL of a crate, the archive the Rust deps cell
+/// fetches
+fn crate_url(name: &str, version: &str) -> String {
+    format!(
         "https://crates.io/api/v1/crates/{}/{}/download",
         name, version
-    );
-
-    // nix-prefetch-cached keeps turnkey's prefetch cache and returns an SRI
-    // hash; rustdeps-gen's wrapper puts it on PATH
-    let output = Command::new("nix-prefetch-cached")
-        .args(["--unpack", &url])
-        .output()
-        .context("Failed to run nix-prefetch-cached")?;
-
-    if !output.status.success() {
-        anyhow::bail!(
-            "prefetch failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-
-    Ok(String::from_utf8(output.stdout)
-        .context("Invalid UTF-8 from nix-prefetch-cached")?
-        .trim()
-        .to_string())
+    )
 }
 
-/// Write crates as TOML
-fn write_toml(mut w: impl Write, crates: &[Crate], requests: &[requested::Request]) -> Result<()> {
-    writeln!(w, "# Auto-generated by rustdeps-gen")?;
-    writeln!(w, "# Source: Cargo.lock")?;
-    writeln!(w, "#")?;
-    writeln!(w, "# To regenerate: rustdeps-gen -o rust-deps.toml")?;
-    writeln!(w, "#")?;
-    writeln!(
-        w,
-        "# Key format: deps.\"crate-name@version\" to support multiple versions"
-    )?;
-    writeln!(w)?;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use deps_gen_kit::MemoryPrefetcher;
 
-    // Schema version for forward compatibility
-    writeln!(w, "schema_version = 1")?;
-    writeln!(w)?;
+    const LOCK: &str = r#"
+version = 4
 
-    for c in crates {
-        // Use "name@version" as key to handle multiple versions of same crate
-        writeln!(w, "[deps.\"{}@{}\"]", c.name, c.version)?;
-        writeln!(w, "name = \"{}\"", c.name)?;
-        writeln!(w, "version = \"{}\"", c.version)?;
-        match &c.nix_hash {
-            Some(hash) => writeln!(w, "hash = \"{}\"", hash)?,
-            None => writeln!(w, "hash = \"\"")?,
-        }
-        writeln!(w)?;
+[[package]]
+name = "serde"
+version = "1.0.228"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
+
+[[package]]
+name = "local"
+version = "0.1.0"
+"#;
+
+    #[test]
+    fn prefetches_crates_io_packages_unpacked() {
+        let lock: Lockfile = LOCK.parse().unwrap();
+        let packages: Vec<&Package> = lock.packages.iter().filter(|p| is_crates_io(p)).collect();
+        let url = crate_url("serde", "1.0.228");
+        let mut fake = MemoryPrefetcher::default().with(&url, true, "sha256-serde");
+
+        let crates = collect_crates(&packages, Some(&mut fake));
+
+        assert_eq!(
+            crates,
+            vec![Crate {
+                name: "serde".into(),
+                version: "1.0.228".into(),
+                hash: "sha256-serde".into(),
+            }]
+        );
+        assert_eq!(fake.calls, vec![(url, true)]);
     }
 
-    writeln!(
-        w,
-        "# The workspace members' registry dependency specs, from"
-    )?;
-    writeln!(
-        w,
-        "# their Cargo.toml files: where feature unification starts."
-    )?;
-    for r in requests {
-        let quoted = |s: &str| toml::Value::String(s.to_string()).to_string();
-        writeln!(w)?;
-        writeln!(w, "[[requested]]")?;
-        writeln!(w, "name = {}", quoted(&r.name))?;
-        if let Some(version) = &r.version {
-            writeln!(w, "version = {}", quoted(version))?;
-        }
-        if !r.default_features {
-            writeln!(w, "default-features = false")?;
-        }
-        if !r.features.is_empty() {
-            let features: Vec<_> = r.features.iter().map(|f| quoted(f)).collect();
-            writeln!(w, "features = [{}]", features.join(", "))?;
-        }
-    }
+    #[test]
+    fn writes_deps_and_requested() {
+        let doc = RustDeps {
+            schema_version: 1,
+            deps: BTreeMap::from([(
+                "serde@1.0.228".to_string(),
+                Crate {
+                    name: "serde".into(),
+                    version: "1.0.228".into(),
+                    hash: "".into(),
+                },
+            )]),
+            requested: vec![requested::Request {
+                name: "serde".into(),
+                version: Some("1.0".into()),
+                default_features: false,
+                features: ["derive".to_string()].into(),
+            }],
+        };
+        let out = deps_gen_kit::render("rustdeps-gen", "Cargo.lock", &doc).unwrap();
+        let parsed: toml::Value = toml::from_str(&out).unwrap();
 
-    Ok(())
+        assert_eq!(parsed["schema_version"].as_integer(), Some(1));
+        assert_eq!(parsed["deps"]["serde@1.0.228"]["hash"].as_str(), Some(""));
+        let req = &parsed["requested"][0];
+        assert_eq!(req["name"].as_str(), Some("serde"));
+        assert_eq!(req["default-features"].as_bool(), Some(false));
+        assert_eq!(req["features"][0].as_str(), Some("derive"));
+    }
 }

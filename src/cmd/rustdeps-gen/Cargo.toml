@@ -13,7 +13,9 @@ anyhow.workspace = true
 base64.workspace = true
 cargo-lock.workspace = true
 clap.workspace = true
+deps-gen-kit.workspace = true
 glob.workspace = true
+serde.workspace = true
 toml.workspace = true
 
 [dev-dependencies]

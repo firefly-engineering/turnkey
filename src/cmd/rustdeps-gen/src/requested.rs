@@ -7,18 +7,27 @@
 //! records them in rust-deps.toml as `[[requested]]` entries.
 
 use anyhow::{Context, Result};
+use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-/// One dependency spec, as Cargo would resolve it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One dependency spec, as Cargo would resolve it, and as rust-deps.toml
+/// records it in `[[requested]]`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Request {
     /// The package name (after `package = ...` renames)
     pub name: String,
     /// The version requirement, if the spec has one
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    #[serde(rename = "default-features", skip_serializing_if = "is_true")]
     pub default_features: bool,
+    #[serde(skip_serializing_if = "BTreeSet::is_empty")]
     pub features: BTreeSet<String>,
+}
+
+fn is_true(b: &bool) -> bool {
+    *b
 }
 
 /// The dependency tables of a manifest that feed Cargo's resolve: normal,

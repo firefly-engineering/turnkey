@@ -1,8 +1,8 @@
 # Turnkey Rust workspace
 #
 # This is a monorepo workspace that declares all Rust dependencies.
-# Run `cargo update` to refresh Cargo.lock, then:
-#   rustdeps-gen --cargo-lock Cargo.lock > rust-deps.toml
+# Run `cargo update` to refresh Cargo.lock, then `tk sync` to regenerate
+# rust-deps.toml.
 
 [workspace]
 resolver = "2"
