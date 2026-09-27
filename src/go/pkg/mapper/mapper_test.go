@@ -11,16 +11,14 @@ import (
 )
 
 func TestMapGoImports(t *testing.T) {
-	m := &Mapper{
-		config: Config{
-			Go: &GoConfig{
-				ModulePath:   "github.com/firefly-engineering/turnkey",
-				ExternalCell: "godeps",
-				ExternalDeps: map[string]bool{
-					"github.com/google/uuid": true,
-					"golang.org/x/sys":       true,
-					"go.starlark.net":        true,
-				},
+	lang := &goLanguage{
+		cfg: &GoConfig{
+			ModulePath:   "github.com/firefly-engineering/turnkey",
+			ExternalCell: "godeps",
+			ExternalDeps: map[string]bool{
+				"github.com/google/uuid": true,
+				"golang.org/x/sys":       true,
+				"go.starlark.net":        true,
 			},
 		},
 	}
@@ -83,7 +81,7 @@ func TestMapGoImports(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			deps, _ := m.mapGoImports(tt.imports)
+			deps, _ := mapImports(lang, tt.imports)
 			targets := DepsToTargets(deps)
 
 			if len(targets) != len(tt.wantDeps) {
@@ -102,15 +100,13 @@ func TestMapGoImports(t *testing.T) {
 
 func TestMapExtractionResult(t *testing.T) {
 	m := &Mapper{
-		config: Config{
-			Go: &GoConfig{
-				ModulePath:   "github.com/example/project",
-				ExternalCell: "godeps",
-				ExternalDeps: map[string]bool{
-					"github.com/google/uuid": true,
-				},
+		languages: []Language{&goLanguage{cfg: &GoConfig{
+			ModulePath:   "github.com/example/project",
+			ExternalCell: "godeps",
+			ExternalDeps: map[string]bool{
+				"github.com/google/uuid": true,
 			},
-		},
+		}}},
 	}
 
 	result := &extraction.Result{
@@ -194,7 +190,7 @@ func TestGoDepsFromGodepsGen(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mapped, unmapped := m.mapGoImports([]extraction.Import{
+	mapped, unmapped := mapImports(m.Language("go").(importLanguage), []extraction.Import{
 		{Path: "github.com/pelletier/go-toml/v2", Kind: extraction.ImportKindExternal},
 		{Path: "golang.org/x/mod/modfile", Kind: extraction.ImportKindExternal},
 	})
@@ -212,15 +208,13 @@ func TestGoDepsFromGodepsGen(t *testing.T) {
 }
 
 func TestUnmappedExternalDep(t *testing.T) {
-	m := &Mapper{
-		config: Config{
-			Go: &GoConfig{
-				ModulePath:   "github.com/example/project",
-				ExternalCell: "godeps",
-				ExternalDeps: map[string]bool{
-					// Only uuid is known
-					"github.com/google/uuid": true,
-				},
+	lang := &goLanguage{
+		cfg: &GoConfig{
+			ModulePath:   "github.com/example/project",
+			ExternalCell: "godeps",
+			ExternalDeps: map[string]bool{
+				// Only uuid is known
+				"github.com/google/uuid": true,
 			},
 		},
 	}
@@ -229,7 +223,7 @@ func TestUnmappedExternalDep(t *testing.T) {
 		{Path: "github.com/unknown/package", Kind: extraction.ImportKindExternal},
 	}
 
-	deps, unmapped := m.mapGoImports(imports)
+	deps, unmapped := mapImports(lang, imports)
 
 	if len(deps) != 0 {
 		t.Errorf("expected 0 deps for unknown import, got %d", len(deps))

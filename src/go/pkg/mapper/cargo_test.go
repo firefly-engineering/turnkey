@@ -96,7 +96,7 @@ func TestMapRustCrate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mapping, err := m.MapRustCrate(filepath.Join(root, "crates/app"))
+	mapping, err := m.Language("rust").ResolveDeps(filepath.Join(root, "crates/app"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ my-lib = "0.1"
 	if err != nil {
 		t.Fatal(err)
 	}
-	mapping, err := m.MapRustCrate(filepath.Join(root, "crates/other"))
+	mapping, err := m.Language("rust").ResolveDeps(filepath.Join(root, "crates/other"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ nope.workspace = true
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.MapRustCrate(filepath.Join(root, "crates/bad")); err == nil {
+	if _, err := m.Language("rust").ResolveDeps(filepath.Join(root, "crates/bad")); err == nil {
 		t.Error("no error for a workspace = true dep missing from [workspace.dependencies]")
 	}
 }

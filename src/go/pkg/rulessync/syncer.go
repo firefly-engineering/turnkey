@@ -1,21 +1,17 @@
-// Package rulessync orchestrates rules.star synchronization using the new architecture:
-// - Extractors for language-specific import detection
-// - Mapper for converting imports to Buck2 targets
-// - Starlark object model for reading/writing rules.star
+// Package rulessync orchestrates rules.star synchronization:
+// - the mapper's language plug-ins classify rule kinds and resolve deps
+// - the starlark object model reads and writes rules.star
 package rulessync
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/mapper"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
-	"golang.org/x/mod/modfile"
 )
 
 // Config holds syncer configuration.
@@ -180,15 +176,15 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 	}
 
 	// Detect language from rules.star content
-	language := s.detectLanguage(f)
-	if language == "" {
+	lang := s.detectLanguage(f)
+	if lang == nil {
 		// Can't determine language, skip
 		return result, nil
 	}
 
 	// Check staleness before running extractor (unless Force mode)
 	if !s.config.Force {
-		stale, err := s.isStale(rulesPath, pkgDir, language)
+		stale, err := s.isStale(rulesPath, pkgDir, lang.SourcePatterns())
 		if err != nil {
 			// On error, assume stale to be safe
 			if s.config.Verbose {
@@ -200,7 +196,7 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 		}
 	}
 
-	pkgMapping, err := s.resolveDeps(language, pkgDir)
+	pkgMapping, err := lang.ResolveDeps(pkgDir)
 	if err != nil {
 		result.Errors = append(result.Errors, err.Error())
 		return result, nil
@@ -236,23 +232,25 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 	// Apply changes to targets
 	modified := false
 
-	// Process library and binary targets: both depend on exactly what their
-	// sources import
 	for _, target := range f.Targets {
-		if (isLibraryTarget(target.Rule) || isSyncedBinaryTarget(target.Rule) || isTestTarget(target.Rule)) &&
-			!hasSyncableDeps(target) {
+		kind, ok := lang.RuleKind(target.Rule)
+		if !ok || kind == mapper.NotSynced {
+			continue
+		}
+		if !hasSyncableDeps(target) {
 			result.Errors = append(result.Errors,
 				fmt.Sprintf("%s: deps is not a list of labels, not synced", target.Name))
 			continue
 		}
 
-		if isLibraryTarget(target.Rule) || isSyncedBinaryTarget(target.Rule) {
+		switch kind {
+		case mapper.Library, mapper.Binary:
+			// Both depend on exactly what their sources need
 			if result.applyDeps(target, mapper.DepsToTargets(pkgMapping.Deps), libUnmapped, unsynced) {
 				modified = true
 			}
-		}
 
-		if isTestTarget(target.Rule) {
+		case mapper.Test:
 			oldDeps := target.GetDeps()
 
 			// Check if test has target_under_test or local target deps (":foo")
@@ -312,6 +310,11 @@ func (s *Syncer) getChangedDirectories(dir string) (map[string]bool, error) {
 
 	changedDirs := make(map[string]bool)
 
+	var sourcePatterns []string
+	for _, lang := range s.mapper.Languages() {
+		sourcePatterns = append(sourcePatterns, lang.SourcePatterns()...)
+	}
+
 	for _, line := range strings.Split(string(output), "\n") {
 		if len(line) < 4 {
 			continue
@@ -326,19 +329,8 @@ func (s *Syncer) getChangedDirectories(dir string) (map[string]bool, error) {
 		// Get absolute path
 		absPath := filepath.Join(s.config.ProjectRoot, filePath)
 
-		// Check if this is a source file we care about
-		ext := filepath.Ext(filePath)
-		isSource := false
-		switch ext {
-		case ".go", ".rs", ".py", ".ts", ".tsx", ".js", ".jsx", ".sol":
-			isSource = true
-		}
-		// Also check for Cargo.toml changes
-		if filepath.Base(filePath) == "Cargo.toml" {
-			isSource = true
-		}
-
-		if !isSource {
+		// Check if this is a source file of any language
+		if !matchesAny(filepath.Base(filePath), sourcePatterns) {
 			continue
 		}
 
@@ -364,8 +356,8 @@ func (s *Syncer) getChangedDirectories(dir string) (map[string]bool, error) {
 }
 
 // isStale checks if rules.star needs updating based on source file mtimes.
-// Returns true if any source file is newer than rules.star.
-func (s *Syncer) isStale(rulesPath, pkgDir, language string) (bool, error) {
+// Returns true if any file matching patterns is newer than rules.star.
+func (s *Syncer) isStale(rulesPath, pkgDir string, patterns []string) (bool, error) {
 	// Get rules.star mtime
 	rulesInfo, err := os.Stat(rulesPath)
 	if err != nil {
@@ -373,10 +365,8 @@ func (s *Syncer) isStale(rulesPath, pkgDir, language string) (bool, error) {
 	}
 	rulesMtime := rulesInfo.ModTime()
 
-	// Get source file patterns for this language
-	patterns := sourcePatterns(language)
 	if len(patterns) == 0 {
-		return true, nil // Unknown language, assume stale
+		return true, nil // No known sources, assume stale
 	}
 
 	// Walk the directory and check mtimes
@@ -397,17 +387,10 @@ func (s *Syncer) isStale(rulesPath, pkgDir, language string) (bool, error) {
 			return nil
 		}
 
-		// Check if file matches any source pattern
-		for _, pattern := range patterns {
-			matched, _ := filepath.Match(pattern, info.Name())
-			if matched {
-				if info.ModTime().After(rulesMtime) {
-					newerCount++
-					// Found a newer file, we're done
-					return filepath.SkipAll
-				}
-				break
-			}
+		if matchesAny(info.Name(), patterns) && info.ModTime().After(rulesMtime) {
+			newerCount++
+			// Found a newer file, we're done
+			return filepath.SkipAll
 		}
 		return nil
 	})
@@ -419,258 +402,25 @@ func (s *Syncer) isStale(rulesPath, pkgDir, language string) (bool, error) {
 	return newerCount > 0, nil
 }
 
-// sourcePatterns returns file patterns for source files in a given language.
-func sourcePatterns(language string) []string {
-	switch language {
-	case "go":
-		return []string{"*.go"}
-	case "rust":
-		return []string{"*.rs", "Cargo.toml"}
-	case "python":
-		return []string{"*.py"}
-	case "typescript":
-		return []string{"*.ts", "*.tsx", "*.js", "*.jsx", "*.mjs", "*.cjs"}
-	case "solidity":
-		return []string{"*.sol"}
-	default:
-		return nil
-	}
-}
-
-// detectLanguage determines the language from rules.star content.
-func (s *Syncer) detectLanguage(f *starlark.File) string {
+// detectLanguage returns the plug-in of the first target whose rule kind a
+// language owns, or nil.
+func (s *Syncer) detectLanguage(f *starlark.File) mapper.Language {
 	for _, target := range f.Targets {
-		if language := ruleLanguage(target.Rule); language != "" {
-			return language
+		if lang, _ := s.mapper.RuleLanguage(target.Rule); lang != nil {
+			return lang
 		}
 	}
-	return ""
+	return nil
 }
 
-// ruleLanguage returns the language a rule kind belongs to, or "".
-func ruleLanguage(rule string) string {
-	switch {
-	case strings.HasPrefix(rule, "go_"):
-		return "go"
-	case strings.HasPrefix(rule, "rust_"):
-		return "rust"
-	case strings.HasPrefix(rule, "python_"):
-		return "python"
-	case strings.HasPrefix(rule, "typescript_"), strings.HasPrefix(rule, "js_"):
-		return "typescript"
-	case strings.HasPrefix(rule, "solidity_"), strings.HasPrefix(rule, "sol_"):
-		return "solidity"
-	}
-	return ""
-}
-
-// resolveDeps returns the mapped deps of the package in pkgDir. A Rust
-// crate's come from its Cargo.toml; every other language's from its
-// sources' imports.
-func (s *Syncer) resolveDeps(language, pkgDir string) (mapper.PackageMapping, error) {
-	if language == "rust" {
-		mapping, err := s.mapper.MapRustCrate(pkgDir)
-		if err != nil {
-			return mapping, fmt.Errorf("reading Cargo.toml: %w", err)
-		}
-		return mapping, nil
-	}
-
-	extractResult, err := s.runExtractor(language, pkgDir)
-	if err != nil {
-		return mapper.PackageMapping{}, fmt.Errorf("extractor failed: %w", err)
-	}
-
-	// Map extraction results to Buck2 targets
-	mappings, err := s.mapper.MapExtractionResult(extractResult)
-	if err != nil {
-		return mapper.PackageMapping{}, fmt.Errorf("mapping failed: %w", err)
-	}
-
-	// Merge all package mappings
-	// For languages with subdirectories (like Solidity with src/ and test/),
-	// combine deps from all packages
-	return mergePackageMappings(mappings), nil
-}
-
-// runExtractor runs the appropriate extractor for the language.
-func (s *Syncer) runExtractor(language, pkgDir string) (*extraction.Result, error) {
-	switch language {
-	case "go":
-		return s.runGoExtractor(pkgDir)
-	case "python":
-		return s.runPythonExtractor(pkgDir)
-	case "typescript":
-		return s.runTypescriptExtractor(pkgDir)
-	case "solidity":
-		return s.runSolidityExtractor(pkgDir)
-	default:
-		return nil, fmt.Errorf("unsupported language: %s", language)
-	}
-}
-
-// runGoExtractor lists a directory's Go imports with go list.
-func (s *Syncer) runGoExtractor(pkgDir string) (*extraction.Result, error) {
-	return s.extractGoImportsDirectly(pkgDir)
-}
-
-// runPythonExtractor runs deps-extract for Python on a directory.
-func (s *Syncer) runPythonExtractor(pkgDir string) (*extraction.Result, error) {
-	return s.runDepsExtract("python", pkgDir)
-}
-
-// runTypescriptExtractor runs deps-extract for TypeScript on a directory.
-func (s *Syncer) runTypescriptExtractor(pkgDir string) (*extraction.Result, error) {
-	return s.runDepsExtract("typescript", pkgDir)
-}
-
-// runSolidityExtractor runs deps-extract for Solidity on a directory.
-func (s *Syncer) runSolidityExtractor(pkgDir string) (*extraction.Result, error) {
-	return s.runDepsExtract("solidity", pkgDir)
-}
-
-// runDepsExtract runs the unified deps-extract tool for a given language.
-func (s *Syncer) runDepsExtract(lang, pkgDir string) (*extraction.Result, error) {
-	extractorPath := "deps-extract"
-
-	// Check if extractor exists
-	_, err := exec.LookPath(extractorPath)
-	if err != nil {
-		return nil, fmt.Errorf("deps-extract not found in PATH (install with: cargo install --path src/rust/deps-extract)")
-	}
-
-	cmd := exec.Command(extractorPath, "--lang", lang, pkgDir)
-	cmd.Dir = s.config.ProjectRoot
-
-	output, err := cmd.Output()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return nil, fmt.Errorf("deps-extract failed: %s", string(exitErr.Stderr))
-		}
-		return nil, fmt.Errorf("running deps-extract: %w", err)
-	}
-
-	var result extraction.Result
-	if err := json.Unmarshal(output, &result); err != nil {
-		return nil, fmt.Errorf("parsing deps-extract output: %w", err)
-	}
-
-	return &result, nil
-}
-
-// extractGoImportsDirectly lists a directory's imports with go list.
-func (s *Syncer) extractGoImportsDirectly(pkgDir string) (*extraction.Result, error) {
-	result := extraction.NewResult("go")
-
-	cmd := exec.Command("go", "list", "-json", "./...")
-	cmd.Dir = pkgDir
-
-	output, err := cmd.Output()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			result.AddError(fmt.Sprintf("go list warning: %s", string(exitErr.Stderr)))
-		} else {
-			return nil, fmt.Errorf("running go list: %w", err)
+// matchesAny reports whether a file name matches any of patterns.
+func matchesAny(name string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if matched, _ := filepath.Match(pattern, name); matched {
+			return true
 		}
 	}
-
-	// Get module path for internal classification
-	modulePath := s.getModulePath()
-
-	// Parse JSON stream
-	dec := json.NewDecoder(strings.NewReader(string(output)))
-	for dec.More() {
-		var pkg struct {
-			Dir         string
-			ImportPath  string
-			GoFiles     []string
-			TestGoFiles []string
-			Imports     []string
-			TestImports []string
-		}
-		if err := dec.Decode(&pkg); err != nil {
-			continue
-		}
-
-		// Calculate relative path
-		relPath, err := filepath.Rel(s.config.ProjectRoot, pkg.Dir)
-		if err != nil {
-			relPath = pkg.Dir
-		}
-
-		// Classify imports
-		var imports []extraction.Import
-		for _, imp := range pkg.Imports {
-			imports = append(imports, extraction.Import{
-				Path: imp,
-				Kind: classifyImport(imp, modulePath),
-			})
-		}
-
-		var testImports []extraction.Import
-		for _, imp := range pkg.TestImports {
-			testImports = append(testImports, extraction.Import{
-				Path: imp,
-				Kind: classifyImport(imp, modulePath),
-			})
-		}
-
-		result.AddPackage(extraction.Package{
-			Path:        relPath,
-			Files:       pkg.GoFiles,
-			Imports:     imports,
-			TestImports: testImports,
-		})
-	}
-
-	return result, nil
-}
-
-// getModulePath reads the module path from go.mod.
-func (s *Syncer) getModulePath() string {
-	modPath := filepath.Join(s.config.ProjectRoot, "go.mod")
-	content, err := os.ReadFile(modPath)
-	if err != nil {
-		return ""
-	}
-
-	return modfile.ModulePath(content)
-}
-
-// classifyImport determines if an import is stdlib, external, or internal.
-func classifyImport(imp, modulePath string) extraction.ImportKind {
-	// Standard library check
-	firstSlash := strings.Index(imp, "/")
-	firstElement := imp
-	if firstSlash > 0 {
-		firstElement = imp[:firstSlash]
-	}
-	if !strings.Contains(firstElement, ".") {
-		return extraction.ImportKindStdlib
-	}
-
-	// Internal check
-	if modulePath != "" && strings.HasPrefix(imp, modulePath) {
-		return extraction.ImportKindInternal
-	}
-
-	return extraction.ImportKindExternal
-}
-
-// isLibraryTarget returns true if the rule is a library target.
-func isLibraryTarget(rule string) bool {
-	return strings.HasSuffix(rule, "_library") || rule == "go_library" || rule == "rust_library"
-}
-
-// isSyncedBinaryTarget returns true if the rule is a binary target whose deps
-// sync manages: a *_binary rule of a language sync supports.
-func isSyncedBinaryTarget(rule string) bool {
-	return strings.HasSuffix(rule, "_binary") && ruleLanguage(rule) != ""
-}
-
-// isTestTarget returns true if the rule is a test target.
-func isTestTarget(rule string) bool {
-	return strings.HasSuffix(rule, "_test") || strings.Contains(rule, "test")
+	return false
 }
 
 // hasSyncableDeps reports whether sync can rewrite a target's deps: they
@@ -723,36 +473,6 @@ func filterSelfReference(deps []mapper.MappedDep, selfTarget string) []mapper.Ma
 		}
 	}
 	return filtered
-}
-
-// mergePackageMappings combines mappings from multiple packages.
-// This is needed for languages that have subdirectory structure (e.g., Solidity with src/ and test/).
-func mergePackageMappings(mappings map[string]mapper.PackageMapping) mapper.PackageMapping {
-	var result mapper.PackageMapping
-	seenDeps := make(map[string]bool)
-	seenTestDeps := make(map[string]bool)
-
-	for _, m := range mappings {
-		// Collect library deps (deduplicated)
-		for _, dep := range m.Deps {
-			if !seenDeps[dep.Target] {
-				seenDeps[dep.Target] = true
-				result.Deps = append(result.Deps, dep)
-			}
-		}
-		// Collect test deps (deduplicated)
-		for _, dep := range m.TestDeps {
-			if !seenTestDeps[dep.Target] {
-				seenTestDeps[dep.Target] = true
-				result.TestDeps = append(result.TestDeps, dep)
-			}
-		}
-		// Collect unmapped imports
-		result.UnmappedImports = append(result.UnmappedImports, m.UnmappedImports...)
-		result.UnmappedTestImports = append(result.UnmappedTestImports, m.UnmappedTestImports...)
-	}
-
-	return result
 }
 
 // mergeWithPreserved merges new deps with preserved deps from old list.

@@ -168,20 +168,20 @@ func loadCargoWorkspace(dir, projectRoot string) (*cargoWorkspace, map[string]st
 	return ws, members, nil
 }
 
-// MapRustCrate resolves a Rust crate's deps from its Cargo.toml:
+// resolveCrate resolves a Rust crate's deps from its Cargo.toml:
 // [dependencies] become Deps, [dev-dependencies] TestDeps. Workspace members
 // map to their Buck2 target, other crates to the external cell. A crate
 // neither is reported in UnmappedImports (or UnmappedTestImports).
 // Optional, target-specific and build dependencies are reported in
 // UnsyncedDeps.
-func (m *Mapper) MapRustCrate(crateDir string) (PackageMapping, error) {
-	rel, err := filepath.Rel(m.config.ProjectRoot, crateDir)
+func (l *rustLanguage) resolveCrate(crateDir string) (PackageMapping, error) {
+	rel, err := filepath.Rel(l.projectRoot, crateDir)
 	if err != nil {
 		rel = crateDir
 	}
 	mapping := PackageMapping{Path: filepath.ToSlash(rel)}
 
-	cfg := m.config.Rust
+	cfg := l.cfg
 	if cfg == nil {
 		return mapping, fmt.Errorf("no Rust configuration: the project has no Cargo.toml")
 	}
@@ -206,7 +206,7 @@ func (m *Mapper) MapRustCrate(crateDir string) (PackageMapping, error) {
 		return mapping, err
 	}
 	for _, dep := range deps {
-		mapped, ok := m.mapCargoDep(dep)
+		mapped, ok := l.mapCargoDep(dep)
 		switch {
 		case !ok:
 			mapping.UnmappedImports = append(mapping.UnmappedImports, dep.Package)
@@ -222,7 +222,7 @@ func (m *Mapper) MapRustCrate(crateDir string) (PackageMapping, error) {
 		return mapping, err
 	}
 	for _, dep := range devDeps {
-		if mapped, ok := m.mapCargoDep(dep); ok {
+		if mapped, ok := l.mapCargoDep(dep); ok {
 			mapping.TestDeps = append(mapping.TestDeps, mapped)
 		} else {
 			mapping.UnmappedTestImports = append(mapping.UnmappedTestImports, dep.Package)
@@ -237,7 +237,7 @@ func (m *Mapper) MapRustCrate(crateDir string) (PackageMapping, error) {
 			return err
 		}
 		for _, dep := range deps {
-			mapped, ok := m.mapCargoDep(dep)
+			mapped, ok := l.mapCargoDep(dep)
 			if !ok {
 				mapped = MappedDep{Type: DependencyUnmapped, ImportPath: dep.Package}
 			}
@@ -271,12 +271,12 @@ func (m *Mapper) MapRustCrate(crateDir string) (PackageMapping, error) {
 // mapCargoDep maps a resolved dependency to its Buck2 target: a workspace
 // member's target, or the external cell's target for the package. It
 // reports false if the dependency is neither.
-func (m *Mapper) mapCargoDep(dep cargoDep) (MappedDep, bool) {
-	cfg := m.config.Rust
+func (l *rustLanguage) mapCargoDep(dep cargoDep) (MappedDep, bool) {
+	cfg := l.cfg
 
 	memberDir, isMember := cfg.WorkspacePackages[dep.Package]
 	if dep.Path != "" {
-		rel, err := filepath.Rel(m.config.ProjectRoot, dep.Path)
+		rel, err := filepath.Rel(l.projectRoot, dep.Path)
 		if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
 			return MappedDep{}, false
 		}
@@ -291,7 +291,7 @@ func (m *Mapper) mapCargoDep(dep cargoDep) (MappedDep, bool) {
 		}, true
 	}
 
-	if !m.isKnownRustDep(dep.Package) {
+	if !cfg.ExternalDeps[dep.Package] {
 		return MappedDep{}, false
 	}
 	// e.g. "tree-sitter" -> "rustdeps//vendor/tree-sitter:tree-sitter"
@@ -300,11 +300,4 @@ func (m *Mapper) mapCargoDep(dep cargoDep) (MappedDep, bool) {
 		Type:       DependencyExternal,
 		ImportPath: dep.Package,
 	}, true
-}
-
-// sortDeps sorts deps by target, for stable output.
-func sortDeps(deps []MappedDep) {
-	sort.Slice(deps, func(i, j int) bool {
-		return deps[i].Target < deps[j].Target
-	})
 }
