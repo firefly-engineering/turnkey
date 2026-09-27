@@ -27,6 +27,10 @@ jobs:
       - name: Check flake syntax
         run: nix flake check --no-build --impure
 
+      # --no-build evaluates checks without running them
+      - name: Check Nix formatting
+        run: nix build .#checks.x86_64-linux.nix-format --no-link
+
   # ===========================================================================
   # Tier 2: Build Verification (~90s)
   # ===========================================================================
