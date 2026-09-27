@@ -79,11 +79,7 @@ func TestMapPythonWorkspaceImports(t *testing.T) {
 			{Path: "tools", Kind: extraction.ImportKindExternal},
 		},
 	})
-	mappings, err := m.MapExtractionResult(result)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mapping := mappings["acme/app"]
+	mapping := resolveImports(m.Language("python").(importLanguage), result)
 
 	wantDeps := []string{
 		"//apps/app:app",

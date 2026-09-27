@@ -1,15 +1,11 @@
 // Package mapper resolves a package's dependencies to Buck2 target
-// references, through one plug-in per language (see Language), and applies
-// them to rules.star files using the starlark object model.
+// references, through one plug-in per language (see Language). Rules sync
+// (package rulessync) writes them to rules.star files.
 package mapper
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
-	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
-	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 )
 
@@ -103,31 +99,6 @@ func (m *Mapper) RuleLanguage(rule string) (Language, TargetKind) {
 	return nil, NotSynced
 }
 
-// MapExtractionResult converts an extraction result to mapped dependencies,
-// with the plug-in of the result's language. A language whose deps don't
-// come from imports, or no language, leaves every import unmapped.
-func (m *Mapper) MapExtractionResult(result *extraction.Result) (map[string]PackageMapping, error) {
-	lang, _ := m.Language(result.Language).(importLanguage)
-
-	mappings := make(map[string]PackageMapping)
-	for _, pkg := range result.Packages {
-		if lang != nil {
-			mappings[pkg.Path] = mapPackage(lang, pkg)
-			continue
-		}
-		mapping := PackageMapping{Path: pkg.Path}
-		for _, imp := range pkg.Imports {
-			mapping.UnmappedImports = append(mapping.UnmappedImports, imp.Path)
-		}
-		for _, imp := range pkg.TestImports {
-			mapping.UnmappedTestImports = append(mapping.UnmappedTestImports, imp.Path)
-		}
-		mappings[pkg.Path] = mapping
-	}
-
-	return mappings, nil
-}
-
 // PackageMapping contains the mapped dependencies for a package.
 type PackageMapping struct {
 	// Path is the package path.
@@ -156,67 +127,6 @@ type PackageMapping struct {
 	// with their values: e.g. a Rust target's "features". An attribute in
 	// Attrs is set to exactly its value; one with no values isn't added.
 	Attrs map[string][]string
-}
-
-// ApplyToRulesStar applies mapped dependencies to a rules.star file.
-func (m *Mapper) ApplyToRulesStar(rulesPath string, pkgMapping PackageMapping) error {
-	// Parse the rules.star file
-	f, err := starlark.ParseFile(rulesPath)
-	if err != nil {
-		return fmt.Errorf("parsing rules.star: %w", err)
-	}
-
-	// Find the library target (typically matches the directory name)
-	dirName := filepath.Base(filepath.Dir(rulesPath))
-
-	// Try common library target names
-	var libTarget *starlark.Target
-	for _, name := range []string{dirName, "lib", "library"} {
-		libTarget = f.GetTarget(name)
-		if libTarget != nil {
-			break
-		}
-	}
-
-	if libTarget != nil && len(pkgMapping.Deps) > 0 {
-		// Convert MappedDep to string slice
-		var deps []string
-		for _, d := range pkgMapping.Deps {
-			deps = append(deps, d.Target)
-		}
-		libTarget.SetDeps(deps)
-	}
-
-	// Find the test target
-	var testTarget *starlark.Target
-	for _, name := range []string{dirName + "_test", "test", "tests"} {
-		testTarget = f.GetTarget(name)
-		if testTarget != nil {
-			break
-		}
-	}
-
-	if testTarget != nil && len(pkgMapping.TestDeps) > 0 {
-		// For tests, we need to include both regular deps and test-only deps
-		var testDeps []string
-		for _, d := range pkgMapping.Deps {
-			testDeps = append(testDeps, d.Target)
-		}
-		for _, d := range pkgMapping.TestDeps {
-			testDeps = append(testDeps, d.Target)
-		}
-		testTarget.SetDeps(testDeps)
-	}
-
-	// Write back if modified
-	if f.IsModified() {
-		output := f.Write()
-		if err := os.WriteFile(rulesPath, output, 0644); err != nil {
-			return fmt.Errorf("writing rules.star: %w", err)
-		}
-	}
-
-	return nil
 }
 
 // DepsToTargets extracts just the target strings from mapped deps.

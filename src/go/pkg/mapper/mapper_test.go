@@ -98,16 +98,16 @@ func TestMapGoImports(t *testing.T) {
 	}
 }
 
-func TestMapExtractionResult(t *testing.T) {
-	m := &Mapper{
-		languages: []Language{&goLanguage{cfg: &GoConfig{
-			ModulePath:   "github.com/example/project",
-			ExternalCell: "godeps",
-			ExternalDeps: map[string]bool{
-				"github.com/google/uuid": true,
-			},
-		}}},
-	}
+// An extraction result's imports are mapped with the language: stdlib
+// skipped, internal and external imports mapped.
+func TestResolveImports(t *testing.T) {
+	lang := &goLanguage{cfg: &GoConfig{
+		ModulePath:   "github.com/example/project",
+		ExternalCell: "godeps",
+		ExternalDeps: map[string]bool{
+			"github.com/google/uuid": true,
+		},
+	}}
 
 	result := &extraction.Result{
 		Version:  "1",
@@ -128,16 +128,7 @@ func TestMapExtractionResult(t *testing.T) {
 		},
 	}
 
-	mappings, err := m.MapExtractionResult(result)
-	if err != nil {
-		t.Fatalf("MapExtractionResult failed: %v", err)
-	}
-
-	if len(mappings) != 1 {
-		t.Fatalf("expected 1 mapping, got %d", len(mappings))
-	}
-
-	mapping := mappings["src/cmd/myapp"]
+	mapping := resolveImports(lang, result)
 	if len(mapping.Deps) != 2 {
 		t.Errorf("expected 2 deps, got %d", len(mapping.Deps))
 	}
@@ -267,87 +258,4 @@ func TestExtractModulePath(t *testing.T) {
 			t.Errorf("extractModulePath(%q) = %q, want %q", tt.content, got, tt.want)
 		}
 	}
-}
-
-func TestApplyToRulesStar(t *testing.T) {
-	// Create a temp directory
-	dir := t.TempDir()
-
-	// Create a test rules.star
-	rulesContent := `load("@prelude//:rules.bzl", "go_library", "go_test")
-
-go_library(
-    name = "mylib",
-    srcs = ["lib.go"],
-    deps = [
-        "//old:dep",
-    ],
-    visibility = ["PUBLIC"],
-)
-
-go_test(
-    name = "mylib_test",
-    srcs = ["lib_test.go"],
-    target_under_test = ":mylib",
-    deps = [],
-    visibility = ["PUBLIC"],
-)
-`
-	rulesPath := filepath.Join(dir, "mylib", "rules.star")
-	if err := os.MkdirAll(filepath.Dir(rulesPath), 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(rulesPath, []byte(rulesContent), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	// Create mapper and apply
-	m := &Mapper{config: Config{}}
-
-	mapping := PackageMapping{
-		Path: "mylib",
-		Deps: []MappedDep{
-			{Target: "//new:dep1", Type: DependencyInternal},
-			{Target: "godeps//vendor/github.com/foo:foo", Type: DependencyExternal},
-		},
-		TestDeps: []MappedDep{
-			{Target: "//test:only", Type: DependencyInternal},
-		},
-	}
-
-	if err := m.ApplyToRulesStar(rulesPath, mapping); err != nil {
-		t.Fatalf("ApplyToRulesStar failed: %v", err)
-	}
-
-	// Read back and verify
-	content, err := os.ReadFile(rulesPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	result := string(content)
-
-	// Check library deps were updated
-	if !contains(result, `"//new:dep1"`) {
-		t.Error("missing //new:dep1 in output")
-	}
-	if !contains(result, `"godeps//vendor/github.com/foo:foo"`) {
-		t.Error("missing godeps dep in output")
-	}
-	if contains(result, `"//old:dep"`) {
-		t.Error("old dep should have been replaced")
-	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || containsInMiddle(s, substr)))
-}
-
-func containsInMiddle(s, substr string) bool {
-	for i := 1; i < len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
