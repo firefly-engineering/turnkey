@@ -87,3 +87,78 @@ go_binary(
 		t.Errorf("deps = %v, want %v", got, want)
 	}
 }
+
+// Each target whose deps change gets its own entry in the result, test
+// targets included, instead of the last one overwriting the others.
+func TestSyncFileReportsEachTarget(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go not in PATH: the Go extractor runs go list")
+	}
+	t.Setenv("GOWORK", "off")
+	t.Setenv("GOFLAGS", "")
+
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"go.mod":             "module example.com/project\n\ngo 1.22\n",
+		"pkg/greet/greet.go": "package greet\n\nfunc Hello() string { return \"hello\" }\n",
+		"pkg/check/check.go": "package check\n\nfunc OK() bool { return true }\n",
+		"pkg/old/old.go":     "package old\n",
+		"pkg/lib/lib.go": `package lib
+
+import "example.com/project/pkg/greet"
+
+func Hi() string { return greet.Hello() }
+`,
+		"pkg/lib/lib_test.go": `package lib
+
+import (
+	"testing"
+
+	"example.com/project/pkg/check"
+)
+
+func TestHi(t *testing.T) { _ = check.OK() }
+`,
+		"pkg/lib/rules.star": `load("@prelude//:rules.bzl", "go_library", "go_test")
+
+go_library(
+    name = "lib",
+    srcs = ["lib.go"],
+    deps = [
+        # turnkey:auto-start
+        "//pkg/old:old",
+        # turnkey:auto-end
+    ],
+)
+
+go_test(
+    name = "lib_test",
+    srcs = glob(["*.go"]),
+    deps = [
+        # turnkey:auto-start
+        # turnkey:auto-end
+    ],
+)
+`,
+	})
+
+	s, err := NewSyncer(Config{ProjectRoot: root, Force: true, DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := s.SyncFile(filepath.Join(root, "pkg/lib/rules.star"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Errors) != 0 {
+		t.Fatalf("sync errors: %v", result.Errors)
+	}
+
+	want := []TargetChange{
+		{Target: "lib", Added: []string{"//pkg/greet:greet"}, Removed: []string{"//pkg/old:old"}},
+		{Target: "lib_test", Added: []string{"//pkg/greet:greet", "//pkg/check:check"}},
+	}
+	if !reflect.DeepEqual(result.Changes, want) {
+		t.Errorf("changes = %+v, want %+v", result.Changes, want)
+	}
+}

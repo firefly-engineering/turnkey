@@ -66,14 +66,24 @@ type SyncResult struct {
 	// Skipped is true if the file was skipped due to staleness check.
 	Skipped bool
 
+	// Changes lists, per target whose deps changed, what was added and
+	// removed, in the order the targets appear in the file.
+	Changes []TargetChange
+
+	// Errors contains any errors encountered.
+	Errors []string
+}
+
+// TargetChange records how sync changed one target's deps.
+type TargetChange struct {
+	// Target is the target's name.
+	Target string
+
 	// Added lists dependencies that were added.
 	Added []string
 
 	// Removed lists dependencies that were removed.
 	Removed []string
-
-	// Errors contains any errors encountered.
-	Errors []string
 }
 
 // SyncDirectory syncs all rules.star files in a directory tree.
@@ -229,7 +239,7 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 			if !stringSlicesEqual(oldDeps, newDeps) {
 				target.SetDeps(newDeps)
 				modified = true
-				result.Added, result.Removed = diffDeps(oldDeps, newDeps)
+				result.recordChange(target.Name, oldDeps, newDeps)
 			}
 		}
 
@@ -268,7 +278,7 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 			if !stringSlicesEqual(oldDeps, newDeps) {
 				target.SetDeps(newDeps)
 				modified = true
-				// Note: we're only tracking library target changes in Added/Removed
+				result.recordChange(target.Name, oldDeps, newDeps)
 			}
 		}
 	}
@@ -720,6 +730,12 @@ func mergeWithPreserved(oldDeps, newDeps []string) []string {
 
 	// Return preserved deps first, then new deps
 	return append(preserved, newDeps...)
+}
+
+// recordChange appends the diff between a target's old and new deps.
+func (r *SyncResult) recordChange(target string, oldDeps, newDeps []string) {
+	added, removed := diffDeps(oldDeps, newDeps)
+	r.Changes = append(r.Changes, TargetChange{Target: target, Added: added, Removed: removed})
 }
 
 // diffDeps returns added and removed deps.

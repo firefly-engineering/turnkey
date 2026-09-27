@@ -109,12 +109,7 @@ func runRulesCheck(args []string) int {
 			relPath, _ := filepath.Rel(root, result.Path)
 			fmt.Fprintf(os.Stderr, "NEEDS UPDATE: %s\n", relPath)
 			if verbose {
-				if len(result.Added) > 0 {
-					fmt.Fprintf(os.Stderr, "         Would add: %v\n", result.Added)
-				}
-				if len(result.Removed) > 0 {
-					fmt.Fprintf(os.Stderr, "         Would remove: %v\n", result.Removed)
-				}
+				printTargetChanges(result.Changes, "Would add", "Would remove")
 			}
 		} else if verbose {
 			relPath, _ := filepath.Rel(root, result.Path)
@@ -229,12 +224,7 @@ func runRulesSync(args []string) int {
 				fmt.Fprintf(os.Stderr, "UPDATED: %s\n", relPath)
 			}
 			if verbose {
-				if len(result.Added) > 0 {
-					fmt.Fprintf(os.Stderr, "         Added: %v\n", result.Added)
-				}
-				if len(result.Removed) > 0 {
-					fmt.Fprintf(os.Stderr, "         Removed: %v\n", result.Removed)
-				}
+				printTargetChanges(result.Changes, "Added", "Removed")
 			}
 		} else if verbose {
 			fmt.Fprintf(os.Stderr, "OK: %s (no changes)\n", relPath)
@@ -258,6 +248,19 @@ func runRulesSync(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+// printTargetChanges prints each changed target's added and removed deps.
+func printTargetChanges(changes []rulessync.TargetChange, addedLabel, removedLabel string) {
+	for _, c := range changes {
+		fmt.Fprintf(os.Stderr, "       :%s\n", c.Target)
+		if len(c.Added) > 0 {
+			fmt.Fprintf(os.Stderr, "         %s: %v\n", addedLabel, c.Added)
+		}
+		if len(c.Removed) > 0 {
+			fmt.Fprintf(os.Stderr, "         %s: %v\n", removedLabel, c.Removed)
+		}
+	}
 }
 
 // printRulesHelp prints help for the rules subcommand.
