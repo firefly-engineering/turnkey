@@ -239,6 +239,28 @@
           # prelude, as the dev shell uses it
           packages.turnkey-prelude = (self.lib.pinnedBuck2Release system).prelude;
 
+          # `nix fmt` formats the Nix files with the nixfmt checks.nix-format
+          # holds them to
+          formatter = pkgs.nixfmt;
+
+          # Every Nix file is formatted as `nix fmt` formats it. The flake's
+          # source holds only tracked files, so nothing untracked is read.
+          checks.nix-format =
+            let
+              src = lib.fileset.toSource {
+                root = ./.;
+                fileset = lib.fileset.fileFilter (file: file.hasExt "nix") ./.;
+              };
+            in
+            pkgs.runCommand "nix-format-check" { nativeBuildInputs = [ config.formatter ]; } ''
+              cd ${src}
+              if ! find . -name '*.nix' -print0 | xargs -0 nixfmt --check; then
+                echo "Nix files are not formatted: run nix fmt" >&2
+                exit 1
+              fi
+              touch $out
+            '';
+
           # The pinned buck2 release holds together: the binary and prelude
           # are the release's, and the shell gets exactly what the flake
           # publishes. Checked at evaluation, so `nix flake check --no-build`
