@@ -92,6 +92,7 @@ func runRulesCheck(args []string) int {
 	}
 
 	anyNeedsUpdate := false
+	anyUnreadable := false
 	checkedCount := 0
 	skippedCount := 0
 	for _, result := range results {
@@ -107,6 +108,10 @@ func runRulesCheck(args []string) int {
 		if !quiet {
 			relPath, _ := filepath.Rel(root, result.Path)
 			printKeptDeps(relPath, result.Changes)
+			printSkippedTargets(relPath, result)
+		}
+		if len(result.Unreadable) > 0 {
+			anyUnreadable = true
 		}
 		if result.Updated {
 			anyNeedsUpdate = true
@@ -130,6 +135,10 @@ func runRulesCheck(args []string) int {
 
 	if anyNeedsUpdate {
 		fmt.Fprintf(os.Stderr, "\ntk rules: some rules.star files need updates, run 'tk rules sync' to update\n")
+		return 1
+	}
+	if anyUnreadable {
+		fmt.Fprintf(os.Stderr, "\ntk rules: some targets' deps can't be synced (see UNREADABLE above)\n")
 		return 1
 	}
 
@@ -217,6 +226,7 @@ func runRulesSync(args []string) int {
 
 		if !quiet {
 			printKeptDeps(relPath, result.Changes)
+			printSkippedTargets(relPath, result)
 		}
 
 		if result.Skipped {
@@ -286,6 +296,21 @@ func printKeptDeps(relPath string, changes []rulessync.TargetChange) {
 	}
 }
 
+// printSkippedTargets reports the targets of a rules.star file that sync
+// skipped: always those whose deps it can't read, and with -v those opted
+// out with # turnkey:no-sync.
+func printSkippedTargets(relPath string, result rulessync.SyncResult) {
+	for _, u := range result.Unreadable {
+		fmt.Fprintf(os.Stderr, "UNREADABLE: %s:%s: %s is not a list of labels; write it as one, or add # turnkey:no-sync before the rule\n",
+			relPath, u.Target, u.Attribute)
+	}
+	if verbose {
+		for _, target := range result.OptedOut {
+			fmt.Fprintf(os.Stderr, "OPTED OUT: %s:%s\n", relPath, target)
+		}
+	}
+}
+
 // printRulesHelp prints help for the rules subcommand.
 func printRulesHelp() {
 	fmt.Fprintln(os.Stderr, `Usage: tk rules <command> [options] [path]
@@ -315,7 +340,8 @@ Examples:
 
 The rules command automatically detects imports from source files and
 updates the deps list in rules.star. Manual dependencies can be preserved
-using turnkey:preserve-start/end markers.`)
+using turnkey:preserve-start/end markers, and a "# turnkey:no-sync" comment
+before a rule leaves that target's deps alone.`)
 }
 
 // runRulesAutoSync is called automatically before buck2 commands.
@@ -370,7 +396,12 @@ func runRulesAutoSync() int {
 
 	// Count results
 	updatedCount := 0
+	var unreadable []string
 	for _, result := range results {
+		relPath, _ := filepath.Rel(root, result.Path)
+		for _, u := range result.Unreadable {
+			unreadable = append(unreadable, relPath+":"+u.Target)
+		}
 		if !quiet {
 			relPath, _ := filepath.Rel(root, result.Path)
 			printKeptDeps(relPath, result.Changes)
@@ -378,6 +409,18 @@ func runRulesAutoSync() int {
 		if result.Updated {
 			updatedCount++
 		}
+	}
+
+	// Strict mode (CI): a target whose deps sync can't read, and nothing opts
+	// out, fails like a stale rules.star. Otherwise the check before a build
+	// stays quiet about it: tk rules sync and tk rules check report it.
+	if (cfg.Rules.Strict || strictRules) && len(unreadable) > 0 {
+		fmt.Fprintf(os.Stderr, "tk: %d target(s) have deps rules sync can't read (strict mode):\n", len(unreadable))
+		for _, u := range unreadable {
+			fmt.Fprintf(os.Stderr, "  - %s\n", u)
+		}
+		fmt.Fprintln(os.Stderr, "\ntk: write their deps as a list of labels, or add # turnkey:no-sync before the rule")
+		return 1
 	}
 
 	// No updates needed

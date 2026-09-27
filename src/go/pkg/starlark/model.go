@@ -65,6 +65,10 @@ type Target struct {
 	// Name is the target name (from the "name" attribute).
 	Name string
 
+	// NoSync is set when a "# turnkey:no-sync" comment precedes the rule
+	// call: rules sync leaves the target alone.
+	NoSync bool
+
 	// Attributes are the target's attributes.
 	Attributes map[string]*Attribute
 

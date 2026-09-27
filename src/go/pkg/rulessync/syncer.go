@@ -66,8 +66,24 @@ type SyncResult struct {
 	// removed, in the order the targets appear in the file.
 	Changes []TargetChange
 
+	// OptedOut lists the targets a "# turnkey:no-sync" comment opts out.
+	OptedOut []string
+
+	// Unreadable lists the targets sync skipped because their deps aren't
+	// a list of labels, and nothing opts them out.
+	Unreadable []UnreadableTarget
+
 	// Errors contains any errors encountered.
 	Errors []string
+}
+
+// UnreadableTarget is a target whose deps attribute sync can't read.
+type UnreadableTarget struct {
+	// Target is the target's name.
+	Target string
+
+	// Attribute is the deps attribute that isn't a list of labels.
+	Attribute string
 }
 
 // TargetChange records how sync changed one target's deps.
@@ -238,9 +254,12 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 		if !ok || kind == mapper.NotSynced {
 			continue
 		}
+		if target.NoSync {
+			result.OptedOut = append(result.OptedOut, target.Name)
+			continue
+		}
 		if !hasSyncableDeps(target, attr) {
-			result.Errors = append(result.Errors,
-				fmt.Sprintf("%s: %s is not a list of labels, not synced", target.Name, attr))
+			result.Unreadable = append(result.Unreadable, UnreadableTarget{Target: target.Name, Attribute: attr})
 			continue
 		}
 

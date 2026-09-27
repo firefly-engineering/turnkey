@@ -1,6 +1,7 @@
 package starlark
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -526,5 +527,35 @@ func TestMarkersFromTheSyntaxTree(t *testing.T) {
 	}
 	if got := lib.GetPreservedDeps(); strings.Join(got, " ") != "//kept:one //kept:two" {
 		t.Errorf("preserved deps %q", got)
+	}
+}
+
+func TestNoSyncMarker(t *testing.T) {
+	src := `rust_library(
+    name = "synced",
+)
+
+# Built with platform-specific features
+# turnkey:no-sync
+rust_library(
+    name = "opted-out",
+)
+
+# turnkey:no-sync is only a marker on its own line
+rust_library(
+    name = "also-synced",
+)
+`
+	f, err := Parse("rules.star", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, target := range f.Targets {
+		got[target.Name] = target.NoSync
+	}
+	want := map[string]bool{"synced": false, "opted-out": true, "also-synced": false}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("NoSync = %v, want %v", got, want)
 	}
 }

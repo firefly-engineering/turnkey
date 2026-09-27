@@ -402,3 +402,58 @@ func TestApplyDepsToOtherAttribute(t *testing.T) {
 		t.Errorf("deps = %v, want %v", got, want)
 	}
 }
+
+// In one file, an ordinary target is synced, a target opted out with
+// "# turnkey:no-sync" is left alone and reported as opted out, and one
+// whose deps sync can't read is reported as unreadable.
+func TestSyncFileOptOutAndUnreadable(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"Cargo.toml": "[workspace]\nmembers = [\"crates/*\"]\n\n[workspace.dependencies]\nanyhow = \"1\"\n",
+		"rust-deps.toml": `[deps."anyhow@1.0.0"]
+name = "anyhow"
+`,
+		"crates/lib/Cargo.toml": "[package]\nname = \"lib\"\n\n[dependencies]\nanyhow.workspace = true\n",
+		"crates/lib/rules.star": `load("@prelude//:rules.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "lib",
+    deps = [],
+)
+
+# turnkey:no-sync
+rust_library(
+    name = "lib-custom",
+    deps = ["//somewhere:else"],
+)
+
+_DEPS = ["rustdeps//vendor/anyhow:anyhow"]
+
+rust_test(
+    name = "lib-test",
+    deps = _DEPS,
+)
+`,
+	})
+
+	s, err := NewSyncer(Config{ProjectRoot: root, Force: true, DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := s.SyncFile(filepath.Join(root, "crates/lib/rules.star"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantChanges := []TargetChange{{Target: "lib", Added: []string{"rustdeps//vendor/anyhow:anyhow"}}}
+	if !reflect.DeepEqual(result.Changes, wantChanges) {
+		t.Errorf("changes = %+v, want %+v", result.Changes, wantChanges)
+	}
+	if want := []string{"lib-custom"}; !reflect.DeepEqual(result.OptedOut, want) {
+		t.Errorf("opted out = %v, want %v", result.OptedOut, want)
+	}
+	wantUnreadable := []UnreadableTarget{{Target: "lib-test", Attribute: "deps"}}
+	if !reflect.DeepEqual(result.Unreadable, wantUnreadable) {
+		t.Errorf("unreadable = %+v, want %+v", result.Unreadable, wantUnreadable)
+	}
+}

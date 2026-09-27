@@ -49,6 +49,7 @@ func Parse(path string, source []byte) (*File, error) {
 					// Not a valid target, skip
 					continue
 				}
+				target.NoSync = hasNoSyncMarker(s)
 				f.Targets = append(f.Targets, target)
 			}
 		}
@@ -258,6 +259,24 @@ type marker struct {
 	position syntax.Position
 	// opensAuto: turnkey:auto-start; every other marker ends the auto section
 	opensAuto bool
+}
+
+// noSyncMarker opts the rule call it precedes out of rules sync.
+const noSyncMarker = "turnkey:no-sync"
+
+// hasNoSyncMarker reports whether a "# turnkey:no-sync" comment directly
+// precedes stmt, among the comments the parser attached before it.
+func hasNoSyncMarker(stmt syntax.Stmt) bool {
+	comments := stmt.Comments()
+	if comments == nil {
+		return false
+	}
+	for _, c := range comments.Before {
+		if strings.TrimSpace(strings.TrimPrefix(c.Text, "#")) == noSyncMarker {
+			return true
+		}
+	}
+	return false
 }
 
 // listMarkers returns the turnkey markers among the comments inside list, in

@@ -189,6 +189,24 @@ go_binary(
 
 Dependencies between `preserve-start` and `preserve-end` markers are never modified by sync.
 
+### Opting a Target Out
+
+To keep sync away from one target entirely, for example to work around a
+problem, put a `# turnkey:no-sync` comment on its own line right before the
+rule:
+
+```python
+# Built with platform-specific Cargo features, which sync doesn't resolve
+# turnkey:no-sync
+rust_library(
+    name = "my-lib-full",
+    deps = _COMMON_DEPS + (["//linux:only"] if _IS_LINUX else []),
+)
+```
+
+Sync never changes an opted-out target. `tk rules sync -v` and
+`tk rules check -v` list them as `OPTED OUT:`.
+
 ## Where Deps Come From
 
 - **Rust**: the crate's `Cargo.toml`, not its sources. `[dependencies]` go to
@@ -219,7 +237,11 @@ Sync never removes a dep it can't account for:
   import`), its deps are incomplete, so sync adds what it resolved but removes
   nothing, and prints a `KEPT:` line naming the deps it kept and why.
 - A target whose `deps` is an expression (`_DEPS`, `_COMMON_DEPS + [...]`)
-  rather than a list of labels is not synced at all.
+  rather than a list of labels is not synced. Unless `# turnkey:no-sync` opts
+  it out, `tk rules sync` and `tk rules check` report it as `UNREADABLE:`,
+  and it makes `tk rules check` and strict mode fail: write its deps as a
+  list of labels, or opt it out. (The sync before a build doesn't report
+  it.)
 - Deps are only added or removed, never reordered.
 
 ## Troubleshooting
