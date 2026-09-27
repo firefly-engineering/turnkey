@@ -113,10 +113,14 @@ type UnreadableTarget struct {
 	Attribute string
 }
 
-// TargetChange records how sync changed one target's deps.
+// TargetChange records how sync changed one target's deps, or another
+// attribute it owns.
 type TargetChange struct {
 	// Target is the target's name.
 	Target string
+
+	// Attribute is the attribute that changed, when it isn't the deps.
+	Attribute string
 
 	// Added lists dependencies that were added.
 	Added []string
@@ -249,6 +253,7 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 		pkgDir:     pkgDir,
 		dims:       dims,
 		selfTarget: computeSelfTarget(pkgDir, s.config.ProjectRoot),
+		space:      s.space,
 		cache:      make(map[string]mapper.PackageMapping),
 		reported:   make(map[string]bool),
 	}
@@ -280,7 +285,7 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 			result.Unreadable = append(result.Unreadable, UnreadableTarget{Target: target.Name, Attribute: attr})
 			continue
 		}
-		variant, badAttr, ok := readVariant(target, lang.VariantAttributes(kind), s.space)
+		variant, badAttr, ok := mapper.ReadVariant(target, lang.VariantAttributes(kind), s.space)
 		if !ok {
 			result.Unreadable = append(result.Unreadable, UnreadableTarget{Target: target.Name, Attribute: badAttr})
 			continue
@@ -329,6 +334,31 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 		}
 		if changed {
 			modified = true
+		}
+
+		// The other attributes the language owns, e.g. Rust's features
+		owned, err := res.ownedAttributes(variant)
+		if err != nil {
+			result.Errors = append(result.Errors, err.Error())
+			return result, nil
+		}
+		for _, name := range owned {
+			oldValue, ok := readLabels(target, name, s.space)
+			if !ok {
+				result.Unreadable = append(result.Unreadable, UnreadableTarget{Target: target.Name, Attribute: name})
+				continue
+			}
+			changed, err := result.applyOwned(target, name, s.space, oldValue, func(config conditions.Configuration) ([]string, error) {
+				m, err := res.resolve(config, variant(config))
+				return m.Attrs[name], err
+			})
+			if err != nil {
+				result.Errors = append(result.Errors, err.Error())
+				return result, nil
+			}
+			if changed {
+				modified = true
+			}
 		}
 	}
 	result.Errors = append(result.Errors, res.messages...)
@@ -508,69 +538,6 @@ func readLabels(target *starlark.Target, attr string, space conditions.Space) (f
 	return ev.Labels, true
 }
 
-// readVariant reads a target's variant attributes (attrs) as their values
-// in each configuration of space: a select() is evaluated, and a list
-// followed by a select() is concatenated with the branch that applies. An
-// attribute the target doesn't set, or whose select() has no branch for a
-// configuration, is absent from that configuration's variant. It reports
-// false, with the attribute, if one can't be read: a select() with a key
-// the space doesn't know, or a concatenation of values that aren't lists.
-func readVariant(target *starlark.Target, attrs []string, space conditions.Space) (func(conditions.Configuration) map[string]starlark.AttributeValue, string, bool) {
-	type conditional struct {
-		sel     starlark.SelectValue
-		matcher *conditions.Matcher
-	}
-	plain := make(map[string]starlark.AttributeValue)
-	selects := make(map[string]conditional)
-	for _, name := range attrs {
-		a := target.GetAttribute(name)
-		if a == nil {
-			continue
-		}
-		sel, ok := a.Value.(starlark.SelectValue)
-		if !ok {
-			plain[name] = a.Value
-			continue
-		}
-		keys := make([]string, len(sel.Branches))
-		for i, b := range sel.Branches {
-			keys[i] = b.Key
-			if _, ok := starlark.Labels(b.Value); sel.Common != nil && !ok {
-				return nil, name, false
-			}
-		}
-		matcher, err := space.Matcher(keys)
-		if err != nil {
-			return nil, name, false
-		}
-		selects[name] = conditional{sel, matcher}
-	}
-
-	if len(plain) == 0 && len(selects) == 0 {
-		return func(conditions.Configuration) map[string]starlark.AttributeValue { return nil }, "", true
-	}
-	return func(config conditions.Configuration) map[string]starlark.AttributeValue {
-		variant := make(map[string]starlark.AttributeValue, len(plain)+len(selects))
-		for name, value := range plain {
-			variant[name] = value
-		}
-		for name, c := range selects {
-			i := c.matcher.Branch(config)
-			if i < 0 {
-				continue
-			}
-			value := c.sel.Branches[i].Value
-			if c.sel.Common != nil {
-				common, _ := starlark.Labels(c.sel.Common)
-				extra, _ := starlark.Labels(value)
-				value = starlark.StringListValue{Values: append(append([]string(nil), common...), extra...)}
-			}
-			variant[name] = value
-		}
-		return variant
-	}, "", true
-}
-
 // resolver resolves one package's deps through its language, once per
 // distinct request, and collects what the resolutions report.
 type resolver struct {
@@ -578,6 +545,7 @@ type resolver struct {
 	pkgDir     string
 	dims       []string
 	selfTarget string
+	space      conditions.Space
 	cache      map[string]mapper.PackageMapping
 
 	// messages are the reports of every resolution, each once, in order.
@@ -589,7 +557,7 @@ type resolver struct {
 // Deps on the package's own target are dropped (e.g. when syncing
 // src/python/cargo, //src/python/cargo:cargo).
 func (r *resolver) resolve(config conditions.Configuration, variant map[string]starlark.AttributeValue) (mapper.PackageMapping, error) {
-	req := mapper.Request{Config: config.Project(r.dims), Variant: variant}
+	req := mapper.Request{Config: config.Project(r.dims), Variant: variant, Space: r.space}
 	key := req.Config.String() + "|" + variantKey(variant)
 	if m, ok := r.cache[key]; ok {
 		return m, nil
@@ -612,6 +580,25 @@ func (r *resolver) resolve(config conditions.Configuration, variant map[string]s
 		r.report(fmt.Sprintf("%s dependency %s not synced", u.Reason, u.Dep.ImportPath))
 	}
 	return m, nil
+}
+
+// ownedAttributes returns the attributes other than the deps that the
+// language sets for a target with variant, in any configuration.
+func (r *resolver) ownedAttributes(variant func(conditions.Configuration) map[string]starlark.AttributeValue) ([]string, error) {
+	var names []string
+	for _, config := range r.space.Configurations {
+		m, err := r.resolve(config, variant(config))
+		if err != nil {
+			return nil, err
+		}
+		for name := range m.Attrs {
+			if !slices.Contains(names, name) {
+				names = append(names, name)
+			}
+		}
+	}
+	sort.Strings(names)
+	return names, nil
 }
 
 // report records a message unless it already was.
@@ -797,6 +784,49 @@ func (r *SyncResult) applyConditional(target *starlark.Target, attr string, spac
 		r.Changes = append(r.Changes, change)
 	}
 	return changed, nil
+}
+
+// applyOwned sets a target's attr, an attribute other than the deps that
+// sync owns, to exactly what want returns in each configuration of space,
+// written as a plain list or a select() like the deps. old gives the
+// values the target has in each configuration. Values are compared as
+// sets, and an absent attribute with no values stays absent. It reports
+// whether the attribute changed.
+func (r *SyncResult) applyOwned(target *starlark.Target, attr string, space conditions.Space,
+	old func(conditions.Configuration) []string, want func(conditions.Configuration) ([]string, error)) (bool, error) {
+	values := make(map[string][]string, len(space.Configurations))
+	changed, anyValue := false, false
+	var added, removed []string
+	for _, config := range space.Configurations {
+		oldValues := old(config)
+		newValues, err := want(config)
+		if err != nil {
+			return false, err
+		}
+		if sameDepSet(oldValues, newValues) {
+			newValues = oldValues
+		}
+		values[config.String()] = newValues
+		anyValue = anyValue || len(newValues) > 0
+		if !stringSlicesEqual(oldValues, newValues) {
+			changed = true
+		}
+		a, rm := diffDeps(oldValues, newValues)
+		added = union(added, a)
+		removed = union(removed, rm)
+	}
+	if !changed || (target.GetAttribute(attr) == nil && !anyValue) {
+		return false, nil
+	}
+
+	split := space.Split(func(config conditions.Configuration) []string { return values[config.String()] })
+	var branches []starlark.SelectBranch
+	for _, b := range split.Branches {
+		branches = append(branches, starlark.SelectBranch{Key: b.Key, Value: starlark.StringListValue{Values: b.Labels}})
+	}
+	target.SetSelect(attr, split.Common, branches)
+	r.Changes = append(r.Changes, TargetChange{Target: target.Name, Attribute: attr, Added: added, Removed: removed})
+	return true, nil
 }
 
 // mergeDeps returns the deps a target with oldDeps gets in one

@@ -274,7 +274,11 @@ func printTargetChanges(changes []rulessync.TargetChange, addedLabel, removedLab
 		if len(c.Added) == 0 && len(c.Removed) == 0 {
 			continue
 		}
-		fmt.Fprintf(os.Stderr, "       :%s\n", c.Target)
+		if c.Attribute != "" {
+			fmt.Fprintf(os.Stderr, "       :%s (%s)\n", c.Target, c.Attribute)
+		} else {
+			fmt.Fprintf(os.Stderr, "       :%s\n", c.Target)
+		}
 		if len(c.Added) > 0 {
 			fmt.Fprintf(os.Stderr, "         %s: %v\n", addedLabel, c.Added)
 		}

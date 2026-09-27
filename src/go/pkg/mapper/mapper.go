@@ -135,9 +135,13 @@ type PackageMapping struct {
 	UnmappedTestImports []string
 
 	// UnsyncedDeps are declared deps sync doesn't manage (e.g. a Rust
-	// crate's optional or target-specific dependencies): they are neither
-	// added nor removed.
+	// crate's build dependencies): they are neither added nor removed.
 	UnsyncedDeps []UnsyncedDep
+
+	// Attrs are other attributes of the package's targets that sync owns,
+	// with their values: e.g. a Rust target's "features". An attribute in
+	// Attrs is set to exactly its value; one with no values isn't added.
+	Attrs map[string][]string
 }
 
 // ApplyToRulesStar applies mapped dependencies to a rules.star file.
