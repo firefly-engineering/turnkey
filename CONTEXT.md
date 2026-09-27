@@ -10,6 +10,12 @@ Turnkey is a toolchain-as-code framework for Nix flakes. It turns declarative to
 The one buck2 release a turnkey revision ships: the binary, the prelude built with it, and the buck2 source revision they come from, always moved together. Consumers get it by choosing a turnkey revision, never by declaring buck2 themselves.
 _Avoid_: buck2 version (as a consumer setting), declared buck2, supported buck2 versions
 
+### Rules sync
+
+**Conditional attribute**:
+A target attribute whose value depends on the build configuration, written as a plain value or as `[...] + select({...})` over the platforms turnkey builds for. Its value in a configuration is the plain part followed by the branch that applies, each label once; in a configuration no branch applies to, the plain part alone. Rules sync, the language plug-ins and the cell generators all read and write it the same way.
+_Avoid_: select attribute, variant (which is only the attributes a language reads to resolve deps)
+
 ### Testing
 
 **Test result caching**:
