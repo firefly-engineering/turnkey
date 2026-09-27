@@ -203,12 +203,18 @@ in
         if langCfg.lockFile != null then
           {
             name = "python";
-            sources = [ langCfg.lockFile ];
+            # uv.lock holds the dependency graph: each dependency's marker,
+            # each package's extras
+            sources = [ langCfg.lockFile ] ++ lib.optional (langCfg.uvLockFile != null) langCfg.uvLockFile;
             target = depsFileName langCfg "python-deps.toml";
             generator = [
               "pydeps-gen"
               "--lock"
               langCfg.lockFile
+            ]
+            ++ lib.optionals (langCfg.uvLockFile != null) [
+              "--uv-lock"
+              langCfg.uvLockFile
             ];
           }
         else

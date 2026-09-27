@@ -29,6 +29,11 @@ pkgs.rustPlatform.buildRustPackage {
   cargoBuildFlags = [ "-p" "pydeps-gen" ];
   cargoTestFlags = [ "-p" "pydeps-gen" ];
 
+  # The PEP 508 cases src/go/pkg/pep508 runs too
+  preCheck = ''
+    export TURNKEY_PEP508_VECTORS=${../../src/go/pkg/pep508/testdata/pep508-vectors.json}
+  '';
+
   nativeBuildInputs = [ pkgs.makeWrapper ];
 
   # Wrap the binary to include nix and nix-prefetch-cached in PATH for prefetching

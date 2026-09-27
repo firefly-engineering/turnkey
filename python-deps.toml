@@ -3,7 +3,7 @@
 #
 # To regenerate: pydeps-gen --lock pylock.toml -o python-deps.toml
 
-schema_version = 1
+schema_version = 2
 
 [deps.six]
 version = "1.17.0"

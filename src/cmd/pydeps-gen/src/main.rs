@@ -8,7 +8,7 @@
 //!   2. uv export --format pylock.toml -o pylock.toml  # Export to PEP 751 format
 //!   3. pydeps-gen --lock pylock.toml -o python-deps.toml
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -16,6 +16,8 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
+
+mod pep508;
 
 /// Generate python-deps.toml from Python dependency files
 #[derive(Parser, Debug)]
@@ -49,15 +51,55 @@ struct Args {
     /// Include dev dependencies (from pyproject.toml optional-dependencies.dev)
     #[arg(long, default_value = "false")]
     include_dev: bool,
+
+    /// uv.lock, whose dependency graph (each dependency's marker, each
+    /// package's extras) is recorded with the --lock packages
+    #[arg(long, requires = "lock")]
+    uv_lock: Option<PathBuf>,
 }
 
 /// A Python package dependency with resolved version and hash
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct PythonDep {
     name: String,
     version: String,
     url: String,
     hash: String,
+    /// The lock's environment marker for installing the package at all
+    marker: Option<String>,
+    /// Its dependencies, from uv.lock
+    dependencies: Vec<UvDep>,
+    /// Its extras and the dependencies each adds, from uv.lock
+    extras: BTreeMap<String, Vec<UvDep>>,
+    /// The extras some package or workspace member asks it for
+    requested_extras: Vec<String>,
+}
+
+/// uv.lock, the part pydeps-gen reads: the dependency graph
+#[derive(Debug, Deserialize)]
+struct UvLock {
+    #[serde(default)]
+    package: Vec<UvPackage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct UvPackage {
+    name: String,
+    #[serde(default)]
+    dependencies: Vec<UvDep>,
+    #[serde(default, rename = "optional-dependencies")]
+    optional_dependencies: BTreeMap<String, Vec<UvDep>>,
+}
+
+/// A dependency edge of uv.lock
+#[derive(Debug, Clone, Deserialize)]
+struct UvDep {
+    name: String,
+    #[serde(default)]
+    marker: Option<String>,
+    /// The extras the edge asks for
+    #[serde(default)]
+    extra: Vec<String>,
 }
 
 /// PyPI package JSON API response
@@ -118,6 +160,8 @@ struct PyLockPackage {
     wheels: Vec<PyLockWheel>,
     #[serde(default)]
     directory: Option<toml::Value>,
+    #[serde(default)]
+    marker: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -180,7 +224,10 @@ fn main() -> Result<()> {
 
     // Handle pylock.toml (recommended path - has exact versions and URLs)
     if let Some(path) = &args.lock {
-        let resolved = parse_pylock(path, args.no_prefetch)?;
+        let mut resolved = parse_pylock(path, args.no_prefetch)?;
+        if let Some(uv_lock) = &args.uv_lock {
+            add_uv_graph(&mut resolved, uv_lock)?;
+        }
 
         if resolved.is_empty() {
             eprintln!("Warning: No dependencies found in lock file");
@@ -244,8 +291,9 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-/// Parse a dependency specifier into (name, version_constraint)
-/// Examples: "requests>=2.0", "flask==2.3.0", "numpy"
+/// Parse a dependency specifier (PEP 508) into (name, version_constraint).
+/// Examples: "requests>=2.0", "flask==2.3.0", "numpy". Its marker and
+/// extras are checked but not returned.
 fn parse_dep_specifier(spec: &str) -> (String, Option<String>) {
     let spec = spec.trim();
 
@@ -254,45 +302,30 @@ fn parse_dep_specifier(spec: &str) -> (String, Option<String>) {
         return (String::new(), None);
     }
 
-    // Handle extras: package[extra1,extra2]>=1.0
-    let spec = if let Some(bracket_pos) = spec.find('[') {
-        if let Some(end_bracket) = spec.find(']') {
-            format!("{}{}", &spec[..bracket_pos], &spec[end_bracket + 1..])
-        } else {
-            spec.to_string()
+    match pep508::parse_requirement(spec) {
+        Ok(req) => {
+            let version = (!req.version.is_empty()).then_some(req.version);
+            (req.name, version)
         }
-    } else {
-        spec.to_string()
-    };
-
-    // Handle environment markers: package>=1.0; python_version >= "3.8"
-    let spec = spec.split(';').next().unwrap_or(&spec).trim();
-
-    // Find version specifier
-    for op in &["===", "==", "!=", "~=", ">=", "<=", ">", "<"] {
-        if let Some(pos) = spec.find(op) {
-            let name = spec[..pos].trim().to_lowercase();
-            let version = spec[pos..].trim().to_string();
-            return (normalize_name(&name), Some(version));
+        Err(e) => {
+            eprintln!("Warning: skipping {spec:?}: {e}");
+            (String::new(), None)
         }
     }
-
-    // No version constraint
-    (normalize_name(spec), None)
 }
 
 /// Normalize package name (PEP 503)
 fn normalize_name(name: &str) -> String {
-    name.to_lowercase().replace(['_', '.'], "-")
+    pep508::normalize_name(name)
 }
 
 /// Parse pyproject.toml and extract dependencies
 fn parse_pyproject(path: &PathBuf, include_dev: bool) -> Result<Vec<(String, Option<String>)>> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
 
-    let pyproject: PyProject = toml::from_str(&content)
-        .with_context(|| format!("Failed to parse {}", path.display()))?;
+    let pyproject: PyProject =
+        toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
 
     let mut deps = Vec::new();
 
@@ -333,28 +366,24 @@ fn parse_pyproject(path: &PathBuf, include_dev: bool) -> Result<Vec<(String, Opt
                 }
                 let version = match value {
                     toml::Value::String(v) => Some(format!("=={}", v.trim_start_matches('^'))),
-                    toml::Value::Table(t) => {
-                        t.get("version").and_then(|v| v.as_str()).map(|v| {
-                            format!("=={}", v.trim_start_matches('^'))
-                        })
-                    }
+                    toml::Value::Table(t) => t
+                        .get("version")
+                        .and_then(|v| v.as_str())
+                        .map(|v| format!("=={}", v.trim_start_matches('^'))),
                     _ => None,
                 };
                 deps.push((normalize_name(name), version));
             }
         }
 
-        if include_dev
-            && let Some(dev_deps) = &poetry.dev_dependencies
-        {
+        if include_dev && let Some(dev_deps) = &poetry.dev_dependencies {
             for (name, value) in dev_deps {
                 let version = match value {
                     toml::Value::String(v) => Some(format!("=={}", v.trim_start_matches('^'))),
-                    toml::Value::Table(t) => {
-                        t.get("version").and_then(|v| v.as_str()).map(|v| {
-                            format!("=={}", v.trim_start_matches('^'))
-                        })
-                    }
+                    toml::Value::Table(t) => t
+                        .get("version")
+                        .and_then(|v| v.as_str())
+                        .map(|v| format!("=={}", v.trim_start_matches('^'))),
                     _ => None,
                 };
                 deps.push((normalize_name(name), version));
@@ -367,8 +396,8 @@ fn parse_pyproject(path: &PathBuf, include_dev: bool) -> Result<Vec<(String, Opt
 
 /// Parse requirements.txt and extract dependencies
 fn parse_requirements(path: &PathBuf) -> Result<Vec<(String, Option<String>)>> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
 
     let mut deps = Vec::new();
 
@@ -397,11 +426,11 @@ fn parse_requirements(path: &PathBuf) -> Result<Vec<(String, Option<String>)>> {
 /// Parse pylock.toml (PEP 751 lock file) and extract resolved dependencies
 /// This is the recommended path for reproducible builds since it has exact versions and URLs
 fn parse_pylock(path: &PathBuf, no_prefetch: bool) -> Result<Vec<PythonDep>> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
 
-    let pylock: PyLock = toml::from_str(&content)
-        .with_context(|| format!("Failed to parse {}", path.display()))?;
+    let pylock: PyLock =
+        toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
 
     eprintln!("Parsed pylock.toml (lock-version: {})", pylock.lock_version);
 
@@ -461,6 +490,8 @@ fn parse_pylock(path: &PathBuf, no_prefetch: bool) -> Result<Vec<PythonDep>> {
             version,
             url,
             hash,
+            marker: pkg.marker.clone(),
+            ..Default::default()
         });
     }
 
@@ -468,6 +499,59 @@ fn parse_pylock(path: &PathBuf, no_prefetch: bool) -> Result<Vec<PythonDep>> {
     resolved.sort_by(|a, b| a.name.cmp(&b.name));
 
     Ok(resolved)
+}
+
+/// Add uv.lock's dependency graph to the resolved packages: each one's
+/// dependencies and extras, and the extras some edge (from a package or a
+/// workspace member) asks it for. Markers are checked, and kept as
+/// written.
+fn add_uv_graph(resolved: &mut [PythonDep], path: &PathBuf) -> Result<()> {
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let lock: UvLock =
+        toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
+
+    let mut requested: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for pkg in &lock.package {
+        let edges = pkg
+            .dependencies
+            .iter()
+            .chain(pkg.optional_dependencies.values().flatten());
+        for edge in edges {
+            if let Some(marker) = &edge.marker {
+                pep508::parse_marker(marker)
+                    .with_context(|| format!("{}'s dependency on {}", pkg.name, edge.name))?;
+            }
+            let extras = requested.entry(normalize_name(&edge.name)).or_default();
+            for extra in &edge.extra {
+                let extra = normalize_name(extra);
+                if !extras.contains(&extra) {
+                    extras.push(extra);
+                }
+            }
+        }
+    }
+
+    let graph: BTreeMap<String, &UvPackage> = lock
+        .package
+        .iter()
+        .map(|p| (normalize_name(&p.name), p))
+        .collect();
+    for dep in resolved.iter_mut() {
+        let name = normalize_name(&dep.name);
+        if let Some(pkg) = graph.get(&name) {
+            dep.dependencies = pkg.dependencies.clone();
+            dep.extras = pkg
+                .optional_dependencies
+                .iter()
+                .map(|(extra, deps)| (normalize_name(extra), deps.clone()))
+                .collect();
+        }
+        let mut extras = requested.remove(&name).unwrap_or_default();
+        extras.sort();
+        dep.requested_extras = extras;
+    }
+    Ok(())
 }
 
 /// Resolve dependencies: fetch version info from PyPI and compute hashes
@@ -528,9 +612,10 @@ fn resolve_single_dep(
     };
 
     // Find sdist (source distribution) URL for this version
-    let releases = response.releases.get(&version).ok_or_else(|| {
-        anyhow!("Version {} not found for {}", version, name)
-    })?;
+    let releases = response
+        .releases
+        .get(&version)
+        .ok_or_else(|| anyhow!("Version {} not found for {}", version, name))?;
 
     // Prefer .tar.gz sdist
     let release = releases
@@ -553,6 +638,7 @@ fn resolve_single_dep(
         version,
         url: release.url.clone(),
         hash,
+        ..Default::default()
     })
 }
 
@@ -591,17 +677,155 @@ fn generate_toml(deps: &[PythonDep], source: &str) -> String {
     output.push_str(&format!("# To regenerate: {}\n", regen_cmd));
     output.push('\n');
 
-    // Schema version for forward compatibility
-    output.push_str("schema_version = 1\n");
+    // Schema version for forward compatibility: 2 records markers and
+    // extras (docs/user-manual/src/languages/python.md)
+    output.push_str("schema_version = 2\n");
     output.push('\n');
 
     for dep in deps {
-        output.push_str(&format!("[deps.{}]\n", dep.name.to_lowercase().replace('-', "_")));
+        let key = dep_key(&dep.name);
+        output.push_str(&format!("[deps.{key}]\n"));
         output.push_str(&format!("version = \"{}\"\n", dep.version));
         output.push_str(&format!("hash = \"{}\"\n", dep.hash));
         output.push_str(&format!("url = \"{}\"\n", dep.url));
+        if let Some(marker) = &dep.marker {
+            output.push_str(&format!("marker = {}\n", toml_string(marker)));
+        }
+        if !dep.dependencies.is_empty() {
+            output.push_str(&format!(
+                "dependencies = {}\n",
+                format_deps(&dep.dependencies)
+            ));
+        }
+        if !dep.requested_extras.is_empty() {
+            let extras: Vec<String> = dep
+                .requested_extras
+                .iter()
+                .map(|e| toml_string(e))
+                .collect();
+            output.push_str(&format!("requested_extras = [{}]\n", extras.join(", ")));
+        }
+        if !dep.extras.is_empty() {
+            output.push_str(&format!("\n[deps.{key}.extras]\n"));
+            for (extra, deps) in &dep.extras {
+                output.push_str(&format!("{} = {}\n", toml_string(extra), format_deps(deps)));
+            }
+        }
         output.push('\n');
     }
 
     output
+}
+
+/// A package's key in python-deps.toml, and its name in the pydeps cell:
+/// its normalized name with _ for -
+fn dep_key(name: &str) -> String {
+    normalize_name(name).replace('-', "_")
+}
+
+/// A TOML string literal
+fn toml_string(s: &str) -> String {
+    toml::Value::String(s.to_string()).to_string()
+}
+
+/// Dependency edges as a TOML array of inline tables: each package by its
+/// key, with its marker and the extras it asks for, if any
+fn format_deps(deps: &[UvDep]) -> String {
+    let items: Vec<String> = deps
+        .iter()
+        .map(|d| {
+            let mut fields = vec![format!("name = {}", toml_string(&dep_key(&d.name)))];
+            if let Some(marker) = &d.marker {
+                fields.push(format!("marker = {}", toml_string(marker)));
+            }
+            if !d.extra.is_empty() {
+                let extras: Vec<String> = d
+                    .extra
+                    .iter()
+                    .map(|e| toml_string(&normalize_name(e)))
+                    .collect();
+                fields.push(format!("extras = [{}]", extras.join(", ")));
+            }
+            format!("{{ {} }}", fields.join(", "))
+        })
+        .collect();
+    format!("[{}]", items.join(", "))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const UV_LOCK: &str = r#"
+version = 1
+
+[[package]]
+name = "app"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [{ name = "Requests", extra = ["socks"] }]
+
+[[package]]
+name = "requests"
+version = "2.32.0"
+dependencies = [
+    { name = "urllib3" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+]
+
+[package.optional-dependencies]
+socks = [{ name = "PySocks", marker = "python_version >= '3.8'" }]
+"#;
+
+    #[test]
+    fn records_markers_and_extras() {
+        let dir = std::env::temp_dir().join(format!("pydeps-gen-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("uv.lock");
+        fs::write(&path, UV_LOCK).unwrap();
+
+        let mut resolved = vec![PythonDep {
+            name: "requests".into(),
+            version: "2.32.0".into(),
+            url: "https://example.com/requests.tar.gz".into(),
+            hash: "sha256-x".into(),
+            marker: Some("python_version >= \"3.8\"".into()),
+            ..Default::default()
+        }];
+        add_uv_graph(&mut resolved, &path).unwrap();
+        let toml = generate_toml(&resolved, "pylock.toml");
+        fs::remove_dir_all(&dir).unwrap();
+
+        assert!(toml.contains("schema_version = 2"), "{toml}");
+        assert!(
+            toml.contains(r#"marker = 'python_version >= "3.8"'"#),
+            "{toml}"
+        );
+        assert!(
+            toml.contains(r#"dependencies = [{ name = "urllib3" }, { name = "colorama", marker = "sys_platform == 'win32'" }]"#),
+            "{toml}"
+        );
+        assert!(toml.contains(r#"requested_extras = ["socks"]"#), "{toml}");
+        assert!(
+            toml.contains("[deps.requests.extras]\n\"socks\" = [{ name = \"pysocks\", marker = \"python_version >= '3.8'\" }]"),
+            "{toml}"
+        );
+        // It is TOML
+        let parsed: toml::Value = toml::from_str(&toml).unwrap();
+        assert_eq!(
+            parsed["deps"]["requests"]["dependencies"][1]["name"].as_str(),
+            Some("colorama")
+        );
+    }
+
+    #[test]
+    fn dep_specifiers_parse_as_pep508() {
+        assert_eq!(
+            parse_dep_specifier("Foo_Bar[x] >= 1.0 ; sys_platform == 'linux'"),
+            ("foo-bar".to_string(), Some(">= 1.0".to_string()))
+        );
+        assert_eq!(parse_dep_specifier("numpy"), ("numpy".to_string(), None));
+        // A malformed marker is skipped, not mangled
+        assert_eq!(parse_dep_specifier("x ; nonsense == 'y'").0, "");
+    }
 }
