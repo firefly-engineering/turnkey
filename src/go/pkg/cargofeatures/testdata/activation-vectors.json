@@ -1,0 +1,434 @@
+{
+  "description": "Cargo feature activation: a crate's [features], its optional and required dependency keys, the requested and removed features, and what they turn on. Read by src/go/pkg/cargofeatures and turnkey.cargo.features.activate (src/python/cargo) alike, so the two can't drift apart.",
+  "cases": [
+    {
+      "name": "default expands",
+      "features": {
+        "default": [
+          "std"
+        ],
+        "std": [
+          "alloc"
+        ],
+        "alloc": []
+      },
+      "requested": [
+        "default"
+      ],
+      "want": {
+        "features": [
+          "alloc",
+          "std"
+        ],
+        "optional_deps": [],
+        "dep_features": {}
+      },
+      "optional": [],
+      "required": [],
+      "remove": []
+    },
+    {
+      "name": "no default without asking",
+      "features": {
+        "default": [
+          "std"
+        ],
+        "std": []
+      },
+      "requested": [],
+      "want": {
+        "features": [],
+        "optional_deps": [],
+        "dep_features": {}
+      },
+      "optional": [],
+      "required": [],
+      "remove": []
+    },
+    {
+      "name": "dep: enables an optional dependency without a feature of its name",
+      "features": {
+        "fuse": [
+          "dep:fuser",
+          "dep:libc"
+        ]
+      },
+      "optional": [
+        "fuser",
+        "libc"
+      ],
+      "requested": [
+        "fuse"
+      ],
+      "want": {
+        "features": [
+          "fuse"
+        ],
+        "optional_deps": [
+          "fuser",
+          "libc"
+        ],
+        "dep_features": {}
+      },
+      "required": [],
+      "remove": []
+    },
+    {
+      "name": "implicit feature of an optional dependency",
+      "features": {
+        "io": [
+          "memchr"
+        ]
+      },
+      "optional": [
+        "memchr"
+      ],
+      "requested": [
+        "io"
+      ],
+      "want": {
+        "features": [
+          "io",
+          "memchr"
+        ],
+        "optional_deps": [
+          "memchr"
+        ],
+        "dep_features": {}
+      },
+      "required": [],
+      "remove": []
+    },
+    {
+      "name": "a dep: name has no implicit feature",
+      "features": {
+        "compat": [
+          "dep:futures_01"
+        ]
+      },
+      "optional": [
+        "futures_01"
+      ],
+      "requested": [
+        "futures_01"
+      ],
+      "want": {
+        "features": [
+          "futures_01"
+        ],
+        "optional_deps": [],
+        "dep_features": {}
+      },
+      "required": [],
+      "remove": []
+    },
+    {
+      "name": "x/feat activates an optional x, and x's implicit feature, and forwards",
+      "features": {
+        "serde": [
+          "dep:serde",
+          "chrono/serde"
+        ]
+      },
+      "optional": [
+        "serde",
+        "chrono"
+      ],
+      "requested": [
+        "serde"
+      ],
+      "want": {
+        "features": [
+          "chrono",
+          "serde"
+        ],
+        "optional_deps": [
+          "chrono",
+          "serde"
+        ],
+        "dep_features": {
+          "chrono": [
+            "serde"
+          ]
+        }
+      },
+      "required": [],
+      "remove": []
+    },
+    {
+      "name": "x/feat on a required dependency only forwards",
+      "features": {
+        "std": [
+          "log/std"
+        ]
+      },
+      "required": [
+        "log"
+      ],
+      "requested": [
+        "std"
+      ],
+      "want": {
+        "features": [
+          "std"
+        ],
+        "optional_deps": [],
+        "dep_features": {
+          "log": [
+            "std"
+          ]
+        }
+      },
+      "optional": [],
+      "remove": []
+    },
+    {
+      "name": "weak x?/feat forwards only when x is active",
+      "features": {
+        "std": [
+          "serde?/std"
+        ]
+      },
+      "optional": [
+        "serde"
+      ],
+      "requested": [
+        "std"
+      ],
+      "want": {
+        "features": [
+          "std"
+        ],
+        "optional_deps": [],
+        "dep_features": {}
+      },
+      "required": [],
+      "remove": []
+    },
+    {
+      "name": "weak x?/feat with x active",
+      "features": {
+        "std": [
+          "serde?/std"
+        ],
+        "ser": [
+          "dep:serde"
+        ]
+      },
+      "optional": [
+        "serde"
+      ],
+      "requested": [
+        "std",
+        "ser"
+      ],
+      "want": {
+        "features": [
+          "ser",
+          "std"
+        ],
+        "optional_deps": [
+          "serde"
+        ],
+        "dep_features": {
+          "serde": [
+            "std"
+          ]
+        }
+      },
+      "required": [],
+      "remove": []
+    },
+    {
+      "name": "weak on a required dependency forwards",
+      "features": {
+        "std": [
+          "log?/std"
+        ]
+      },
+      "required": [
+        "log"
+      ],
+      "requested": [
+        "std"
+      ],
+      "want": {
+        "features": [
+          "std"
+        ],
+        "optional_deps": [],
+        "dep_features": {
+          "log": [
+            "std"
+          ]
+        }
+      },
+      "optional": [],
+      "remove": []
+    },
+    {
+      "name": "x/feat turns on x's explicit feature",
+      "features": {
+        "tls": [
+          "rustls/ring"
+        ],
+        "rustls": [
+          "dep:rustls",
+          "extra"
+        ],
+        "extra": []
+      },
+      "optional": [
+        "rustls"
+      ],
+      "requested": [
+        "tls"
+      ],
+      "want": {
+        "features": [
+          "extra",
+          "rustls",
+          "tls"
+        ],
+        "optional_deps": [
+          "rustls"
+        ],
+        "dep_features": {
+          "rustls": [
+            "ring"
+          ]
+        }
+      },
+      "required": [],
+      "remove": []
+    },
+    {
+      "name": "feature-to-feature chains",
+      "features": {
+        "full": [
+          "a",
+          "b"
+        ],
+        "a": [
+          "c"
+        ],
+        "b": [],
+        "c": []
+      },
+      "requested": [
+        "full"
+      ],
+      "want": {
+        "features": [
+          "a",
+          "b",
+          "c",
+          "full"
+        ],
+        "optional_deps": [],
+        "dep_features": {}
+      },
+      "optional": [],
+      "required": [],
+      "remove": []
+    },
+    {
+      "name": "removing default drops the default set",
+      "features": {
+        "default": [
+          "std"
+        ],
+        "std": []
+      },
+      "requested": [
+        "default"
+      ],
+      "remove": [
+        "default"
+      ],
+      "want": {
+        "features": [],
+        "optional_deps": [],
+        "dep_features": {}
+      },
+      "optional": [],
+      "required": []
+    },
+    {
+      "name": "a removed feature's items stay off",
+      "features": {
+        "default": [
+          "std",
+          "net"
+        ],
+        "std": [],
+        "net": [
+          "dep:socket2"
+        ]
+      },
+      "optional": [
+        "socket2"
+      ],
+      "requested": [
+        "default"
+      ],
+      "remove": [
+        "net"
+      ],
+      "want": {
+        "features": [
+          "std"
+        ],
+        "optional_deps": [],
+        "dep_features": {}
+      },
+      "required": []
+    },
+    {
+      "name": "composition on Linux",
+      "features": {
+        "default": [],
+        "fuse": [
+          "dep:fuser",
+          "dep:libc"
+        ],
+        "fuse-t": [
+          "dep:libc"
+        ],
+        "watcher": [
+          "dep:notify",
+          "dep:notify-debouncer-mini"
+        ]
+      },
+      "optional": [
+        "fuser",
+        "libc",
+        "notify",
+        "notify-debouncer-mini"
+      ],
+      "required": [
+        "log",
+        "serde"
+      ],
+      "requested": [
+        "default",
+        "watcher",
+        "fuse"
+      ],
+      "want": {
+        "features": [
+          "fuse",
+          "watcher"
+        ],
+        "optional_deps": [
+          "fuser",
+          "libc",
+          "notify",
+          "notify-debouncer-mini"
+        ],
+        "dep_features": {}
+      },
+      "remove": []
+    }
+  ]
+}

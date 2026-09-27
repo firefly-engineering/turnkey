@@ -44,3 +44,15 @@ python_test(
         "//src/python/cfg:cfg",
     ],
 )
+
+# The feature activation cases src/go/pkg/cargofeatures runs too
+python_test(
+    name = "test-activation-vectors",
+    srcs = ["tests/test_activation_vectors.py"],
+    base_module = "tests",
+    env = {"TURNKEY_ACTIVATION_VECTORS": "$(location //src/go/pkg/cargofeatures:activation-vectors)"},
+    deps = [
+        ":cargo",
+        "//src/python/cfg:cfg",
+    ],
+)
