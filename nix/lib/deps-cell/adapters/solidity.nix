@@ -76,7 +76,7 @@ rec {
     # For git packages
     repo ? null,        # Git repository URL
     rev ? null,         # Git revision/tag/branch
-    hash ? null,        # SRI hash of the unpacked `url` archive (soldeps-gen --prefetch)
+    hash ? null,        # SRI hash of the unpacked `url` archive (soldeps-gen prefetches it)
 
     # Auto-generated remapping from soldeps-gen
     remapping ? null,

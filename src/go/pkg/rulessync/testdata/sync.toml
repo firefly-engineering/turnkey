@@ -59,7 +59,7 @@ sources = ["pnpm-lock.yaml"]
 target = "js-deps.toml"
 
 [[deps]]
-generator = ["soldeps-gen", "--foundry", "foundry.toml", "--package-json", "package.json", "--pnpm-lock", "pnpm-lock.yaml", "--prefetch"]
+generator = ["soldeps-gen", "--foundry", "foundry.toml", "--package-json", "package.json", "--pnpm-lock", "pnpm-lock.yaml"]
 name = "solidity"
 sources = ["foundry.toml", "package.json", "pnpm-lock.yaml"]
 target = "solidity-deps.toml"

@@ -6,11 +6,12 @@ rust_binary(
     srcs = glob(["src/**/*.rs", "VERSION.txt"]),
     edition = "2024",
     deps = [
+        "//src/rust/deps-gen-kit:deps-gen-kit",
         "rustdeps//vendor/anyhow:anyhow",
         "rustdeps//vendor/clap:clap",
+        "rustdeps//vendor/serde-saphyr:serde-saphyr",
         "rustdeps//vendor/serde:serde",
         "rustdeps//vendor/serde_json:serde_json",
-        "rustdeps//vendor/serde-saphyr:serde-saphyr",
         "rustdeps//vendor/toml:toml",
         "rustdeps//vendor/ureq:ureq",
     ],

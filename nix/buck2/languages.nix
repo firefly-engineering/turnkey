@@ -350,7 +350,6 @@ in
           langCfg.packageJsonFile
           "--pnpm-lock"
           langCfg.pnpmLockFile
-          "--prefetch"
         ];
       };
   }

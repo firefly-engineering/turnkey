@@ -7,6 +7,7 @@ description = "Generate solidity-deps.toml from foundry.toml and package.json fo
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
+deps-gen-kit.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde-saphyr.workspace = true

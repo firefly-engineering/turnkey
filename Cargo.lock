@@ -2080,6 +2080,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "deps-gen-kit",
  "serde",
  "serde-saphyr",
  "serde_json",

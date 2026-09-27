@@ -25,10 +25,10 @@ const VERSION: &str = {
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use deps_gen_kit::{OutputArgs, PrefetchArgs, Prefetcher};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -49,15 +49,14 @@ struct Args {
     #[arg(long)]
     pnpm_lock: Option<PathBuf>,
 
-    /// Output file path (default: stdout)
-    #[arg(short = 'o', long)]
-    output: Option<PathBuf>,
+    #[command(flatten)]
+    output: OutputArgs,
 
-    /// Pin every dependency for Nix: resolve git refs to commits, and fetch
-    /// the Nix hashes of GitHub archives and of npm tarballs the pnpm lock
-    /// has no integrity for (through nix-prefetch-cached)
-    #[arg(long, default_value = "false")]
-    prefetch: bool,
+    /// Prefetching pins every dependency for Nix: it resolves git refs to
+    /// commits, and fetches the Nix hashes of GitHub archives and of npm
+    /// tarballs the pnpm lock has no integrity for
+    #[command(flatten)]
+    prefetch: PrefetchArgs,
 }
 
 /// Represents a package in the output TOML
@@ -260,19 +259,17 @@ fn parse_pnpm_lock(path: &PathBuf) -> Result<BTreeMap<String, String>> {
     Ok(integrity_map)
 }
 
-/// The network lookups prefetching needs
-trait Prefetcher {
+/// The git lookup prefetching needs, next to the hashes deps-gen-kit's
+/// Prefetcher gets
+trait RefResolver {
     /// Resolve a git ref (tag, branch or HEAD) of a repository to a commit
     fn resolve_ref(&self, repo: &str, git_ref: &str) -> Result<String>;
-
-    /// Nix SRI hash of a URL, of its unpacked contents when `unpack` is set
-    fn prefetch_url(&self, url: &str, unpack: bool) -> Result<String>;
 }
 
-/// Prefetcher backed by `git ls-remote` and `nix-prefetch-cached`
-struct NixPrefetcher;
+/// RefResolver backed by `git ls-remote`
+struct GitRefResolver;
 
-impl Prefetcher for NixPrefetcher {
+impl RefResolver for GitRefResolver {
     fn resolve_ref(&self, repo: &str, git_ref: &str) -> Result<String> {
         // Asking for `<ref>^{}` too makes ls-remote list the commit an
         // annotated tag points to, next to the tag object itself
@@ -290,31 +287,6 @@ impl Prefetcher for NixPrefetcher {
 
         peeled_commit(&String::from_utf8_lossy(&output.stdout), git_ref)
             .ok_or_else(|| anyhow::anyhow!("Could not resolve {} in {}", git_ref, repo))
-    }
-
-    fn prefetch_url(&self, url: &str, unpack: bool) -> Result<String> {
-        // nix-prefetch-cached keeps turnkey's prefetch cache and returns an SRI
-        // hash; soldeps-gen's wrapper puts it on PATH
-        let mut cmd = Command::new("nix-prefetch-cached");
-        if unpack {
-            cmd.arg("--unpack");
-        }
-        let output = cmd
-            .arg(url)
-            .output()
-            .context("Failed to run nix-prefetch-cached")?;
-
-        if !output.status.success() {
-            anyhow::bail!(
-                "prefetch failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
-
-        Ok(String::from_utf8(output.stdout)
-            .context("Invalid UTF-8 from nix-prefetch-cached")?
-            .trim()
-            .to_string())
     }
 }
 
@@ -370,7 +342,11 @@ fn github_archive_url(repo: &str, commit: &str) -> Option<String> {
 /// archive of that commit and its hash, which the soldeps cell fetches as a
 /// fixed-output derivation. An npm package the pnpm lock gave no integrity
 /// gets the hash of its tarball.
-fn prefetch_package(pkg: &mut OutputPackage, prefetcher: &dyn Prefetcher) {
+fn prefetch_package(
+    pkg: &mut OutputPackage,
+    refs: &dyn RefResolver,
+    prefetcher: &mut dyn Prefetcher,
+) {
     match pkg.source.as_str() {
         "git" => {
             let Some(repo) = pkg.repo.clone() else { return };
@@ -380,7 +356,7 @@ fn prefetch_package(pkg: &mut OutputPackage, prefetcher: &dyn Prefetcher) {
                 git_ref
             } else {
                 eprintln!("  resolving {}@{}...", repo, git_ref);
-                match prefetcher.resolve_ref(&repo, &git_ref) {
+                match refs.resolve_ref(&repo, &git_ref) {
                     Ok(commit) => {
                         eprintln!("  {} -> {}", git_ref, &commit[..12.min(commit.len())]);
                         commit
@@ -397,7 +373,7 @@ fn prefetch_package(pkg: &mut OutputPackage, prefetcher: &dyn Prefetcher) {
                 eprintln!("  {}: not on GitHub, pinned by commit only", pkg.name);
                 return;
             };
-            match prefetcher.prefetch_url(&url, true) {
+            match prefetcher.prefetch(&url, true) {
                 Ok(hash) => {
                     pkg.url = Some(url);
                     pkg.hash = Some(hash);
@@ -411,7 +387,7 @@ fn prefetch_package(pkg: &mut OutputPackage, prefetcher: &dyn Prefetcher) {
             }
             let Some(url) = pkg.url.clone() else { return };
             eprintln!("  prefetching {}...", url);
-            match prefetcher.prefetch_url(&url, false) {
+            match prefetcher.prefetch(&url, false) {
                 Ok(hash) => pkg.integrity = Some(hash),
                 Err(e) => eprintln!("  warning: failed to prefetch {}: {}", url, e),
             }
@@ -530,10 +506,10 @@ fn main() -> Result<()> {
         }
     }
 
-    if args.prefetch {
+    if let Some(mut prefetcher) = args.prefetch.prefetcher() {
         eprintln!("Prefetching...");
         for pkg in &mut output_packages {
-            prefetch_package(pkg, &NixPrefetcher);
+            prefetch_package(pkg, &GitRefResolver, &mut prefetcher);
         }
     }
 
@@ -550,20 +526,8 @@ fn main() -> Result<()> {
         packages: output_packages,
     };
 
-    // Serialize to TOML
-    let toml_str = toml::to_string_pretty(&output).context("Failed to serialize to TOML")?;
-
-    // Write output
-    if let Some(output_path) = args.output {
-        let mut file = fs::File::create(&output_path)
-            .with_context(|| format!("Failed to create {}", output_path.display()))?;
-        file.write_all(toml_str.as_bytes())?;
-        eprintln!("Wrote {}", output_path.display());
-    } else {
-        print!("{}", toml_str);
-    }
-
-    Ok(())
+    args.output
+        .write("soldeps-gen", "foundry.toml and package.json", &output)
 }
 
 #[cfg(test)]
@@ -615,15 +579,16 @@ mod tests {
         assert!(!is_solidity_package("typescript"));
     }
 
-    /// Records every call and answers from fixed tables.
+    use deps_gen_kit::MemoryPrefetcher;
+
+    /// Records every call and answers from a fixed table.
     #[derive(Default)]
-    struct FakePrefetcher {
+    struct FakeRefs {
         commits: BTreeMap<(String, String), String>,
-        hashes: BTreeMap<(String, bool), String>,
         calls: std::cell::RefCell<Vec<String>>,
     }
 
-    impl Prefetcher for FakePrefetcher {
+    impl RefResolver for FakeRefs {
         fn resolve_ref(&self, repo: &str, git_ref: &str) -> Result<String> {
             self.calls
                 .borrow_mut()
@@ -633,24 +598,14 @@ mod tests {
                 .cloned()
                 .ok_or_else(|| anyhow::anyhow!("unknown ref {git_ref}"))
         }
-
-        fn prefetch_url(&self, url: &str, unpack: bool) -> Result<String> {
-            self.calls
-                .borrow_mut()
-                .push(format!("prefetch {url} unpack={unpack}"));
-            self.hashes
-                .get(&(url.to_string(), unpack))
-                .cloned()
-                .ok_or_else(|| anyhow::anyhow!("unknown url {url}"))
-        }
     }
 
     const COMMIT: &str = "b6a506db2262cad5ff982a87789ee6d1558ec861";
 
     #[test]
     fn test_prefetch_github_dep_pins_commit_and_archive_hash() {
-        let mut fake = FakePrefetcher::default();
-        fake.commits.insert(
+        let mut refs = FakeRefs::default();
+        refs.commits.insert(
             (
                 "https://github.com/foundry-rs/forge-std".into(),
                 "v1.8.0".into(),
@@ -658,14 +613,13 @@ mod tests {
             COMMIT.into(),
         );
         let archive = format!("https://github.com/foundry-rs/forge-std/archive/{COMMIT}.tar.gz");
-        fake.hashes
-            .insert((archive.clone(), true), "sha256-forge".into());
+        let mut hashes = MemoryPrefetcher::default().with(&archive, true, "sha256-forge");
 
         let mut pkg = parse_foundry_dep(
             "forge-std",
             "https://github.com/foundry-rs/forge-std@v1.8.0",
         );
-        prefetch_package(&mut pkg, &fake);
+        prefetch_package(&mut pkg, &refs, &mut hashes);
 
         assert_eq!(pkg.version, "v1.8.0");
         assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
@@ -675,21 +629,19 @@ mod tests {
 
     #[test]
     fn test_prefetch_git_dep_without_rev_resolves_head() {
-        let mut fake = FakePrefetcher::default();
-        fake.commits.insert(
+        let mut refs = FakeRefs::default();
+        refs.commits.insert(
             ("https://github.com/vectorized/solady".into(), "HEAD".into()),
             COMMIT.into(),
         );
-        fake.hashes.insert(
-            (
-                format!("https://github.com/vectorized/solady/archive/{COMMIT}.tar.gz"),
-                true,
-            ),
-            "sha256-solady".into(),
+        let mut hashes = MemoryPrefetcher::default().with(
+            &format!("https://github.com/vectorized/solady/archive/{COMMIT}.tar.gz"),
+            true,
+            "sha256-solady",
         );
 
         let mut pkg = parse_foundry_dep("solady", "https://github.com/vectorized/solady");
-        prefetch_package(&mut pkg, &fake);
+        prefetch_package(&mut pkg, &refs, &mut hashes);
 
         assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
         assert_eq!(pkg.hash.as_deref(), Some("sha256-solady"));
@@ -697,52 +649,48 @@ mod tests {
 
     #[test]
     fn test_prefetch_git_dep_already_at_commit_skips_resolution() {
-        let mut fake = FakePrefetcher::default();
-        fake.hashes.insert(
-            (
-                format!("https://github.com/foundry-rs/forge-std/archive/{COMMIT}.tar.gz"),
-                true,
-            ),
-            "sha256-forge".into(),
+        let refs = FakeRefs::default();
+        let mut hashes = MemoryPrefetcher::default().with(
+            &format!("https://github.com/foundry-rs/forge-std/archive/{COMMIT}.tar.gz"),
+            true,
+            "sha256-forge",
         );
 
         let mut pkg = parse_foundry_dep(
             "forge-std",
             &format!("https://github.com/foundry-rs/forge-std@{COMMIT}"),
         );
-        prefetch_package(&mut pkg, &fake);
+        prefetch_package(&mut pkg, &refs, &mut hashes);
 
         assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
-        assert!(
-            fake.calls
-                .borrow()
-                .iter()
-                .all(|c| !c.starts_with("resolve"))
-        );
+        assert!(refs.calls.borrow().is_empty());
     }
 
     #[test]
     fn test_prefetch_non_github_dep_pins_commit_without_hash() {
-        let mut fake = FakePrefetcher::default();
-        fake.commits.insert(
+        let mut refs = FakeRefs::default();
+        refs.commits.insert(
             ("https://gitlab.com/acme/lib".into(), "v1".into()),
             COMMIT.into(),
         );
+        let mut hashes = MemoryPrefetcher::default();
 
         let mut pkg = parse_foundry_dep("lib", "https://gitlab.com/acme/lib@v1");
-        prefetch_package(&mut pkg, &fake);
+        prefetch_package(&mut pkg, &refs, &mut hashes);
 
         assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
         assert_eq!(pkg.url, None);
         assert_eq!(pkg.hash, None);
+        assert!(hashes.calls.is_empty());
     }
 
     #[test]
     fn test_prefetch_git_dep_keeps_ref_when_resolution_fails() {
-        let fake = FakePrefetcher::default();
+        let refs = FakeRefs::default();
+        let mut hashes = MemoryPrefetcher::default();
 
         let mut pkg = parse_foundry_dep("forge-std", "https://github.com/foundry-rs/forge-std@v9");
-        prefetch_package(&mut pkg, &fake);
+        prefetch_package(&mut pkg, &refs, &mut hashes);
 
         assert_eq!(pkg.rev.as_deref(), Some("v9"));
         assert_eq!(pkg.hash, None);
@@ -751,28 +699,30 @@ mod tests {
     #[test]
     fn test_prefetch_npm_dep_without_integrity_hashes_tarball() {
         let url = npm_tarball_url("@openzeppelin/contracts", "5.4.0");
-        let mut fake = FakePrefetcher::default();
-        fake.hashes.insert((url.clone(), false), "sha256-oz".into());
+        let refs = FakeRefs::default();
+        let mut hashes = MemoryPrefetcher::default().with(&url, false, "sha256-oz");
 
         let mut pkg = npm_package("@openzeppelin/contracts", "5.4.0", None);
-        prefetch_package(&mut pkg, &fake);
+        prefetch_package(&mut pkg, &refs, &mut hashes);
 
         assert_eq!(pkg.integrity.as_deref(), Some("sha256-oz"));
     }
 
     #[test]
     fn test_prefetch_npm_dep_keeps_lockfile_integrity() {
-        let fake = FakePrefetcher::default();
+        let refs = FakeRefs::default();
+        let mut hashes = MemoryPrefetcher::default();
 
         let mut pkg = npm_package(
             "@openzeppelin/contracts",
             "5.4.0",
             Some("sha512-lock".into()),
         );
-        prefetch_package(&mut pkg, &fake);
+        prefetch_package(&mut pkg, &refs, &mut hashes);
 
         assert_eq!(pkg.integrity.as_deref(), Some("sha512-lock"));
-        assert!(fake.calls.borrow().is_empty());
+        assert!(refs.calls.borrow().is_empty());
+        assert!(hashes.calls.is_empty());
     }
 
     #[test]
