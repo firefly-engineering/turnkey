@@ -6,7 +6,9 @@ import (
 	"os/exec"
 	"sort"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
 )
 
 // TargetKind is what a Buck2 rule builds, as far as sync is concerned.
@@ -42,11 +44,43 @@ type Language interface {
 	// changes make the language's targets stale.
 	SourcePatterns() []string
 
-	// ResolveDeps returns the deps of the package in pkgDir: Deps for its
-	// library and binary targets, TestDeps for what its test targets need
-	// beyond those, and what couldn't be mapped or isn't synced.
-	ResolveDeps(pkgDir string) (PackageMapping, error)
+	// Dimensions names the configuration dimensions (conditions.OS,
+	// conditions.CPU) the deps of the package in pkgDir depend on, or none.
+	// Sync resolves the package once per combination of their values, and
+	// writes deps that differ as a select().
+	Dimensions(pkgDir string) ([]string, error)
+
+	// VariantAttributes names the attributes of a target of kind that
+	// select which variant of the package it builds (e.g. Rust features),
+	// or none. Sync reads them from the target, evaluating a select() for
+	// each configuration, and passes them to ResolveDeps.
+	VariantAttributes(kind TargetKind) []string
+
+	// ResolveDeps returns the deps of the package in pkgDir, for one
+	// configuration and variant: Deps for its library and binary targets,
+	// TestDeps for what its test targets need beyond those, and what
+	// couldn't be mapped or isn't synced.
+	ResolveDeps(pkgDir string, req Request) (PackageMapping, error)
 }
+
+// Request is what one resolution of a package's deps is for.
+type Request struct {
+	// Config gives a value to each of the language's dimensions for the
+	// package; it is empty when the deps don't depend on the configuration.
+	Config conditions.Configuration
+
+	// Variant holds the target's variant attributes (VariantAttributes)
+	// that it sets, as they are in the configuration being resolved.
+	Variant map[string]starlark.AttributeValue
+}
+
+// unconditional is embedded by a language whose deps depend on neither the
+// configuration nor a variant.
+type unconditional struct{}
+
+func (unconditional) Dimensions(string) ([]string, error) { return nil, nil }
+
+func (unconditional) VariantAttributes(TargetKind) []string { return nil }
 
 // registry holds the language plug-ins, in the order sync tries them. Each
 // is created for a project root and loads its own configuration from it.

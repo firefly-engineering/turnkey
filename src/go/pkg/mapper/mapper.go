@@ -57,6 +57,12 @@ func New(cfg Config) (*Mapper, error) {
 	return m, nil
 }
 
+// NewWith creates a Mapper with the given language plug-ins instead of the
+// registered ones.
+func NewWith(cfg Config, languages ...Language) *Mapper {
+	return &Mapper{config: cfg, languages: languages}
+}
+
 // Languages returns the language plug-ins, in registration order.
 func (m *Mapper) Languages() []Language {
 	return m.languages

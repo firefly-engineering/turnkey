@@ -36,6 +36,8 @@ var solidityRules = map[string]TargetKind{
 // solidityLanguage resolves a Solidity package's deps from the imports
 // deps-extract finds in its sources.
 type solidityLanguage struct {
+	unconditional
+
 	projectRoot string
 	cfg         *SolidityConfig
 }
@@ -56,7 +58,7 @@ func (l *solidityLanguage) DepsAttribute() string { return "deps" }
 
 func (l *solidityLanguage) SourcePatterns() []string { return []string{"*.sol"} }
 
-func (l *solidityLanguage) ResolveDeps(pkgDir string) (PackageMapping, error) {
+func (l *solidityLanguage) ResolveDeps(pkgDir string, _ Request) (PackageMapping, error) {
 	return resolveWithDepsExtract(l, l.projectRoot, pkgDir)
 }
 

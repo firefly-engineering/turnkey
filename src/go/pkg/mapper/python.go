@@ -40,6 +40,8 @@ var pythonRules = map[string]TargetKind{
 // pythonLanguage resolves a Python package's deps from the imports
 // deps-extract finds in its sources.
 type pythonLanguage struct {
+	unconditional
+
 	projectRoot string
 	cfg         *PythonConfig
 }
@@ -60,7 +62,7 @@ func (l *pythonLanguage) DepsAttribute() string { return "deps" }
 
 func (l *pythonLanguage) SourcePatterns() []string { return []string{"*.py"} }
 
-func (l *pythonLanguage) ResolveDeps(pkgDir string) (PackageMapping, error) {
+func (l *pythonLanguage) ResolveDeps(pkgDir string, _ Request) (PackageMapping, error) {
 	return resolveWithDepsExtract(l, l.projectRoot, pkgDir)
 }
 

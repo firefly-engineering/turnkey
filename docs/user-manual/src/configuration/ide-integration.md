@@ -143,9 +143,11 @@ turnkey.toolchains.buck2.rules = {
 };
 ```
 
-Nothing else is configured: sync finds each language's internal targets
-from its own manifest (`go.mod`, `Cargo.toml`, the uv workspace) and uses
-turnkey's deps cells (`godeps`, `rustdeps`, `pydeps`, `jsdeps`, `soldeps`).
+Sync finds each language's internal targets from its own manifest
+(`go.mod`, `Cargo.toml`, the uv workspace) and uses turnkey's deps cells
+(`godeps`, `rustdeps`, `pydeps`, `jsdeps`, `soldeps`). The platforms it
+resolves deps for come from `buck2.platforms` (see
+[Platform-Conditional Deps](#platform-conditional-deps)).
 
 ### Command Line Options
 
@@ -206,6 +208,63 @@ rust_library(
 
 Sync never changes an opted-out target. `tk rules sync -v` and
 `tk rules check -v` list them as `OPTED OUT:`.
+
+## Platform-Conditional Deps
+
+Some deps are only needed on some platforms. Sync resolves every target's
+deps on each platform the project builds for, so what it writes is the same
+whichever machine runs it. The platforms are `buck2.platforms`, the flake's
+`systems` by default:
+
+```nix
+turnkey.toolchains.buck2.platforms = [ "x86_64-linux" "aarch64-darwin" ];
+```
+
+They reach sync through the `[conditions]` section of `.turnkey/sync.toml`,
+in Buck2's names:
+
+```toml
+[conditions]
+settings = "toolchains//conditions"
+
+[[conditions.platforms]]
+os = "linux"
+cpu = "x86_64"
+```
+
+Deps every platform needs are written as a plain list. The others are
+written as a `select()` after it:
+
+```python
+rust_library(
+    name = "my-lib",
+    deps = [
+        # turnkey:auto-start
+        "rustdeps//vendor/libc:libc",
+        # turnkey:auto-end
+    ] + select({
+        "config//os:linux": ["rustdeps//vendor/fuser:fuser"],
+        "config//os:macos": [],
+    }),
+)
+```
+
+- A key is the smallest one that says exactly where the deps apply:
+  `config//os:<os>` when they differ only by OS (or `config//cpu:<cpu>` by
+  CPU alone), otherwise one of the toolchains cell's `config_setting`s
+  combining both, `toolchains//conditions:<os>-<cpu>`, one per platform.
+- Every platform gets a branch, empty if it needs nothing more, and there is
+  no `DEFAULT`: building for a platform that isn't listed fails instead of
+  silently missing deps.
+- Sync reads this form back and owns all of it. The `turnkey:auto` and
+  `turnkey:preserve` markers apply to the plain list only. A change to one
+  branch rewrites only that branch.
+- A target whose deps don't depend on the platform keeps a plain list.
+
+A `select()` sync can't read (its keys aren't `config//os:*`,
+`config//cpu:*`, `toolchains//conditions:*` or `DEFAULT`, or its values
+aren't lists of labels) makes the target unreadable, like any other
+expression.
 
 ## Where Deps Come From
 

@@ -38,6 +38,8 @@ var goRules = map[string]TargetKind{
 
 // goLanguage resolves a Go package's deps from the imports go list reports.
 type goLanguage struct {
+	unconditional
+
 	projectRoot string
 	cfg         *GoConfig
 }
@@ -58,7 +60,7 @@ func (l *goLanguage) DepsAttribute() string { return "deps" }
 
 func (l *goLanguage) SourcePatterns() []string { return []string{"*.go"} }
 
-func (l *goLanguage) ResolveDeps(pkgDir string) (PackageMapping, error) {
+func (l *goLanguage) ResolveDeps(pkgDir string, _ Request) (PackageMapping, error) {
 	result, err := l.extract(pkgDir)
 	if err != nil {
 		return PackageMapping{}, fmt.Errorf("extractor failed: %w", err)

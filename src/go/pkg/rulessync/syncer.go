@@ -8,10 +8,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/mapper"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 )
 
 // Config holds syncer configuration.
@@ -28,12 +32,20 @@ type Config struct {
 	// Force if true, syncs all files even if they appear up-to-date.
 	// When false, uses mtime-based staleness detection to skip files.
 	Force bool
+
+	// Conditions are the build configurations sync evaluates. When nil,
+	// they are read from the project's .turnkey/sync.toml.
+	Conditions *syncconfig.ConditionsConfig
 }
 
 // Syncer orchestrates rules.star synchronization.
 type Syncer struct {
 	config Config
 	mapper *mapper.Mapper
+
+	// space holds the configurations every target's deps are resolved
+	// for, so that what sync writes doesn't depend on the host.
+	space conditions.Space
 }
 
 // NewSyncer creates a new Syncer.
@@ -45,9 +57,24 @@ func NewSyncer(cfg Config) (*Syncer, error) {
 		return nil, fmt.Errorf("creating mapper: %w", err)
 	}
 
+	return newSyncer(cfg, m)
+}
+
+// newSyncer creates a Syncer with the given mapper.
+func newSyncer(cfg Config, m *mapper.Mapper) (*Syncer, error) {
+	cond := cfg.Conditions
+	if cond == nil {
+		syncCfg, err := syncconfig.LoadDefaultFrom(cfg.ProjectRoot)
+		if err != nil {
+			return nil, fmt.Errorf("reading sync config: %w", err)
+		}
+		cond = &syncCfg.Conditions
+	}
+
 	return &Syncer{
 		config: cfg,
 		mapper: m,
+		space:  cond.Space(),
 	}, nil
 }
 
@@ -212,38 +239,28 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 		}
 	}
 
-	pkgMapping, err := lang.ResolveDeps(pkgDir)
+	dims, err := lang.Dimensions(pkgDir)
 	if err != nil {
 		result.Errors = append(result.Errors, err.Error())
 		return result, nil
 	}
-
-	// Filter out self-references (deps pointing to the current package)
-	// e.g., when syncing src/python/cargo, filter out //src/python/cargo:cargo
-	selfTarget := computeSelfTarget(pkgDir, s.config.ProjectRoot)
-	pkgMapping.Deps = filterSelfReference(pkgMapping.Deps, selfTarget)
-	pkgMapping.TestDeps = filterSelfReference(pkgMapping.TestDeps, selfTarget)
-
-	// Report unmapped imports
-	for _, unmapped := range pkgMapping.UnmappedImports {
-		result.Errors = append(result.Errors, fmt.Sprintf("unmapped import: %s", unmapped))
+	res := &resolver{
+		lang:       lang,
+		pkgDir:     pkgDir,
+		dims:       dims,
+		selfTarget: computeSelfTarget(pkgDir, s.config.ProjectRoot),
+		cache:      make(map[string]mapper.PackageMapping),
+		reported:   make(map[string]bool),
 	}
-	for _, unmapped := range pkgMapping.UnmappedTestImports {
-		result.Errors = append(result.Errors, fmt.Sprintf("unmapped test import: %s", unmapped))
-	}
-	var unsynced []string
-	for _, u := range pkgMapping.UnsyncedDeps {
-		result.Errors = append(result.Errors, fmt.Sprintf("%s dependency %s not synced", u.Reason, u.Dep.ImportPath))
-		if u.Dep.Target != "" {
-			unsynced = append(unsynced, u.Dep.Target)
+
+	// Resolve the package in every configuration up front, so that what
+	// can't be mapped is reported even if no target is synced.
+	for _, config := range s.space.Configurations {
+		if _, err := res.resolve(config, nil); err != nil {
+			result.Errors = append(result.Errors, err.Error())
+			return result, nil
 		}
 	}
-
-	// An unmapped import is a dep the mapper doesn't know, not one the
-	// target doesn't use, so a target with any keeps all its existing deps.
-	// Test-only imports affect only test targets.
-	libUnmapped := pkgMapping.UnmappedImports
-	testUnmapped := append(append([]string(nil), libUnmapped...), pkgMapping.UnmappedTestImports...)
 
 	// Apply changes to targets
 	modified := false
@@ -258,52 +275,63 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 			result.OptedOut = append(result.OptedOut, target.Name)
 			continue
 		}
-		if !hasSyncableDeps(target, attr) {
+		old, ok := readLabels(target, attr, s.space)
+		if !ok {
 			result.Unreadable = append(result.Unreadable, UnreadableTarget{Target: target.Name, Attribute: attr})
 			continue
 		}
+		variant, badAttr, ok := readVariant(target, lang.VariantAttributes(kind), s.space)
+		if !ok {
+			result.Unreadable = append(result.Unreadable, UnreadableTarget{Target: target.Name, Attribute: badAttr})
+			continue
+		}
 
-		switch kind {
-		case mapper.Library, mapper.Binary:
-			// Both depend on exactly what their sources need
-			if result.applyDeps(target, attr, mapper.DepsToTargets(pkgMapping.Deps), libUnmapped, unsynced) {
-				modified = true
+		// Test targets with a target_under_test or a same-package dep
+		// (":foo") get their library deps transitively.
+		hasTargetUnderTest := target.GetStringAttr("target_under_test") != ""
+
+		want := func(config conditions.Configuration) (resolved, error) {
+			m, err := res.resolve(config, variant(config))
+			if err != nil {
+				return resolved{}, err
 			}
-
-		case mapper.Test:
-			oldDeps := target.GetDeps()
-
-			// Check if test has target_under_test or local target deps (":foo")
-			// If so, library deps come transitively - don't add them directly
-			hasTargetUnderTest := target.GetStringAttr("target_under_test") != ""
-			hasLocalTargetDep := hasLocalDep(oldDeps)
-
-			var newDeps []string
-			seen := make(map[string]bool)
-
-			if !hasTargetUnderTest && !hasLocalTargetDep {
-				// No target_under_test and no local deps, so include library deps
-				for _, d := range mapper.DepsToTargets(pkgMapping.Deps) {
-					if !seen[d] {
-						seen[d] = true
-						newDeps = append(newDeps, d)
+			w := resolved{unsynced: unsyncedTargets(m)}
+			switch kind {
+			case mapper.Library, mapper.Binary:
+				// Both depend on exactly what their sources need
+				w.mapped = mapper.DepsToTargets(m.Deps)
+				w.unmapped = m.UnmappedImports
+			case mapper.Test:
+				seen := make(map[string]bool)
+				add := func(deps []mapper.MappedDep) {
+					for _, d := range mapper.DepsToTargets(deps) {
+						if !seen[d] {
+							seen[d] = true
+							w.mapped = append(w.mapped, d)
+						}
 					}
 				}
-			}
-
-			// Always add test-only deps
-			for _, d := range mapper.DepsToTargets(pkgMapping.TestDeps) {
-				if !seen[d] {
-					seen[d] = true
-					newDeps = append(newDeps, d)
+				if !hasTargetUnderTest && !hasLocalDep(old(config)) {
+					add(m.Deps)
 				}
+				// Always add test-only deps
+				add(m.TestDeps)
+				// Test-only imports affect only test targets
+				w.unmapped = append(append([]string(nil), m.UnmappedImports...), m.UnmappedTestImports...)
 			}
+			return w, nil
+		}
 
-			if result.applyDeps(target, attr, newDeps, testUnmapped, unsynced) {
-				modified = true
-			}
+		changed, err := result.applyConditional(target, attr, s.space, old, want)
+		if err != nil {
+			result.Errors = append(result.Errors, err.Error())
+			return result, nil
+		}
+		if changed {
+			modified = true
 		}
 	}
+	result.Errors = append(result.Errors, res.messages...)
 
 	// Write if modified
 	if modified && !s.config.DryRun {
@@ -443,21 +471,180 @@ func matchesAny(name string, patterns []string) bool {
 	return false
 }
 
-// hasSyncableDeps reports whether sync can rewrite a target's deps, held in
-// attr: they
-// are absent or a list of string labels. A computed value (a variable, a
-// concatenation, a conditional) is left alone, since sync would replace the
-// expression with a flat list of its own.
-func hasSyncableDeps(target *starlark.Target, attr string) bool {
+// readLabels reads a target's label-list attribute, attr, as the labels it
+// has in each configuration of space. It reports false if sync can't read
+// it: the attribute isn't absent, a list of labels, or
+// [<labels>] + select({<key>: [<labels>], ...}) with keys the space knows.
+// A computed value (a variable, a concatenation, a conditional) is left
+// alone, since sync would replace the expression with values of its own.
+func readLabels(target *starlark.Target, attr string, space conditions.Space) (func(conditions.Configuration) []string, bool) {
 	a := target.GetAttribute(attr)
 	if a == nil {
-		return true
+		return func(conditions.Configuration) []string { return nil }, true
 	}
-	switch a.Value.(type) {
-	case starlark.StringListValue, starlark.DepsValue:
-		return true
+	if labels, ok := starlark.Labels(a.Value); ok {
+		return func(conditions.Configuration) []string { return labels }, true
 	}
-	return false
+	sel, ok := a.Value.(starlark.SelectValue)
+	if !ok {
+		return nil, false
+	}
+	common, ok := starlark.Labels(sel.Common)
+	if !ok {
+		return nil, false
+	}
+	branches := make([]conditions.Branch, len(sel.Branches))
+	for i, b := range sel.Branches {
+		labels, ok := starlark.Labels(b.Value)
+		if !ok || b.Value == nil {
+			return nil, false
+		}
+		branches[i] = conditions.Branch{Key: b.Key, Labels: labels}
+	}
+	ev, err := space.Reader(common, branches)
+	if err != nil {
+		return nil, false
+	}
+	return ev.Labels, true
+}
+
+// readVariant reads a target's variant attributes (attrs) as their values
+// in each configuration of space: a select() is evaluated, and a list
+// followed by a select() is concatenated with the branch that applies. An
+// attribute the target doesn't set, or whose select() has no branch for a
+// configuration, is absent from that configuration's variant. It reports
+// false, with the attribute, if one can't be read: a select() with a key
+// the space doesn't know, or a concatenation of values that aren't lists.
+func readVariant(target *starlark.Target, attrs []string, space conditions.Space) (func(conditions.Configuration) map[string]starlark.AttributeValue, string, bool) {
+	type conditional struct {
+		sel     starlark.SelectValue
+		matcher *conditions.Matcher
+	}
+	plain := make(map[string]starlark.AttributeValue)
+	selects := make(map[string]conditional)
+	for _, name := range attrs {
+		a := target.GetAttribute(name)
+		if a == nil {
+			continue
+		}
+		sel, ok := a.Value.(starlark.SelectValue)
+		if !ok {
+			plain[name] = a.Value
+			continue
+		}
+		keys := make([]string, len(sel.Branches))
+		for i, b := range sel.Branches {
+			keys[i] = b.Key
+			if _, ok := starlark.Labels(b.Value); sel.Common != nil && !ok {
+				return nil, name, false
+			}
+		}
+		matcher, err := space.Matcher(keys)
+		if err != nil {
+			return nil, name, false
+		}
+		selects[name] = conditional{sel, matcher}
+	}
+
+	if len(plain) == 0 && len(selects) == 0 {
+		return func(conditions.Configuration) map[string]starlark.AttributeValue { return nil }, "", true
+	}
+	return func(config conditions.Configuration) map[string]starlark.AttributeValue {
+		variant := make(map[string]starlark.AttributeValue, len(plain)+len(selects))
+		for name, value := range plain {
+			variant[name] = value
+		}
+		for name, c := range selects {
+			i := c.matcher.Branch(config)
+			if i < 0 {
+				continue
+			}
+			value := c.sel.Branches[i].Value
+			if c.sel.Common != nil {
+				common, _ := starlark.Labels(c.sel.Common)
+				extra, _ := starlark.Labels(value)
+				value = starlark.StringListValue{Values: append(append([]string(nil), common...), extra...)}
+			}
+			variant[name] = value
+		}
+		return variant
+	}, "", true
+}
+
+// resolver resolves one package's deps through its language, once per
+// distinct request, and collects what the resolutions report.
+type resolver struct {
+	lang       mapper.Language
+	pkgDir     string
+	dims       []string
+	selfTarget string
+	cache      map[string]mapper.PackageMapping
+
+	// messages are the reports of every resolution, each once, in order.
+	messages []string
+	reported map[string]bool
+}
+
+// resolve returns the package's deps in config, for a target's variant.
+// Deps on the package's own target are dropped (e.g. when syncing
+// src/python/cargo, //src/python/cargo:cargo).
+func (r *resolver) resolve(config conditions.Configuration, variant map[string]starlark.AttributeValue) (mapper.PackageMapping, error) {
+	req := mapper.Request{Config: config.Project(r.dims), Variant: variant}
+	key := req.Config.String() + "|" + variantKey(variant)
+	if m, ok := r.cache[key]; ok {
+		return m, nil
+	}
+	m, err := r.lang.ResolveDeps(r.pkgDir, req)
+	if err != nil {
+		return m, err
+	}
+	m.Deps = filterSelfReference(m.Deps, r.selfTarget)
+	m.TestDeps = filterSelfReference(m.TestDeps, r.selfTarget)
+	r.cache[key] = m
+
+	for _, unmapped := range m.UnmappedImports {
+		r.report(fmt.Sprintf("unmapped import: %s", unmapped))
+	}
+	for _, unmapped := range m.UnmappedTestImports {
+		r.report(fmt.Sprintf("unmapped test import: %s", unmapped))
+	}
+	for _, u := range m.UnsyncedDeps {
+		r.report(fmt.Sprintf("%s dependency %s not synced", u.Reason, u.Dep.ImportPath))
+	}
+	return m, nil
+}
+
+// report records a message unless it already was.
+func (r *resolver) report(msg string) {
+	if !r.reported[msg] {
+		r.reported[msg] = true
+		r.messages = append(r.messages, msg)
+	}
+}
+
+// variantKey identifies a variant.
+func variantKey(variant map[string]starlark.AttributeValue) string {
+	names := make([]string, 0, len(variant))
+	for name := range variant {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var b strings.Builder
+	for _, name := range names {
+		fmt.Fprintf(&b, "%s=%s;", name, starlark.Render(variant[name]))
+	}
+	return b.String()
+}
+
+// unsyncedTargets returns the targets of a mapping's unsynced deps.
+func unsyncedTargets(m mapper.PackageMapping) []string {
+	var targets []string
+	for _, u := range m.UnsyncedDeps {
+		if u.Dep.Target != "" {
+			targets = append(targets, u.Dep.Target)
+		}
+	}
+	return targets
 }
 
 // hasLocalDep returns true if deps contains a local target dep (":foo").
@@ -544,42 +731,64 @@ func withoutDeps(deps, drop []string) []string {
 	return result
 }
 
-// applyDeps sets a target's deps, held in its attr attribute (deps,
-// npm_deps, ...), to the mapped ones, preserving manual deps,
-// and records the change. If unmapped is non-empty the mapped deps are
-// incomplete, so no existing dep is removed: those that would have been are
-// recorded as kept instead. An existing dep in the Buck2 package of an
-// unsynced dep is never removed either. It reports whether the target's
-// deps changed.
-func (r *SyncResult) applyDeps(target *starlark.Target, attr string, mapped, unmapped, unsynced []string) bool {
-	oldDeps := target.GetLabels(attr)
+// resolved is what sync wants for a target's deps in one configuration.
+type resolved struct {
+	// mapped are the deps the target's sources or manifest need.
+	mapped []string
+
+	// unmapped are the imports that couldn't be mapped: with any, mapped
+	// is incomplete, so no existing dep is removed.
+	unmapped []string
+
+	// unsynced are deps sync doesn't manage: an existing dep in the Buck2
+	// package of one is never removed.
+	unsynced []string
+}
+
+// applyConditional sets a target's deps, held in its attr attribute (deps,
+// npm_deps, ...), to what want returns in each configuration of space,
+// preserving manual deps, and records the change. old gives the deps the
+// target has in each configuration. Deps every configuration has are
+// written as a plain list; the others as a select() (see
+// conditions.Space.Split). It reports whether the target's deps changed.
+func (r *SyncResult) applyConditional(target *starlark.Target, attr string, space conditions.Space,
+	old func(conditions.Configuration) []string, want func(conditions.Configuration) (resolved, error)) (bool, error) {
 	preserved := target.GetPreservedLabels(attr)
-	newDeps := mergeWithPreserved(oldDeps, preferVersioned(oldDeps, mapped), preserved)
+	newDeps := make(map[string][]string, len(space.Configurations))
+	changed := false
+	var added, removed, kept, unmapped []string
+	for _, config := range space.Configurations {
+		oldDeps := old(config)
+		w, err := want(config)
+		if err != nil {
+			return false, err
+		}
+		deps, k := mergeDeps(oldDeps, w, preserved)
+		newDeps[config.String()] = deps
+		if !stringSlicesEqual(oldDeps, deps) {
+			changed = true
+		}
+		a, rm := diffDeps(oldDeps, deps)
+		added = union(added, a)
+		removed = union(removed, rm)
+		if len(k) > 0 {
+			kept = union(kept, k)
+			unmapped = union(unmapped, w.unmapped)
+		}
+	}
 
-	unsyncedPkgs := make(map[string]bool, len(unsynced))
-	for _, d := range unsynced {
-		unsyncedPkgs[labelPackage(d)] = true
-	}
-	var kept []string
-	newDeps, kept = keepExisting(oldDeps, newDeps, func(d string) bool {
-		return len(unmapped) > 0 || unsyncedPkgs[labelPackage(d)]
-	})
-	if len(unmapped) == 0 {
-		// Only unsynced deps were kept; they are reported on their own.
-		kept = nil
-	}
-	if sameDepSet(oldDeps, newDeps) {
-		// Sync manages which deps a target has, not their order.
-		newDeps = oldDeps
-	}
-
-	changed := !stringSlicesEqual(oldDeps, newDeps)
 	if changed {
-		// With markers, SetDeps writes only the auto-managed section.
-		target.SetLabels(attr, withoutDeps(newDeps, preserved))
+		// With markers, SetSelect writes only the auto-managed section.
+		split := space.Split(func(config conditions.Configuration) []string {
+			return withoutDeps(newDeps[config.String()], preserved)
+		})
+		var branches []starlark.SelectBranch
+		for _, b := range split.Branches {
+			branches = append(branches, starlark.SelectBranch{Key: b.Key, Value: starlark.StringListValue{Values: b.Labels}})
+		}
+		target.SetSelect(attr, split.Common, branches)
 	}
 	if changed || len(kept) > 0 {
-		added, removed := diffDeps(oldDeps, newDeps)
 		change := TargetChange{Target: target.Name, Added: added, Removed: removed}
 		if len(kept) > 0 {
 			change.Kept = kept
@@ -587,7 +796,44 @@ func (r *SyncResult) applyDeps(target *starlark.Target, attr string, mapped, unm
 		}
 		r.Changes = append(r.Changes, change)
 	}
-	return changed
+	return changed, nil
+}
+
+// mergeDeps returns the deps a target with oldDeps gets in one
+// configuration: w's mapped deps, preserving manual ones. If w has unmapped
+// imports its mapped deps are incomplete, so no existing dep is removed:
+// those that would have been are returned as kept. An existing dep in the
+// Buck2 package of an unsynced dep is never removed either (nor reported
+// as kept). Deps that are oldDeps in another order are oldDeps.
+func mergeDeps(oldDeps []string, w resolved, preserved []string) (newDeps, kept []string) {
+	newDeps = mergeWithPreserved(oldDeps, preferVersioned(oldDeps, w.mapped), preserved)
+
+	unsyncedPkgs := make(map[string]bool, len(w.unsynced))
+	for _, d := range w.unsynced {
+		unsyncedPkgs[labelPackage(d)] = true
+	}
+	newDeps, kept = keepExisting(oldDeps, newDeps, func(d string) bool {
+		return len(w.unmapped) > 0 || unsyncedPkgs[labelPackage(d)]
+	})
+	if len(w.unmapped) == 0 {
+		// Only unsynced deps were kept; they are reported on their own.
+		kept = nil
+	}
+	if sameDepSet(oldDeps, newDeps) {
+		// Sync manages which deps a target has, not their order.
+		newDeps = oldDeps
+	}
+	return newDeps, kept
+}
+
+// union returns list with the strings of more it lacks appended, in order.
+func union(list, more []string) []string {
+	for _, s := range more {
+		if !slices.Contains(list, s) {
+			list = append(list, s)
+		}
+	}
+	return list
 }
 
 // keepExisting returns the deps of oldDeps that newDeps lacks and keep

@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/mapper"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
 )
@@ -164,6 +165,17 @@ go_test(
 	}
 }
 
+// applyDeps applies one set of mapped deps to a target, with no
+// configurations.
+func (r *SyncResult) applyDeps(target *starlark.Target, attr string, mapped, unmapped, unsynced []string) bool {
+	space := conditions.NewSpace(nil, "")
+	old, _ := readLabels(target, attr, space)
+	changed, _ := r.applyConditional(target, attr, space, old, func(conditions.Configuration) (resolved, error) {
+		return resolved{mapped: mapped, unmapped: unmapped, unsynced: unsynced}, nil
+	})
+	return changed
+}
+
 // parseTarget parses a rules.star source and returns its only target.
 func parseTarget(t *testing.T, src string) *starlark.Target {
 	t.Helper()
@@ -246,8 +258,10 @@ func TestApplyDepsRemovesWhenAllMapped(t *testing.T) {
 }
 
 // Deps given as an expression rather than a list of labels are not synced:
-// rewriting them would replace the expression with a flat list.
-func TestHasSyncableDeps(t *testing.T) {
+// rewriting them would replace the expression with a flat list. A select()
+// is read when the platforms give its keys a meaning.
+func TestReadLabels(t *testing.T) {
+	space := conditions.NewSpace([]conditions.Platform{{OS: "linux", CPU: "x86_64"}, {OS: "macos", CPU: "arm64"}}, "")
 	for _, tc := range []struct {
 		deps string
 		want bool
@@ -257,13 +271,17 @@ func TestHasSyncableDeps(t *testing.T) {
 		{`_DEPS`, false},
 		{`_DEPS + ["//a:a"]`, false},
 		{`["//a:a"] if X else []`, false},
+		{`["//a:a"] + select({"config//os:linux": ["//l:l"], "config//os:macos": []})`, true},
+		{`select({"config//os:linux": ["//l:l"], "DEFAULT": []})`, true},
+		{`select({"//my:setting": ["//l:l"]})`, false},
+		{`select({"config//os:linux": _LINUX})`, false},
 	} {
 		target := parseTarget(t, "rust_library(\n    name = \"lib\",\n    deps = "+tc.deps+",\n)\n")
-		if got := hasSyncableDeps(target, "deps"); got != tc.want {
-			t.Errorf("hasSyncableDeps(deps = %s) = %v, want %v", tc.deps, got, tc.want)
+		if _, got := readLabels(target, "deps", space); got != tc.want {
+			t.Errorf("readLabels(deps = %s) = %v, want %v", tc.deps, got, tc.want)
 		}
 	}
-	if !hasSyncableDeps(parseTarget(t, "rust_library(name = \"lib\")\n"), "deps") {
+	if _, ok := readLabels(parseTarget(t, "rust_library(name = \"lib\")\n"), "deps", space); !ok {
 		t.Error("target without deps is not syncable, want syncable")
 	}
 }

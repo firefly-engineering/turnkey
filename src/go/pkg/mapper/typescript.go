@@ -38,6 +38,8 @@ var typescriptRules = map[string]TargetKind{
 // typescriptLanguage resolves a TypeScript or JavaScript package's deps from
 // the imports deps-extract finds in its sources.
 type typescriptLanguage struct {
+	unconditional
+
 	projectRoot string
 	cfg         *TypeScriptConfig
 }
@@ -66,7 +68,7 @@ func (l *typescriptLanguage) SourcePatterns() []string {
 // ResolveDeps maps the package's imports, and adds for each npm package
 // its DefinitelyTyped package (@types/...) when js-deps.toml has one: code
 // never imports those, but TypeScript needs them to type-check the import.
-func (l *typescriptLanguage) ResolveDeps(pkgDir string) (PackageMapping, error) {
+func (l *typescriptLanguage) ResolveDeps(pkgDir string, _ Request) (PackageMapping, error) {
 	mapping, err := resolveWithDepsExtract(l, l.projectRoot, pkgDir)
 	if err != nil {
 		return mapping, err

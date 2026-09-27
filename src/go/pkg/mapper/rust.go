@@ -41,6 +41,8 @@ var rustRules = map[string]TargetKind{
 
 // rustLanguage resolves a Rust crate's deps from its Cargo.toml.
 type rustLanguage struct {
+	unconditional
+
 	projectRoot string
 	cfg         *RustConfig
 }
@@ -61,7 +63,7 @@ func (l *rustLanguage) DepsAttribute() string { return "deps" }
 
 func (l *rustLanguage) SourcePatterns() []string { return []string{"*.rs", "Cargo.toml"} }
 
-func (l *rustLanguage) ResolveDeps(crateDir string) (PackageMapping, error) {
+func (l *rustLanguage) ResolveDeps(crateDir string, _ Request) (PackageMapping, error) {
 	mapping, err := l.resolveCrate(crateDir)
 	if err != nil {
 		return mapping, fmt.Errorf("reading Cargo.toml: %w", err)

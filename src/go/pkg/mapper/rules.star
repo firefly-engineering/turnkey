@@ -5,6 +5,7 @@ go_library(
     package_name = "github.com/firefly-engineering/turnkey/src/go/pkg/mapper",
     srcs = glob(["*.go"], exclude = ["*_test.go"]),
     deps = [
+        "//src/go/pkg/conditions:conditions",
         "//src/go/pkg/extraction:extraction",
         "//src/go/pkg/starlark:starlark",
         "godeps//vendor/github.com/pelletier/go-toml/v2:v2",
