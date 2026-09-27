@@ -16,6 +16,14 @@ _Avoid_: buck2 version (as a consumer setting), declared buck2, supported buck2 
 A target attribute whose value depends on the build configuration, written as a plain value or as `[...] + select({...})` over the platforms turnkey builds for. Its value in a configuration is the plain part followed by the branch that applies, each label once; in a configuration no branch applies to, the plain part alone. Rules sync, the language plug-ins and the cell generators all read and write it the same way.
 _Avoid_: select attribute, variant (which is only the attributes a language reads to resolve deps)
 
+**Language plug-in**:
+One language's part of rules sync: which rule kinds are its, which files make its targets stale, which configuration dimensions a package's deps depend on, and what a package's deps resolve to in one configuration. It says what a target wants; rules sync alone decides what is written.
+_Avoid_: mapper (the module that holds the plug-ins), language adapter
+
+**Keep policy**:
+Why rules sync leaves an existing dep in place that no plug-in wants: it is a same-package (`:name`) or preserved dep, an import couldn't be mapped so the wanted deps are incomplete, it is in the package of a dep sync doesn't own, or it stands for a wanted label, as a Rust dep pinning a crate's version does. The plug-in supplies the parts that are its language's.
+_Avoid_: preserve (which is only the `turnkey:preserve` section)
+
 ### Testing
 
 **Test result caching**:
