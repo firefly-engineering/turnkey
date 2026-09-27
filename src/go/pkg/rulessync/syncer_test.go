@@ -1,6 +1,7 @@
 package rulessync
 
 import (
+	_ "embed"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,22 +14,54 @@ import (
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 )
 
-// testLanguages are a project's languages as sync.toml lists them, each
-// with its default cell and deps file.
-var testLanguages = []syncconfig.Language{
-	{Name: "go", Cell: "godeps", DepsFile: "go-deps.toml"},
-	{Name: "rust", Cell: "rustdeps", DepsFile: "rust-deps.toml"},
-	{Name: "python", Cell: "pydeps", DepsFile: "python-deps.toml"},
-	{Name: "javascript", Cell: "jsdeps", DepsFile: "js-deps.toml"},
-	{Name: "solidity", Cell: "soldeps", DepsFile: "solidity-deps.toml"},
+// contractSyncToml is .turnkey/sync.toml as turnkey's shell writes it for
+// a project with every language. The Nix side (checks.sync-config-contract)
+// checks that it is what nix/buck2/sync-config.nix renders.
+//
+//go:embed testdata/sync.toml
+var contractSyncToml []byte
+
+// contractSync parses and validates contractSyncToml.
+func contractSync(t *testing.T) *syncconfig.Config {
+	t.Helper()
+	cfg, err := syncconfig.Parse(contractSyncToml)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("the sync.toml turnkey writes doesn't validate: %v", err)
+	}
+	return cfg
 }
 
-// testSync is the sync configuration of a project with testLanguages,
-// built for platforms.
-func testSync(platforms []conditions.Platform) *syncconfig.Config {
+// testSync is the sync configuration of a project with every language, as
+// turnkey's shell lists them, built for platforms.
+func testSync(t *testing.T, platforms []conditions.Platform) *syncconfig.Config {
+	t.Helper()
 	return &syncconfig.Config{
-		Languages:  testLanguages,
+		Languages:  contractSync(t).Languages,
 		Conditions: syncconfig.ConditionsConfig{Platforms: platforms},
+	}
+}
+
+// Rules sync reads the sync.toml turnkey writes: every language gets its
+// plug-in, with the cell and deps file its record gives, and the Go
+// plug-in the allowed build tags.
+func TestSyncerReadsWhatTheShellWrites(t *testing.T) {
+	cfg := contractSync(t)
+	s, err := NewSyncer(Config{ProjectRoot: t.TempDir(), Sync: cfg})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, lang := range cfg.Languages {
+		names = append(names, lang.Name)
+	}
+	if got, want := len(s.mapper.Languages()), len(cfg.Languages); got != want {
+		t.Errorf("%d plug-ins for the languages %v", got, names)
+	}
+	if len(cfg.Conditions.GoTags) == 0 || len(s.space.Configurations) == 0 {
+		t.Errorf("conditions = %+v: the contract has no Go tags or platforms to check", cfg.Conditions)
 	}
 }
 
@@ -92,7 +125,7 @@ go_binary(
 `,
 	})
 
-	s, err := NewSyncer(Config{ProjectRoot: root, Force: true, Sync: testSync(nil)})
+	s, err := NewSyncer(Config{ProjectRoot: root, Force: true, Sync: testSync(t, nil)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +205,7 @@ go_test(
 `,
 	})
 
-	s, err := NewSyncer(Config{ProjectRoot: root, Force: true, DryRun: true, Sync: testSync(nil)})
+	s, err := NewSyncer(Config{ProjectRoot: root, Force: true, DryRun: true, Sync: testSync(t, nil)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -482,7 +515,7 @@ rust_test(
 `,
 	})
 
-	s, err := NewSyncer(Config{ProjectRoot: root, Force: true, DryRun: true, Sync: testSync(nil)})
+	s, err := NewSyncer(Config{ProjectRoot: root, Force: true, DryRun: true, Sync: testSync(t, nil)})
 	if err != nil {
 		t.Fatal(err)
 	}

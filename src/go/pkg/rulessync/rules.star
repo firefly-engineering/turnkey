@@ -16,6 +16,8 @@ go_library(
 go_test(
     name = "rulessync_test",
     srcs = glob(["*_test.go"]),
+    # The sync.toml turnkey writes, checked from both sides
+    embed_srcs = ["testdata/sync.toml"],
     target_under_test = ":rulessync",
     deps = [
         "//src/go/pkg/conditions:conditions",

@@ -69,7 +69,7 @@ func syncFake(t *testing.T, lang *fakeLanguage, platforms []conditions.Platform,
 	s, err := newSyncer(Config{
 		ProjectRoot: root,
 		Force:       true,
-		Sync:        testSync(platforms),
+		Sync:        testSync(t, platforms),
 	}, mapper.NewWith(mapper.Config{ProjectRoot: root}, lang))
 	if err != nil {
 		t.Fatal(err)
@@ -247,7 +247,7 @@ inotify = "0.11"
 	s, err := NewSyncer(Config{
 		ProjectRoot: root,
 		Force:       true,
-		Sync:        testSync(defaultPlatforms),
+		Sync:        testSync(t, defaultPlatforms),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -327,7 +327,7 @@ rust_library(
 	s, err := NewSyncer(Config{
 		ProjectRoot: root,
 		Force:       true,
-		Sync:        testSync(defaultPlatforms),
+		Sync:        testSync(t, defaultPlatforms),
 	})
 	if err != nil {
 		t.Fatal(err)

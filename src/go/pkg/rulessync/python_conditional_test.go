@@ -61,7 +61,7 @@ python_library(
 	s, err := NewSyncer(Config{
 		ProjectRoot: root,
 		Force:       true,
-		Sync:        testSync(defaultPlatforms),
+		Sync:        testSync(t, defaultPlatforms),
 	})
 	if err != nil {
 		t.Fatal(err)

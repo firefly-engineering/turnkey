@@ -536,6 +536,50 @@
             ) "split vectors: ${lib.concatStringsSep "; " namingProblems}";
             pkgs.runCommand "split-vectors-check" { } "touch $out";
 
+          # .turnkey/sync.toml as the shell writes it for a project with every
+          # language, byte for byte what rulessync's tests read
+          # (src/go/pkg/rulessync/testdata/sync.toml): the seam between the
+          # language records and rules sync, checked from both sides.
+          checks.sync-config-contract =
+            let
+              buck2Options =
+                (lib.evalModules {
+                  modules = [
+                    (import ./nix/buck2/options.nix {
+                      inherit lib;
+                      version = "check";
+                    })
+                    {
+                      rules.enabled = true;
+                      go = {
+                        depsFile = "go-deps.toml";
+                        allowedBuildTags = [ "integration" ];
+                      };
+                      rust.depsFile = "rust-deps.toml";
+                      python = {
+                        depsFile = "python-deps.toml";
+                        lockFile = "pylock.toml";
+                        uvLockFile = "uv.lock";
+                      };
+                      javascript.depsFile = "js-deps.toml";
+                      solidity.depsFile = "solidity-deps.toml";
+                    }
+                  ];
+                }).config;
+              syncConfig = import ./nix/buck2/sync-config.nix { inherit pkgs lib; } {
+                languages = import ./nix/buck2/languages.nix { inherit pkgs lib; };
+                buck2 = buck2Options;
+              };
+              fixture = ./src/go/pkg/rulessync/testdata/sync.toml;
+            in
+            pkgs.runCommand "sync-config-contract-check" { } ''
+              if ! diff -u ${fixture} ${syncConfig.file}; then
+                echo "sync.toml changed: copy ${syncConfig.file} to src/go/pkg/rulessync/testdata/sync.toml" >&2
+                exit 1
+              fi
+              touch $out
+            '';
+
           # The language records (nix/buck2/languages.nix) agree with
           # themselves: rule names are unique, a rule runs after the rule
           # that writes its source, and each wrapper runs a rule of its own
