@@ -3,7 +3,7 @@
 #
 # Key format: deps."import-path@version" to support multiple versions
 #
-# To regenerate: godeps-gen --prefetch -o go-deps.toml
+# To regenerate: tk sync
 
 schema_version = 2
 
