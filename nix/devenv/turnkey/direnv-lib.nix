@@ -106,7 +106,9 @@ let
         # Flags: --only-<rule> take highest precedence
         rules="$only_rules"
       elif [[ -n "''${TURNKEY_SKIP_ALL:-}" ]]; then
-        # SKIP_ALL mode: start empty, add ENABLE_* rules
+        # SKIP_ALL mode: start empty, add ENABLE_* rules. The no-op keeps
+        # the branch valid bash for a shell without deps rules.
+        :
         ${lib.concatMapStringsSep "\n    " (
           name: ''[[ -n "''${TURNKEY_ENABLE_${lib.toUpper name}:-}" ]] && rules="$rules ${name}"''
         ) ruleNames}
