@@ -25,16 +25,21 @@ turnkey.toolchains.buck2.solidity = {
 
 ```
 my-project/
-├── foundry.toml              # Foundry configuration
+├── foundry.toml              # The only Foundry configuration, for the whole repository
 ├── solidity-deps.toml        # Generated dependency manifest
-├── src/
-│   └── contracts/
-│       ├── MyToken.sol
-│       └── rules.star
-└── test/
-    ├── MyToken.t.sol
-    └── rules.star
+└── src/
+    └── contracts/
+        ├── rules.star
+        ├── src/
+        │   └── MyToken.sol
+        └── test/
+            └── MyToken.t.sol
 ```
+
+The repository has at most one `foundry.toml`, at its root. A package under
+`src/` has none of its own: a nested `foundry.toml` would become forge's root for its
+subtree and break native `forge` there. With the `tk.foundryConfigCheck` option
+on, a pre-commit hook rejects one (see [Native forge](#native-forge)).
 
 ## Build Rules
 
@@ -49,7 +54,6 @@ solidity_library(
     name = "my_token",
     srcs = ["MyToken.sol"],
     deps = ["//soldeps:openzeppelin_contracts"],
-    solc_version = "0.8.20",  # Optional: specify compiler version
     optimizer = True,
     optimizer_runs = 200,
 )
@@ -161,23 +165,65 @@ Its prefix must be `<name>/` of a declared package (remappings cannot alias
 one package under another name), and its target must lie inside
 `.turnkey/soldeps/vendor/<name>/`. `tk sync` rejects anything else.
 
+## Native forge
+
+`forge build` and `forge test` work in the dev shell alongside `tk build` and
+`tk test`, the same way running `cargo` or `go` natively does. They run from any
+directory, since forge finds the root `foundry.toml`, and cover every package
+under `src/`:
+
+```toml
+[profile.default]
+src = "src"
+test = "src"
+libs = [".turnkey/soldeps/vendor"]
+out = "out"
+auto_detect_remappings = false
+optimizer = true
+optimizer_runs = 200
+
+[fuzz]
+runs = 256
+```
+
+`src` and `test` are both `src`, so Solidity code added anywhere under `src/` is
+covered without editing the file. There is no per-package scoping; narrow a run
+with `--match-path` instead:
+
+```bash
+forge build
+forge test --match-path 'src/contracts/**'
+```
+
+Git-ignore forge's `/out/` and `/cache/`.
+
+Imports resolve against the `soldeps` cell's `vendor/` directory (`libs`).
+Automatic remapping detection is off, so an import forge cannot resolve that
+way, such as `@openzeppelin/contracts/...`, needs a remapping in a root
+`remappings.txt`.
+
+**The compiler comes from the dev shell.** `foundry.toml` sets neither `solc`
+nor `solc_version`. When Solidity is enabled, the dev shell exports
+`FOUNDRY_SOLC`, the solc the Buck2 toolchain uses, together with
+`FOUNDRY_OFFLINE=true`. Native runs therefore share their compiler with
+`solidity_test` and never download one. Only the compiler is shared so far: the
+Buck2 rules do not take their other settings (optimizer, fuzz runs) from the
+root `foundry.toml` yet
+([#138](https://github.com/firefly-engineering/turnkey/issues/138)). The toolchain
+declared in `toolchain.toml` stays the one place the compiler version is set;
+a `solc_version` in `foundry.toml` could only go stale on a toolchain bump, so
+the pre-commit hook rejects `solc` and `solc_version` keys.
+
 ## Compiler Version
 
-You can specify the Solidity compiler version per-target:
+The compiler version comes from the toolchain declared in `toolchain.toml`
+(`solidity-toolchain` or `solc`, not both): Buck2's Solidity rules and native forge
+(through `FOUNDRY_SOLC`) both use its `solc`. To change the version, change the
+toolchain.
 
-```python
-solidity_library(
-    name = "legacy_contract",
-    srcs = ["Legacy.sol"],
-    solc_version = "0.7.6",  # Use older compiler
-)
-
-solidity_library(
-    name = "modern_contract",
-    srcs = ["Modern.sol"],
-    solc_version = "0.8.20",  # Use newer compiler
-)
-```
+The Solidity rules still accept a per-target `solc_version` attribute. It is
+going away ([#138](https://github.com/firefly-engineering/turnkey/issues/138));
+don't use it in new targets.
 
 ## Building and Testing
 

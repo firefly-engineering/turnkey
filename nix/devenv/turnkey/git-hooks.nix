@@ -79,11 +79,11 @@ in
         '';
       };
 
-      # Foundry configuration consistency check
+      # foundry.toml rules: at most one, at the root, with no solc pin
       foundry-config-check = lib.mkIf (cfg.solidity.enable && cfg.tk.foundryConfigCheck) {
         enable = true;
         name = "foundry-config-check";
-        description = "Check Foundry config consistency (solc version, dependencies)";
+        description = "Check there is at most one foundry.toml, at the root, with no solc pin";
         files = "foundry\\.toml$";
         pass_filenames = false;
         entry = ''

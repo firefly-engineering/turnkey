@@ -332,6 +332,17 @@ in
     }
     # The test result cache, as tk reads it (src/go/pkg/testcache)
     // testCache.env
+    # Native forge compiles with the solc the toolchains cell's solc target
+    # runs, and never touches the network, as solidity_test does with
+    # `forge test --use $SOLC --offline`. foundry.toml cannot say this itself
+    # (`solc = "solc"` is not looked up on PATH, and an offline `solc_version`
+    # cannot install), and the toolchain stays the one place the compiler
+    # version is declared. Offline without a compiler could not build, so
+    # both variables are set or neither is.
+    // lib.optionalAttrs (cfg.solidity.enable && toolchainsCellContent.solcPath != null) {
+      FOUNDRY_SOLC = toolchainsCellContent.solcPath;
+      FOUNDRY_OFFLINE = "true";
+    }
     # Store tk's share path for shell completion setup
     // lib.optionalAttrs (turnkeyCfg.registry ? tk) {
       TURNKEY_TK_SHARE = "${resolvedRegistry.tk}/share";

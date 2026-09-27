@@ -1,14 +1,24 @@
-# Root-level Foundry configuration for turnkey monorepo
-# This declares Solidity dependencies used by all examples.
+# The repository's one Foundry configuration.
 #
-# Individual examples may have their own foundry.toml for local development,
-# but the soldeps cell is built from the root solidity-deps.toml.
+# Native forge runs from any directory and covers every Solidity package under
+# src/; narrow a run with --match-path 'src/examples/<name>/**'. There is no
+# per-package foundry.toml (check-foundry-config rejects one).
+#
+# The compiler is not pinned here: the dev shell exports FOUNDRY_SOLC (the
+# toolchain's solc) and FOUNDRY_OFFLINE=true, the same compiler and offline
+# policy solidity_test uses under Buck2.
 
 [profile.default]
-src = "examples"
-test = "examples"
-libs = ["lib"]
+src = "src"
+test = "src"
+libs = [".turnkey/soldeps/vendor"]
 out = "out"
+auto_detect_remappings = false
+optimizer = true
+optimizer_runs = 200
+
+[fuzz]
+runs = 256
 
 # Shared dependencies used across examples
 [dependencies]

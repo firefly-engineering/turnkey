@@ -367,6 +367,15 @@
                 resolvedRegistry = builtins.removeAttrs registry [ "mdbook-toolchain" ];
                 declaredToolchains.mdbook = { };
               };
+              # The solc native forge gets (FOUNDRY_SOLC) is the cell's own
+              solidityCell = toolchainsCell { declaredToolchains.solidity-toolchain = { }; };
+              solcCell = toolchainsCell { declaredToolchains.solc = { }; };
+              bothSolcCell = toolchainsCell {
+                declaredToolchains = {
+                  solc = { };
+                  solidity-toolchain = { };
+                };
+              };
 
               buckconfig =
                 testCache:
@@ -467,6 +476,19 @@
             assert lib.assertMsg (
               !(lib.hasInfix "preprocessor_paths" plainMdbookCell.buckFile)
             ) "toolchains cell: mdbook gets preprocessor_paths with none configured";
+            assert lib.assertMsg (
+              solidityCell.solcPath == "/nix/store/stand-in-solidity-toolchain/bin/solc"
+              && lib.hasInfix ''solc_path = "${solidityCell.solcPath}"'' solidityCell.buckFile
+            ) "toolchains cell: solcPath is not the solc the solidity-toolchain cell's solc target runs";
+            assert lib.assertMsg (
+              solcCell.solcPath == "/nix/store/stand-in-solc/bin/solc"
+            ) "toolchains cell: solcPath is not the declared solc's";
+            assert lib.assertMsg (
+              goCell.solcPath == null
+            ) "toolchains cell: solcPath is set without a Solidity toolchain";
+            assert lib.assertMsg (
+              !(builtins.tryEval bothSolcCell.solcPath).success
+            ) "toolchains cell: declaring both solc and solidity-toolchain picks a solc silently";
             assert lib.assertMsg (
               lib.hasInfix "godeps = .turnkey/godeps" uncached
               && lib.hasInfix "target:godeps//...->prelude//platforms:default" uncached

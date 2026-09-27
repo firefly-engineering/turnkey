@@ -76,32 +76,51 @@ let
     in
     lib.concatStringsSep "\n" loadStmts;
 
+  # Every target the cell defines, with its attrs resolved once: the BUCK file
+  # renders them, and solcPath reads the solc target's
+  cellTargets = builtins.concatMap (
+    name:
+    map (
+      t:
+      t
+      // {
+        # Static attrs from the mapping, overridden by the dynamic attrs
+        # resolved from the registry (e.g., absolute paths to compilers)
+        attrs = (t.attrs or { }) // (if t ? dynamicAttrs then t.dynamicAttrs resolvedRegistry else { });
+      }
+    ) (mappings.${name}.targets or [ ])
+  ) finalToolchains;
+
   # Generate target instantiations for rules.star file
   generateTargets =
-    toolchains:
+    targets:
+    lib.concatStringsSep "\n\n" (
+      map (
+        t:
+        let
+          attrLines = [
+            "    name = \"${t.name}\","
+          ]
+          ++ [ "    visibility = ${builtins.toJSON t.visibility}," ]
+          ++ (lib.mapAttrsToList (k: v: "    ${k} = ${builtins.toJSON v},") t.attrs);
+        in
+        "${t.rule}(\n${lib.concatStringsSep "\n" attrLines}\n)"
+      ) targets
+    );
+
+  # The solc the cell's solc target runs, for the dev shell's FOUNDRY_SOLC, or
+  # null without one. Both solc and solidity-toolchain map to a target named
+  # solc; declaring both would define it twice, so there is no solc to pick.
+  solcPath =
     let
-      targets = builtins.concatMap (
-        name:
-        map (
-          t:
-          let
-            # Static attrs defined in the mapping
-            staticAttrs = t.attrs or { };
-            # Dynamic attrs resolved from registry (e.g., absolute paths to compilers)
-            dynamicAttrs = if t ? dynamicAttrs then t.dynamicAttrs resolvedRegistry else { };
-            # Merge: dynamic attrs override static attrs
-            attrs = staticAttrs // dynamicAttrs;
-            attrLines = [
-              "    name = \"${t.name}\","
-            ]
-            ++ [ "    visibility = ${builtins.toJSON t.visibility}," ]
-            ++ (lib.mapAttrsToList (k: v: "    ${k} = ${builtins.toJSON v},") attrs);
-          in
-          "${t.rule}(\n${lib.concatStringsSep "\n" attrLines}\n)"
-        ) (mappings.${name}.targets or [ ])
-      ) toolchains;
+      solcTargets = builtins.filter (t: t.name == "solc") cellTargets;
     in
-    lib.concatStringsSep "\n\n" targets;
+    if solcTargets == [ ] then
+      null
+    else if builtins.length solcTargets > 1 then
+      throw "turnkey: both solc and solidity-toolchain are declared, and each defines the toolchains cell's solc target; declare one of them"
+    else
+      (builtins.head solcTargets).attrs.solc_path;
 
   # The complete rules.star file content
   buckFile = ''
@@ -110,11 +129,11 @@ let
 
     ${generateLoads finalToolchains}
 
-    ${generateTargets finalToolchains}
+    ${generateTargets cellTargets}
   '';
 
 in
 {
   toolchains = finalToolchains;
-  inherit runtimeDeps buckFile;
+  inherit runtimeDeps buckFile solcPath;
 }

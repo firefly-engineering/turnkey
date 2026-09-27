@@ -609,8 +609,10 @@ in
         type = types.bool;
         default = false;
         description = ''
-          Add a pre-commit hook that verifies Foundry configuration consistency.
-          Checks that solc_version matches toolchain and dependencies match root.
+          Add a pre-commit hook that checks the repository's foundry.toml:
+          there is at most one, at the root, and it sets no solc or
+          solc_version (the compiler comes from the toolchain, through
+          FOUNDRY_SOLC).
         '';
       };
 

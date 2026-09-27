@@ -34,3 +34,7 @@ vendor/
 # Rust build artifacts
 target/
 node_modules/
+
+# Foundry build output (native forge from the repo root)
+/out/
+/cache/
