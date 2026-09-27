@@ -16,12 +16,12 @@ import (
 // wants in them. It resolves each distinct request once, and collects what
 // the resolutions report.
 type Package struct {
-	lang       Language
-	dir        string
-	dims       []string
-	selfTarget string
-	space      conditions.Space
-	cache      map[string]PackageMapping
+	lang        Language
+	dir         string
+	dims        []string
+	buckPackage string
+	space       conditions.Space
+	cache       map[string]PackageMapping
 
 	// messages are the reports of every resolution, each once, in order.
 	messages []string
@@ -38,13 +38,13 @@ func OpenPackage(lang Language, projectRoot, dir string, space conditions.Space)
 		return nil, err
 	}
 	return &Package{
-		lang:       lang,
-		dir:        dir,
-		dims:       dims.names(),
-		selfTarget: computeSelfTarget(dir, projectRoot),
-		space:      space.WithDimensions(dims.OnOff),
-		cache:      make(map[string]PackageMapping),
-		reported:   make(map[string]bool),
+		lang:        lang,
+		dir:         dir,
+		dims:        dims.names(),
+		buckPackage: buckPackage(dir, projectRoot),
+		space:       space.WithDimensions(dims.OnOff),
+		cache:       make(map[string]PackageMapping),
+		reported:    make(map[string]bool),
 	}, nil
 }
 
@@ -191,8 +191,9 @@ func composeDeps(m PackageMapping, kind TargetKind, withLibrary bool) Want {
 
 // resolve returns the package's deps in config, for a target of kind and
 // its variant.
-// Deps on the package's own target are dropped (e.g. when syncing
-// src/python/cargo, //src/python/cargo:cargo).
+// Deps on the package's own targets are dropped (e.g. when syncing
+// src/python/cargo, //src/python/cargo:cargo): its targets depend on each
+// other as ":name", which sync keeps.
 func (p *Package) resolve(config conditions.Configuration, kind TargetKind, variant map[string]starlark.AttributeValue) (PackageMapping, error) {
 	req := Request{Config: config.Project(p.dims), Kind: kind, Variant: variant}
 	key := fmt.Sprintf("%s|%d|%s", req.Config, kind, variantKey(variant))
@@ -203,8 +204,8 @@ func (p *Package) resolve(config conditions.Configuration, kind TargetKind, vari
 	if err != nil {
 		return m, err
 	}
-	m.Deps = filterSelfReference(m.Deps, p.selfTarget)
-	m.TestDeps = filterSelfReference(m.TestDeps, p.selfTarget)
+	m.Deps = p.withoutOwnTargets(m.Deps)
+	m.TestDeps = p.withoutOwnTargets(m.TestDeps)
 	p.cache[key] = m
 
 	for _, unmapped := range m.UnmappedImports {
@@ -262,26 +263,29 @@ func hasLocalDep(deps []string) bool {
 	return false
 }
 
-// computeSelfTarget computes the Buck target for the current package.
-// e.g., "/path/to/src/python/cargo" with projectRoot "/path/to" -> "//src/python/cargo:cargo"
-func computeSelfTarget(pkgDir, projectRoot string) string {
-	relPath, err := filepath.Rel(projectRoot, pkgDir)
-	if err != nil {
+// buckPackage returns the Buck2 package of the directory pkgDir, e.g.
+// "/path/to/src/python/cargo" with projectRoot "/path/to" ->
+// "//src/python/cargo", or "" if it isn't under projectRoot.
+func buckPackage(pkgDir, projectRoot string) string {
+	rel, err := filepath.Rel(projectRoot, pkgDir)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
 		return ""
 	}
-	// relPath is like "src/python/cargo"
-	targetName := filepath.Base(relPath)
-	return fmt.Sprintf("//%s:%s", relPath, targetName)
+	if rel == "." {
+		return "//"
+	}
+	return "//" + filepath.ToSlash(rel)
 }
 
-// filterSelfReference removes deps that match the selfTarget.
-func filterSelfReference(deps []MappedDep, selfTarget string) []MappedDep {
-	if selfTarget == "" {
+// withoutOwnTargets returns deps without those on a target of the
+// package.
+func (p *Package) withoutOwnTargets(deps []MappedDep) []MappedDep {
+	if p.buckPackage == "" {
 		return deps
 	}
 	var filtered []MappedDep
 	for _, dep := range deps {
-		if dep.Target != selfTarget {
+		if pkg, _, _ := strings.Cut(dep.Target, ":"); pkg != p.buckPackage {
 			filtered = append(filtered, dep)
 		}
 	}

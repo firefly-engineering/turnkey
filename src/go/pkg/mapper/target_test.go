@@ -211,14 +211,15 @@ func TestTestTargetComposition(t *testing.T) {
 	}
 }
 
-// Deps on the package's own target are dropped: a Python member's imports
-// of its own modules map to it.
+// Deps on the package's own targets are dropped, whatever they are named:
+// a Python member's imports of its own modules map to it. A package
+// nested in it is another package.
 func TestTargetDropsSelfReference(t *testing.T) {
 	lang := &fakeLanguage{mapping: PackageMapping{
-		Deps: []MappedDep{{Target: "//pkg:pkg"}, {Target: "//cfg:cfg"}},
+		Deps: []MappedDep{{Target: "//pkg:pkg"}, {Target: "//pkg:lib"}, {Target: "//pkg/sub:sub"}, {Target: "//cfg:cfg"}},
 	}}
 	lib := fakeTarget(t, openFake(t, lang), `fake_library(name = "lib")`)
-	if got, want := wantDeps(t, lib, onMacOS, nil).Labels, []string{"//cfg:cfg"}; !reflect.DeepEqual(got, want) {
+	if got, want := wantDeps(t, lib, onMacOS, nil).Labels, []string{"//pkg/sub:sub", "//cfg:cfg"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("labels = %v, want %v", got, want)
 	}
 }
