@@ -815,23 +815,18 @@
                 }
               ];
 
-              # The registries of before fixup sets, as a module
-              legacy =
-                (resolveWith [
-                  (import ./nix/lib/fixups/legacy.nix { inherit lib; } {
-                    buildScriptFixups.serde = { patchVersion, vendorPath, ... }: "echo ${vendorPath} ${patchVersion}";
-                    rustcFlags."rustix@1.0.7".linux = [
-                      "--cfg"
-                      "old"
-                    ];
-                    nativeLibraries.ring =
-                      { patchVersion, ... }:
-                      {
-                        lib_name = "ring_${patchVersion}";
-                        static_lib_path = "out_dir/libring.a";
-                      };
-                  })
-                ] "rust" locked).fixups;
+              # The options fixup sets replaced, set as they used to be
+              retired =
+                option:
+                (lib.evalModules {
+                  modules = [
+                    (import ./nix/buck2/options.nix {
+                      inherit lib;
+                      version = "check";
+                    })
+                    { rust.${option}.serde = [ ]; }
+                  ];
+                }).config.rust.${option};
 
               # turnkey's own set, as another repository imports it, on
               # two platforms
@@ -953,14 +948,8 @@
                       version = "v1.2.0";
                     }
                   ]).errors != [ ];
-                "the old registries resolve as they used to" =
-                  lib.hasInfix "echo . 219" legacy."serde@1.0.219".commands
-                  &&
-                    legacy."rustix@1.0.7".gen.rustcFlags.os.linux == [
-                      "--cfg"
-                      "old"
-                    ]
-                  && (builtins.head legacy."ring@0.17.14".gen.nativeLibraries).lib_name == "ring_14";
+                "the options fixup sets replaced are errors" =
+                  fails (retired "buildScriptFixups") && fails (retired "rustcFlagsRegistry");
                 "turnkey's published set fixes the crates it locks" =
                   lib.hasInfix "pub mod __private219" ownOnLinux."serde@1.0.219".commands
                   && ownOnLinux."rustix@1.0.7".gen.rustcFlags.os.macos != [ ]

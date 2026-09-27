@@ -18,7 +18,6 @@
 let
   # Import sub-modules
   fetchers = import ./fetchers.nix { inherit pkgs lib; };
-  fixups = import ./fixups { inherit pkgs lib; };
 
   # Import adapters with access to generic builder (see below)
   mkAdapters =
@@ -185,7 +184,7 @@ let
 in
 rec {
   # Export sub-modules
-  inherit fetchers fixups adapters;
+  inherit fetchers adapters;
 
   # Export generic cell builder for direct use
   mkDepsCell = genericMkDepsCell;

@@ -124,6 +124,8 @@ let
       cfg.go.generateOnShellEntry
       cfg.rules.go.internalPrefix
       cfg.rules.go.externalCell
+      cfg.rust.buildScriptFixups
+      cfg.rust.rustcFlagsRegistry
     ];
     cfg.prelude.path != null;
   prelude = if customPrelude then cfg.prelude.path else cfg.prelude.package;

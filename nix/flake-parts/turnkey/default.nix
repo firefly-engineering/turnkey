@@ -319,19 +319,11 @@ in
       platforms = import ../../buck2/platforms.nix { inherit lib; };
 
       # The fixup sets the repository imports and its own fixups
-      # (buck2.fixups): no others apply. The old registry options still
-      # feed in until they are retired.
+      # (buck2.fixups): no others apply
       fixupsLib = import ../../lib/fixups { inherit lib; };
       evaluatedFixups = fixupsLib.evalFixups {
         inherit pkgs;
-        modules = [
-          cfg.buck2.fixups
-          (import ../../lib/fixups/legacy.nix { inherit lib; } {
-            inherit (cfg.buck2.rust) buildScriptFixups;
-            rustcFlags = cfg.buck2.rust.rustcFlagsRegistry;
-            nativeLibraries = { };
-          })
-        ];
+        modules = [ cfg.buck2.fixups ];
       };
       # Fixups written in buck2.fixups itself are this repository's own:
       # their definitions carry the files that define buck2

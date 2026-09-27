@@ -15,7 +15,6 @@
 
 let
   fetchers = import ../fetchers.nix { inherit pkgs lib; };
-  fixups = import ../fixups { inherit pkgs lib; };
   inherit (genericBuilder) genericMkDepsCell;
 in
 rec {
@@ -96,7 +95,6 @@ rec {
       pythonVersion ? pkgs.python3.version,
 
       # Optional
-      userFixups ? { }, # Additional fixups
       # The locked dependencies' fixups: [ { key; name; version; } ] ->
       # { fixups = { <key> = { commands; }; }; } (nix/lib/fixups's resolve)
       resolveFixups ? (_: { fixups = { }; }),
@@ -105,9 +103,6 @@ rec {
     let
       depsToml = builtins.fromTOML (builtins.readFile depsFile);
       deps = depsToml.deps or { };
-
-      # Merge built-in fixups with user-provided
-      allFixups = (fixups.builtinFixups.python or { }) // userFixups;
 
       # The locked distributions' fixups
       resolvedFixups = resolveFixups (
@@ -128,7 +123,7 @@ rec {
           version = depSpec.version;
           sha256 = depSpec.hash;
           url = depSpec.url;
-          fixup = (fixups.${name}.commands or "") + (allFixups.${name} or "");
+          fixup = fixups.${name}.commands or "";
         }
       ) deps;
     in

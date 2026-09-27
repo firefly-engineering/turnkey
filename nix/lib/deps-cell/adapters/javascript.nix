@@ -17,7 +17,6 @@
 
 let
   fetchers = import ../fetchers.nix { inherit pkgs lib; };
-  fixups = import ../fixups { inherit pkgs lib; };
   platformsLib = import ../../../buck2/platforms.nix { inherit lib; };
   inherit (genericBuilder) genericMkDepsCell;
 
@@ -157,7 +156,6 @@ rec {
       conditions,
 
       # Optional
-      userFixups ? { }, # Additional fixups
       # The locked dependencies' fixups: [ { key; name; version; } ] ->
       # { fixups = { <key> = { commands; }; }; } (nix/lib/fixups's resolve)
       resolveFixups ? (_: { fixups = { }; }),
@@ -166,9 +164,6 @@ rec {
     let
       depsToml = builtins.fromTOML (builtins.readFile depsFile);
       packages = depsToml.package or [ ];
-
-      # Merge built-in fixups with user-provided
-      allFixups = (fixups.builtinFixups.javascript or { }) // userFixups;
 
       # The locked packages' fixups
       resolvedFixups = resolveFixups (
@@ -192,7 +187,7 @@ rec {
               integrity
               ;
             dependencies = pkg.dependencies or [ ];
-            fixup = (fixups.${pkg.name}.commands or "") + (allFixups.${pkg.name} or "");
+            fixup = fixups.${pkg.name}.commands or "";
           };
         }) packages
       );

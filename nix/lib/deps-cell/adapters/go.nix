@@ -15,7 +15,6 @@
 
 let
   fetchers = import ../fetchers.nix { inherit pkgs lib; };
-  fixups = import ../fixups { inherit pkgs lib; };
   inherit (genericBuilder) genericMkDepsCell;
 
   # Generate buckgen configuration (JSON) for the cell named cellName.
@@ -115,7 +114,6 @@ rec {
       buckgen, # buckgen tool derivation
 
       # Optional
-      userFixups ? { }, # Additional fixups
       # The locked dependencies' fixups: [ { key; name; version; } ] ->
       # { fixups = { <key> = { commands; }; }; } (nix/lib/fixups's resolve)
       resolveFixups ? (_: { fixups = { }; }),
@@ -141,9 +139,6 @@ rec {
           allowedBuildTags
           ;
       };
-
-      # Merge built-in fixups with user-provided
-      allFixups = (fixups.builtinFixups.go or { }) // userFixups;
 
       # Parse dependency info based on schema version
       # v1: key is import path, version in depSpec.version
@@ -186,14 +181,13 @@ rec {
         key: depSpec:
         let
           parsed = parseDep key depSpec;
-          legacy = allFixups.${parsed.importPath} or allFixups.${key} or "";
         in
         mkGoDepPackage {
           importPath = parsed.importPath;
           fetchPath = parsed.fetchPath;
           version = parsed.version;
           sha256 = depSpec.hash;
-          fixup = (fixups.${key}.commands or "") + legacy;
+          fixup = fixups.${key}.commands or "";
         }
       ) deps;
 
