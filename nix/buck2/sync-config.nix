@@ -70,10 +70,6 @@ let
     auto_sync = ${lib.boolToString buck2.rules.autoSync}
     strict = ${lib.boolToString buck2.rules.strict}
 
-    [rules.go]
-    internal_prefix = ${builtins.toJSON buck2.rules.go.internalPrefix}
-    external_cell = ${builtins.toJSON buck2.rules.go.externalCell}
-
     ${lib.concatMapStringsSep "\n" formatSyncRule syncRules}
     ${lib.concatMapStringsSep "\n" formatWrapperRule wrapperRules}
   '';

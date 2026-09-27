@@ -64,24 +64,6 @@ type RulesConfig struct {
 	// Strict causes tk to fail if rules.star files would change.
 	// This is useful for CI to ensure rules.star files are committed up-to-date.
 	Strict bool `toml:"strict"`
-
-	// Go contains Go-specific configuration for rules.star generation.
-	Go GoRulesConfig `toml:"go"`
-}
-
-// GoRulesConfig contains Go-specific settings for rules.star generation.
-type GoRulesConfig struct {
-	// Enabled controls whether Go rules sync is active (default: true when parent enabled).
-	Enabled *bool `toml:"enabled,omitempty"`
-
-	// InternalPrefix is the Buck2 target prefix for internal packages.
-	// Example: "//src/go" means imports from github.com/org/repo/src/go/pkg/foo
-	// become //src/go/pkg/foo:foo
-	InternalPrefix string `toml:"internal_prefix"`
-
-	// ExternalCell is the Buck2 cell for external dependencies.
-	// Example: "godeps" means external imports become godeps//vendor/path:target
-	ExternalCell string `toml:"external_cell"`
 }
 
 // IsAutoSync returns whether auto-sync is enabled (defaults to true).
@@ -90,14 +72,6 @@ func (c *RulesConfig) IsAutoSync() bool {
 		return true
 	}
 	return *c.AutoSync
-}
-
-// IsGoEnabled returns whether Go rules sync is enabled.
-func (c *RulesConfig) IsGoEnabled() bool {
-	if c.Go.Enabled == nil {
-		return c.Enabled // Inherit from parent
-	}
-	return *c.Go.Enabled
 }
 
 // DepsRule defines a staleness rule for dependency generation.

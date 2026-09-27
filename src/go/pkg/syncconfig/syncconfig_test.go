@@ -216,3 +216,27 @@ generator = ["cat"]
 		t.Errorf("expected name 'test', got %q", cfg.Deps[0].Name)
 	}
 }
+
+// A sync.toml generated before the [rules.go] settings were removed still
+// loads: its section is ignored.
+func TestLoadIgnoresRemovedRulesGo(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sync.toml")
+	content := `[rules]
+enabled = true
+auto_sync = false
+
+[rules.go]
+internal_prefix = "//src/go"
+external_cell = "godeps"
+`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.Rules.Enabled || cfg.Rules.IsAutoSync() {
+		t.Errorf("rules = %+v, want enabled without auto-sync", cfg.Rules)
+	}
+}

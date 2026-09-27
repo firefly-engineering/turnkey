@@ -129,28 +129,23 @@ Add to your Emacs configuration:
 
 ## Configuration Options
 
-### sync.toml Settings
+### Module Options
 
-Configure rules sync behavior in `.turnkey/sync.toml`:
+Rules sync is configured through turnkey's Buck2 options in your
+`flake.nix`, which generate the `[rules]` section of `.turnkey/sync.toml`
+(a generated file: don't edit it):
 
-```toml
-[rules]
-enabled = true       # Enable rules.star sync (default: false)
-auto_sync = true     # Auto-sync before tk build (default: true)
-strict = false       # Fail if rules would change - for CI (default: false)
-
-[rules.go]
-internal_prefix = "//src/go"
-external_cell = "godeps"
-
-[rules.rust]
-internal_prefix = "//src/rust"
-external_cell = "rustdeps"
-
-[rules.python]
-internal_prefix = "//src/python"
-external_cell = "pydeps"
+```nix
+turnkey.toolchains.buck2.rules = {
+  enabled = true;    # Enable rules.star sync (default: false)
+  autoSync = true;   # Auto-sync before tk build (default: true)
+  strict = false;    # Fail if rules would change - for CI (default: false)
+};
 ```
+
+Nothing else is configured: sync finds each language's internal targets
+from its own manifest (`go.mod`, `Cargo.toml`, the uv workspace) and uses
+turnkey's deps cells (`godeps`, `rustdeps`, `pydeps`, `jsdeps`, `soldeps`).
 
 ### Command Line Options
 
