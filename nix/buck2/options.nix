@@ -206,6 +206,22 @@ in
         '';
       };
 
+      allowedBuildTags = mkOption {
+        type = types.listOf (types.strMatching "[A-Za-z0-9_.]+");
+        default = [ ];
+        example = [ "integration" ];
+        description = ''
+          The Go build tags a target can be built with. It is the single
+          source of `.buckconfig`'s `go.allowed_build_tags`, which the
+          prelude requires for a `build_tags` attribute and turns into the
+          `prelude//go/tags/constraints:<tag>` constraints, and of rules
+          sync's list: a library's imports that depend on one of these tags
+          are written as a `select()` on its constraint. The toolchains
+          cell defines the settings combining them with the platform, one
+          per combination, so keep the list short.
+        '';
+      };
+
       autoRegenerate = removedRegeneration "autoRegenerate";
       generateOnShellEntry = removedRegeneration "generateOnShellEntry";
     };

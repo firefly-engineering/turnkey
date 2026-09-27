@@ -95,7 +95,9 @@ let
     # (nix/buck2/platforms.nix)
     mkdir -p $out/conditions
     cat > $out/conditions/BUCK <<'BUCK'
-    ${platforms.settingsBuckFile (map platforms.fromSystem cfg.platforms)}
+    ${platforms.settingsBuckFile (map platforms.fromSystem cfg.platforms) (
+      lib.optionals cfg.go.enable cfg.go.allowedBuildTags
+    )}
     BUCK
 
     # Create cell identity .buckconfig
@@ -242,6 +244,7 @@ let
     cells = lib.attrValues nixCells;
     inherit toolchainsCellPath testRunnerProtocol;
     testCache = testCache.buckconfig;
+    goAllowedBuildTags = lib.optionals cfg.go.enable cfg.go.allowedBuildTags;
   };
 
   # Buckconfig file derivation

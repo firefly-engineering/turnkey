@@ -73,6 +73,10 @@ type ConditionsConfig struct {
 
 	// Platforms are the platforms turnkey builds for (buck2.platforms).
 	Platforms []conditions.Platform `toml:"platforms"`
+
+	// GoTags are the Go build tags allowed to vary per configuration
+	// (buck2.go.allowedBuildTags, .buckconfig's go.allowed_build_tags).
+	GoTags []string `toml:"go_tags"`
 }
 
 // RulesConfig configures automatic rules.star file synchronization.

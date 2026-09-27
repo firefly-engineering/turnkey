@@ -88,6 +88,10 @@ platform in `buck2.platforms` (the flake's `systems` by default), combining
 its OS and CPU constraints. Rules sync keys a `select()` on one when deps
 differ by CPU within one OS
 ([Platform-Conditional Deps](ide-integration.md#platform-conditional-deps)).
+With `buck2.go.allowedBuildTags`, which also sets `.buckconfig`'s
+`go.allowed_build_tags`, it holds the settings combining the platform's OS
+and CPU with each allowed tag, set (`linux-x86_64-integration`) or unset
+(`linux-no_integration`), for a Go library whose imports depend on a tag.
 
 ### Prelude Cell
 

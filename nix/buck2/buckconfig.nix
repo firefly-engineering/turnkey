@@ -19,6 +19,8 @@
   # null, or { runner, path, address, tls }: turnkey's test runner, the PATH
   # cached tests get, and the cache endpoint buck2's RE client reads from
   testCache,
+  # The Go build tags targets may use (buck2.go.allowedBuildTags)
+  goAllowedBuildTags ? [ ],
 }:
 
 let
@@ -68,4 +70,9 @@ in
       action_cache_address = ${testCache.address}
       cas_address = ${testCache.address}
       tls = ${lib.boolToString testCache.tls}
+''
++ lib.optionalString (goAllowedBuildTags != [ ]) ''
+
+  [go]
+      allowed_build_tags = ${lib.concatStringsSep "," goAllowedBuildTags}
 ''

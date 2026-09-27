@@ -83,6 +83,7 @@ let
     # package of the combined <os>-<cpu> config_settings its select()s use.
     [conditions]
     settings = ${builtins.toJSON platforms.settingsPackage}
+    go_tags = ${builtins.toJSON (if buck2.go.enable then buck2.go.allowedBuildTags else [ ])}
     ${lib.concatMapStringsSep "\n" formatPlatform (map platforms.fromSystem buck2.platforms)}
     ${lib.concatMapStringsSep "\n" formatSyncRule syncRules}
     ${lib.concatMapStringsSep "\n" formatWrapperRule wrapperRules}

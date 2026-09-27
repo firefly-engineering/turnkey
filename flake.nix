@@ -375,7 +375,20 @@
               };
               syncToml = builtins.fromTOML syncConfig.content;
               platforms = import ./nix/buck2/platforms.nix { inherit lib; };
-              platformSettings = platforms.settingsBuckFile (map platforms.fromSystem buck2Options.platforms);
+              platformSettings = platforms.settingsBuckFile (map platforms.fromSystem buck2Options.platforms) [ ];
+              taggedSettings = platforms.settingsBuckFile (map platforms.fromSystem [ "x86_64-linux" ]) [
+                "integration"
+              ];
+              taggedBuckconfig = import ./nix/buck2/buckconfig.nix { inherit lib; } {
+                cells = [ ];
+                toolchainsCellPath = ".turnkey/toolchains";
+                testRunnerProtocol = "/nix/store/stand-in-protocol";
+                testCache = null;
+                goAllowedBuildTags = [
+                  "integration"
+                  "e2e"
+                ];
+              };
 
               # How the shell describes the cache to tk, as tk's tests read it
               shellContract = builtins.fromJSON (builtins.readFile ./src/go/pkg/testcache/testdata/shell-contract.json);
@@ -455,6 +468,15 @@
               lib.hasInfix ''name = "macos-arm64"'' platformSettings
               && lib.hasInfix ''"prelude//cpu/constraints:cpu[arm64]"'' platformSettings
             ) "toolchains cell: no combined config_setting for macos-arm64";
+            assert lib.assertMsg (
+              lib.hasInfix ''name = "linux-integration"'' taggedSettings
+              && lib.hasInfix ''name = "linux-x86_64-no_integration"'' taggedSettings
+              && lib.hasInfix ''"prelude//go/tags/constraints:integration[set]"'' taggedSettings
+            ) "toolchains cell: no config_setting combining the OS and an allowed Go build tag";
+            assert lib.assertMsg (lib.hasInfix "allowed_build_tags = integration,e2e" taggedBuckconfig)
+              "buckconfig: buck2.go.allowedBuildTags doesn't reach go.allowed_build_tags";
+            assert lib.assertMsg (syncToml.conditions.go_tags == [ ])
+              "sync.toml: [conditions] go_tags isn't buck2.go.allowedBuildTags";
             pkgs.runCommand "buck2-generators-check" { } "touch $out";
 
           # The language records (nix/buck2/languages.nix) agree with
