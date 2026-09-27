@@ -247,7 +247,10 @@ func extractModulePath(content string) string {
 	return modfile.ModulePath([]byte(content))
 }
 
-// loadGoDeps loads dependency names from go-deps.toml.
+// loadGoDeps loads the import paths of the modules in go-deps.toml.
+//
+// Entries are keyed "path@version" (schema 2), so the import path comes from
+// each entry's import_path; a key without one is taken as the path itself.
 func loadGoDeps(path string) (map[string]bool, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -255,15 +258,21 @@ func loadGoDeps(path string) (map[string]bool, error) {
 	}
 
 	var depsFile struct {
-		Deps map[string]interface{} `toml:"deps"`
+		Deps map[string]struct {
+			ImportPath string `toml:"import_path"`
+		} `toml:"deps"`
 	}
 	if err := toml.Unmarshal(content, &depsFile); err != nil {
 		return nil, err
 	}
 
 	result := make(map[string]bool)
-	for dep := range depsFile.Deps {
-		result[dep] = true
+	for key, dep := range depsFile.Deps {
+		if dep.ImportPath != "" {
+			result[dep.ImportPath] = true
+		} else {
+			result[key] = true
+		}
 	}
 	return result, nil
 }

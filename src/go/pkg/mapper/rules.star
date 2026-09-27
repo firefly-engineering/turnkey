@@ -19,6 +19,7 @@ go_test(
     target_under_test = ":mapper",
     deps = [
         "//src/go/pkg/extraction:extraction",
+        "//src/go/pkg/godeps:godeps",
     ],
     visibility = ["PUBLIC"],
 )

@@ -216,9 +216,10 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 	// Apply changes to targets
 	modified := false
 
-	// Process library targets
+	// Process library and binary targets: both depend on exactly what their
+	// sources import
 	for _, target := range f.Targets {
-		if isLibraryTarget(target.Rule) {
+		if isLibraryTarget(target.Rule) || isSyncedBinaryTarget(target.Rule) {
 			oldDeps := target.GetDeps()
 			newDeps := mapper.DepsToTargets(pkgMapping.Deps)
 
@@ -615,6 +616,15 @@ func classifyImport(imp, modulePath string) extraction.ImportKind {
 // isLibraryTarget returns true if the rule is a library target.
 func isLibraryTarget(rule string) bool {
 	return strings.HasSuffix(rule, "_library") || rule == "go_library" || rule == "rust_library"
+}
+
+// isSyncedBinaryTarget returns true if the rule is a binary target whose deps
+// sync manages. Only go_binary for now: the Go extractor (go list) reports
+// exactly what a package imports, while deps-extract still reports unmapped
+// names for Rust and Python and would strip correct deps from their binaries
+// (see #99).
+func isSyncedBinaryTarget(rule string) bool {
+	return rule == "go_binary"
 }
 
 // isTestTarget returns true if the rule is a test target.

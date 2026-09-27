@@ -3,9 +3,11 @@ package mapper
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/godeps"
 )
 
 func TestMapGoImports(t *testing.T) {
@@ -15,9 +17,9 @@ func TestMapGoImports(t *testing.T) {
 				ModulePath:   "github.com/firefly-engineering/turnkey",
 				ExternalCell: "godeps",
 				ExternalDeps: map[string]bool{
-					"github.com/google/uuid":  true,
-					"golang.org/x/sys":        true,
-					"go.starlark.net":         true,
+					"github.com/google/uuid": true,
+					"golang.org/x/sys":       true,
+					"go.starlark.net":        true,
 				},
 			},
 		},
@@ -162,6 +164,50 @@ func TestMapExtractionResult(t *testing.T) {
 	}
 	if !hasExternal {
 		t.Error("missing external dep")
+	}
+}
+
+// The mapper reads the go-deps.toml godeps-gen writes: its keys carry a
+// version ("path@version"), so imports must match on import_path.
+func TestGoDepsFromGodepsGen(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module github.com/example/project\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	depsFile, err := os.Create(filepath.Join(dir, "go-deps.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	deps := []godeps.Dependency{
+		{ImportPath: "github.com/pelletier/go-toml/v2", Version: "v2.2.4"},
+		{ImportPath: "golang.org/x/mod", Version: "v0.31.0"},
+	}
+	if err := godeps.WriteTOML(depsFile, deps, godeps.DefaultOutputOptions()); err != nil {
+		t.Fatal(err)
+	}
+	if err := depsFile.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	m, err := New(Config{ProjectRoot: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mapped, unmapped := m.mapGoImports([]extraction.Import{
+		{Path: "github.com/pelletier/go-toml/v2", Kind: extraction.ImportKindExternal},
+		{Path: "golang.org/x/mod/modfile", Kind: extraction.ImportKindExternal},
+	})
+
+	if len(unmapped) != 0 {
+		t.Errorf("unmapped = %v, want none", unmapped)
+	}
+	want := []string{
+		"godeps//vendor/github.com/pelletier/go-toml/v2:v2",
+		"godeps//vendor/golang.org/x/mod/modfile:modfile",
+	}
+	if got := DepsToTargets(mapped); !reflect.DeepEqual(got, want) {
+		t.Errorf("targets = %v, want %v", got, want)
 	}
 }
 

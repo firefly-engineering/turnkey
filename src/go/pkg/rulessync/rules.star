@@ -1,4 +1,4 @@
-load("@prelude//:rules.bzl", "go_library")
+load("@prelude//:rules.bzl", "go_library", "go_test")
 
 go_library(
     name = "rulessync",
@@ -10,5 +10,13 @@ go_library(
         "//src/go/pkg/starlark:starlark",
         "godeps//vendor/golang.org/x/mod/modfile:modfile",
     ],
+    visibility = ["PUBLIC"],
+)
+
+go_test(
+    name = "rulessync_test",
+    srcs = glob(["*_test.go"]),
+    target_under_test = ":rulessync",
+    deps = ["//src/go/pkg/starlark:starlark"],
     visibility = ["PUBLIC"],
 )
