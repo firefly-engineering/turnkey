@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/goparse"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
@@ -86,34 +85,23 @@ func (l *goLanguage) Rule(rule string) (Rule, bool) {
 func (l *goLanguage) SourcePatterns() []string { return []string{"*.go"} }
 
 func (l *goLanguage) ResolveDeps(pkgDir string, req Request) (PackageMapping, error) {
-	result, err := l.extract(pkgDir, goEnv(req.Config), buildTags(req))
+	ctx, _ := goparse.ConfigContext(req.Config)
+	result, err := l.extract(pkgDir, ctx.Environ(), buildTags(req, ctx))
 	if err != nil {
 		return PackageMapping{}, fmt.Errorf("extractor failed: %w", err)
 	}
 	return resolveImports(l, result), nil
 }
 
-// goEnv returns the environment go list needs to see a configuration's
-// platform, whatever the host: GOOS, GOARCH and cgo. A configuration
-// without a platform gets the host's.
-func goEnv(config conditions.Configuration) []string {
-	goos := map[string]string{"linux": "linux", "macos": "darwin"}[config[conditions.OS]]
-	goarch := map[string]string{"x86_64": "amd64", "arm64": "arm64"}[config[conditions.CPU]]
-	if goos == "" || goarch == "" {
-		return nil
-	}
-	return []string{"GOOS=" + goos, "GOARCH=" + goarch, "CGO_ENABLED=1"}
-}
-
 // buildTags returns the build tags a request is resolved with: a binary's
 // or test's build_tags, literally, or the tags a library's configuration
-// sets.
-func buildTags(req Request) []string {
+// sets (in ctx, its Go build).
+func buildTags(req Request, ctx goparse.BuildContext) []string {
 	if req.Kind == Binary || req.Kind == Test {
 		tags, _ := starlark.Labels(req.Variant["build_tags"])
 		return tags
 	}
-	return goparse.ConfigTags(req.Config)
+	return ctx.Tags
 }
 
 // extract lists the imports of the Go packages under pkgDir with go list,

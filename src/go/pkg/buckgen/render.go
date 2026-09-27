@@ -88,24 +88,13 @@ func packageSpace(pkg *goparse.GoPackage, cfg *Config) conditions.Space {
 	return conditions.NewSpace(cfg.Conditions.Platforms, cfg.Conditions.Settings).WithDimensions(dims)
 }
 
-// buildContext returns the Go build of a configuration: its platform's
-// GOOS and GOARCH, cgo, the toolchain's release tags and the tags it sets.
+// buildContext returns the Go build of a configuration (goparse's), with
+// the toolchain's release tags.
 func buildContext(config conditions.Configuration, cfg *Config) goparse.BuildContext {
-	ctx := goparse.BuildContext{
-		GOOS:       goOS[config[conditions.OS]],
-		GOARCH:     goArch[config[conditions.CPU]],
-		CgoEnabled: true,
-		GoVersion:  cfg.GoVersion,
-	}
-	ctx.Tags = goparse.ConfigTags(config)
+	ctx, _ := goparse.ConfigContext(config)
+	ctx.GoVersion = cfg.GoVersion
 	return ctx
 }
-
-// Go's names for Buck2's OS and CPU constraint values
-var (
-	goOS   = map[string]string{"linux": "linux", "macos": "darwin"}
-	goArch = map[string]string{"x86_64": "amd64", "arm64": "arm64"}
-)
 
 // RenderCell generates rules.star files for all packages in a vendor directory
 func RenderCell(vendorDir string, cfg *Config) ([]string, error) {
