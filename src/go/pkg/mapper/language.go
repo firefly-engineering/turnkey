@@ -35,13 +35,9 @@ type Language interface {
 	// Name identifies the language, e.g. "go".
 	Name() string
 
-	// RuleKind reports whether a Buck2 rule kind belongs to the language
-	// and, if so, which kind of target it builds.
-	RuleKind(rule string) (kind TargetKind, ok bool)
-
-	// DepsAttribute is the attribute of its targets that the resolved
-	// deps go in, e.g. "deps".
-	DepsAttribute() string
+	// Rule reports whether a Buck2 rule kind belongs to the language and,
+	// if so, what sync knows of it.
+	Rule(rule string) (Rule, bool)
 
 	// SourcePatterns are the file name patterns (filepath.Match) whose
 	// changes make the language's targets stale.
@@ -54,17 +50,27 @@ type Language interface {
 	// writes deps that differ as a select().
 	Dimensions(pkgDir string) ([]string, error)
 
-	// VariantAttributes names the attributes of a target of kind that
-	// select which variant of the package it builds (e.g. Rust features),
-	// or none. Sync reads them from the target, evaluating a select() for
-	// each configuration, and passes them to ResolveDeps.
-	VariantAttributes(kind TargetKind) []string
-
 	// ResolveDeps returns the deps of the package in pkgDir, for one
 	// configuration and variant: Deps for its library and binary targets,
 	// TestDeps for what its test targets need beyond those, and what
 	// couldn't be mapped or isn't synced.
 	ResolveDeps(pkgDir string, req Request) (PackageMapping, error)
+}
+
+// Rule is what sync knows of one of a language's Buck2 rule kinds.
+type Rule struct {
+	// Kind is what its targets build, as far as sync is concerned.
+	Kind TargetKind
+
+	// DepsAttribute is the attribute of its targets that the resolved
+	// deps go in, e.g. "deps".
+	DepsAttribute string
+
+	// Variant names the attributes of its targets that select which
+	// variant of the package they build (e.g. Rust features), or none.
+	// Sync reads them from the target, evaluating a select() for each
+	// configuration, and passes them to ResolveDeps.
+	Variant []string
 }
 
 // Request is what one resolution of a package's deps is for.
@@ -76,7 +82,7 @@ type Request struct {
 	// Kind is the kind of target the deps are for.
 	Kind TargetKind
 
-	// Variant holds the target's variant attributes (VariantAttributes)
+	// Variant holds the target's variant attributes (Rule.Variant)
 	// that it sets, as they are in the configuration being resolved.
 	Variant map[string]starlark.AttributeValue
 
@@ -85,13 +91,11 @@ type Request struct {
 	Space conditions.Space
 }
 
-// unconditional is embedded by a language whose deps depend on neither the
-// configuration nor a variant.
+// unconditional is embedded by a language whose deps don't depend on the
+// configuration.
 type unconditional struct{}
 
 func (unconditional) Dimensions(string) ([]string, error) { return nil, nil }
-
-func (unconditional) VariantAttributes(TargetKind) []string { return nil }
 
 // registry holds the language plug-ins, by the name of the language record
 // each serves (nix/buck2/languages.nix). Each is created for the mapper's

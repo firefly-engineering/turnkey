@@ -88,15 +88,15 @@ func (m *Mapper) Language(name string) Language {
 	return nil
 }
 
-// RuleLanguage returns the plug-in a Buck2 rule kind belongs to, and the
-// kind of target it builds, or nil.
-func (m *Mapper) RuleLanguage(rule string) (Language, TargetKind) {
+// RuleLanguage returns the plug-in a Buck2 rule kind belongs to, and what
+// it knows of the rule, or nil.
+func (m *Mapper) RuleLanguage(rule string) (Language, Rule) {
 	for _, lang := range m.languages {
-		if kind, ok := lang.RuleKind(rule); ok {
-			return lang, kind
+		if r, ok := lang.Rule(rule); ok {
+			return lang, r
 		}
 	}
-	return nil, NotSynced
+	return nil, Rule{}
 }
 
 // PackageMapping contains the mapped dependencies for a package.

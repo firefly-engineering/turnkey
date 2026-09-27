@@ -33,12 +33,13 @@ type GoConfig struct {
 	ExternalDeps map[string]bool
 }
 
-// goRules are the Go rule kinds.
-var goRules = map[string]TargetKind{
-	"go_library":          Library,
-	"go_exported_library": Library,
-	"go_binary":           Binary,
-	"go_test":             Test,
+// goRules are the Go rule kinds. A binary or a test is built with its
+// build_tags, literally; a library gets its tags from the configuration.
+var goRules = map[string]Rule{
+	"go_library":          {Kind: Library, DepsAttribute: "deps"},
+	"go_exported_library": {Kind: Library, DepsAttribute: "deps"},
+	"go_binary":           {Kind: Binary, DepsAttribute: "deps", Variant: []string{"build_tags"}},
+	"go_test":             {Kind: Test, DepsAttribute: "deps", Variant: []string{"build_tags"}},
 }
 
 // goLanguage resolves a Go package's deps from the imports go list reports,
@@ -75,23 +76,12 @@ func (l *goLanguage) Dimensions(pkgDir string) ([]string, error) {
 	return dims, nil
 }
 
-// VariantAttributes: a binary or a test is built with its build_tags,
-// literally; a library gets its tags from the configuration.
-func (l *goLanguage) VariantAttributes(kind TargetKind) []string {
-	if kind == Binary || kind == Test {
-		return []string{"build_tags"}
-	}
-	return nil
-}
-
 func (l *goLanguage) Name() string { return "go" }
 
-func (l *goLanguage) RuleKind(rule string) (TargetKind, bool) {
-	kind, ok := goRules[rule]
-	return kind, ok
+func (l *goLanguage) Rule(rule string) (Rule, bool) {
+	r, ok := goRules[rule]
+	return r, ok
 }
-
-func (l *goLanguage) DepsAttribute() string { return "deps" }
 
 func (l *goLanguage) SourcePatterns() []string { return []string{"*.go"} }
 

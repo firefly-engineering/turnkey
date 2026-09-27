@@ -281,12 +281,12 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 	// Apply changes to targets
 	modified := false
 
-	attr := lang.DepsAttribute()
 	for _, target := range f.Targets {
-		kind, ok := lang.RuleKind(target.Rule)
-		if !ok || kind == mapper.NotSynced {
+		rule, ok := lang.Rule(target.Rule)
+		if !ok || rule.Kind == mapper.NotSynced {
 			continue
 		}
+		attr := rule.DepsAttribute
 		if target.NoSync {
 			result.OptedOut = append(result.OptedOut, target.Name)
 			continue
@@ -296,7 +296,7 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 			result.Unreadable = append(result.Unreadable, UnreadableTarget{Target: target.Name, Attribute: attr})
 			continue
 		}
-		want, badAttr, ok := pkg.Target(target, kind)
+		want, badAttr, ok := pkg.Target(target, rule)
 		if !ok {
 			result.Unreadable = append(result.Unreadable, UnreadableTarget{Target: target.Name, Attribute: badAttr})
 			continue

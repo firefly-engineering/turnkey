@@ -35,11 +35,12 @@ type RustConfig struct {
 	workspace *cargoWorkspace
 }
 
-// rustRules are the Rust rule kinds.
-var rustRules = map[string]TargetKind{
-	"rust_library": Library,
-	"rust_binary":  Binary,
-	"rust_test":    Test,
+// rustRules are the Rust rule kinds. A Rust target can ask for features
+// in Cargo's terms.
+var rustRules = map[string]Rule{
+	"rust_library": {Kind: Library, DepsAttribute: "deps", Variant: cargoVariantAttributes},
+	"rust_binary":  {Kind: Binary, DepsAttribute: "deps", Variant: cargoVariantAttributes},
+	"rust_test":    {Kind: Test, DepsAttribute: "deps", Variant: cargoVariantAttributes},
 }
 
 // rustLanguage resolves a Rust crate's deps from its Cargo.toml.
@@ -58,12 +59,10 @@ func newRustLanguage(mcfg Config, lang syncconfig.Language) Language {
 
 func (l *rustLanguage) Name() string { return "rust" }
 
-func (l *rustLanguage) RuleKind(rule string) (TargetKind, bool) {
-	kind, ok := rustRules[rule]
-	return kind, ok
+func (l *rustLanguage) Rule(rule string) (Rule, bool) {
+	r, ok := rustRules[rule]
+	return r, ok
 }
-
-func (l *rustLanguage) DepsAttribute() string { return "deps" }
 
 func (l *rustLanguage) SourcePatterns() []string { return []string{"*.rs", "Cargo.toml"} }
 
@@ -71,11 +70,6 @@ func (l *rustLanguage) SourcePatterns() []string { return []string{"*.rs", "Carg
 // member targets' variants, depend on the platform.
 func (l *rustLanguage) Dimensions(string) ([]string, error) {
 	return []string{conditions.OS, conditions.CPU}, nil
-}
-
-// VariantAttributes: a Rust target can ask for features in Cargo's terms.
-func (l *rustLanguage) VariantAttributes(TargetKind) []string {
-	return cargoVariantAttributes
 }
 
 func (l *rustLanguage) ResolveDeps(crateDir string, req Request) (PackageMapping, error) {

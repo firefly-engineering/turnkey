@@ -32,11 +32,12 @@ type PythonConfig struct {
 	ExternalDeps map[string]bool
 }
 
-// pythonRules are the Python rule kinds.
-var pythonRules = map[string]TargetKind{
-	"python_library": Library,
-	"python_binary":  Binary,
-	"python_test":    Test,
+// pythonRules are the Python rule kinds. A Python target builds its
+// package with extras.
+var pythonRules = map[string]Rule{
+	"python_library": {Kind: Library, DepsAttribute: "deps", Variant: []string{"extras"}},
+	"python_binary":  {Kind: Binary, DepsAttribute: "deps", Variant: []string{"extras"}},
+	"python_test":    {Kind: Test, DepsAttribute: "deps", Variant: []string{"extras"}},
 }
 
 // pythonLanguage resolves a Python package's deps from the imports
@@ -71,19 +72,12 @@ func (l *pythonLanguage) Dimensions(string) ([]string, error) {
 	return []string{conditions.OS, conditions.CPU}, nil
 }
 
-// VariantAttributes: a Python target builds its package with extras.
-func (l *pythonLanguage) VariantAttributes(TargetKind) []string {
-	return []string{"extras"}
-}
-
 func (l *pythonLanguage) Name() string { return "python" }
 
-func (l *pythonLanguage) RuleKind(rule string) (TargetKind, bool) {
-	kind, ok := pythonRules[rule]
-	return kind, ok
+func (l *pythonLanguage) Rule(rule string) (Rule, bool) {
+	r, ok := pythonRules[rule]
+	return r, ok
 }
-
-func (l *pythonLanguage) DepsAttribute() string { return "deps" }
 
 func (l *pythonLanguage) SourcePatterns() []string { return []string{"*.py"} }
 

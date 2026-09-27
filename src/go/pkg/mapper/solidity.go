@@ -28,10 +28,10 @@ type SolidityConfig struct {
 
 // solidityRules are the Solidity rule kinds. A solidity_contract's deps are
 // not synced.
-var solidityRules = map[string]TargetKind{
-	"solidity_library":  Library,
-	"solidity_contract": NotSynced,
-	"solidity_test":     Test,
+var solidityRules = map[string]Rule{
+	"solidity_library":  {Kind: Library, DepsAttribute: "deps"},
+	"solidity_contract": {Kind: NotSynced},
+	"solidity_test":     {Kind: Test, DepsAttribute: "deps"},
 }
 
 // solidityLanguage resolves a Solidity package's deps from the imports
@@ -50,12 +50,10 @@ func newSolidityLanguage(mcfg Config, lang syncconfig.Language) Language {
 
 func (l *solidityLanguage) Name() string { return "solidity" }
 
-func (l *solidityLanguage) RuleKind(rule string) (TargetKind, bool) {
-	kind, ok := solidityRules[rule]
-	return kind, ok
+func (l *solidityLanguage) Rule(rule string) (Rule, bool) {
+	r, ok := solidityRules[rule]
+	return r, ok
 }
-
-func (l *solidityLanguage) DepsAttribute() string { return "deps" }
 
 func (l *solidityLanguage) SourcePatterns() []string { return []string{"*.sol"} }
 

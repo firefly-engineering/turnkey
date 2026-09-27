@@ -18,19 +18,19 @@ type fakeLanguage struct {
 
 func (l *fakeLanguage) Name() string { return "fake" }
 
-func (l *fakeLanguage) RuleKind(rule string) (TargetKind, bool) {
-	kind, ok := map[string]TargetKind{"fake_library": Library, "fake_test": Test}[rule]
-	return kind, ok
+func (l *fakeLanguage) Rule(rule string) (Rule, bool) {
+	r, ok := map[string]Rule{
+		"fake_library": {Kind: Library, DepsAttribute: "deps", Variant: []string{"features"}},
+		"fake_test":    {Kind: Test, DepsAttribute: "deps", Variant: []string{"features"}},
+	}[rule]
+	return r, ok
 }
 
-func (l *fakeLanguage) DepsAttribute() string    { return "deps" }
 func (l *fakeLanguage) SourcePatterns() []string { return []string{"*.fake"} }
 
 func (l *fakeLanguage) Dimensions(string) ([]string, error) {
 	return []string{conditions.OS}, nil
 }
-
-func (l *fakeLanguage) VariantAttributes(TargetKind) []string { return []string{"features"} }
 
 func (l *fakeLanguage) ResolveDeps(_ string, req Request) (PackageMapping, error) {
 	l.requests = append(l.requests, req)
@@ -75,8 +75,8 @@ func fakeTarget(t *testing.T, pkg *Package, src string) *Target {
 	if err != nil {
 		t.Fatal(err)
 	}
-	kind, _ := pkg.lang.RuleKind(f.Targets[0].Rule)
-	target, attr, ok := pkg.Target(f.Targets[0], kind)
+	rule, _ := pkg.lang.Rule(f.Targets[0].Rule)
+	target, attr, ok := pkg.Target(f.Targets[0], rule)
 	if !ok {
 		t.Fatalf("attribute %s unreadable", attr)
 	}
@@ -143,7 +143,8 @@ func TestTargetUnreadableVariant(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, attr, ok := pkg.Target(f.Targets[0], Library); ok || attr != "features" {
+	rule, _ := pkg.lang.Rule("fake_library")
+	if _, attr, ok := pkg.Target(f.Targets[0], rule); ok || attr != "features" {
 		t.Errorf("Target = %q, %v; want features unreadable", attr, ok)
 	}
 }

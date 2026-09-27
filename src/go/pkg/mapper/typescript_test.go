@@ -44,8 +44,8 @@ func TestMapTypeScriptImports(t *testing.T) {
 		t.Fatal(err)
 	}
 	lang := m.Language("typescript").(*typescriptLanguage)
-	if got := lang.DepsAttribute(); got != "npm_deps" {
-		t.Errorf("DepsAttribute() = %q, want npm_deps", got)
+	if r, _ := lang.Rule("typescript_library"); r.DepsAttribute != "npm_deps" {
+		t.Errorf("DepsAttribute = %q, want npm_deps", r.DepsAttribute)
 	}
 
 	result := extraction.NewResult("typescript")

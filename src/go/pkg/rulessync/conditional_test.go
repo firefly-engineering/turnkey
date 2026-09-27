@@ -31,18 +31,15 @@ type fakeLanguage struct {
 
 func (l *fakeLanguage) Name() string { return "fake" }
 
-func (l *fakeLanguage) RuleKind(rule string) (mapper.TargetKind, bool) {
-	return mapper.Library, rule == "fake_library"
+func (l *fakeLanguage) Rule(rule string) (mapper.Rule, bool) {
+	return mapper.Rule{Kind: mapper.Library, DepsAttribute: "deps", Variant: []string{"features"}}, rule == "fake_library"
 }
 
-func (l *fakeLanguage) DepsAttribute() string    { return "deps" }
 func (l *fakeLanguage) SourcePatterns() []string { return []string{"*.fake"} }
 
 func (l *fakeLanguage) Dimensions(string) ([]string, error) {
 	return []string{conditions.OS}, nil
 }
-
-func (l *fakeLanguage) VariantAttributes(mapper.TargetKind) []string { return []string{"features"} }
 
 func (l *fakeLanguage) ResolveDeps(_ string, req mapper.Request) (mapper.PackageMapping, error) {
 	l.requests = append(l.requests, req)

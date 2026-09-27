@@ -70,10 +70,10 @@ type ruleKindCase struct {
 func testRuleKinds(t *testing.T, lang Language, cases []ruleKindCase) {
 	t.Helper()
 	for _, tc := range cases {
-		kind, owned := lang.RuleKind(tc.rule)
-		if owned != tc.owned || (owned && kind != tc.kind) {
-			t.Errorf("%s.RuleKind(%q) = (%v, %v), want (%v, %v)",
-				lang.Name(), tc.rule, kind, owned, tc.kind, tc.owned)
+		rule, owned := lang.Rule(tc.rule)
+		if owned != tc.owned || (owned && rule.Kind != tc.kind) {
+			t.Errorf("%s.Rule(%q) = (%v, %v), want kind %v, %v",
+				lang.Name(), tc.rule, rule, owned, tc.kind, tc.owned)
 		}
 	}
 }
@@ -143,7 +143,7 @@ func TestRuleLanguage(t *testing.T) {
 		"sh_binary":     "",
 		"genrule":       "",
 	} {
-		lang, kind := m.RuleLanguage(rule)
+		lang, r := m.RuleLanguage(rule)
 		got := ""
 		if lang != nil {
 			got = lang.Name()
@@ -151,8 +151,8 @@ func TestRuleLanguage(t *testing.T) {
 		if got != want {
 			t.Errorf("RuleLanguage(%q) = %q, want %q", rule, got, want)
 		}
-		if want != "" && kind != Binary {
-			t.Errorf("RuleLanguage(%q) kind = %v, want Binary", rule, kind)
+		if want != "" && r.Kind != Binary {
+			t.Errorf("RuleLanguage(%q) kind = %v, want Binary", rule, r.Kind)
 		}
 	}
 }

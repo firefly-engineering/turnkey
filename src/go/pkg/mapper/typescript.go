@@ -26,14 +26,17 @@ type TypeScriptConfig struct {
 	ExternalDeps map[string]bool
 }
 
-// typescriptRules are the TypeScript and JavaScript rule kinds.
-var typescriptRules = map[string]TargetKind{
-	"typescript_library": Library,
-	"typescript_binary":  Binary,
-	"typescript_test":    Test,
-	"js_library":         Library,
-	"js_binary":          Binary,
-	"js_test":            Test,
+// typescriptRules are the TypeScript and JavaScript rule kinds. Their deps
+// go in npm_deps: the rules take the jsdeps cell's packages there, and
+// other TypeScript targets in deps, which sync doesn't resolve (it skips
+// relative imports).
+var typescriptRules = map[string]Rule{
+	"typescript_library": {Kind: Library, DepsAttribute: "npm_deps"},
+	"typescript_binary":  {Kind: Binary, DepsAttribute: "npm_deps"},
+	"typescript_test":    {Kind: Test, DepsAttribute: "npm_deps"},
+	"js_library":         {Kind: Library, DepsAttribute: "npm_deps"},
+	"js_binary":          {Kind: Binary, DepsAttribute: "npm_deps"},
+	"js_test":            {Kind: Test, DepsAttribute: "npm_deps"},
 }
 
 // typescriptLanguage resolves a TypeScript or JavaScript package's deps from
@@ -52,15 +55,10 @@ func newTypeScriptLanguage(mcfg Config, lang syncconfig.Language) Language {
 
 func (l *typescriptLanguage) Name() string { return "typescript" }
 
-func (l *typescriptLanguage) RuleKind(rule string) (TargetKind, bool) {
-	kind, ok := typescriptRules[rule]
-	return kind, ok
+func (l *typescriptLanguage) Rule(rule string) (Rule, bool) {
+	r, ok := typescriptRules[rule]
+	return r, ok
 }
-
-// DepsAttribute is npm_deps: the TypeScript rules take the jsdeps cell's
-// packages there, and other TypeScript targets in deps, which sync doesn't
-// resolve (it skips relative imports).
-func (l *typescriptLanguage) DepsAttribute() string { return "npm_deps" }
 
 func (l *typescriptLanguage) SourcePatterns() []string {
 	return []string{"*.ts", "*.tsx", "*.js", "*.jsx", "*.mjs", "*.cjs"}

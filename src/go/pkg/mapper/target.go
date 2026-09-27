@@ -91,16 +91,16 @@ type Target struct {
 	underTest bool
 }
 
-// Target returns what target, of kind, wants. It reports false, with the
+// Target returns what target, of rule, wants. It reports false, with the
 // attribute, if one of its variant attributes can't be read.
-func (p *Package) Target(target *starlark.Target, kind TargetKind) (*Target, string, bool) {
-	variant, badAttr, ok := ReadVariant(target, p.lang.VariantAttributes(kind), p.space)
+func (p *Package) Target(target *starlark.Target, rule Rule) (*Target, string, bool) {
+	variant, badAttr, ok := ReadVariant(target, rule.Variant, p.space)
 	if !ok {
 		return nil, badAttr, false
 	}
 	return &Target{
 		pkg:       p,
-		kind:      kind,
+		kind:      rule.Kind,
 		variant:   variant,
 		underTest: target.GetStringAttr("target_under_test") != "",
 	}, "", true
