@@ -25,14 +25,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
-	"os/signal"
-	"strings"
-	"syscall"
 
-	"github.com/firefly-engineering/turnkey/src/go/pkg/snapshot"
-	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
-	"github.com/firefly-engineering/turnkey/src/go/pkg/syncer"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/wrap"
 )
 
 var (
@@ -41,115 +35,21 @@ var (
 )
 
 func main() {
-	args := os.Args[1:]
-
-	// Parse tw-specific flags
-	args = parseFlags(args)
-
-	// Need at least a tool name
+	args := parseFlags(os.Args[1:])
 	if len(args) == 0 {
 		printHelp()
 		os.Exit(0)
 	}
 
-	toolName := args[0]
-	toolArgs := args[1:]
-
-	// Find project root
-	root, err := findProjectRoot()
+	cwd, err := os.Getwd()
 	if err != nil {
-		// No project root found - just pass through
-		if verbose {
-			fmt.Fprintf(os.Stderr, "tw: no project root found, passing through\n")
-		}
-		runToolAndExit(toolName, toolArgs)
+		fmt.Fprintf(os.Stderr, "tw: failed to get working directory: %v\n", err)
+		os.Exit(wrap.RealExec("", args[0], args[1:]))
 	}
-
-	// Load configuration
-	s, err := syncer.Load(root)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "tw: %v\n", err)
-		runToolAndExit(toolName, toolArgs)
-	}
-
-	// Find the wrapper rule for this tool
-	rule := s.Config.FindWrapper(toolName)
-	if rule == nil {
-		// No wrapper configured for this tool - just pass through
-		if verbose {
-			fmt.Fprintf(os.Stderr, "tw: no wrapper rule for %q, passing through\n", toolName)
-		}
-		runToolAndExit(toolName, toolArgs)
-	}
-
-	// Determine if this is a mutating subcommand
-	subcommand := ""
-	if len(toolArgs) > 0 {
-		subcommand = toolArgs[0]
-	}
-	isMutating := rule.IsMutatingSubcommand(subcommand)
-
-	if !isMutating || noSync {
-		// Not a mutating command or sync disabled - just run
-		if verbose && noSync {
-			fmt.Fprintf(os.Stderr, "tw: sync disabled, passing through\n")
-		} else if verbose {
-			fmt.Fprintf(os.Stderr, "tw: %q is not a mutating subcommand, passing through\n", subcommand)
-		}
-		runToolAndExit(toolName, toolArgs)
-	}
-
-	// Mutating command - capture before state
-	if verbose {
-		fmt.Fprintf(os.Stderr, "tw: capturing state of %v\n", rule.WatchFiles)
-	}
-	beforeSnap, err := snapshot.Capture(root, rule.WatchFiles)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "tw: failed to capture before state: %v\n", err)
-		runToolAndExit(toolName, toolArgs)
-	}
-
-	// Run the tool
-	exitCode := runTool(toolName, toolArgs)
-
-	// Capture after state
-	afterSnap, err := snapshot.Capture(root, rule.WatchFiles)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "tw: failed to capture after state: %v\n", err)
-		os.Exit(exitCode)
-	}
-
-	// Check for changes
-	if snapshot.Changed(beforeSnap, afterSnap) {
-		if verbose {
-			fmt.Fprintf(os.Stderr, "tw: detected changes in %v\n", rule.WatchFiles)
-		}
-
-		// Run post-commands (e.g., "go mod tidy" after "go get")
-		for _, postCmd := range rule.PostCommands {
-			if verbose {
-				fmt.Fprintf(os.Stderr, "tw: running post-command: %s\n", postCmd)
-			}
-			postExitCode := runPostCommand(postCmd, root)
-			if postExitCode != 0 {
-				fmt.Fprintf(os.Stderr, "tw: post-command %q failed with exit code %d\n", postCmd, postExitCode)
-				// Continue with sync anyway - the post-command failure shouldn't block sync
-			}
-		}
-
-		// Run sync
-		if verbose {
-			fmt.Fprintf(os.Stderr, "tw: running sync\n")
-		}
-		syncExitCode := runSyncForRule(s, rule)
-		if syncExitCode != 0 {
-			fmt.Fprintf(os.Stderr, "tw: sync failed with exit code %d\n", syncExitCode)
-		}
-	} else if verbose {
-		fmt.Fprintf(os.Stderr, "tw: no changes detected\n")
-	}
-
-	os.Exit(exitCode)
+	w := wrap.Open(cwd, wrap.RealExec, os.Stderr)
+	w.Verbose = verbose
+	w.NoSync = noSync
+	os.Exit(w.Run(args[0], args[1:]))
 }
 
 // parseFlags extracts tw-specific flags from the beginning of args.
@@ -170,145 +70,6 @@ func parseFlags(args []string) []string {
 		}
 	}
 	return args
-}
-
-// runTool executes the tool with the given arguments and returns the exit code.
-// It forwards signals to the child process.
-func runTool(name string, args []string) int {
-	toolPath := findRealTool(name)
-	if toolPath == "" {
-		fmt.Fprintf(os.Stderr, "tw: %s not found in PATH\n", name)
-		return 1
-	}
-
-	cmd := exec.Command(toolPath, args...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	// Forward signals to child
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-	go func() {
-		for sig := range sigChan {
-			if cmd.Process != nil {
-				_ = cmd.Process.Signal(sig)
-			}
-		}
-	}()
-
-	err := cmd.Run()
-	signal.Stop(sigChan)
-	close(sigChan)
-
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return exitErr.ExitCode()
-		}
-		return 1
-	}
-	return 0
-}
-
-// runToolAndExit executes the tool and exits with its exit code.
-// This is used when no sync is needed - we just pass through.
-func runToolAndExit(name string, args []string) {
-	os.Exit(runTool(name, args))
-}
-
-// runPostCommand runs a post-command string (e.g., "go mod tidy").
-func runPostCommand(cmdStr, dir string) int {
-	parts := strings.Fields(cmdStr)
-	if len(parts) == 0 {
-		return 0
-	}
-
-	toolPath := findRealTool(parts[0])
-	if toolPath == "" {
-		fmt.Fprintf(os.Stderr, "tw: post-command tool %q not found\n", parts[0])
-		return 1
-	}
-
-	cmd := exec.Command(toolPath, parts[1:]...)
-	cmd.Dir = dir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err := cmd.Run()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return exitErr.ExitCode()
-		}
-		return 1
-	}
-	return 0
-}
-
-// runSyncForRule regenerates the wrapper's deps rule, then every rule left
-// stale by it: a rule whose source is that rule's target (python-deps.toml
-// from pylock.toml) comes after it in sync.toml.
-func runSyncForRule(s *syncer.Syncer, wrapper *syncconfig.WrapperRule) int {
-	depsRule := s.Config.FindDepsRule(wrapper.DepsRule)
-	if depsRule == nil {
-		fmt.Fprintf(os.Stderr, "tw: deps rule %q not found\n", wrapper.DepsRule)
-		return 1
-	}
-
-	s.Verbose = verbose
-	s.Output = os.Stderr
-
-	err := s.SyncRule(*depsRule)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "tw: sync error: %v\n", err)
-		return 1
-	}
-
-	s.Quiet = !verbose
-	result, err := s.SyncDeps()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "tw: sync error: %v\n", err)
-		return 1
-	}
-	for _, e := range result.Errors {
-		fmt.Fprintf(os.Stderr, "tw: sync error: %v\n", e)
-	}
-	if len(result.Errors) > 0 {
-		return 1
-	}
-
-	return 0
-}
-
-// findRealTool finds the real tool binary, avoiding wrapper recursion.
-// It first checks TURNKEY_REAL_<TOOL> env var (set by shell wrappers),
-// then falls back to PATH lookup.
-func findRealTool(name string) string {
-	// Check for explicit path from shell wrapper (avoids recursion)
-	envVar := "TURNKEY_REAL_" + strings.ToUpper(name)
-	if path := os.Getenv(envVar); path != "" {
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-	}
-
-	// Fall back to PATH lookup
-	path, err := exec.LookPath(name)
-	if err != nil {
-		return ""
-	}
-	return path
-}
-
-// findProjectRoot returns the project root above cwd (syncconfig.FindRoot).
-func findProjectRoot() (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("failed to get working directory: %w", err)
-	}
-	if root, ok := syncconfig.FindRoot(cwd); ok {
-		return root, nil
-	}
-	return "", fmt.Errorf("no project root found (looking for .buckconfig or %s)", syncconfig.DefaultConfigPath)
 }
 
 func printHelp() {

@@ -28,6 +28,7 @@ pkgs.buildGoModule {
       (root + "/src/go/pkg/syncer")
       (root + "/src/go/pkg/staleness")
       (root + "/src/go/pkg/snapshot")
+      (root + "/src/go/pkg/wrap")
     ];
   };
   subPackages = [ "src/cmd/tw" ];

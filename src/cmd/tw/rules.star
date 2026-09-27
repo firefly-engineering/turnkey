@@ -5,9 +5,7 @@ go_binary(
     name = "tw",
     srcs = ["main.go"],
     deps = [
-        "//src/go/pkg/snapshot:snapshot",
-        "//src/go/pkg/syncconfig:syncconfig",
-        "//src/go/pkg/syncer:syncer",
+        "//src/go/pkg/wrap:wrap",
     ],
     visibility = ["PUBLIC"],
 )
