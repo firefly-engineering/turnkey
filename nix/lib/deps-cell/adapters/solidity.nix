@@ -23,12 +23,6 @@ rec {
   # Build inputs for cell builds
   cellBuildInputs = [];
 
-  # Hooks for per-dependency phases
-  hooks = {};
-
-  # Hooks for cell merge phase
-  cellHooks = {};
-
   # ==========================================================================
   # Public API
   # ==========================================================================
@@ -278,24 +272,4 @@ rec {
         name = rules.star
     CELLCONFIG
   '';
-
-  # ==========================================================================
-  # Internal Helpers
-  # ==========================================================================
-
-  mkDepPackage = { key, depSpec, config, allDeps }:
-    mkSolDepPackage {
-      name = key;
-      version = depSpec.version;
-      source = depSpec.source;
-      url = depSpec.url or null;
-      integrity = depSpec.integrity or null;
-      repo = depSpec.repo or null;
-      rev = depSpec.rev or null;
-      hash = depSpec.hash or null;
-      remapping = depSpec.remapping or null;
-      fixup = (config.userFixups or {}).${key} or null;
-    };
-
-  mergeCommands = ctx: "";
 }

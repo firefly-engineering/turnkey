@@ -56,17 +56,6 @@ rec {
     pkgs.findutils
   ];
 
-  # Hooks for per-dependency phases
-  # Go doesn't need per-dep BUCK generation - it's done at merge time by buckgen
-  hooks = {
-    # No per-dep hooks needed for Go
-  };
-
-  # Hooks for cell merge phase
-  cellHooks = {
-    # BUCK generation happens via buckgen in mergeCommands
-  };
-
   # ==========================================================================
   # Public API
   # ==========================================================================

@@ -74,16 +74,6 @@ rec {
   # Build inputs for cell builds
   cellBuildInputs = [];
 
-  # Hooks for per-dependency phases
-  hooks = {
-    # JavaScript BUCK generation is done per-dep
-  };
-
-  # Hooks for cell merge phase
-  cellHooks = {
-    # No special merge operations needed for JavaScript
-  };
-
   # ==========================================================================
   # Public API
   # ==========================================================================

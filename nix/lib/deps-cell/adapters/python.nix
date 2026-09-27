@@ -21,16 +21,6 @@ rec {
   # Build inputs for cell builds
   cellBuildInputs = [];
 
-  # Hooks for per-dependency phases
-  hooks = {
-    # Python BUCK generation is simple enough to be done per-dep
-  };
-
-  # Hooks for cell merge phase
-  cellHooks = {
-    # No special merge operations needed for Python
-  };
-
   # ==========================================================================
   # Public API
   # ==========================================================================

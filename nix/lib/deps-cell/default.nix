@@ -1,10 +1,9 @@
 # Unified Dependency Cell Library
 #
-# Provides a phase-based build system for dependency cells, similar to Nix's
-# stdenv phases. Each dependency becomes an individual Nix package, enabling
-# deduplication across cell generations.
-#
-# Standard phases: fetch → patch → process → buildInfra → merge
+# Builds dependency cells. Each dependency becomes an individual Nix package,
+# enabling deduplication across cell generations; genericMkDepsCell merges
+# them into the cell, and each language adapter (./adapters) builds its
+# packages and calls it.
 #
 # Usage:
 #   let depsCell = import ./nix/lib/deps-cell { inherit pkgs lib; };
@@ -18,8 +17,6 @@
 
 let
   # Import sub-modules
-  phases = import ./phases.nix { inherit lib; };
-  hooks = import ./hooks.nix { inherit lib; };
   fetchers = import ./fetchers.nix { inherit pkgs lib; };
   fixups = import ./fixups { inherit pkgs lib; };
 
@@ -27,17 +24,6 @@ let
   mkAdapters = genericBuilder: import ./adapters {
     inherit pkgs lib genericBuilder;
   };
-
-  # Extend lib with our functions for internal use
-  libWithDepsCell = lib // {
-    deps-cell = {
-      inherit phases hooks fetchers fixups;
-    };
-  };
-
-  # Re-import with extended lib
-  phasesExt = import ./phases.nix { lib = libWithDepsCell; };
-  hooksExt = import ./hooks.nix { lib = libWithDepsCell; };
 
   # Generic cell builder - the core reusable function
   genericMkDepsCell = {
@@ -168,7 +154,7 @@ let
 in
 rec {
   # Export sub-modules
-  inherit phases hooks fetchers fixups adapters;
+  inherit fetchers fixups adapters;
 
   # Export generic cell builder for direct use
   mkDepsCell = genericMkDepsCell;

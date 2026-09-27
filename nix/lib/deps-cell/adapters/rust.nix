@@ -21,18 +21,6 @@ rec {
   # Build inputs for cell builds
   cellBuildInputs = with pkgs; [ python3 ];
 
-  # Hooks for per-dependency phases
-  hooks = {
-    # Build script fixups are applied during patch phase
-    # This is handled in mkRustDepPackage based on fixup lookup
-  };
-
-  # Hooks for cell merge phase
-  cellHooks = {
-    # Feature unification and BUCK generation happen in postMerge
-    # This is handled in mkRustDepsCell
-  };
-
   # ==========================================================================
   # Public API
   # ==========================================================================
