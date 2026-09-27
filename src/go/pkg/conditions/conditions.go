@@ -15,6 +15,10 @@
 // through .turnkey/sync.toml) fix which os and cpu values go together. Sync
 // evaluates every configuration, so what it writes never depends on the
 // host it runs on.
+//
+// turnkey.cfg (src/python/cfg) and nix/buck2/platforms.nix mirror Split
+// for the os and cpu dimensions, for the cell generators;
+// testdata/split-vectors.json holds test cases all three run.
 package conditions
 
 import (

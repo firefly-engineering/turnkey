@@ -1,0 +1,1070 @@
+{
+  "description": "Label lists that differ between configurations, and the [<common>] + select({<key>: [<labels>]}) src/go/pkg/conditions splits them into. Each configuration's labels are those of every entry of labels whose when it includes, in order. Read by src/go/pkg/conditions, turnkey.cfg (src/python/cfg) and nix/buck2/platforms.nix alike, so the three can't drift apart; the last two only have os and cpu, so they skip cases with dimensions.",
+  "cases": [
+    {
+      "name": "the same labels everywhere are common",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [],
+      "labels": [
+        {
+          "when": {},
+          "labels": [
+            "//a:a",
+            "//b:b"
+          ]
+        }
+      ],
+      "common": [
+        "//a:a",
+        "//b:b"
+      ],
+      "branches": []
+    },
+    {
+      "name": "no labels anywhere",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [],
+      "labels": [],
+      "common": [],
+      "branches": []
+    },
+    {
+      "name": "common labels keep the first configuration's order",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [],
+      "labels": [
+        {
+          "when": {
+            "os": "linux"
+          },
+          "labels": [
+            "//b:b"
+          ]
+        },
+        {
+          "when": {},
+          "labels": [
+            "//a:a"
+          ]
+        },
+        {
+          "when": {
+            "os": "macos"
+          },
+          "labels": [
+            "//b:b"
+          ]
+        }
+      ],
+      "common": [
+        "//b:b",
+        "//a:a"
+      ],
+      "branches": []
+    },
+    {
+      "name": "repeated labels count once",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [],
+      "labels": [
+        {
+          "when": {},
+          "labels": [
+            "//a:a",
+            "//a:a"
+          ]
+        },
+        {
+          "when": {
+            "os": "linux"
+          },
+          "labels": [
+            "//a:a",
+            "//l:l",
+            "//l:l"
+          ]
+        }
+      ],
+      "common": [
+        "//a:a"
+      ],
+      "branches": [
+        {
+          "key": "config//os:linux",
+          "labels": [
+            "//l:l"
+          ]
+        },
+        {
+          "key": "config//os:macos",
+          "labels": []
+        }
+      ]
+    },
+    {
+      "name": "an OS-only difference uses OS keys",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [],
+      "labels": [
+        {
+          "when": {},
+          "labels": [
+            "//u:u"
+          ]
+        },
+        {
+          "when": {
+            "os": "linux"
+          },
+          "labels": [
+            "//l:l"
+          ]
+        },
+        {
+          "when": {
+            "os": "macos"
+          },
+          "labels": [
+            "//m:m"
+          ]
+        }
+      ],
+      "common": [
+        "//u:u"
+      ],
+      "branches": [
+        {
+          "key": "config//os:linux",
+          "labels": [
+            "//l:l"
+          ]
+        },
+        {
+          "key": "config//os:macos",
+          "labels": [
+            "//m:m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "the other OS gets an empty branch",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [],
+      "labels": [
+        {
+          "when": {
+            "os": "linux"
+          },
+          "labels": [
+            "//linux:only"
+          ]
+        }
+      ],
+      "common": [],
+      "branches": [
+        {
+          "key": "config//os:linux",
+          "labels": [
+            "//linux:only"
+          ]
+        },
+        {
+          "key": "config//os:macos",
+          "labels": []
+        }
+      ]
+    },
+    {
+      "name": "a CPU-only difference uses CPU keys",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [],
+      "labels": [
+        {
+          "when": {
+            "cpu": "x86_64"
+          },
+          "labels": [
+            "//x86:only"
+          ]
+        }
+      ],
+      "common": [],
+      "branches": [
+        {
+          "key": "config//cpu:arm64",
+          "labels": []
+        },
+        {
+          "key": "config//cpu:x86_64",
+          "labels": [
+            "//x86:only"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a CPU difference within one OS uses the combined key",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [],
+      "labels": [
+        {
+          "when": {
+            "cpu": "arm64",
+            "os": "linux"
+          },
+          "labels": [
+            "//linux-arm:only"
+          ]
+        }
+      ],
+      "common": [],
+      "branches": [
+        {
+          "key": "toolchains//conditions:linux-arm64",
+          "labels": [
+            "//linux-arm:only"
+          ]
+        },
+        {
+          "key": "toolchains//conditions:linux-x86_64",
+          "labels": []
+        },
+        {
+          "key": "toolchains//conditions:macos-arm64",
+          "labels": []
+        },
+        {
+          "key": "toolchains//conditions:macos-x86_64",
+          "labels": []
+        }
+      ]
+    },
+    {
+      "name": "every platform different",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [],
+      "labels": [
+        {
+          "when": {
+            "cpu": "x86_64",
+            "os": "linux"
+          },
+          "labels": [
+            "//linux-x86_64:linux-x86_64"
+          ]
+        },
+        {
+          "when": {
+            "cpu": "arm64",
+            "os": "linux"
+          },
+          "labels": [
+            "//linux-arm64:linux-arm64"
+          ]
+        },
+        {
+          "when": {
+            "cpu": "x86_64",
+            "os": "macos"
+          },
+          "labels": [
+            "//macos-x86_64:macos-x86_64"
+          ]
+        },
+        {
+          "when": {
+            "cpu": "arm64",
+            "os": "macos"
+          },
+          "labels": [
+            "//macos-arm64:macos-arm64"
+          ]
+        }
+      ],
+      "common": [],
+      "branches": [
+        {
+          "key": "toolchains//conditions:linux-arm64",
+          "labels": [
+            "//linux-arm64:linux-arm64"
+          ]
+        },
+        {
+          "key": "toolchains//conditions:linux-x86_64",
+          "labels": [
+            "//linux-x86_64:linux-x86_64"
+          ]
+        },
+        {
+          "key": "toolchains//conditions:macos-arm64",
+          "labels": [
+            "//macos-arm64:macos-arm64"
+          ]
+        },
+        {
+          "key": "toolchains//conditions:macos-x86_64",
+          "labels": [
+            "//macos-x86_64:macos-x86_64"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a branch keeps its first configuration's order",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [],
+      "labels": [
+        {
+          "when": {
+            "cpu": "x86_64",
+            "os": "linux"
+          },
+          "labels": [
+            "//y:y"
+          ]
+        },
+        {
+          "when": {
+            "os": "linux"
+          },
+          "labels": [
+            "//x:x"
+          ]
+        },
+        {
+          "when": {
+            "cpu": "arm64",
+            "os": "linux"
+          },
+          "labels": [
+            "//y:y"
+          ]
+        }
+      ],
+      "common": [],
+      "branches": [
+        {
+          "key": "config//os:linux",
+          "labels": [
+            "//y:y",
+            "//x:x"
+          ]
+        },
+        {
+          "key": "config//os:macos",
+          "labels": []
+        }
+      ]
+    },
+    {
+      "name": "a single platform never needs a select()",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [],
+      "labels": [
+        {
+          "when": {},
+          "labels": [
+            "//a:a"
+          ]
+        },
+        {
+          "when": {
+            "os": "linux"
+          },
+          "labels": [
+            "//l:l"
+          ]
+        }
+      ],
+      "common": [
+        "//a:a",
+        "//l:l"
+      ],
+      "branches": []
+    },
+    {
+      "name": "when OS and CPU go together, the OS key wins",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [],
+      "labels": [
+        {
+          "when": {
+            "os": "linux"
+          },
+          "labels": [
+            "//l:l"
+          ]
+        }
+      ],
+      "common": [],
+      "branches": [
+        {
+          "key": "config//os:linux",
+          "labels": [
+            "//l:l"
+          ]
+        },
+        {
+          "key": "config//os:macos",
+          "labels": []
+        }
+      ]
+    },
+    {
+      "name": "three platforms, one of them different: combined keys",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [],
+      "labels": [
+        {
+          "when": {
+            "cpu": "arm64",
+            "os": "linux"
+          },
+          "labels": [
+            "//x:x"
+          ]
+        }
+      ],
+      "common": [],
+      "branches": [
+        {
+          "key": "toolchains//conditions:linux-arm64",
+          "labels": [
+            "//x:x"
+          ]
+        },
+        {
+          "key": "toolchains//conditions:linux-x86_64",
+          "labels": []
+        },
+        {
+          "key": "toolchains//conditions:macos-arm64",
+          "labels": []
+        }
+      ]
+    },
+    {
+      "name": "three platforms, differing by CPU",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [],
+      "labels": [
+        {
+          "when": {
+            "cpu": "x86_64"
+          },
+          "labels": [
+            "//x:x"
+          ]
+        }
+      ],
+      "common": [],
+      "branches": [
+        {
+          "key": "config//cpu:arm64",
+          "labels": []
+        },
+        {
+          "key": "config//cpu:x86_64",
+          "labels": [
+            "//x:x"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "the combined key names the settings package",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "root//platform/conditions",
+      "dimensions": [],
+      "labels": [
+        {
+          "when": {
+            "cpu": "x86_64",
+            "os": "macos"
+          },
+          "labels": [
+            "//x:x"
+          ]
+        }
+      ],
+      "common": [],
+      "branches": [
+        {
+          "key": "root//platform/conditions:linux-arm64",
+          "labels": []
+        },
+        {
+          "key": "root//platform/conditions:linux-x86_64",
+          "labels": []
+        },
+        {
+          "key": "root//platform/conditions:macos-arm64",
+          "labels": []
+        },
+        {
+          "key": "root//platform/conditions:macos-x86_64",
+          "labels": [
+            "//x:x"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "repeated platforms count once",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        },
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [],
+      "labels": [
+        {
+          "when": {
+            "os": "macos"
+          },
+          "labels": [
+            "//m:m"
+          ]
+        }
+      ],
+      "common": [],
+      "branches": [
+        {
+          "key": "config//os:linux",
+          "labels": []
+        },
+        {
+          "key": "config//os:macos",
+          "labels": [
+            "//m:m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a Go tag-only difference uses the tag's keys",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [
+        "go_tag:integration"
+      ],
+      "labels": [
+        {
+          "when": {
+            "go_tag:integration": "set"
+          },
+          "labels": [
+            "//it:it"
+          ]
+        }
+      ],
+      "common": [],
+      "branches": [
+        {
+          "key": "prelude//go/tags/constraints:integration[set]",
+          "labels": [
+            "//it:it"
+          ]
+        },
+        {
+          "key": "prelude//go/tags/constraints:integration[unset]",
+          "labels": []
+        }
+      ]
+    },
+    {
+      "name": "an OS and Go tag difference uses a combined key",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [
+        "go_tag:integration"
+      ],
+      "labels": [
+        {
+          "when": {
+            "go_tag:integration": "set",
+            "os": "linux"
+          },
+          "labels": [
+            "//it:it"
+          ]
+        }
+      ],
+      "common": [],
+      "branches": [
+        {
+          "key": "toolchains//conditions:linux-integration",
+          "labels": [
+            "//it:it"
+          ]
+        },
+        {
+          "key": "toolchains//conditions:linux-no_integration",
+          "labels": []
+        },
+        {
+          "key": "toolchains//conditions:macos-integration",
+          "labels": []
+        },
+        {
+          "key": "toolchains//conditions:macos-no_integration",
+          "labels": []
+        }
+      ]
+    },
+    {
+      "name": "an OS, CPU and Go tag difference uses the full combined key",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [
+        "go_tag:integration"
+      ],
+      "labels": [
+        {
+          "when": {
+            "cpu": "arm64",
+            "go_tag:integration": "set",
+            "os": "linux"
+          },
+          "labels": [
+            "//it:it"
+          ]
+        }
+      ],
+      "common": [],
+      "branches": [
+        {
+          "key": "toolchains//conditions:linux-arm64-integration",
+          "labels": [
+            "//it:it"
+          ]
+        },
+        {
+          "key": "toolchains//conditions:linux-arm64-no_integration",
+          "labels": []
+        },
+        {
+          "key": "toolchains//conditions:linux-x86_64-integration",
+          "labels": []
+        },
+        {
+          "key": "toolchains//conditions:linux-x86_64-no_integration",
+          "labels": []
+        },
+        {
+          "key": "toolchains//conditions:macos-arm64-integration",
+          "labels": []
+        },
+        {
+          "key": "toolchains//conditions:macos-arm64-no_integration",
+          "labels": []
+        },
+        {
+          "key": "toolchains//conditions:macos-x86_64-integration",
+          "labels": []
+        },
+        {
+          "key": "toolchains//conditions:macos-x86_64-no_integration",
+          "labels": []
+        }
+      ]
+    },
+    {
+      "name": "with a Go tag, an OS-only difference still uses OS keys",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "linux",
+          "cpu": "arm64"
+        },
+        {
+          "os": "macos",
+          "cpu": "x86_64"
+        },
+        {
+          "os": "macos",
+          "cpu": "arm64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [
+        "go_tag:integration"
+      ],
+      "labels": [
+        {
+          "when": {
+            "os": "macos"
+          },
+          "labels": [
+            "//m:m"
+          ]
+        }
+      ],
+      "common": [],
+      "branches": [
+        {
+          "key": "config//os:linux",
+          "labels": []
+        },
+        {
+          "key": "config//os:macos",
+          "labels": [
+            "//m:m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "two Go tags are keyed in name order",
+      "platforms": [
+        {
+          "os": "linux",
+          "cpu": "x86_64"
+        }
+      ],
+      "settings": "toolchains//conditions",
+      "dimensions": [
+        "go_tag:b",
+        "go_tag:a"
+      ],
+      "labels": [
+        {
+          "when": {
+            "go_tag:a": "set",
+            "go_tag:b": "set"
+          },
+          "labels": [
+            "//ab:ab"
+          ]
+        }
+      ],
+      "common": [],
+      "branches": [
+        {
+          "key": "toolchains//conditions:a-b",
+          "labels": [
+            "//ab:ab"
+          ]
+        },
+        {
+          "key": "toolchains//conditions:a-no_b",
+          "labels": []
+        },
+        {
+          "key": "toolchains//conditions:no_a-b",
+          "labels": []
+        },
+        {
+          "key": "toolchains//conditions:no_a-no_b",
+          "labels": []
+        }
+      ]
+    }
+  ]
+}
