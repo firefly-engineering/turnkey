@@ -243,3 +243,26 @@ func TestApplyDepsRemovesWhenAllMapped(t *testing.T) {
 		t.Errorf("changes = %+v, want %+v", result.Changes, want)
 	}
 }
+
+// Deps given as an expression rather than a list of labels are not synced:
+// rewriting them would replace the expression with a flat list.
+func TestHasSyncableDeps(t *testing.T) {
+	for _, tc := range []struct {
+		deps string
+		want bool
+	}{
+		{`["//a:a"]`, true},
+		{"[\n        # turnkey:auto-start\n        \"//a:a\",\n        # turnkey:auto-end\n    ]", true},
+		{`_DEPS`, false},
+		{`_DEPS + ["//a:a"]`, false},
+		{`["//a:a"] if X else []`, false},
+	} {
+		target := parseTarget(t, "rust_library(\n    name = \"lib\",\n    deps = "+tc.deps+",\n)\n")
+		if got := hasSyncableDeps(target); got != tc.want {
+			t.Errorf("hasSyncableDeps(deps = %s) = %v, want %v", tc.deps, got, tc.want)
+		}
+	}
+	if !hasSyncableDeps(parseTarget(t, "rust_library(name = \"lib\")\n")) {
+		t.Error("target without deps is not syncable, want syncable")
+	}
+}

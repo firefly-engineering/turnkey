@@ -245,6 +245,13 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 	// Process library and binary targets: both depend on exactly what their
 	// sources import
 	for _, target := range f.Targets {
+		if (isLibraryTarget(target.Rule) || isSyncedBinaryTarget(target.Rule) || isTestTarget(target.Rule)) &&
+			!hasSyncableDeps(target) {
+			result.Errors = append(result.Errors,
+				fmt.Sprintf("%s: deps is not a list of labels, not synced", target.Name))
+			continue
+		}
+
 		if isLibraryTarget(target.Rule) || isSyncedBinaryTarget(target.Rule) {
 			if result.applyDeps(target, mapper.DepsToTargets(pkgMapping.Deps), libUnmapped) {
 				modified = true
@@ -643,6 +650,22 @@ func isSyncedBinaryTarget(rule string) bool {
 // isTestTarget returns true if the rule is a test target.
 func isTestTarget(rule string) bool {
 	return strings.HasSuffix(rule, "_test") || strings.Contains(rule, "test")
+}
+
+// hasSyncableDeps reports whether sync can rewrite a target's deps: they
+// are absent or a list of string labels. A computed value (a variable, a
+// concatenation, a conditional) is left alone, since sync would replace the
+// expression with a flat list of its own.
+func hasSyncableDeps(target *starlark.Target) bool {
+	attr := target.GetAttribute("deps")
+	if attr == nil {
+		return true
+	}
+	switch attr.Value.(type) {
+	case starlark.StringListValue, starlark.DepsValue:
+		return true
+	}
+	return false
 }
 
 // hasLocalDep returns true if deps contains a local target dep (":foo").
