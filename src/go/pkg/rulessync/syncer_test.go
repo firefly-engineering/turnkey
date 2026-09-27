@@ -232,8 +232,8 @@ go_test(
 func (r *SyncResult) applyDeps(target *starlark.Target, attr string, mapped, unmapped, unsynced []string) bool {
 	space := conditions.NewSpace(nil, "")
 	old, _ := conditional.ReadLabels(target, attr, space)
-	changed, _ := r.applyConditional(target, attr, space, old, func(conditions.Configuration) (resolved, error) {
-		return resolved{mapped: mapped, unmapped: unmapped, unsynced: unsynced}, nil
+	changed, _ := r.applyConditional(target, attr, space, old, func(conditions.Configuration) (mapper.Want, error) {
+		return mapper.Want{Labels: mapped, Unmapped: unmapped, Unsynced: unsynced}, nil
 	})
 	return changed
 }
@@ -377,20 +377,6 @@ func TestApplyDepsLeavesUnsyncedDeps(t *testing.T) {
 	result.applyDeps(target, "deps", nil, nil, []string{"//src/rust/composition:composition"})
 	if got := target.GetDeps(); len(got) != 0 {
 		t.Errorf("deps = %v, want unsynced dep not added", got)
-	}
-}
-
-// A member's imports of its own modules map to its own target, which is
-// not a dep of it.
-func TestFilterSelfReference(t *testing.T) {
-	self := computeSelfTarget("/repo/src/python/buck", "/repo")
-	deps := []mapper.MappedDep{
-		{Target: "//src/python/buck:buck", ImportPath: "turnkey.buck.generator"},
-		{Target: "//src/python/cfg:cfg", ImportPath: "turnkey.cfg"},
-	}
-	got := mapper.DepsToTargets(filterSelfReference(deps, self))
-	if want := []string{"//src/python/cfg:cfg"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("deps = %v, want %v", got, want)
 	}
 }
 

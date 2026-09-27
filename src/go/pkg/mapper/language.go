@@ -28,7 +28,9 @@ const (
 
 // Language is one language's rules sync plug-in. It owns everything sync
 // knows about the language: its rule kinds, the files whose changes make
-// its targets stale, and how a package's deps are resolved.
+// its targets stale, and how a package's deps are resolved. It says what
+// a package wants; Package composes that into what each target wants, and
+// rules sync writes it.
 type Language interface {
 	// Name identifies the language, e.g. "go".
 	Name() string
