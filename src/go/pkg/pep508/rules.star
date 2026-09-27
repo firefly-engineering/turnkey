@@ -4,7 +4,7 @@ go_library(
     name = "pep508",
     package_name = "github.com/firefly-engineering/turnkey/src/go/pkg/pep508",
     srcs = glob(["*.go"], exclude = ["*_test.go"]),
-    deps = [],
+    deps = ["//src/go/pkg/conditions:conditions"],
     visibility = ["PUBLIC"],
 )
 
@@ -13,7 +13,7 @@ go_test(
     srcs = glob(["*_test.go"]),
     embed_srcs = ["testdata/pep508-vectors.json"],
     target_under_test = ":pep508",
-    deps = [],
+    deps = ["//src/go/pkg/conditions:conditions"],
     visibility = ["PUBLIC"],
 )
 

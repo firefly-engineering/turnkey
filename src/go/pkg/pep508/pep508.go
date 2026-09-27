@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 )
 
 // Requirement is a parsed dependency specifier.
@@ -574,4 +576,60 @@ func majorMinor(version string) string {
 		return version
 	}
 	return parts[0] + "." + parts[1]
+}
+
+// EnvFor returns the marker environment of a configuration for a CPython
+// of the given full version (e.g. "3.13.12"), with extra. It holds only
+// the variables it knows: the platform's when the configuration has a
+// platform, in Buck2's names (os "linux" or "macos", cpu "x86_64" or
+// "arm64"); the Python version's when pythonVersion isn't ""; and the
+// implementation's and extra always. platform_release and
+// platform_version, which no configuration fixes, it never holds.
+// Evaluate reads a variable the environment doesn't hold as "", and
+// Decides tells whether a marker reads any. EnvFor reports false for a
+// configuration whose platform it doesn't know.
+func EnvFor(config conditions.Configuration, pythonVersion, extra string) (Env, bool) {
+	env := Env{
+		"implementation_name":            "cpython",
+		"platform_python_implementation": "CPython",
+		"extra":                          extra,
+	}
+	if pythonVersion != "" {
+		env["python_full_version"] = pythonVersion
+		env["implementation_version"] = pythonVersion
+		env["python_version"] = majorMinor(pythonVersion)
+	}
+	os, cpu := config[conditions.OS], config[conditions.CPU]
+	if os == "" && cpu == "" {
+		return env, true
+	}
+	platform, ok := platformEnvs[conditions.Platform{OS: os, CPU: cpu}]
+	if !ok {
+		return env, false
+	}
+	for k, v := range platform {
+		env[k] = v
+	}
+	return env, true
+}
+
+// platformEnvs are the platform variables of each platform EnvFor knows,
+// keyed by its Buck2 names.
+var platformEnvs = map[conditions.Platform]Env{
+	{OS: "linux", CPU: "x86_64"}: {"os_name": "posix", "sys_platform": "linux", "platform_system": "Linux", "platform_machine": "x86_64"},
+	{OS: "linux", CPU: "arm64"}:  {"os_name": "posix", "sys_platform": "linux", "platform_system": "Linux", "platform_machine": "aarch64"},
+	{OS: "macos", CPU: "x86_64"}: {"os_name": "posix", "sys_platform": "darwin", "platform_system": "Darwin", "platform_machine": "x86_64"},
+	{OS: "macos", CPU: "arm64"}:  {"os_name": "posix", "sys_platform": "darwin", "platform_system": "Darwin", "platform_machine": "arm64"},
+}
+
+// Decides reports whether env holds every variable m reads, so that
+// m.Evaluate(env) doesn't depend on a value env doesn't know. It does for
+// a nil marker.
+func (env Env) Decides(m *Marker) bool {
+	for _, v := range m.Variables() {
+		if _, ok := env[v]; !ok {
+			return false
+		}
+	}
+	return true
 }
