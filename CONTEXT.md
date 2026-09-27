@@ -24,6 +24,12 @@ _Avoid_: mapper (the module that holds the plug-ins), language adapter
 Why rules sync leaves an existing dep in place that no plug-in wants: it is a same-package (`:name`) or preserved dep, an import couldn't be mapped so the wanted deps are incomplete, it is in the package of a dep sync doesn't own, or it stands for a wanted label, as a Rust dep pinning a crate's version does. The plug-in supplies the parts that are its language's.
 _Avoid_: preserve (which is only the `turnkey:preserve` section)
 
+### Dependencies
+
+**Deps generator**:
+The tool that reads one language's lock file and writes the deps file (`rust-deps.toml`, `go-deps.toml`, ...) that language's deps cell is built from. `tk sync` runs it from the language's sync rule. Its own code is the lock file parsing and the record it writes; the flags (`--output`, prefetching on unless `--no-prefetch`, `--no-cache`), the prefetching of Nix hashes and the file's header are the same for every generator, and live in deps-gen-kit.
+_Avoid_: deps-gen tool, lockfile converter
+
 ### Testing
 
 **Test result caching**:
