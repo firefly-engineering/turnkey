@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/cargocfg"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -64,6 +67,10 @@ type cargoDep struct {
 
 	// Optional is set for optional = true.
 	Optional bool
+
+	// Features are the features the entry asks for: its own and, for a
+	// workspace = true entry, the workspace entry's.
+	Features []string
 }
 
 // parseCargoDep reads one dependency entry, whose value is a version string
@@ -82,6 +89,13 @@ func parseCargoDep(key string, value any, baseDir string) cargoDep {
 	}
 	if optional, ok := table["optional"].(bool); ok {
 		dep.Optional = optional
+	}
+	if features, ok := table["features"].([]any); ok {
+		for _, f := range features {
+			if name, ok := f.(string); ok {
+				dep.Features = append(dep.Features, name)
+			}
+		}
 	}
 	return dep
 }
@@ -127,8 +141,15 @@ func resolveCargoDeps(table map[string]any, crateDir string, ws *cargoWorkspace)
 			return nil, fmt.Errorf("dependency %s: workspace = true, but [workspace.dependencies] has no %s", key, key)
 		}
 		dep := parseCargoDep(key, inherited, ws.dir)
-		// optional is set on the member's entry, never the workspace's
-		dep.Optional = parseCargoDep(key, value, crateDir).Optional
+		// optional is set on the member's entry, never the workspace's;
+		// features add up
+		own := parseCargoDep(key, value, crateDir)
+		dep.Optional = own.Optional
+		for _, f := range own.Features {
+			if !slices.Contains(dep.Features, f) {
+				dep.Features = append(dep.Features, f)
+			}
+		}
 		deps = append(deps, dep)
 	}
 	return deps, nil
@@ -168,13 +189,16 @@ func loadCargoWorkspace(dir, projectRoot string) (*cargoWorkspace, map[string]st
 	return ws, members, nil
 }
 
-// resolveCrate resolves a Rust crate's deps from its Cargo.toml:
-// [dependencies] become Deps, [dev-dependencies] TestDeps. Workspace members
-// map to their Buck2 target, other crates to the external cell. A crate
-// neither is reported in UnmappedImports (or UnmappedTestImports).
-// Optional, target-specific and build dependencies are reported in
-// UnsyncedDeps.
-func (l *rustLanguage) resolveCrate(crateDir string) (PackageMapping, error) {
+// resolveCrate resolves a Rust crate's deps from its Cargo.toml, in the
+// configuration req.Config: [dependencies] become Deps, [dev-dependencies]
+// TestDeps, and so do the [target.'<spec>'.*] tables whose spec (a cfg()
+// expression or a target triple) holds on the configuration's platform.
+// Workspace members map to their Buck2 target, other crates to the
+// external cell. A crate neither, or a member the dependency asks for
+// features of, is reported in UnmappedImports (or UnmappedTestImports).
+// Optional and build dependencies are reported in UnsyncedDeps, and so are
+// target-specific ones when there's no platform to evaluate them for.
+func (l *rustLanguage) resolveCrate(crateDir string, config conditions.Configuration) (PackageMapping, error) {
 	rel, err := filepath.Rel(l.projectRoot, crateDir)
 	if err != nil {
 		rel = crateDir
@@ -201,34 +225,6 @@ func (l *rustLanguage) resolveCrate(crateDir string) (PackageMapping, error) {
 		return resolveCargoDeps(table, crateDir, ws)
 	}
 
-	deps, err := resolve(manifest.Dependencies)
-	if err != nil {
-		return mapping, err
-	}
-	for _, dep := range deps {
-		mapped, ok := l.mapCargoDep(dep)
-		switch {
-		case !ok:
-			mapping.UnmappedImports = append(mapping.UnmappedImports, dep.Package)
-		case dep.Optional:
-			mapping.UnsyncedDeps = append(mapping.UnsyncedDeps, UnsyncedDep{Dep: mapped, Reason: "optional"})
-		default:
-			mapping.Deps = append(mapping.Deps, mapped)
-		}
-	}
-
-	devDeps, err := resolve(manifest.DevDependencies)
-	if err != nil {
-		return mapping, err
-	}
-	for _, dep := range devDeps {
-		if mapped, ok := l.mapCargoDep(dep); ok {
-			mapping.TestDeps = append(mapping.TestDeps, mapped)
-		} else {
-			mapping.UnmappedTestImports = append(mapping.UnmappedTestImports, dep.Package)
-		}
-	}
-
 	// Sync doesn't manage these, but reports each so none is dropped
 	// silently.
 	unsynced := func(table map[string]any, reason string) error {
@@ -245,27 +241,104 @@ func (l *rustLanguage) resolveCrate(crateDir string) (PackageMapping, error) {
 		}
 		return nil
 	}
-	if err := unsynced(manifest.BuildDependencies, "build dependency"); err != nil {
-		return mapping, err
+
+	// The tables that apply: the unconditional ones, and each
+	// target-specific one whose spec holds
+	type tables struct {
+		deps, devDeps, buildDeps map[string]any
 	}
-	platforms := make([]string, 0, len(manifest.Target))
-	for platform := range manifest.Target {
-		platforms = append(platforms, platform)
+	applicable := []tables{{manifest.Dependencies, manifest.DevDependencies, manifest.BuildDependencies}}
+	// Target-specific tables there's no platform to evaluate for
+	type unsyncedTable struct {
+		table  map[string]any
+		reason string
 	}
-	sort.Strings(platforms)
-	for _, platform := range platforms {
-		target := manifest.Target[platform]
-		reason := fmt.Sprintf("target-specific (%s)", platform)
-		for _, table := range []map[string]any{target.Dependencies, target.DevDependencies, target.BuildDependencies} {
-			if err := unsynced(table, reason); err != nil {
-				return mapping, err
+	var unevaluated []unsyncedTable
+	target, hasTarget := rustTarget(config)
+	specs := make([]string, 0, len(manifest.Target))
+	for spec := range manifest.Target {
+		specs = append(specs, spec)
+	}
+	sort.Strings(specs)
+	for _, spec := range specs {
+		t := manifest.Target[spec]
+		parsed, err := cargocfg.Parse(spec)
+		reason := fmt.Sprintf("target-specific (%s)", spec)
+		switch {
+		case err != nil:
+			reason = fmt.Sprintf("target-specific (%s: %v)", spec, err)
+		case hasTarget:
+			if parsed.Matches(target) {
+				applicable = append(applicable, tables{t.Dependencies, t.DevDependencies, t.BuildDependencies})
 			}
+			continue
+		}
+		for _, table := range []map[string]any{t.Dependencies, t.DevDependencies, t.BuildDependencies} {
+			unevaluated = append(unevaluated, unsyncedTable{table, reason})
+		}
+	}
+
+	for _, t := range applicable {
+		deps, err := resolve(t.deps)
+		if err != nil {
+			return mapping, err
+		}
+		for _, dep := range deps {
+			mapped, ok := l.mapCargoDep(dep)
+			switch {
+			case !ok:
+				mapping.UnmappedImports = append(mapping.UnmappedImports, unmappedCargoDep(dep))
+			case dep.Optional:
+				mapping.UnsyncedDeps = append(mapping.UnsyncedDeps, UnsyncedDep{Dep: mapped, Reason: "optional"})
+			default:
+				mapping.Deps = append(mapping.Deps, mapped)
+			}
+		}
+
+		devDeps, err := resolve(t.devDeps)
+		if err != nil {
+			return mapping, err
+		}
+		for _, dep := range devDeps {
+			if mapped, ok := l.mapCargoDep(dep); ok {
+				mapping.TestDeps = append(mapping.TestDeps, mapped)
+			} else {
+				mapping.UnmappedTestImports = append(mapping.UnmappedTestImports, unmappedCargoDep(dep))
+			}
+		}
+
+		if err := unsynced(t.buildDeps, "build dependency"); err != nil {
+			return mapping, err
+		}
+	}
+	for _, t := range unevaluated {
+		if err := unsynced(t.table, t.reason); err != nil {
+			return mapping, err
 		}
 	}
 
 	sortDeps(mapping.Deps)
 	sortDeps(mapping.TestDeps)
 	return mapping, nil
+}
+
+// rustTarget returns the Rust target of a configuration's platform. It
+// reports false if the configuration has no platform, or one cargocfg
+// doesn't know.
+func rustTarget(config conditions.Configuration) (cargocfg.Target, bool) {
+	os, cpu := config[conditions.OS], config[conditions.CPU]
+	if os == "" || cpu == "" {
+		return cargocfg.Target{}, false
+	}
+	return cargocfg.ForPlatform(conditions.Platform{OS: os, CPU: cpu})
+}
+
+// unmappedCargoDep describes a dependency mapCargoDep can't map.
+func unmappedCargoDep(dep cargoDep) string {
+	if len(dep.Features) > 0 {
+		return fmt.Sprintf("%s (asks for features %s)", dep.Package, strings.Join(dep.Features, ", "))
+	}
+	return dep.Package
 }
 
 // mapCargoDep maps a resolved dependency to its Buck2 target: a workspace
@@ -283,6 +356,11 @@ func (l *rustLanguage) mapCargoDep(dep cargoDep) (MappedDep, bool) {
 		memberDir, isMember = filepath.ToSlash(rel), true
 	}
 	if isMember {
+		// Which of the member's targets builds the features asked for
+		// isn't known: its primary target may lack them.
+		if len(dep.Features) > 0 {
+			return MappedDep{}, false
+		}
 		// e.g. "src/rust/nix-eval" -> "//src/rust/nix-eval:nix-eval"
 		return MappedDep{
 			Target:     fmt.Sprintf("//%s:%s", memberDir, filepath.Base(memberDir)),

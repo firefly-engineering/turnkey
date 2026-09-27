@@ -178,3 +178,122 @@ nope.workspace = true
 		t.Error("no error for a workspace = true dep missing from [workspace.dependencies]")
 	}
 }
+
+// A [target.'<spec>'.*] table applies in the configurations whose platform
+// its spec holds on, like the unconditional tables.
+func TestMapRustCrateTargetSpecific(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"Cargo.toml": "[workspace]\nmembers = [\"crates/*\"]\n",
+		"rust-deps.toml": `[deps."libc@0.2.0"]
+name = "libc"
+[deps."inotify@0.11.0"]
+name = "inotify"
+[deps."core-foundation@0.10.0"]
+name = "core-foundation"
+[deps."tempfile@3.0.0"]
+name = "tempfile"
+`,
+		"crates/app/Cargo.toml": `[package]
+name = "app"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+inotify = "0.11"
+
+[target.aarch64-apple-darwin.dependencies]
+core-foundation = "0.10"
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+tempfile = "3"
+`,
+	})
+	m, err := New(Config{ProjectRoot: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lang := m.Language("rust")
+	crate := filepath.Join(root, "crates/app")
+
+	dims, err := lang.Dimensions(crate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"os", "cpu"}; !reflect.DeepEqual(dims, want) {
+		t.Errorf("dimensions = %v, want %v", dims, want)
+	}
+
+	for _, tc := range []struct {
+		os, cpu        string
+		deps, testDeps []string
+	}{
+		{"linux", "x86_64", []string{"rustdeps//vendor/inotify:inotify", "rustdeps//vendor/libc:libc"}, []string{"rustdeps//vendor/tempfile:tempfile"}},
+		{"macos", "x86_64", []string{"rustdeps//vendor/libc:libc"}, nil},
+		{"macos", "arm64", []string{"rustdeps//vendor/core-foundation:core-foundation", "rustdeps//vendor/libc:libc"}, nil},
+	} {
+		mapping, err := lang.ResolveDeps(crate, Request{Config: map[string]string{"os": tc.os, "cpu": tc.cpu}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := targets(mapping.Deps); !reflect.DeepEqual(got, tc.deps) {
+			t.Errorf("%s-%s: deps = %v, want %v", tc.os, tc.cpu, got, tc.deps)
+		}
+		if got := targets(mapping.TestDeps); !reflect.DeepEqual(got, tc.testDeps) {
+			t.Errorf("%s-%s: test deps = %v, want %v", tc.os, tc.cpu, got, tc.testDeps)
+		}
+		if len(mapping.UnsyncedDeps) != 0 {
+			t.Errorf("%s-%s: unsynced = %+v, want none", tc.os, tc.cpu, mapping.UnsyncedDeps)
+		}
+	}
+
+	// Without a platform, target-specific tables stay unsynced
+	mapping, err := lang.ResolveDeps(crate, Request{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(mapping.Deps) != 0 || len(mapping.UnsyncedDeps) != 4 {
+		t.Errorf("without a platform: deps = %v, unsynced = %+v", mapping.Deps, mapping.UnsyncedDeps)
+	}
+
+	// A crate without target tables doesn't depend on the platform
+	if dims, _ := lang.Dimensions(filepath.Join(cargoWorkspaceFixture(t), "crates/lib")); dims != nil {
+		t.Errorf("dimensions without target tables = %v, want none", dims)
+	}
+}
+
+// A dependency on a member that asks for features is unmapped: the
+// member's primary target may not build them.
+func TestMapRustMemberWithFeatures(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"Cargo.toml": `[workspace]
+members = ["crates/*"]
+
+[workspace.dependencies]
+lib = { path = "crates/lib", features = ["base"] }
+`,
+		"crates/lib/Cargo.toml": "[package]\nname = \"lib\"\n\n[features]\nbase = []\nextra = []\n",
+		"crates/app/Cargo.toml": `[package]
+name = "app"
+
+[dependencies]
+lib = { workspace = true, features = ["extra"] }
+`,
+	})
+	m, err := New(Config{ProjectRoot: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mapping, err := m.Language("rust").ResolveDeps(filepath.Join(root, "crates/app"), Request{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(mapping.Deps) != 0 {
+		t.Errorf("deps = %v, want none", targets(mapping.Deps))
+	}
+	if want := []string{"lib (asks for features base, extra)"}; !reflect.DeepEqual(mapping.UnmappedImports, want) {
+		t.Errorf("unmapped = %v, want %v", mapping.UnmappedImports, want)
+	}
+}

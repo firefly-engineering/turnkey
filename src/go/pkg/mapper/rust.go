@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -63,8 +64,21 @@ func (l *rustLanguage) DepsAttribute() string { return "deps" }
 
 func (l *rustLanguage) SourcePatterns() []string { return []string{"*.rs", "Cargo.toml"} }
 
-func (l *rustLanguage) ResolveDeps(crateDir string, _ Request) (PackageMapping, error) {
-	mapping, err := l.resolveCrate(crateDir)
+// Dimensions: a crate with [target.'<spec>'.*] tables depends on the
+// platform.
+func (l *rustLanguage) Dimensions(crateDir string) ([]string, error) {
+	manifest, err := readCargoManifest(crateDir)
+	if err != nil {
+		return nil, fmt.Errorf("reading Cargo.toml: %w", err)
+	}
+	if len(manifest.Target) == 0 {
+		return nil, nil
+	}
+	return []string{conditions.OS, conditions.CPU}, nil
+}
+
+func (l *rustLanguage) ResolveDeps(crateDir string, req Request) (PackageMapping, error) {
+	mapping, err := l.resolveCrate(crateDir, req.Config)
 	if err != nil {
 		return mapping, fmt.Errorf("reading Cargo.toml: %w", err)
 	}

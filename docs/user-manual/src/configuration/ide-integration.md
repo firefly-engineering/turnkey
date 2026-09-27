@@ -275,9 +275,18 @@ expression.
   crate maps to `rustdeps//vendor/<package>:<package>` (a renamed dependency
   maps to its `package`). An existing label that pins a version
   (`rustdeps//vendor/tokio@1.50.0:tokio`) satisfies the unversioned one.
-  Optional, target-specific (`[target.'cfg(...)'.dependencies]`) and build
-  dependencies are not synced: sync reports them and leaves any existing dep
-  on them alone.
+  A target-specific table (`[target.'cfg(...)'.dependencies]`, or a target
+  triple) applies on the platforms its spec holds on, so its deps are
+  [platform-conditional](#platform-conditional-deps): a dep every platform
+  gets is a plain dep, one no platform gets is dropped. `cfg()` supports
+  `target_os`, `target_family` (`unix`), `target_arch`,
+  `target_pointer_width`, `target_env`, `target_vendor`, `target_endian`
+  and `all`/`any`/`not`, as the rustdeps cell evaluates it for vendored
+  crates. A dependency on a workspace member that asks for features
+  (`features = [...]`, its own or the `[workspace.dependencies]` entry's) is
+  reported as an unmapped import naming them: the member's primary target
+  may not build them. Optional and build dependencies are not synced: sync
+  reports them and leaves any existing dep on them alone.
 - **Python**: the imports found in the sources. An import of a package that a
   uv workspace member provides (`turnkey.cfg`, `from turnkey import cfg`)
   maps to that member's target. The packages come from the members listed in

@@ -218,3 +218,62 @@ func TestSyncFileUnreadableVariant(t *testing.T) {
 		t.Errorf("unreadable = %+v, want %+v", result.Unreadable, want)
 	}
 }
+
+// A crate's cfg(target_os = "linux") and cfg(unix) deps: the unix one is
+// common, the Linux one is keyed on the OS, and there is no DEFAULT.
+func TestSyncFileRustTargetSpecificDeps(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"Cargo.toml": "[workspace]\nmembers = [\"crates/*\"]\n",
+		"rust-deps.toml": `[deps."libc@0.2.0"]
+name = "libc"
+[deps."inotify@0.11.0"]
+name = "inotify"
+`,
+		"crates/watch/Cargo.toml": `[package]
+name = "watch"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+inotify = "0.11"
+`,
+		"crates/watch/rules.star": `rust_library(
+    name = "watch",
+    deps = [],
+)
+`,
+	})
+	s, err := NewSyncer(Config{
+		ProjectRoot: root,
+		Force:       true,
+		Conditions:  &syncconfig.ConditionsConfig{Platforms: defaultPlatforms},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rulesPath := filepath.Join(root, "crates/watch/rules.star")
+	result, err := s.SyncFile(rulesPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Errors) != 0 {
+		t.Fatalf("sync errors: %v", result.Errors)
+	}
+	out, err := os.ReadFile(rulesPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `rust_library(
+    name = "watch",
+    deps = ["rustdeps//vendor/libc:libc"] + select({
+        "config//os:linux": ["rustdeps//vendor/inotify:inotify"],
+        "config//os:macos": [],
+    }),
+)
+`
+	if string(out) != want {
+		t.Errorf("rules.star:\n%s\nwant:\n%s", out, want)
+	}
+}
