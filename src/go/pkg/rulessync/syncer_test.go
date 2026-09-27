@@ -342,3 +342,42 @@ func TestFilterSelfReference(t *testing.T) {
 		t.Errorf("deps = %v, want %v", got, want)
 	}
 }
+
+// A dep in a turnkey:preserve section is never removed, reported or copied
+// into the auto-managed section.
+func TestApplyDepsHonoursPreserveSection(t *testing.T) {
+	src := `rust_binary(
+    name = "bin",
+    deps = [
+        # turnkey:auto-start
+        "//a:a",
+        # turnkey:auto-end
+        # turnkey:preserve-start
+        "//native:lib",
+        # turnkey:preserve-end
+    ],
+)
+`
+	target := parseTarget(t, src)
+	var result SyncResult
+	if !result.applyDeps(target, []string{"//b:b"}, nil, nil) {
+		t.Fatal("target not changed")
+	}
+	if got, want := target.GetAutoDeps(), []string{"//b:b"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("auto deps = %v, want %v", got, want)
+	}
+	if got, want := target.GetPreservedDeps(), []string{"//native:lib"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("preserved deps = %v, want %v", got, want)
+	}
+	want := []TargetChange{{Target: "bin", Added: []string{"//b:b"}, Removed: []string{"//a:a"}}}
+	if !reflect.DeepEqual(result.Changes, want) {
+		t.Errorf("changes = %+v, want %+v", result.Changes, want)
+	}
+
+	// Mapped deps that match: nothing to do.
+	target = parseTarget(t, src)
+	result = SyncResult{}
+	if result.applyDeps(target, []string{"//a:a"}, nil, nil) || len(result.Changes) != 0 {
+		t.Errorf("unchanged target reported changes: %+v", result.Changes)
+	}
+}

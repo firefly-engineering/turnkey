@@ -753,8 +753,13 @@ func mergePackageMappings(mappings map[string]mapper.PackageMapping) mapper.Pack
 // mergeWithPreserved merges new deps with preserved deps from old list.
 // Preserves:
 // - Local target deps (starting with ":") - these are manual same-package deps
-// - TODO: deps between preserve markers
-func mergeWithPreserved(oldDeps, newDeps []string) []string {
+// - Deps outside the auto-managed section of a list with markers (preserved)
+func mergeWithPreserved(oldDeps, newDeps, preserved []string) []string {
+	isPreserved := make(map[string]bool, len(preserved))
+	for _, d := range preserved {
+		isPreserved[d] = true
+	}
+
 	// Build set of new deps for deduplication
 	seen := make(map[string]bool)
 	for _, d := range newDeps {
@@ -763,16 +768,34 @@ func mergeWithPreserved(oldDeps, newDeps []string) []string {
 
 	// Preserve local target deps from old list (e.g., ":mylib")
 	// These are manual dependencies on same-package targets
-	var preserved []string
+	var kept []string
 	for _, d := range oldDeps {
-		if strings.HasPrefix(d, ":") && !seen[d] {
-			preserved = append(preserved, d)
+		if (strings.HasPrefix(d, ":") || isPreserved[d]) && !seen[d] {
+			kept = append(kept, d)
 			seen[d] = true
 		}
 	}
 
 	// Return preserved deps first, then new deps
-	return append(preserved, newDeps...)
+	return append(kept, newDeps...)
+}
+
+// withoutDeps returns deps without those in drop.
+func withoutDeps(deps, drop []string) []string {
+	if len(drop) == 0 {
+		return deps
+	}
+	dropped := make(map[string]bool, len(drop))
+	for _, d := range drop {
+		dropped[d] = true
+	}
+	var result []string
+	for _, d := range deps {
+		if !dropped[d] {
+			result = append(result, d)
+		}
+	}
+	return result
 }
 
 // applyDeps sets a target's deps to the mapped ones, preserving manual deps,
@@ -783,7 +806,8 @@ func mergeWithPreserved(oldDeps, newDeps []string) []string {
 // deps changed.
 func (r *SyncResult) applyDeps(target *starlark.Target, mapped, unmapped, unsynced []string) bool {
 	oldDeps := target.GetDeps()
-	newDeps := mergeWithPreserved(oldDeps, preferVersioned(oldDeps, mapped))
+	preserved := target.GetPreservedDeps()
+	newDeps := mergeWithPreserved(oldDeps, preferVersioned(oldDeps, mapped), preserved)
 
 	unsyncedPkgs := make(map[string]bool, len(unsynced))
 	for _, d := range unsynced {
@@ -804,7 +828,8 @@ func (r *SyncResult) applyDeps(target *starlark.Target, mapped, unmapped, unsync
 
 	changed := !stringSlicesEqual(oldDeps, newDeps)
 	if changed {
-		target.SetDeps(newDeps)
+		// With markers, SetDeps writes only the auto-managed section.
+		target.SetDeps(withoutDeps(newDeps, preserved))
 	}
 	if changed || len(kept) > 0 {
 		added, removed := diffDeps(oldDeps, newDeps)
