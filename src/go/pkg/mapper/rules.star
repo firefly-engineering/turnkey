@@ -7,6 +7,7 @@ go_library(
     deps = [
         "//src/go/pkg/cargocfg:cargocfg",
         "//src/go/pkg/cargofeatures:cargofeatures",
+        "//src/go/pkg/conditional:conditional",
         "//src/go/pkg/conditions:conditions",
         "//src/go/pkg/extraction:extraction",
         "//src/go/pkg/pep508:pep508",

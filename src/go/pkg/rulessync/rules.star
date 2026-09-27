@@ -21,6 +21,7 @@ go_test(
     embed_srcs = ["testdata/sync.toml"],
     target_under_test = ":rulessync",
     deps = [
+        "//src/go/pkg/conditional:conditional",
         "//src/go/pkg/conditions:conditions",
         "//src/go/pkg/mapper:mapper",
         "//src/go/pkg/starlark:starlark",

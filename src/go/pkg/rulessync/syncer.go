@@ -308,8 +308,8 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 			result.OptedOut = append(result.OptedOut, target.Name)
 			continue
 		}
-		old, ok := readLabels(target, attr, space)
-		if !ok {
+		old, err := conditional.ReadLabels(target, attr, space)
+		if err != nil {
 			result.Unreadable = append(result.Unreadable, UnreadableTarget{Target: target.Name, Attribute: attr})
 			continue
 		}
@@ -371,8 +371,8 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 			return result, nil
 		}
 		for _, name := range owned {
-			oldValue, ok := readLabels(target, name, space)
-			if !ok {
+			oldValue, err := conditional.ReadLabels(target, name, space)
+			if err != nil {
 				result.Unreadable = append(result.Unreadable, UnreadableTarget{Target: target.Name, Attribute: name})
 				continue
 			}
@@ -527,43 +527,6 @@ func matchesAny(name string, patterns []string) bool {
 		}
 	}
 	return false
-}
-
-// readLabels reads a target's label-list attribute, attr, as the labels it
-// has in each configuration of space. It reports false if sync can't read
-// it: the attribute isn't absent, a list of labels, or
-// [<labels>] + select({<key>: [<labels>], ...}) with keys the space knows.
-// A computed value (a variable, a concatenation, a conditional) is left
-// alone, since sync would replace the expression with values of its own.
-func readLabels(target *starlark.Target, attr string, space conditions.Space) (func(conditions.Configuration) []string, bool) {
-	a := target.GetAttribute(attr)
-	if a == nil {
-		return func(conditions.Configuration) []string { return nil }, true
-	}
-	if labels, ok := starlark.Labels(a.Value); ok {
-		return func(conditions.Configuration) []string { return labels }, true
-	}
-	sel, ok := a.Value.(starlark.SelectValue)
-	if !ok {
-		return nil, false
-	}
-	common, ok := starlark.Labels(sel.Common)
-	if !ok {
-		return nil, false
-	}
-	branches := make([]conditions.Branch, len(sel.Branches))
-	for i, b := range sel.Branches {
-		labels, ok := starlark.Labels(b.Value)
-		if !ok || b.Value == nil {
-			return nil, false
-		}
-		branches[i] = conditions.Branch{Key: b.Key, Labels: labels}
-	}
-	ev, err := space.Reader(common, branches)
-	if err != nil {
-		return nil, false
-	}
-	return ev.Labels, true
 }
 
 // resolver resolves one package's deps through its language, once per
