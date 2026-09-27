@@ -7,6 +7,9 @@
 //
 //   - os: the platform's operating system (config//os:linux, ...)
 //   - cpu: the platform's CPU (config//cpu:x86_64, ...)
+//   - one on/off dimension per Go build tag that matters, named
+//     GoTag(<tag>), backed by prelude//go/tags/constraints:<tag>[set] and
+//     [unset]
 //
 // The platforms turnkey builds for (the buck2.platforms Nix option, passed
 // through .turnkey/sync.toml) fix which os and cpu values go together. Sync
@@ -26,6 +29,18 @@ const (
 	OS  = "os"
 	CPU = "cpu"
 )
+
+// GoTagPrefix starts the name of a Go build tag's dimension.
+const GoTagPrefix = "go_tag:"
+
+// The values of an on/off dimension.
+const (
+	Set   = "set"
+	Unset = "unset"
+)
+
+// GoTag returns the name of a Go build tag's dimension.
+func GoTag(tag string) string { return GoTagPrefix + tag }
 
 // DefaultSettingsPackage is the Buck2 package holding turnkey's combined
 // config_settings (one per platform, named "<os>-<cpu>"), when sync.toml
@@ -95,6 +110,9 @@ type Dimension struct {
 
 	// key returns the select() key matching one value, alone.
 	key func(value string) string
+
+	// token names a value in a combined config_setting's name.
+	token func(value string) string
 }
 
 // Key returns the select() key that matches value alone, e.g.
@@ -142,11 +160,64 @@ func NewSpace(platforms []Platform, settings string) Space {
 	}
 	sort.Strings(oses)
 	sort.Strings(cpus)
+	same := func(v string) string { return v }
 	space.Dimensions = []Dimension{
-		{Name: OS, Values: oses, key: func(v string) string { return "config//os:" + v }},
-		{Name: CPU, Values: cpus, key: func(v string) string { return "config//cpu:" + v }},
+		{Name: OS, Values: oses, key: func(v string) string { return "config//os:" + v }, token: same},
+		{Name: CPU, Values: cpus, key: func(v string) string { return "config//cpu:" + v }, token: same},
 	}
 	return space
+}
+
+// WithDimensions returns the space with the on/off dimensions named in
+// dims (GoTag's) added, sorted by name, each crossing every configuration
+// with both its values. Names already in the space, and others, are
+// ignored.
+func (s Space) WithDimensions(dims []string) Space {
+	var tags []string
+	for _, name := range dims {
+		tag, ok := strings.CutPrefix(name, GoTagPrefix)
+		if ok && !slices.Contains(tags, tag) {
+			if _, have := s.dimension(name); !have {
+				tags = append(tags, tag)
+			}
+		}
+	}
+	if len(tags) == 0 {
+		return s
+	}
+	sort.Strings(tags)
+
+	extended := Space{settings: s.settings, Dimensions: append([]Dimension(nil), s.Dimensions...)}
+	configs := s.Configurations
+	for _, tag := range tags {
+		extended.Dimensions = append(extended.Dimensions, Dimension{
+			Name:   GoTag(tag),
+			Values: []string{Set, Unset},
+			key: func(v string) string {
+				return fmt.Sprintf("prelude//go/tags/constraints:%s[%s]", tag, v)
+			},
+			token: func(v string) string {
+				if v == Set {
+					return tag
+				}
+				return "no_" + tag
+			},
+		})
+		var crossed []Configuration
+		for _, config := range configs {
+			for _, v := range []string{Set, Unset} {
+				c := make(Configuration, len(config)+1)
+				for k, val := range config {
+					c[k] = val
+				}
+				c[GoTag(tag)] = v
+				crossed = append(crossed, c)
+			}
+		}
+		configs = crossed
+	}
+	extended.Configurations = configs
+	return extended
 }
 
 // appendNew appends s to list unless it is already there.
@@ -175,11 +246,12 @@ func (s Space) key(dims []string, partial Configuration) string {
 		d, _ := s.dimension(dims[0])
 		return d.Key(partial[dims[0]])
 	}
-	values := make([]string, len(dims))
+	tokens := make([]string, len(dims))
 	for i, dim := range dims {
-		values[i] = partial[dim]
+		d, _ := s.dimension(dim)
+		tokens[i] = d.token(partial[dim])
 	}
-	return s.settings + ":" + strings.Join(values, "-")
+	return s.settings + ":" + strings.Join(tokens, "-")
 }
 
 // keys returns every select() key the space can write, with the partial

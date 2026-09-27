@@ -181,3 +181,57 @@ func TestSpaceWithoutPlatforms(t *testing.T) {
 		t.Errorf("split = %+v, want a plain list", got)
 	}
 }
+
+// A Go build tag is an on/off dimension: deps that differ only by it are
+// keyed on its constraint values, and with the OS on a combined setting.
+func TestSplitOnGoTags(t *testing.T) {
+	space := NewSpace(platforms, "").WithDimensions([]string{GoTag("integration"), OS})
+	if got := len(space.Configurations); got != 8 {
+		t.Fatalf("configurations = %d, want 8", got)
+	}
+	tagged := func(c Configuration) []string {
+		if c[GoTag("integration")] == Set {
+			return []string{"//it:it"}
+		}
+		return nil
+	}
+	want := []Branch{
+		{Key: "prelude//go/tags/constraints:integration[set]", Labels: []string{"//it:it"}},
+		{Key: "prelude//go/tags/constraints:integration[unset]"},
+	}
+	if got := space.Split(tagged).Branches; !reflect.DeepEqual(got, want) {
+		t.Errorf("branches = %+v, want %+v", got, want)
+	}
+
+	linuxTagged := func(c Configuration) []string {
+		if c[OS] == "linux" && c[GoTag("integration")] == Set {
+			return []string{"//it:it"}
+		}
+		return nil
+	}
+	got := space.Split(linuxTagged).Branches
+	wantKeys := []string{
+		"toolchains//conditions:linux-integration",
+		"toolchains//conditions:linux-no_integration",
+		"toolchains//conditions:macos-integration",
+		"toolchains//conditions:macos-no_integration",
+	}
+	var keys []string
+	for _, b := range got {
+		keys = append(keys, b.Key)
+	}
+	if !reflect.DeepEqual(keys, wantKeys) || !reflect.DeepEqual(got[0].Labels, []string{"//it:it"}) {
+		t.Errorf("branches = %+v, want keys %v", got, wantKeys)
+	}
+
+	// Read back
+	ev, err := space.Reader(nil, got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range space.Configurations {
+		if !sameSet(ev.Labels(c), linuxTagged(c)) {
+			t.Errorf("%s: labels = %v, want %v", c, ev.Labels(c), linuxTagged(c))
+		}
+	}
+}
