@@ -376,6 +376,16 @@
               syncToml = builtins.fromTOML syncConfig.content;
               platforms = import ./nix/buck2/platforms.nix { inherit lib; };
               platformSettings = platforms.settingsBuckFile (map platforms.fromSystem buck2Options.platforms) [ ];
+              # The Nix port of the conditions core's key rules
+              # (src/go/pkg/conditions's tests)
+              defaultConditions = platforms.conditions [
+                "x86_64-linux"
+                "aarch64-linux"
+                "x86_64-darwin"
+                "aarch64-darwin"
+              ];
+              splitKeys =
+                valuesOf: map (b: b.key) (platforms.split defaultConditions valuesOf).branches;
               taggedSettings = platforms.settingsBuckFile (map platforms.fromSystem [ "x86_64-linux" ]) [
                 "integration"
               ];
@@ -473,6 +483,23 @@
               && lib.hasInfix ''name = "linux-x86_64-no_integration"'' taggedSettings
               && lib.hasInfix ''"prelude//go/tags/constraints:integration[set]"'' taggedSettings
             ) "toolchains cell: no config_setting combining the OS and an allowed Go build tag";
+            assert lib.assertMsg (
+              splitKeys (_: [ "a" ]) == [ ]
+              && splitKeys (p: lib.optional (p.os == "linux") "l") == [
+                "config//os:linux"
+                "config//os:macos"
+              ]
+              && splitKeys (p: lib.optional (p.cpu == "x86_64") "x") == [
+                "config//cpu:arm64"
+                "config//cpu:x86_64"
+              ]
+              && splitKeys (p: lib.optional (p.os == "linux" && p.cpu == "arm64") "x") == [
+                "toolchains//conditions:linux-arm64"
+                "toolchains//conditions:linux-x86_64"
+                "toolchains//conditions:macos-arm64"
+                "toolchains//conditions:macos-x86_64"
+              ]
+            ) "platforms.split: its keys aren't the conditions core's";
             assert lib.assertMsg (lib.hasInfix "allowed_build_tags = integration,e2e" taggedBuckconfig)
               "buckconfig: buck2.go.allowedBuildTags doesn't reach go.allowed_build_tags";
             assert lib.assertMsg (syncToml.conditions.go_tags == [ ])

@@ -262,7 +262,7 @@ in
         conditions,
       }:
       depsCell.mkJsDepsCell {
-        inherit cellName;
+        inherit cellName conditions;
         inherit (langCfg) depsFile;
         inherit userPatchesDir;
       };

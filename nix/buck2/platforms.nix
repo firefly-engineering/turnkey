@@ -52,6 +52,67 @@ in
     platforms = map (system: builtins.removeAttrs (fromSystem system) [ "system" ]) systems;
   };
 
+  # Split each platform's list of values (valuesOf platform) into the values
+  # every platform has and select() branches, with the conditions core's
+  # key rules (src/go/pkg/conditions): the smallest exact key, the OS's
+  # (config//os:<os>), the CPU's (config//cpu:<cpu>), or the combined
+  # <settings>:<os>-<cpu>, and a branch for every platform, with no
+  # DEFAULT. conditions is `conditions`'s result. Returns { common;
+  # branches = [ { key; values; } ] sorted by key, empty when every
+  # platform has the same values }.
+  split =
+    conditions: valuesOf:
+    let
+      inherit (conditions) platforms;
+      per = map (p: {
+        platform = p;
+        values = lib.unique (valuesOf p);
+      }) platforms;
+      common = builtins.filter (v: lib.all (x: builtins.elem v x.values) per) (builtins.head per).values;
+      extra = map (x: x // { values = lib.subtractLists common x.values; }) per;
+      keyOf =
+        dims: p:
+        if dims == [ "os" ] then
+          "config//os:${p.os}"
+        else if dims == [ "cpu" ] then
+          "config//cpu:${p.cpu}"
+        else
+          "${conditions.settings}:${p.os}-${p.cpu}";
+      sameSet = a: b: lib.sort (x: y: x < y) a == lib.sort (x: y: x < y) b;
+      # The branches keyed on dims, or null if dims don't tell the
+      # platforms' values apart
+      keyed =
+        dims:
+        let
+          groups = lib.groupBy (x: keyOf dims x.platform) extra;
+          consistent = lib.all (g: lib.all (x: sameSet x.values (builtins.head g).values) g) (
+            builtins.attrValues groups
+          );
+        in
+        if consistent then
+          lib.mapAttrsToList (key: g: {
+            inherit key;
+            inherit (builtins.head g) values;
+          }) groups
+        else
+          null;
+      firstKeyed = lib.findFirst (b: b != null) null (
+        map keyed [
+          [ "os" ]
+          [ "cpu" ]
+          [
+            "os"
+            "cpu"
+          ]
+        ]
+      );
+    in
+    {
+      inherit common;
+      branches =
+        if lib.all (x: x.values == [ ]) extra then [ ] else lib.sort (a: b: a.key < b.key) firstKeyed;
+    };
+
   # The combined config_settings' BUCK file, for platforms (fromSystem's)
   # and the allowed Go build tags: one per value combination of every set
   # of two or more dimensions (os, cpu, then each tag, set or unset), named
