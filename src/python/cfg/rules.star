@@ -31,3 +31,12 @@ python_test(
     env = {"TURNKEY_CFG_VECTORS": "$(location //src/go/pkg/cargocfg:cfg-vectors)"},
     deps = [":cfg"],
 )
+
+# The split cases src/go/pkg/conditions runs too
+python_test(
+    name = "test-split-vectors",
+    srcs = ["tests/test_split_vectors.py"],
+    base_module = "tests",
+    env = {"TURNKEY_SPLIT_VECTORS": "$(location //src/go/pkg/conditions:split-vectors)"},
+    deps = [":cfg"],
+)

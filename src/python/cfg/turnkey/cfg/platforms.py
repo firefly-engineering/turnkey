@@ -7,6 +7,7 @@ config//os:<os> when they differ only by OS (config//cpu:<cpu> by CPU
 alone), otherwise the combined config_setting <settings>:<os>-<cpu>. Every
 platform gets a branch, and there is never a DEFAULT, so building for a
 platform that isn't listed fails instead of silently missing values.
+tests/test_split_vectors.py runs the Go module's test cases against split.
 
 The platforms come from turnkey's buck2.platforms option, as JSON:
 {"settings": "toolchains//conditions", "platforms": [{"os": ..., "cpu": ...}]}.
