@@ -3,10 +3,14 @@
 {
   lib,
   flake-parts-lib,
+  config,
   ...
 }:
 
 let
+  # The flake's systems, the default platforms (buck2.platforms). perSystem
+  # rebinds `config`.
+  flakeSystems = config.systems;
   inherit (flake-parts-lib) mkPerSystemOption;
   inherit (lib) mkOption types;
   # turnkey's own flake lib. perSystem rebinds `turnkeyLib` to the teller lib,
@@ -118,6 +122,10 @@ in
                 inherit lib;
                 inherit ((import ../../buck2/buck2-source.nix { inherit pkgs lib; })) version;
               })
+              {
+                # Build for the flake's systems unless told otherwise
+                platforms = lib.mkDefault flakeSystems;
+              }
               {
                 options.shells = mkOption {
                   type = types.listOf types.str;

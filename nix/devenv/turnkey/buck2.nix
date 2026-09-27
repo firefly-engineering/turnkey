@@ -79,6 +79,9 @@ let
     # Always include deps-extract (used by tk rules sync for all non-Go languages)
     ++ [ depsExtract ];
 
+  # The platforms the project builds for (nix/buck2/platforms.nix)
+  platforms = import ../../buck2/platforms.nix { inherit lib; };
+
   # Toolchains cell derivation
   toolchainsCell = pkgs.runCommand "turnkey-toolchains-cell" { } ''
     mkdir -p $out
@@ -86,6 +89,13 @@ let
     # Create BUCK file (Buck2's buildfile name setting only applies to root cell)
     cat > $out/BUCK <<'BUCK'
     ${toolchainsCellContent.buckFile}
+    BUCK
+
+    # The combined <os>-<cpu> config_settings rules sync's select()s use
+    # (nix/buck2/platforms.nix)
+    mkdir -p $out/conditions
+    cat > $out/conditions/BUCK <<'BUCK'
+    ${platforms.settingsBuckFile (map platforms.fromSystem cfg.platforms)}
     BUCK
 
     # Create cell identity .buckconfig

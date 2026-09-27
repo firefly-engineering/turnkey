@@ -374,6 +374,8 @@
                 buck2 = buck2Options;
               };
               syncToml = builtins.fromTOML syncConfig.content;
+              platforms = import ./nix/buck2/platforms.nix { inherit lib; };
+              platformSettings = platforms.settingsBuckFile (map platforms.fromSystem buck2Options.platforms);
 
               # How the shell describes the cache to tk, as tk's tests read it
               shellContract = builtins.fromJSON (builtins.readFile ./src/go/pkg/testcache/testdata/shell-contract.json);
@@ -428,6 +430,31 @@
             ]) "sync.toml: the go and uv wrappers don't run the go and pylock rules";
             assert lib.assertMsg (lib.all describes shellContract.caches)
               "test cache: the shell doesn't describe the cache as testdata/shell-contract.json says";
+            assert lib.assertMsg (
+              syncToml.conditions.settings == "toolchains//conditions"
+              && syncToml.conditions.platforms == [
+                {
+                  os = "linux";
+                  cpu = "x86_64";
+                }
+                {
+                  os = "linux";
+                  cpu = "arm64";
+                }
+                {
+                  os = "macos";
+                  cpu = "x86_64";
+                }
+                {
+                  os = "macos";
+                  cpu = "arm64";
+                }
+              ]
+            ) "sync.toml: [conditions] doesn't list buck2.platforms' default four platforms in Buck2's names";
+            assert lib.assertMsg (
+              lib.hasInfix ''name = "macos-arm64"'' platformSettings
+              && lib.hasInfix ''"prelude//cpu/constraints:cpu[arm64]"'' platformSettings
+            ) "toolchains cell: no combined config_setting for macos-arm64";
             pkgs.runCommand "buck2-generators-check" { } "touch $out";
 
           # The language records (nix/buck2/languages.nix) agree with

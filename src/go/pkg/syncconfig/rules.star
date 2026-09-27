@@ -9,6 +9,7 @@ go_library(
     srcs = ["syncconfig.go"],
     deps = [
         # turnkey:auto-start
+        "//src/go/pkg/conditions:conditions",
         "godeps//vendor/github.com/pelletier/go-toml/v2:v2",
         # turnkey:auto-end
     ],
@@ -19,6 +20,6 @@ go_test(
     name = "syncconfig_test",
     srcs = ["syncconfig_test.go"],
     target_under_test = ":syncconfig",
-    deps = [],
+    deps = ["//src/go/pkg/conditions:conditions"],
     visibility = ["PUBLIC"],
 )

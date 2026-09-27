@@ -3,7 +3,10 @@ package syncconfig
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
+
+	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 )
 
 func TestParse(t *testing.T) {
@@ -238,5 +241,31 @@ external_cell = "godeps"
 	}
 	if !cfg.Rules.Enabled || cfg.Rules.IsAutoSync() {
 		t.Errorf("rules = %+v, want enabled without auto-sync", cfg.Rules)
+	}
+}
+
+// The platforms (buck2.platforms) and the combined config_settings'
+// package are read from [conditions].
+func TestLoadConditions(t *testing.T) {
+	cfg, err := Parse([]byte(`[conditions]
+settings = "toolchains//conditions"
+
+[[conditions.platforms]]
+os = "linux"
+cpu = "x86_64"
+
+[[conditions.platforms]]
+os = "macos"
+cpu = "arm64"
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []conditions.Platform{{OS: "linux", CPU: "x86_64"}, {OS: "macos", CPU: "arm64"}}
+	if !reflect.DeepEqual(cfg.Conditions.Platforms, want) {
+		t.Errorf("platforms = %+v, want %+v", cfg.Conditions.Platforms, want)
+	}
+	if got := len(cfg.Conditions.Space().Configurations); got != 2 {
+		t.Errorf("space has %d configurations, want 2", got)
 	}
 }

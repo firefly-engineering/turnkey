@@ -83,6 +83,12 @@ Located at `.turnkey/toolchains/`, contains toolchain rules for each declared la
 - `toolchains//:python` - Python toolchain
 - etc.
 
+It also holds `toolchains//conditions:<os>-<cpu>`, one `config_setting` per
+platform in `buck2.platforms` (the flake's `systems` by default), combining
+its OS and CPU constraints. Rules sync keys a `select()` on one when deps
+differ by CPU within one OS
+([Platform-Conditional Deps](ide-integration.md#platform-conditional-deps)).
+
 ### Prelude Cell
 
 The Buck2 prelude is provided via Nix at `.turnkey/prelude/`: the prelude built with turnkey's pinned buck2 release, with turnkey's patches and extensions applied.

@@ -15,6 +15,8 @@
 }:
 
 let
+  platforms = import ./platforms.nix { inherit lib; };
+
   # Each language's sync rules, in language order
   syncRules = builtins.concatMap (language: language.syncRules buck2.${language.name}) languages;
 
@@ -46,6 +48,13 @@ let
     generator = ${builtins.toJSON rule.generator}
   '';
 
+  # Format a platform as TOML
+  formatPlatform = platform: ''
+    [[conditions.platforms]]
+    os = ${builtins.toJSON platform.os}
+    cpu = ${builtins.toJSON platform.cpu}
+  '';
+
   # Format a wrapper rule as TOML
   formatWrapperRule = rule: ''
     [[wrappers]]
@@ -70,6 +79,11 @@ let
     auto_sync = ${lib.boolToString buck2.rules.autoSync}
     strict = ${lib.boolToString buck2.rules.strict}
 
+    # The platforms rules sync resolves deps for (buck2.platforms), and the
+    # package of the combined <os>-<cpu> config_settings its select()s use.
+    [conditions]
+    settings = ${builtins.toJSON platforms.settingsPackage}
+    ${lib.concatMapStringsSep "\n" formatPlatform (map platforms.fromSystem buck2.platforms)}
     ${lib.concatMapStringsSep "\n" formatSyncRule syncRules}
     ${lib.concatMapStringsSep "\n" formatWrapperRule wrapperRules}
   '';

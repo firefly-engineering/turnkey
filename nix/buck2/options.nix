@@ -66,6 +66,31 @@ in
       '';
     };
 
+    platforms = mkOption {
+      type = types.listOf types.str;
+      default = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "aarch64-darwin"
+      ];
+      defaultText = lib.literalMD "the flake's `systems`, through the flake-parts module; otherwise the four above";
+      example = [
+        "x86_64-linux"
+        "aarch64-darwin"
+      ];
+      description = ''
+        The platforms the project builds for, as Nix systems. Rules sync
+        resolves each target's deps on every one of them, so what it
+        writes doesn't depend on the machine it runs on, and writes deps
+        that differ between them as a `select()` on `config//os:<os>`, or
+        on the combined `toolchains//conditions:<os>-<cpu>` when they
+        differ by CPU within one OS. With no branch for other platforms,
+        building for one that isn't listed fails instead of silently
+        missing deps.
+      '';
+    };
+
     prelude.path = mkOption {
       type = types.nullOr (types.either types.package types.path);
       default = null;

@@ -17,6 +17,13 @@
 //	sources = ["Cargo.toml", "Cargo.lock"]
 //	target = "rust-deps.toml"
 //	generator = ["cargo-deps-gen"]
+//
+//	[conditions]
+//	settings = "toolchains//conditions"
+//
+//	[[conditions.platforms]]
+//	os = "linux"
+//	cpu = "x86_64"
 package syncconfig
 
 import (
@@ -24,6 +31,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -49,6 +57,22 @@ type Config struct {
 	// Rules configures automatic rules.star file synchronization.
 	// When enabled, tk will update rules.star deps before build commands.
 	Rules RulesConfig `toml:"rules"`
+
+	// Conditions are the build configurations rules sync evaluates, for
+	// deps that differ between them.
+	Conditions ConditionsConfig `toml:"conditions"`
+}
+
+// ConditionsConfig describes the build configurations rules sync
+// evaluates, from turnkey's Nix options.
+type ConditionsConfig struct {
+	// Settings is the Buck2 package holding turnkey's combined
+	// config_settings, one per platform, named "<os>-<cpu>"
+	// (e.g. "toolchains//conditions").
+	Settings string `toml:"settings"`
+
+	// Platforms are the platforms turnkey builds for (buck2.platforms).
+	Platforms []conditions.Platform `toml:"platforms"`
 }
 
 // RulesConfig configures automatic rules.star file synchronization.
@@ -320,4 +344,9 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// Space returns the configuration space of the configured platforms.
+func (c ConditionsConfig) Space() conditions.Space {
+	return conditions.NewSpace(c.Platforms, c.Settings)
 }

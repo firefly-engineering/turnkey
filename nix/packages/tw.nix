@@ -24,6 +24,7 @@ pkgs.buildGoModule {
       (root + "/go.sum")
       (root + "/src/cmd/tw")
       (root + "/src/go/pkg/syncconfig")
+      (root + "/src/go/pkg/conditions")
       (root + "/src/go/pkg/syncer")
       (root + "/src/go/pkg/staleness")
       (root + "/src/go/pkg/snapshot")
