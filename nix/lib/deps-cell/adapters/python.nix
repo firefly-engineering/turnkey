@@ -98,8 +98,8 @@ rec {
       # Optional
       userFixups ? { }, # Additional fixups
       # The locked dependencies' fixups: [ { key; name; version; } ] ->
-      # { <key> = { commands; }; } (nix/lib/fixups's resolve)
-      resolveFixups ? (_: { }),
+      # { fixups = { <key> = { commands; }; }; } (nix/lib/fixups's resolve)
+      resolveFixups ? (_: { fixups = { }; }),
       userPatchesDir ? null, # Path to .turnkey/patches directory (from FUSE edit layer)
     }:
     let
@@ -110,13 +110,15 @@ rec {
       allFixups = (fixups.builtinFixups.python or { }) // userFixups;
 
       # The locked distributions' fixups
-      fixups = resolveFixups (
+      resolvedFixups = resolveFixups (
         lib.mapAttrsToList (name: depSpec: {
           key = name;
           inherit name;
           inherit (depSpec) version;
         }) deps
       );
+
+      fixups = resolvedFixups.fixups;
 
       # Build individual dep packages
       depPackages = lib.mapAttrs (

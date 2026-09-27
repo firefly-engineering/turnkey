@@ -5,6 +5,7 @@
 # no other repository unless it imports them.
 let
   families = {
+    build-script-skips = ./rust/build-script-skips.nix;
     fuser = ./rust/fuser.nix;
     nix = ./rust/nix.nix;
     ring = ./rust/ring.nix;

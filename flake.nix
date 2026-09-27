@@ -851,6 +851,29 @@
               } [ self.modules.turnkeyFixups.default ];
               serdeOnly = turnkeySet platform [ self.modules.turnkeyFixups.serde ];
 
+              # An unaccounted build script's error, pointing at turnkey's
+              # published family when one accounts for it
+              catalog = lib.mapAttrs (name: module: {
+                inherit module;
+                import = "inputs.turnkey.modules.turnkeyFixups.${name}";
+              }) (builtins.removeAttrs (import ./nix/fixups) [ "default" ]);
+              unaccounted =
+                (fixups.resolve {
+                  evaluated = fixups.evalFixups {
+                    inherit pkgs;
+                    modules = [ self.modules.turnkeyFixups.ring ];
+                  };
+                  language = "rust";
+                  deps = locked ++ [
+                    {
+                      key = "mystery@1.0.0";
+                      name = "mystery";
+                      version = "1.0.0";
+                    }
+                  ];
+                  inherit platform catalog;
+                }).unaccounted;
+
               expectations = {
                 "sets and inline fixups merge per field" =
                   serde.gen.rustcFlags.common == [
@@ -948,6 +971,14 @@
                   && !(lib.hasInfix "-elf.S" ownOnIntelMac."ring@0.17.14".commands);
                 "turnkey's ring fixup is for ring 0.17 only" =
                   !ownOnLinux."ring@0.16.20".accounted && ownOnLinux."ring@0.16.20".commands == "";
+                "an unaccounted build script names the published family that accounts for it" =
+                  lib.hasSuffix
+                    "a published fixup set does: add `inputs.turnkey.modules.turnkeyFixups.serde` to turnkey.toolchains.buck2.fixups.imports"
+                    unaccounted."serde@1.0.219";
+                "an unaccounted build script no family accounts for asks for a fixup" =
+                  lib.hasInfix "`rust.\"mystery\".buildScript.skip = true`" unaccounted."mystery@1.0.0"
+                  && lib.hasInfix "`rust.\"ring\".buildScript.generate`" unaccounted."ring@0.16.20";
+                "an accounted build script has no error" = !(unaccounted ? "ring@0.17.14");
                 "a family module brings its family only" =
                   serdeOnly ? "serde@1.0.219" && !(serdeOnly ? "ring@0.17.14");
               };

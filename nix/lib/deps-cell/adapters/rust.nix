@@ -75,8 +75,15 @@ rec {
       featuresFile ? null, # Path to rust-features.toml (optional)
 
       # The locked crates' fixups: [ { key; name; version; } ] ->
-      # { <key> = { commands; gen; }; } (nix/lib/fixups's resolve)
-      resolveFixups ? (_: { }),
+      # { fixups = { <key> = { commands; gen; }; }; unaccounted = { <key> =
+      # message; }; } (nix/lib/fixups's resolve): a crate in unaccounted
+      # fails the cell if it has a build script
+      resolveFixups ? (
+        _: {
+          fixups = { };
+          unaccounted = { };
+        }
+      ),
 
       # User patches (from FUSE edit layer)
       userPatchesDir ? null, # Path to .turnkey/patches directory
@@ -100,7 +107,14 @@ rec {
         name = depSpec.name or (lib.head (lib.splitString "@" key));
         inherit (depSpec) version;
       }) deps;
-      fixups = resolveFixups locked;
+      resolvedFixups = resolveFixups locked;
+      inherit (resolvedFixups) fixups;
+
+      # The crates no fixup accounts for the build script of, and what the
+      # cell fails with if they have one
+      unaccountedFile = pkgs.writeText "${cellName}-unaccounted-build-scripts.json" (
+        builtins.toJSON resolvedFixups.unaccounted
+      );
 
       # Build individual dep packages
       depPackages = lib.listToAttrs (
@@ -149,8 +163,13 @@ rec {
 
       conditionsJSON = builtins.toJSON conditions;
 
-      # Merge commands: feature unification + BUCK generation
+      # Merge commands: every build script accounted for, feature
+      # unification, BUCK generation
       mergeCommands = ''
+        # Every crate with a build script needs a fixup saying what stands
+        # in for it: Buck2 never runs build.rs
+        python3 ${./rust-build-scripts.py} "$out/vendor" ${unaccountedFile}
+
         # Compute unified features (if tool provided)
         ${
           if computeUnifiedFeatures != null then

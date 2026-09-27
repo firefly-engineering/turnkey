@@ -344,6 +344,12 @@ in
             inherit language deps pkgs;
             platform = platforms.fromSystem pkgs.stdenv.hostPlatform.system;
             inlineFiles = inlineFixupFiles;
+            # turnkey's published families, which an unaccounted build
+            # script's error names when one accounts for it
+            catalog = lib.mapAttrs (name: module: {
+              inherit module;
+              import = "inputs.turnkey.modules.turnkeyFixups.${name}";
+            }) (builtins.removeAttrs (import ../../fixups) [ "default" ]);
           }
         );
 

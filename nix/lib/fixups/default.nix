@@ -192,10 +192,17 @@ rec {
   #   platform     { system; os; cpu; }: the platform the cell is built on
   #   inlineFiles  the files of the repository's own fixups: a fixup
   #                defined only there warns when it matches nothing locked
+  #   catalog      published fixup sets, { <name> = { module; import; }; }
+  #                (import: how a repository imports it), which the
+  #                message for an unaccounted build script points at when
+  #                one of them accounts for it
   #
   # Returns { fixups = { <key> = { commands; gen; accounted; }; };
-  # warnings; errors; }. commands run in the dependency's derivation
-  # (patches, then the build script); gen is what gen-rust-buck reads.
+  # unaccounted = { <key> = message; }; warnings; errors; }. commands run
+  # in the dependency's derivation (patches, then the build script); gen is
+  # what gen-rust-buck reads. unaccounted holds, for every Rust crate whose
+  # build.rs no fixup accounts for, the error the cell fails with if the
+  # crate turns out to have one.
   resolve =
     {
       evaluated,
@@ -204,6 +211,7 @@ rec {
       platform,
       pkgs ? null,
       inlineFiles ? [ ],
+      catalog ? { },
     }:
     let
       records = evaluated.config.${language};
@@ -333,20 +341,62 @@ rec {
         inherit (d) key;
         r = resolveDep d;
       }) applicable;
+      fixups = builtins.listToAttrs (map (x: lib.nameValuePair x.key x.r.value) resolved);
+
+      # The published sets that would account for each crate's build script
+      accountedBy = lib.mapAttrs (
+        _: set:
+        (resolve {
+          evaluated = evalFixups {
+            inherit pkgs;
+            modules = [ set.module ];
+          };
+          inherit
+            language
+            deps
+            platform
+            pkgs
+            ;
+        }).fixups
+      ) catalog;
+      unaccountedMessage =
+        dep:
+        let
+          sets = builtins.filter (n: (accountedBy.${n}.${dep.key}.accounted or false)) (
+            builtins.attrNames catalog
+          );
+        in
+        "turnkey: ${dep.name} ${dep.version} has a build.rs, and no fixup says what stands in for it; "
+        + (
+          if sets != [ ] then
+            "a published fixup set does: add `${
+              catalog.${builtins.head sets}.import
+            }` to turnkey.toolchains.buck2.fixups.imports"
+          else
+            "give it one in turnkey.toolchains.buck2.fixups: `rust.\"${dep.name}\".buildScript.generate` producing what its build.rs would, or `rust.\"${dep.name}\".buildScript.skip = true` if the build needs nothing from it"
+        );
     in
     {
-      fixups = builtins.listToAttrs (map (x: lib.nameValuePair x.key x.r.value) resolved);
+      inherit fixups;
+      unaccounted = lib.optionalAttrs (language == "rust") (
+        builtins.listToAttrs (
+          map (dep: lib.nameValuePair dep.key (unaccountedMessage dep)) (
+            builtins.filter (dep: !(fixups.${dep.key}.accounted or false)) deps
+          )
+        )
+      );
       warnings = unusedWarnings;
       errors = lib.concatMap (x: x.r.errors) resolved;
     };
 
-  # The thin layer: warn, throw on errors, and return the fixups
+  # The thin layer: warn, throw on errors, and return what the cell
+  # builders read, { fixups; unaccounted; }
   apply =
     result:
     if result.errors != [ ] then
       throw ("turnkey: fixups:\n" + lib.concatMapStringsSep "\n" (e: "  - ${e}") result.errors)
     else
-      lib.foldr lib.warn result.fixups result.warnings;
+      lib.foldr lib.warn { inherit (result) fixups unaccounted; } result.warnings;
 
   # The languages a fixup set can hold fixups for
   inherit languages;

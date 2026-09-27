@@ -1,10 +1,12 @@
-# The nix crate's build script sets up platform aliases with cfg_aliases.
+# The nix crate's build script sets up platform aliases with cfg_aliases;
+# the flags stand in for it.
 #
 # Reference: https://github.com/nix-rust/nix/blob/master/build.rs
 { ... }:
 
 {
   rust.nix = {
+    buildScript.skip = true;
     os.linux.rustcFlags = [
       "--cfg"
       "linux"

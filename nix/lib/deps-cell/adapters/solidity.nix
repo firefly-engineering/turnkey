@@ -182,8 +182,8 @@ rec {
       # Optional
       userFixups ? { }, # Additional fixups
       # The locked dependencies' fixups: [ { key; name; version; } ] ->
-      # { <key> = { commands; }; } (nix/lib/fixups's resolve)
-      resolveFixups ? (_: { }),
+      # { fixups = { <key> = { commands; }; }; } (nix/lib/fixups's resolve)
+      resolveFixups ? (_: { fixups = { }; }),
       userPatchesDir ? null, # Path to .turnkey/patches directory (from FUSE edit layer)
     }:
     let
@@ -194,12 +194,14 @@ rec {
       allFixups = (fixups.builtinFixups.solidity or { }) // userFixups;
 
       # The locked packages' fixups
-      fixups = resolveFixups (
+      resolvedFixups = resolveFixups (
         map (pkg: {
           key = pkg.name;
           inherit (pkg) name version;
         }) packages
       );
+
+      fixups = resolvedFixups.fixups;
 
       # Build individual dep packages
       depPackages = builtins.listToAttrs (

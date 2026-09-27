@@ -117,8 +117,8 @@ rec {
       # Optional
       userFixups ? { }, # Additional fixups
       # The locked dependencies' fixups: [ { key; name; version; } ] ->
-      # { <key> = { commands; }; } (nix/lib/fixups's resolve)
-      resolveFixups ? (_: { }),
+      # { fixups = { <key> = { commands; }; }; } (nix/lib/fixups's resolve)
+      resolveFixups ? (_: { fixups = { }; }),
       localReplaces ? { }, # Map import path -> Buck2 target for local replacements
       userPatchesDir ? null, # Path to .turnkey/patches directory (from FUSE edit layer)
 
@@ -165,7 +165,7 @@ rec {
           };
 
       # The locked modules' fixups, keyed by import path
-      fixups = resolveFixups (
+      resolvedFixups = resolveFixups (
         lib.mapAttrsToList (
           key: depSpec:
           let
@@ -178,6 +178,8 @@ rec {
           }
         ) deps
       );
+
+      fixups = resolvedFixups.fixups;
 
       # Build individual dep packages
       depPackages = lib.mapAttrs (

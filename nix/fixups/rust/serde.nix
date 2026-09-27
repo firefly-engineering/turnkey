@@ -29,6 +29,7 @@ in
     "use serde_core::__private${ctx.versionParts.patch} as serde_core_private;"
   ]);
 
+  rust.serde_json.buildScript.skip = true;
   rust.serde_json.rustcFlags = [
     "--cfg"
     ''fast_arithmetic="64"''
