@@ -4,7 +4,7 @@
 //! using its session loop (`fuse_loop`) which correctly handles FUSE-T's
 //! NFS-based socket protocol.
 
-pub mod bindings;
 pub mod backend;
+pub mod bindings;
 pub mod metrics;
 pub mod operations;

@@ -7,14 +7,10 @@ use tree_sitter::{Parser, Query, QueryCursor, StreamingIterator};
 use walkdir::WalkDir;
 
 /// Rust standard library crates.
-const RUST_STDLIB: &[&str] = &[
-    "std", "core", "alloc", "proc_macro", "test",
-];
+const RUST_STDLIB: &[&str] = &["std", "core", "alloc", "proc_macro", "test"];
 
 /// Default directories to exclude.
-const DEFAULT_EXCLUDES: &[&str] = &[
-    "target", ".git", ".hg", ".svn", "node_modules",
-];
+const DEFAULT_EXCLUDES: &[&str] = &["target", ".git", ".hg", ".svn", "node_modules"];
 
 /// Extract Rust imports from a directory.
 pub fn extract(dir: &Path, exclude_patterns: &[&str]) -> anyhow::Result<Result> {
@@ -91,9 +87,8 @@ pub fn extract(dir: &Path, exclude_patterns: &[&str]) -> anyhow::Result<Result> 
             .unwrap_or_default();
 
         // Determine if this is a test file
-        let is_test_file = filename.ends_with("_test.rs")
-            || filename == "tests.rs"
-            || pkg_dir.contains("tests");
+        let is_test_file =
+            filename.ends_with("_test.rs") || filename == "tests.rs" || pkg_dir.contains("tests");
 
         // Parse the file
         let source = std::fs::read_to_string(path)?;
@@ -129,7 +124,9 @@ pub fn extract(dir: &Path, exclude_patterns: &[&str]) -> anyhow::Result<Result> 
         }
 
         // Add to package
-        let pkg = packages.entry(pkg_dir.clone()).or_insert_with(|| Package::new(pkg_dir));
+        let pkg = packages
+            .entry(pkg_dir.clone())
+            .or_insert_with(|| Package::new(pkg_dir));
         pkg.files.push(filename);
 
         for imp in imports {

@@ -58,8 +58,10 @@ impl NixClient for CliNixClient {
     fn list_packages(&self, system: &str) -> Result<Vec<String>, NixError> {
         let attr = format!(".#packages.{}", system);
         let stdout = self.run_nix(&[
-            "eval", &attr,
-            "--apply", "builtins.attrNames",
+            "eval",
+            &attr,
+            "--apply",
+            "builtins.attrNames",
             "--json",
             "--impure",
         ])?;
@@ -105,9 +107,7 @@ impl NixClient for CliNixClient {
     }
 
     fn eval_json(&self, expr: &str) -> Result<serde_json::Value, NixError> {
-        let stdout = self.run_nix(&[
-            "eval", "--impure", "--json", "--expr", expr,
-        ])?;
+        let stdout = self.run_nix(&["eval", "--impure", "--json", "--expr", expr])?;
 
         serde_json::from_str(&stdout).map_err(|e| NixError::Parse {
             message: format!("failed to parse eval result: {}", e),

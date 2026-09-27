@@ -128,10 +128,9 @@ impl ComposeFile {
 
     /// Convert to a CompositionConfig
     pub fn into_composition_config(self) -> CompositionConfig {
-        let mut config =
-            CompositionConfig::new(&self.mount.point, &self.mount.repo_root)
-                .with_source_dir_name(&self.settings.source_dir)
-                .with_cell_prefix(&self.settings.cell_prefix);
+        let mut config = CompositionConfig::new(&self.mount.point, &self.mount.repo_root)
+            .with_source_dir_name(&self.settings.source_dir)
+            .with_cell_prefix(&self.settings.cell_prefix);
 
         for (name, entry) in &self.cells {
             let cell = CellConfig::new(name, entry.path()).with_editable(entry.editable());
@@ -183,7 +182,10 @@ repo_root = "/home/user/src/turnkey"
 "#;
         let config: ComposeFile = toml::from_str(toml).unwrap();
         assert_eq!(config.mount.point, PathBuf::from("/firefly/turnkey"));
-        assert_eq!(config.mount.repo_root, PathBuf::from("/home/user/src/turnkey"));
+        assert_eq!(
+            config.mount.repo_root,
+            PathBuf::from("/home/user/src/turnkey")
+        );
         assert!(config.cells.is_empty());
         assert_eq!(config.settings.layout, "buck2");
     }

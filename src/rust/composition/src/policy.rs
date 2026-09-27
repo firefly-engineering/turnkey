@@ -541,10 +541,12 @@ mod tests {
         assert!(FileClass::VirtualGenerated.is_always_accessible());
         assert!(FileClass::VirtualDirectory.is_always_accessible());
 
-        assert!(!FileClass::CellContent {
-            cell: "godeps".into()
-        }
-        .is_always_accessible());
+        assert!(
+            !FileClass::CellContent {
+                cell: "godeps".into()
+            }
+            .is_always_accessible()
+        );
     }
 
     #[test]
@@ -664,10 +666,14 @@ mod tests {
     #[test]
     fn test_policy_decision_helpers() {
         let block = PolicyDecision::block();
-        assert!(matches!(block, PolicyDecision::Block { timeout } if timeout == Duration::from_secs(300)));
+        assert!(
+            matches!(block, PolicyDecision::Block { timeout } if timeout == Duration::from_secs(300))
+        );
 
         let custom_block = PolicyDecision::block_with_timeout(Duration::from_secs(60));
-        assert!(matches!(custom_block, PolicyDecision::Block { timeout } if timeout == Duration::from_secs(60)));
+        assert!(
+            matches!(custom_block, PolicyDecision::Block { timeout } if timeout == Duration::from_secs(60))
+        );
 
         let eagain = PolicyDecision::eagain();
         assert_eq!(eagain, PolicyDecision::Deny { errno: EAGAIN });

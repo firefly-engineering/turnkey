@@ -263,7 +263,7 @@ mod symlink_tests {
 mod fuse_tests {
     use super::*;
     use composition::fuse::FuseBackend;
-    use composition::selector::{is_fuse_available, select_backend, BackendType};
+    use composition::selector::{BackendType, is_fuse_available, select_backend};
 
     /// Check if FUSE is available for testing
     fn fuse_available() -> bool {
@@ -565,8 +565,8 @@ mod platform_tests {
 // ============================================================================
 
 mod state_tests {
-    use composition::state::ConsistencyStateMachine;
     use composition::BackendStatus;
+    use composition::state::ConsistencyStateMachine;
     use std::path::PathBuf;
 
     #[test]
@@ -646,8 +646,8 @@ mod state_tests {
 // ============================================================================
 
 mod recovery_tests {
-    use composition::recovery::{is_transient_error, recovery_suggestion, RetryConfig};
     use composition::Error;
+    use composition::recovery::{RetryConfig, is_transient_error, recovery_suggestion};
     use std::path::PathBuf;
     use std::time::Duration;
 
@@ -690,8 +690,8 @@ mod recovery_tests {
 
 mod layout_tests {
     use composition::layout::{
-        available_layouts, default_layout, global_registry, layout_by_name, Buck2Layout,
-        LayoutContext,
+        Buck2Layout, LayoutContext, available_layouts, default_layout, global_registry,
+        layout_by_name,
     };
     use std::path::PathBuf;
 

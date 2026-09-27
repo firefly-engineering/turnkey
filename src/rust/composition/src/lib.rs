@@ -54,19 +54,19 @@ pub mod compose_config;
 mod config;
 pub mod discover;
 mod error;
-pub mod serve_config;
-pub mod service;
-pub mod synthetic;
-pub mod vcs_wrappers;
 pub mod layout;
 pub mod performance;
 pub mod policy;
 pub mod recovery;
 pub mod selector;
+pub mod serve_config;
+pub mod service;
 pub mod state;
 mod status;
 pub mod symlink;
+pub mod synthetic;
 pub mod tracing;
+pub mod vcs_wrappers;
 
 #[cfg(any(feature = "fuse", feature = "fuse-t"))]
 pub mod fuse;
@@ -75,30 +75,32 @@ pub mod fuse;
 pub mod watcher;
 
 pub use backend::CompositionBackend;
-pub use symlink::SymlinkBackend;
 pub use config::{CellConfig, CompositionConfig, ConsistencyMode};
 pub use error::Error;
+pub use layout::{
+    BazelLayout, BoxedLayout, Buck2Layout, CellInfo, ConfigFile, Layout, LayoutContext,
+    LayoutFactory, LayoutRegistry, SimpleLayout, available_layouts, default_layout,
+    global_registry, layout_by_name,
+};
+pub use performance::{
+    CacheConfig, CacheStats, DirEntry, DirEntryType, InodeCache, OptimizedReaddir,
+};
 pub use policy::{
     AccessPolicy, CIPolicy, DevelopmentPolicy, FileClass, LenientPolicy, OperationType,
     PolicyDecision, StrictPolicy, SystemState,
 };
-pub use state::{CellUpdate, ConsistencyStateMachine, StateObserver};
-pub use status::BackendStatus;
-pub use layout::{
-    available_layouts, default_layout, global_registry, layout_by_name, BazelLayout, BoxedLayout,
-    Buck2Layout, CellInfo, ConfigFile, Layout, LayoutContext, LayoutFactory, LayoutRegistry,
-    SimpleLayout,
+pub use recovery::{
+    DaemonRecovery, RecoveryAction, RetryConfig, is_transient_error, recovery_suggestion,
+    retry_with_backoff,
 };
 pub use selector::{
-    create_backend, fuse_install_instructions, is_fuse_available, select_backend,
-    BackendSelection, BackendType,
+    BackendSelection, BackendType, create_backend, fuse_install_instructions, is_fuse_available,
+    select_backend,
 };
-pub use recovery::{
-    is_transient_error, recovery_suggestion, retry_with_backoff, DaemonRecovery, RecoveryAction,
-    RetryConfig,
-};
+pub use state::{CellUpdate, ConsistencyStateMachine, StateObserver};
+pub use status::BackendStatus;
+pub use symlink::SymlinkBackend;
 pub use tracing::{DebugInfo, FuseTracer, Metrics, StateLogger, TracingConfig};
-pub use performance::{CacheConfig, CacheStats, DirEntry, DirEntryType, InodeCache, OptimizedReaddir};
 
 /// Result type for composition operations
 pub type Result<T> = std::result::Result<T, Error>;

@@ -178,9 +178,7 @@ impl LayoutContext {
 
     /// Get the path to a cell in the composed view
     pub fn cell_path(&self, cell_name: &str) -> PathBuf {
-        self.mount_point
-            .join(&self.cell_prefix)
-            .join(cell_name)
+        self.mount_point.join(&self.cell_prefix).join(cell_name)
     }
 
     /// Get the path to the source directory in the composed view
@@ -337,15 +335,9 @@ impl Buck2Layout {
         // Check if prelude is provided as a cell
         let has_prelude_cell = ctx.cells.iter().any(|c| c.name == "prelude");
         if has_prelude_cell {
-            content.push_str(&format!(
-                "    prelude = {}/prelude\n",
-                ctx.cell_prefix
-            ));
+            content.push_str(&format!("    prelude = {}/prelude\n", ctx.cell_prefix));
         } else {
-            content.push_str(&format!(
-                "    prelude = {}/prelude\n",
-                ctx.source_dir_name
-            ));
+            content.push_str(&format!("    prelude = {}/prelude\n", ctx.source_dir_name));
         }
 
         // Add cells for each dependency (skip prelude, already handled)
@@ -476,7 +468,7 @@ impl BazelLayout {
     ///
     /// For example: ("godeps", "vendor/github.com/foo/bar") -> "@godeps//vendor/github.com/foo/bar"
     pub fn to_bazel_label(cell: &str, path: &str) -> String {
-        format!("@{}//{}",  cell, path)
+        format!("@{}//{}", cell, path)
     }
 }
 
@@ -761,8 +753,7 @@ mod tests {
 
     #[test]
     fn test_cell_info() {
-        let cell = CellInfo::new("godeps", "/nix/store/abc")
-            .with_editable(true);
+        let cell = CellInfo::new("godeps", "/nix/store/abc").with_editable(true);
         assert_eq!(cell.name, "godeps");
         assert_eq!(cell.source_path, PathBuf::from("/nix/store/abc"));
         assert!(cell.editable);
@@ -787,10 +778,7 @@ mod tests {
     #[test]
     fn test_layout_context_source_path() {
         let ctx = test_context();
-        assert_eq!(
-            ctx.source_path(),
-            PathBuf::from("/firefly/turnkey/root")
-        );
+        assert_eq!(ctx.source_path(), PathBuf::from("/firefly/turnkey/root"));
     }
 
     #[test]
@@ -815,7 +803,9 @@ mod tests {
         let path = layout.map_dep(&ctx, "godeps", Path::new("vendor/github.com/foo"));
         assert_eq!(
             path,
-            Some(PathBuf::from("/firefly/turnkey/external/godeps/vendor/github.com/foo"))
+            Some(PathBuf::from(
+                "/firefly/turnkey/external/godeps/vendor/github.com/foo"
+            ))
         );
 
         // Unknown cell
@@ -901,7 +891,9 @@ mod tests {
         let path = layout.map_dep(&ctx, "godeps", Path::new("vendor/github.com/foo"));
         assert_eq!(
             path,
-            Some(PathBuf::from("/firefly/turnkey/external/godeps/vendor/github.com/foo"))
+            Some(PathBuf::from(
+                "/firefly/turnkey/external/godeps/vendor/github.com/foo"
+            ))
         );
 
         // Unknown cell
@@ -924,7 +916,11 @@ mod tests {
         assert!(workspace.content.contains("name = \"godeps\""));
         assert!(workspace.content.contains("path = \"../external/godeps\""));
         assert!(workspace.content.contains("name = \"rustdeps\""));
-        assert!(workspace.content.contains("path = \"../external/rustdeps\""));
+        assert!(
+            workspace
+                .content
+                .contains("path = \"../external/rustdeps\"")
+        );
 
         // Check BUILD.bazel
         let build_bazel = configs.iter().find(|c| c.name == "BUILD.bazel").unwrap();
@@ -1100,8 +1096,7 @@ mod tests {
 
     #[test]
     fn test_simple_layout_with_static_config() {
-        let layout = SimpleLayout::new("test")
-            .with_static_config("VERSION", "1.0.0\n");
+        let layout = SimpleLayout::new("test").with_static_config("VERSION", "1.0.0\n");
 
         let ctx = test_context();
         let configs = layout.generate_config(&ctx);
@@ -1113,8 +1108,8 @@ mod tests {
 
     #[test]
     fn test_simple_layout_with_root_marker_content() {
-        let layout = SimpleLayout::new("test")
-            .with_root_marker_content(".marker", "custom content");
+        let layout =
+            SimpleLayout::new("test").with_root_marker_content(".marker", "custom content");
 
         let ctx = test_context();
         let configs = layout.generate_config(&ctx);

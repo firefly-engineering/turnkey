@@ -9,7 +9,7 @@
 
 #![cfg(target_os = "macos")]
 
-use std::ffi::{c_void, CString};
+use std::ffi::{CString, c_void};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -21,7 +21,7 @@ use log::{debug, error, info};
 use super::bindings;
 use super::operations;
 use crate::fuse::fs_core::FsCore;
-use crate::fuse::platform::{self, detect_macfuse_backend, MacFuseBackend, Platform};
+use crate::fuse::platform::{self, MacFuseBackend, Platform, detect_macfuse_backend};
 use crate::state::ConsistencyStateMachine;
 use crate::{BackendStatus, CellMapping, CompositionBackend, CompositionConfig, Error, Result};
 
@@ -94,7 +94,9 @@ impl CompositionBackend for FuseTBackend {
         // active. Fail fast with activation guidance instead.
         let backend = detect_macfuse_backend();
         match &backend {
-            MacFuseBackend::FSKit { version, bundle_id, .. } => {
+            MacFuseBackend::FSKit {
+                version, bundle_id, ..
+            } => {
                 info!(
                     "{} active: {}{}",
                     backend.label(),
@@ -185,8 +187,7 @@ impl CompositionBackend for FuseTBackend {
             let arg0 = CString::new("turnkey-composed").unwrap();
             let arg_ro = CString::new("-o").unwrap();
             let arg_ro_val =
-                CString::new("backend=fskit,fsname=turnkey,noappledouble,noapplexattr")
-                    .unwrap();
+                CString::new("backend=fskit,fsname=turnkey,noappledouble,noapplexattr").unwrap();
             let mut argv: Vec<*mut i8> = vec![
                 arg0.as_ptr() as *mut i8,
                 arg_ro.as_ptr() as *mut i8,
@@ -260,7 +261,10 @@ impl CompositionBackend for FuseTBackend {
                 info!("Starting multi-threaded FUSE loop");
                 let r = bindings::fuse_loop_mt(fuse, 0);
                 if r != 0 && !should_stop.load(Ordering::SeqCst) {
-                    error!("fuse_loop_mt returned {}, trying single-threaded fallback", r);
+                    error!(
+                        "fuse_loop_mt returned {}, trying single-threaded fallback",
+                        r
+                    );
                     bindings::fuse_loop(fuse)
                 } else {
                     r

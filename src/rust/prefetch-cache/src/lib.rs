@@ -77,8 +77,9 @@ impl PrefetchCache {
 
         // Create cache directory if it doesn't exist
         if let Some(parent) = cache_path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create cache directory: {}", parent.display()))?;
+            fs::create_dir_all(parent).with_context(|| {
+                format!("Failed to create cache directory: {}", parent.display())
+            })?;
         }
 
         // Load existing cache or create new one
@@ -100,7 +101,10 @@ impl PrefetchCache {
                     }
                 }
                 Err(e) => {
-                    eprintln!("prefetch-cache: failed to parse cache ({}), starting fresh", e);
+                    eprintln!(
+                        "prefetch-cache: failed to parse cache ({}), starting fresh",
+                        e
+                    );
                     CacheFile::default()
                 }
             }
@@ -177,11 +181,12 @@ impl PrefetchCache {
             return Ok(());
         }
 
-        let content = serde_json::to_string_pretty(&self.cache)
-            .context("Failed to serialize cache")?;
+        let content =
+            serde_json::to_string_pretty(&self.cache).context("Failed to serialize cache")?;
 
-        fs::write(&self.cache_path, content)
-            .with_context(|| format!("Failed to write cache file: {}", self.cache_path.display()))?;
+        fs::write(&self.cache_path, content).with_context(|| {
+            format!("Failed to write cache file: {}", self.cache_path.display())
+        })?;
 
         self.dirty = false;
         Ok(())

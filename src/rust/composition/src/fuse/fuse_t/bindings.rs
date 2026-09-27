@@ -264,11 +264,7 @@ pub struct fuse_operations {
     pub rmdir: Option<unsafe extern "C" fn(path: *const c_char) -> c_int>,
     pub symlink: Option<unsafe extern "C" fn(from: *const c_char, to: *const c_char) -> c_int>,
     pub rename: Option<
-        unsafe extern "C" fn(
-            from: *const c_char,
-            to: *const c_char,
-            flags: libc::c_uint,
-        ) -> c_int,
+        unsafe extern "C" fn(from: *const c_char, to: *const c_char, flags: libc::c_uint) -> c_int,
     >,
     pub link: Option<unsafe extern "C" fn(from: *const c_char, to: *const c_char) -> c_int>,
     pub chmod: Option<
@@ -293,8 +289,7 @@ pub struct fuse_operations {
             fi: *mut fuse_file_info,
         ) -> c_int,
     >,
-    pub open:
-        Option<unsafe extern "C" fn(path: *const c_char, fi: *mut fuse_file_info) -> c_int>,
+    pub open: Option<unsafe extern "C" fn(path: *const c_char, fi: *mut fuse_file_info) -> c_int>,
     pub read: Option<
         unsafe extern "C" fn(
             path: *const c_char,
@@ -315,8 +310,7 @@ pub struct fuse_operations {
     >,
     pub statfs:
         Option<unsafe extern "C" fn(path: *const c_char, stbuf: *mut libc::statvfs) -> c_int>,
-    pub flush:
-        Option<unsafe extern "C" fn(path: *const c_char, fi: *mut fuse_file_info) -> c_int>,
+    pub flush: Option<unsafe extern "C" fn(path: *const c_char, fi: *mut fuse_file_info) -> c_int>,
     pub release:
         Option<unsafe extern "C" fn(path: *const c_char, fi: *mut fuse_file_info) -> c_int>,
     pub fsync: Option<
@@ -344,11 +338,7 @@ pub struct fuse_operations {
         ) -> c_int,
     >,
     pub listxattr: Option<
-        unsafe extern "C" fn(
-            path: *const c_char,
-            list: *mut c_char,
-            size: libc::size_t,
-        ) -> c_int,
+        unsafe extern "C" fn(path: *const c_char, list: *mut c_char, size: libc::size_t) -> c_int,
     >,
     pub removexattr:
         Option<unsafe extern "C" fn(path: *const c_char, name: *const c_char) -> c_int>,
@@ -401,11 +391,7 @@ pub struct fuse_operations {
         ) -> c_int,
     >,
     pub bmap: Option<
-        unsafe extern "C" fn(
-            path: *const c_char,
-            blocksize: libc::size_t,
-            idx: *mut u64,
-        ) -> c_int,
+        unsafe extern "C" fn(path: *const c_char, blocksize: libc::size_t, idx: *mut u64) -> c_int,
     >,
     pub ioctl: Option<
         unsafe extern "C" fn(
@@ -443,11 +429,7 @@ pub struct fuse_operations {
         ) -> c_int,
     >,
     pub flock: Option<
-        unsafe extern "C" fn(
-            path: *const c_char,
-            fi: *mut fuse_file_info,
-            op: c_int,
-        ) -> c_int,
+        unsafe extern "C" fn(path: *const c_char, fi: *mut fuse_file_info, op: c_int) -> c_int,
     >,
     pub fallocate: Option<
         unsafe extern "C" fn(
@@ -600,7 +582,10 @@ mod tests {
         // here mis-dispatches every callback past getattr — see the struct
         // doc-comment for details.
         let rust_size = std::mem::size_of::<fuse_operations>();
-        assert_eq!(rust_size, 376, "fuse_operations size mismatch: Rust={rust_size} expected=376");
+        assert_eq!(
+            rust_size, 376,
+            "fuse_operations size mismatch: Rust={rust_size} expected=376"
+        );
     }
 
     #[test]
@@ -611,19 +596,43 @@ mod tests {
             // subsequent field by 8 bytes vs. upstream; chflags/setvolname/monitor
             // before statx push statx from 336 to 360.
             assert_eq!(std::ptr::addr_of!((*base).getattr) as usize, 0, "getattr");
-            assert_eq!(std::ptr::addr_of!((*base).setattr) as usize, 8, "setattr (Apple)");
-            assert_eq!(std::ptr::addr_of!((*base).readlink) as usize, 16, "readlink");
+            assert_eq!(
+                std::ptr::addr_of!((*base).setattr) as usize,
+                8,
+                "setattr (Apple)"
+            );
+            assert_eq!(
+                std::ptr::addr_of!((*base).readlink) as usize,
+                16,
+                "readlink"
+            );
             assert_eq!(std::ptr::addr_of!((*base).open) as usize, 104, "open");
             assert_eq!(std::ptr::addr_of!((*base).read) as usize, 112, "read");
             assert_eq!(std::ptr::addr_of!((*base).statfs) as usize, 128, "statfs");
             assert_eq!(std::ptr::addr_of!((*base).opendir) as usize, 192, "opendir");
             assert_eq!(std::ptr::addr_of!((*base).readdir) as usize, 200, "readdir");
-            assert_eq!(std::ptr::addr_of!((*base).releasedir) as usize, 208, "releasedir");
+            assert_eq!(
+                std::ptr::addr_of!((*base).releasedir) as usize,
+                208,
+                "releasedir"
+            );
             assert_eq!(std::ptr::addr_of!((*base).init) as usize, 224, "init");
             assert_eq!(std::ptr::addr_of!((*base).destroy) as usize, 232, "destroy");
-            assert_eq!(std::ptr::addr_of!((*base).chflags) as usize, 344, "chflags (Apple)");
-            assert_eq!(std::ptr::addr_of!((*base).setvolname) as usize, 352, "setvolname (Apple)");
-            assert_eq!(std::ptr::addr_of!((*base).monitor) as usize, 360, "monitor (Apple)");
+            assert_eq!(
+                std::ptr::addr_of!((*base).chflags) as usize,
+                344,
+                "chflags (Apple)"
+            );
+            assert_eq!(
+                std::ptr::addr_of!((*base).setvolname) as usize,
+                352,
+                "setvolname (Apple)"
+            );
+            assert_eq!(
+                std::ptr::addr_of!((*base).monitor) as usize,
+                360,
+                "monitor (Apple)"
+            );
             assert_eq!(std::ptr::addr_of!((*base).statx) as usize, 368, "statx");
         }
     }
@@ -638,7 +647,11 @@ mod tests {
         unsafe {
             assert_eq!(std::ptr::addr_of!((*base).flags) as usize, 0);
             assert_eq!(std::ptr::addr_of!((*base).bitfields) as usize, 4);
-            assert_eq!(std::ptr::addr_of!((*base).fh) as usize, 16, "fh must be at 16, not 8");
+            assert_eq!(
+                std::ptr::addr_of!((*base).fh) as usize,
+                16,
+                "fh must be at 16, not 8"
+            );
             assert_eq!(std::ptr::addr_of!((*base).lock_owner) as usize, 24);
             assert_eq!(std::ptr::addr_of!((*base).poll_events) as usize, 32);
             assert_eq!(std::ptr::addr_of!((*base).backing_id) as usize, 36);

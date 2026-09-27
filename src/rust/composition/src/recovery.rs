@@ -158,7 +158,8 @@ where
 
                 // Calculate next delay with exponential backoff
                 delay = Duration::from_secs_f64(
-                    (delay.as_secs_f64() * config.backoff_multiplier).min(config.max_delay.as_secs_f64()),
+                    (delay.as_secs_f64() * config.backoff_multiplier)
+                        .min(config.max_delay.as_secs_f64()),
                 );
             }
         }
@@ -428,10 +429,7 @@ impl DaemonRecovery {
             }
 
             // Socket exists but daemon isn't responding - clean it up
-            info!(
-                "Removing stale socket at {:?}",
-                self.socket_path
-            );
+            info!("Removing stale socket at {:?}", self.socket_path);
             std::fs::remove_file(&self.socket_path).map_err(|e| Error::Io(e))?;
             return Ok(RecoveryAction::CleanedSocket);
         }

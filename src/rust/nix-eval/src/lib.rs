@@ -22,11 +22,11 @@
 //! let paths = client.build(&["godeps-cell", "rustdeps-cell"])?;
 //! ```
 
-mod error;
 mod cli;
+mod error;
 
-pub use error::NixError;
 pub use cli::CliNixClient;
+pub use error::NixError;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -53,11 +53,19 @@ pub trait NixClient: Send + Sync {
 /// Get the Nix system string for the current platform.
 pub fn current_system() -> &'static str {
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    { "aarch64-darwin" }
+    {
+        "aarch64-darwin"
+    }
     #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-    { "x86_64-darwin" }
+    {
+        "x86_64-darwin"
+    }
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    { "x86_64-linux" }
+    {
+        "x86_64-linux"
+    }
     #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-    { "aarch64-linux" }
+    {
+        "aarch64-linux"
+    }
 }

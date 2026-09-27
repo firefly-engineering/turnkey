@@ -92,10 +92,7 @@ pub fn service_install_path() -> PathBuf {
 }
 
 /// Install the service file and optionally start it
-pub fn install_service(
-    binary_path: &Path,
-    config_path: &Path,
-) -> Result<PathBuf, ServiceError> {
+pub fn install_service(binary_path: &Path, config_path: &Path) -> Result<PathBuf, ServiceError> {
     let install_path = service_install_path();
 
     // Ensure parent directory exists

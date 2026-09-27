@@ -8,14 +8,30 @@ use walkdir::WalkDir;
 
 /// Common Solidity library prefixes.
 const COMMON_LIBRARIES: &[&str] = &[
-    "@openzeppelin/", "@chainlink/", "@uniswap/", "@aave/", "@compound/",
-    "@gnosis/", "@safe-global/", "forge-std/", "ds-test/", "solmate/", "solady/",
+    "@openzeppelin/",
+    "@chainlink/",
+    "@uniswap/",
+    "@aave/",
+    "@compound/",
+    "@gnosis/",
+    "@safe-global/",
+    "forge-std/",
+    "ds-test/",
+    "solmate/",
+    "solady/",
 ];
 
 /// Default directories to exclude.
 const DEFAULT_EXCLUDES: &[&str] = &[
-    "node_modules", "lib", "out", "cache", "artifacts", "forge-cache",
-    ".git", ".hg", ".svn",
+    "node_modules",
+    "lib",
+    "out",
+    "cache",
+    "artifacts",
+    "forge-cache",
+    ".git",
+    ".hg",
+    ".svn",
 ];
 
 /// Extract Solidity imports from a directory.
@@ -98,13 +114,18 @@ pub fn extract(dir: &Path, exclude_patterns: &[&str]) -> anyhow::Result<Result> 
 
                 if !seen.contains(&pkg_name) {
                     seen.insert(pkg_name.clone());
-                    imports.push(Import { path: pkg_name, kind });
+                    imports.push(Import {
+                        path: pkg_name,
+                        kind,
+                    });
                 }
             }
         }
 
         // Add to package
-        let pkg = packages.entry(pkg_dir.clone()).or_insert_with(|| Package::new(pkg_dir));
+        let pkg = packages
+            .entry(pkg_dir.clone())
+            .or_insert_with(|| Package::new(pkg_dir));
         pkg.files.push(filename);
 
         for imp in imports {
@@ -171,7 +192,11 @@ fn get_package_name(import_path: &str) -> String {
         }
     } else {
         // Regular package
-        import_path.split('/').next().unwrap_or(import_path).to_string()
+        import_path
+            .split('/')
+            .next()
+            .unwrap_or(import_path)
+            .to_string()
     }
 }
 

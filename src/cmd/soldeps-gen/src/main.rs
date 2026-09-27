@@ -240,8 +240,8 @@ fn npm_tarball_url(name: &str, version: &str) -> String {
 /// Parse pnpm-lock.yaml to extract integrity hashes
 /// Returns a map of "package@version" -> integrity hash
 fn parse_pnpm_lock(path: &PathBuf) -> Result<BTreeMap<String, String>> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
 
     let lockfile: PnpmLockfile = serde_saphyr::from_str(&content)
         .with_context(|| format!("Failed to parse {}", path.display()))?;
@@ -494,14 +494,13 @@ fn main() -> Result<()> {
                 // Key format: "@scope/pkg@version" or "pkg@version"
                 // First try exact match, then search for any version of this package
                 let lock_key = format!("{}@{}", name, clean_version);
-                let (resolved_version, integrity) = if let Some(hash) = integrity_map.get(&lock_key) {
+                let (resolved_version, integrity) = if let Some(hash) = integrity_map.get(&lock_key)
+                {
                     (clean_version.to_string(), Some(hash.clone()))
                 } else {
                     // Search for any version of this package in the lock file
                     let prefix = format!("{}@", name);
-                    let found = integrity_map
-                        .iter()
-                        .find(|(k, _)| k.starts_with(&prefix));
+                    let found = integrity_map.iter().find(|(k, _)| k.starts_with(&prefix));
 
                     if let Some((key, hash)) = found {
                         // Extract version from key (e.g., "@openzeppelin/contracts@5.4.0" -> "5.4.0")
@@ -513,7 +512,10 @@ fn main() -> Result<()> {
                 };
 
                 if integrity.is_some() {
-                    eprintln!("  {} -> found integrity hash (resolved to {})", name, resolved_version);
+                    eprintln!(
+                        "  {} -> found integrity hash (resolved to {})",
+                        name, resolved_version
+                    );
                 } else {
                     eprintln!("  {} -> no integrity hash found in lock file", name);
                 }
@@ -582,7 +584,10 @@ mod tests {
 
     #[test]
     fn test_parse_foundry_dep_with_version() {
-        let pkg = parse_foundry_dep("forge-std", "https://github.com/foundry-rs/forge-std@v1.8.0");
+        let pkg = parse_foundry_dep(
+            "forge-std",
+            "https://github.com/foundry-rs/forge-std@v1.8.0",
+        );
         assert_eq!(pkg.name, "forge-std");
         assert_eq!(
             pkg.repo,
@@ -620,7 +625,9 @@ mod tests {
 
     impl Prefetcher for FakePrefetcher {
         fn resolve_ref(&self, repo: &str, git_ref: &str) -> Result<String> {
-            self.calls.borrow_mut().push(format!("resolve {repo} {git_ref}"));
+            self.calls
+                .borrow_mut()
+                .push(format!("resolve {repo} {git_ref}"));
             self.commits
                 .get(&(repo.to_string(), git_ref.to_string()))
                 .cloned()
@@ -628,7 +635,9 @@ mod tests {
         }
 
         fn prefetch_url(&self, url: &str, unpack: bool) -> Result<String> {
-            self.calls.borrow_mut().push(format!("prefetch {url} unpack={unpack}"));
+            self.calls
+                .borrow_mut()
+                .push(format!("prefetch {url} unpack={unpack}"));
             self.hashes
                 .get(&(url.to_string(), unpack))
                 .cloned()
@@ -642,13 +651,20 @@ mod tests {
     fn test_prefetch_github_dep_pins_commit_and_archive_hash() {
         let mut fake = FakePrefetcher::default();
         fake.commits.insert(
-            ("https://github.com/foundry-rs/forge-std".into(), "v1.8.0".into()),
+            (
+                "https://github.com/foundry-rs/forge-std".into(),
+                "v1.8.0".into(),
+            ),
             COMMIT.into(),
         );
         let archive = format!("https://github.com/foundry-rs/forge-std/archive/{COMMIT}.tar.gz");
-        fake.hashes.insert((archive.clone(), true), "sha256-forge".into());
+        fake.hashes
+            .insert((archive.clone(), true), "sha256-forge".into());
 
-        let mut pkg = parse_foundry_dep("forge-std", "https://github.com/foundry-rs/forge-std@v1.8.0");
+        let mut pkg = parse_foundry_dep(
+            "forge-std",
+            "https://github.com/foundry-rs/forge-std@v1.8.0",
+        );
         prefetch_package(&mut pkg, &fake);
 
         assert_eq!(pkg.version, "v1.8.0");
@@ -665,7 +681,10 @@ mod tests {
             COMMIT.into(),
         );
         fake.hashes.insert(
-            (format!("https://github.com/vectorized/solady/archive/{COMMIT}.tar.gz"), true),
+            (
+                format!("https://github.com/vectorized/solady/archive/{COMMIT}.tar.gz"),
+                true,
+            ),
             "sha256-solady".into(),
         );
 
@@ -680,7 +699,10 @@ mod tests {
     fn test_prefetch_git_dep_already_at_commit_skips_resolution() {
         let mut fake = FakePrefetcher::default();
         fake.hashes.insert(
-            (format!("https://github.com/foundry-rs/forge-std/archive/{COMMIT}.tar.gz"), true),
+            (
+                format!("https://github.com/foundry-rs/forge-std/archive/{COMMIT}.tar.gz"),
+                true,
+            ),
             "sha256-forge".into(),
         );
 
@@ -691,7 +713,12 @@ mod tests {
         prefetch_package(&mut pkg, &fake);
 
         assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
-        assert!(fake.calls.borrow().iter().all(|c| !c.starts_with("resolve")));
+        assert!(
+            fake.calls
+                .borrow()
+                .iter()
+                .all(|c| !c.starts_with("resolve"))
+        );
     }
 
     #[test]
@@ -737,7 +764,11 @@ mod tests {
     fn test_prefetch_npm_dep_keeps_lockfile_integrity() {
         let fake = FakePrefetcher::default();
 
-        let mut pkg = npm_package("@openzeppelin/contracts", "5.4.0", Some("sha512-lock".into()));
+        let mut pkg = npm_package(
+            "@openzeppelin/contracts",
+            "5.4.0",
+            Some("sha512-lock".into()),
+        );
         prefetch_package(&mut pkg, &fake);
 
         assert_eq!(pkg.integrity.as_deref(), Some("sha512-lock"));
@@ -803,11 +834,17 @@ mod tests {
         ] {
             assert_eq!(
                 github_archive_url(repo, COMMIT).as_deref(),
-                Some(format!("https://github.com/foundry-rs/forge-std/archive/{COMMIT}.tar.gz").as_str()),
+                Some(
+                    format!("https://github.com/foundry-rs/forge-std/archive/{COMMIT}.tar.gz")
+                        .as_str()
+                ),
                 "{repo}"
             );
         }
-        assert_eq!(github_archive_url("https://gitlab.com/acme/lib", COMMIT), None);
+        assert_eq!(
+            github_archive_url("https://gitlab.com/acme/lib", COMMIT),
+            None
+        );
         assert_eq!(github_archive_url("https://github.com/acme", COMMIT), None);
     }
 

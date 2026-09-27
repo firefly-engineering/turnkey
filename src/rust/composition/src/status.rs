@@ -109,9 +109,7 @@ impl BackendStatus {
             BackendStatus::Stopped => "stopped",
             BackendStatus::Ready => "ready",
             BackendStatus::Updating { .. } => "updating",
-            BackendStatus::Building { message, .. } => {
-                message.as_deref().unwrap_or("building")
-            }
+            BackendStatus::Building { message, .. } => message.as_deref().unwrap_or("building"),
             BackendStatus::Transitioning => "transitioning",
             BackendStatus::Error { message, .. } => message,
         }
@@ -154,21 +152,27 @@ mod tests {
         assert!(BackendStatus::Stopped.is_stopped());
         assert!(!BackendStatus::Ready.is_stopped());
 
-        assert!(BackendStatus::Error {
-            message: "test".into(),
-            recoverable: false
-        }
-        .is_error());
+        assert!(
+            BackendStatus::Error {
+                message: "test".into(),
+                recoverable: false
+            }
+            .is_error()
+        );
 
-        assert!(BackendStatus::Updating {
-            cells: vec!["godeps".into()]
-        }
-        .is_updating());
-        assert!(BackendStatus::Building {
-            affected_paths: vec![],
-            message: None
-        }
-        .is_updating());
+        assert!(
+            BackendStatus::Updating {
+                cells: vec!["godeps".into()]
+            }
+            .is_updating()
+        );
+        assert!(
+            BackendStatus::Building {
+                affected_paths: vec![],
+                message: None
+            }
+            .is_updating()
+        );
         assert!(BackendStatus::Transitioning.is_updating());
         assert!(!BackendStatus::Ready.is_updating());
     }

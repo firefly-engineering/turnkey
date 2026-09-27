@@ -166,7 +166,7 @@ fn convert_checksum_to_sri(hex: &str) -> Option<String> {
         .collect();
 
     bytes.ok().map(|b| {
-        use base64::{engine::general_purpose::STANDARD, Engine};
+        use base64::{Engine, engine::general_purpose::STANDARD};
         format!("sha256-{}", STANDARD.encode(&b))
     })
 }
@@ -205,7 +205,10 @@ fn write_toml(mut w: impl Write, crates: &[Crate], requests: &[requested::Reques
     writeln!(w, "#")?;
     writeln!(w, "# To regenerate: rustdeps-gen -o rust-deps.toml")?;
     writeln!(w, "#")?;
-    writeln!(w, "# Key format: deps.\"crate-name@version\" to support multiple versions")?;
+    writeln!(
+        w,
+        "# Key format: deps.\"crate-name@version\" to support multiple versions"
+    )?;
     writeln!(w)?;
 
     // Schema version for forward compatibility

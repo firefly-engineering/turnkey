@@ -21,9 +21,7 @@ use std::path::PathBuf;
 
 use log::{debug, info};
 
-use crate::{
-    BackendStatus, CellMapping, CompositionBackend, CompositionConfig, Error, Result,
-};
+use crate::{BackendStatus, CellMapping, CompositionBackend, CompositionConfig, Error, Result};
 
 /// Symlink-based composition backend
 ///
@@ -113,7 +111,10 @@ impl CompositionBackend for SymlinkBackend {
             return Err(Error::AlreadyMounted(self.config.mount_point.clone()));
         }
 
-        info!("Setting up symlink composition at {:?}", self.config.mount_point);
+        info!(
+            "Setting up symlink composition at {:?}",
+            self.config.mount_point
+        );
 
         // Create mount point directory
         self.ensure_mount_point()?;
@@ -149,7 +150,10 @@ impl CompositionBackend for SymlinkBackend {
             return Err(Error::NotMounted);
         }
 
-        info!("Removing symlink composition at {:?}", self.config.mount_point);
+        info!(
+            "Removing symlink composition at {:?}",
+            self.config.mount_point
+        );
 
         // Remove symlinks for each cell
         for cell in &self.config.cells {

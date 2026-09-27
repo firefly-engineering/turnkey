@@ -154,10 +154,8 @@ impl CompositionBackend for FuseBackend {
         let handle = thread::spawn(move || {
             // Create mount options - try minimal first (allow_other requires system config)
             let mut options = Config::default();
-            options.mount_options = vec![
-                MountOption::FSName("turnkey".to_string()),
-                MountOption::RO,
-            ];
+            options.mount_options =
+                vec![MountOption::FSName("turnkey".to_string()), MountOption::RO];
 
             // Create the filesystem
             let fs = CompositionFs::new(config, repo_root, state_machine);

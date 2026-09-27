@@ -249,13 +249,12 @@ impl EditOverlay {
         offset: i64,
         size: u32,
     ) -> io::Result<(Vec<u8>, bool)> {
-        let (path, is_overlay) = if let Some(overlay_path) =
-            self.get_read_path(cell_name, relative_path)
-        {
-            (overlay_path, true)
-        } else {
-            (original_path.to_path_buf(), false)
-        };
+        let (path, is_overlay) =
+            if let Some(overlay_path) = self.get_read_path(cell_name, relative_path) {
+                (overlay_path, true)
+            } else {
+                (original_path.to_path_buf(), false)
+            };
 
         let mut file = File::open(&path)?;
         file.seek(SeekFrom::Start(offset as u64))?;
@@ -363,11 +362,7 @@ impl EditOverlay {
             // Clean up empty parent directories
             self.cleanup_empty_dirs(&overlay_path);
 
-            debug!(
-                "Reverted edit: {}/{}",
-                cell_name,
-                relative_path.display()
-            );
+            debug!("Reverted edit: {}/{}", cell_name, relative_path.display());
             Ok(true)
         } else {
             Ok(false)
@@ -440,7 +435,8 @@ mod tests {
 
     #[test]
     fn test_overlay_path() {
-        let overlay = EditOverlay::new(PathBuf::from("/repo/.turnkey/edits"), vec!["godeps".into()]);
+        let overlay =
+            EditOverlay::new(PathBuf::from("/repo/.turnkey/edits"), vec!["godeps".into()]);
         let path = overlay.overlay_path("godeps", Path::new("vendor/github.com/foo/bar/lib.go"));
         assert_eq!(
             path,
@@ -544,10 +540,7 @@ mod tests {
         // Try to copy for a non-editable cell
         let result = overlay.copy_to_overlay("rustdeps", &relative, &original);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("not editable"));
+        assert!(result.unwrap_err().to_string().contains("not editable"));
     }
 
     #[test]

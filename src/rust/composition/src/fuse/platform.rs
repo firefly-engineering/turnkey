@@ -165,9 +165,11 @@ mod macfuse_paths {
     pub const KEXT_BUNDLE_ID_PREFIX: &str = "io.macfuse.filesystems.macfuse";
     /// `macfuse` GUI binary that exposes the `install` subcommand for
     /// registering the FSKit extension.
-    pub const MACFUSE_APP_BIN: &str = "/Library/Filesystems/macfuse.fs/Contents/Resources/macfuse.app/Contents/MacOS/macfuse";
+    pub const MACFUSE_APP_BIN: &str =
+        "/Library/Filesystems/macfuse.fs/Contents/Resources/macfuse.app/Contents/MacOS/macfuse";
     /// Helper used for legacy kext loads (requires `sudo`).
-    pub const LOAD_MACFUSE: &str = "/Library/Filesystems/macfuse.fs/Contents/Resources/load_macfuse";
+    pub const LOAD_MACFUSE: &str =
+        "/Library/Filesystems/macfuse.fs/Contents/Resources/load_macfuse";
 }
 
 /// FUSE-T paths. FUSE-T 1.2+ ships an FSKit `fsmodule` extension alongside
@@ -229,8 +231,14 @@ impl MacFuseBackend {
     /// Short label suitable for log lines.
     pub fn label(&self) -> &'static str {
         match self {
-            MacFuseBackend::FSKit { vendor: FuseVendor::MacFuse, .. } => "macFUSE FSKit",
-            MacFuseBackend::FSKit { vendor: FuseVendor::FuseT, .. } => "FUSE-T FSKit",
+            MacFuseBackend::FSKit {
+                vendor: FuseVendor::MacFuse,
+                ..
+            } => "macFUSE FSKit",
+            MacFuseBackend::FSKit {
+                vendor: FuseVendor::FuseT,
+                ..
+            } => "FUSE-T FSKit",
             MacFuseBackend::Kext { .. } => "macFUSE kext",
             MacFuseBackend::NotActivated { .. } => "macFUSE not activated",
             MacFuseBackend::NotInstalled => "macFUSE not installed",
@@ -249,7 +257,10 @@ impl MacFuseBackend {
                 "its File System Extension in System Settings."
             )
             .to_string(),
-            MacFuseBackend::NotActivated { fskit_bundle_present, kext_bundle_present } => {
+            MacFuseBackend::NotActivated {
+                fskit_bundle_present,
+                kext_bundle_present,
+            } => {
                 let mut msg = String::from(
                     "macFUSE is installed but no backend is active. Without activation,\n\
                      fuse_mount() will block waiting for a GUI approval prompt.\n\n",
@@ -315,7 +326,11 @@ pub fn detect_macfuse_backend() -> MacFuseBackend {
         return MacFuseBackend::FSKit {
             vendor: FuseVendor::MacFuse,
             bundle_id: macfuse_paths::FSKIT_BUNDLE_ID.to_string(),
-            version: if version.is_empty() { None } else { Some(version) },
+            version: if version.is_empty() {
+                None
+            } else {
+                Some(version)
+            },
         };
     }
 
@@ -323,7 +338,11 @@ pub fn detect_macfuse_backend() -> MacFuseBackend {
         return MacFuseBackend::FSKit {
             vendor: FuseVendor::FuseT,
             bundle_id: fuse_t_paths::FSKIT_BUNDLE_ID.to_string(),
-            version: if version.is_empty() { None } else { Some(version) },
+            version: if version.is_empty() {
+                None
+            } else {
+                Some(version)
+            },
         };
     }
 
@@ -349,13 +368,7 @@ pub fn detect_macfuse_backend() -> MacFuseBackend {
 #[cfg(target_os = "macos")]
 fn pluginkit_fsmodule_registered(bundle_id: &str) -> Option<String> {
     let output = Command::new("pluginkit")
-        .args([
-            "-m",
-            "-p",
-            "com.apple.fskit.fsmodule",
-            "-i",
-            bundle_id,
-        ])
+        .args(["-m", "-p", "com.apple.fskit.fsmodule", "-i", bundle_id])
         .output()
         .ok()?;
     // pluginkit always returns 0; the only signal is non-empty stdout
@@ -651,7 +664,8 @@ mod tests {
     #[test]
     fn test_parse_pluginkit_match_with_election_prefix() {
         // pluginkit -mv prefixes lines with the election state char.
-        let sample = "-    io.macfuse.app.fsmodule.macfuse(1.6)\tUUID\ttimestamp\tpath\n (1 plug-in)\n";
+        let sample =
+            "-    io.macfuse.app.fsmodule.macfuse(1.6)\tUUID\ttimestamp\tpath\n (1 plug-in)\n";
         assert_eq!(
             parse_pluginkit_match(sample, "io.macfuse.app.fsmodule.macfuse").as_deref(),
             Some("1.6")
@@ -673,7 +687,10 @@ mod tests {
     #[test]
     fn test_parse_pluginkit_match_absent() {
         // pluginkit produces empty stdout when the bundle ID isn't registered.
-        assert_eq!(parse_pluginkit_match("", "io.macfuse.app.fsmodule.macfuse"), None);
+        assert_eq!(
+            parse_pluginkit_match("", "io.macfuse.app.fsmodule.macfuse"),
+            None
+        );
     }
 
     #[cfg(target_os = "macos")]

@@ -24,11 +24,11 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use super::edit_overlay::EditOverlay;
-use crate::layout::{default_layout, layout_by_name, BoxedLayout, CellInfo, LayoutContext};
+use crate::layout::{BoxedLayout, CellInfo, LayoutContext, default_layout, layout_by_name};
 use crate::performance::CacheConfig;
 use crate::policy::{
-    default_policy, BoxedPolicy, FileClass, OperationType, PolicyDecision,
-    SystemState as PolicyState,
+    BoxedPolicy, FileClass, OperationType, PolicyDecision, SystemState as PolicyState,
+    default_policy,
 };
 use crate::state::ConsistencyStateMachine;
 use crate::{BackendStatus, CompositionConfig};
@@ -111,15 +111,31 @@ pub(crate) struct FsAttr {
 pub(crate) enum ResolvedPath {
     Root,
     Source,
-    SourceChild { real_path: PathBuf },
+    SourceChild {
+        real_path: PathBuf,
+    },
     CellPrefix,
-    Cell { name: String, real_path: PathBuf },
-    CellChild { cell_name: String, real_path: PathBuf },
-    VirtualFile { file: VirtualFile },
+    Cell {
+        name: String,
+        real_path: PathBuf,
+    },
+    CellChild {
+        cell_name: String,
+        real_path: PathBuf,
+    },
+    VirtualFile {
+        file: VirtualFile,
+    },
     /// An output directory mounted at the root (e.g., "build" → /tmp/buck-out)
-    OutputMount { real_path: PathBuf, symlink: bool },
+    OutputMount {
+        real_path: PathBuf,
+        symlink: bool,
+    },
     /// A child path within an output mount
-    OutputChild { real_path: PathBuf, symlink: bool },
+    OutputChild {
+        real_path: PathBuf,
+        symlink: bool,
+    },
     NotFound,
 }
 
@@ -188,7 +204,13 @@ impl FsCore {
         state_machine: Arc<ConsistencyStateMachine>,
         policy: BoxedPolicy,
     ) -> Self {
-        Self::with_options(config, repo_root, state_machine, policy, CacheConfig::default())
+        Self::with_options(
+            config,
+            repo_root,
+            state_machine,
+            policy,
+            CacheConfig::default(),
+        )
     }
 
     /// Create a new filesystem core with custom policy and cache configuration
@@ -221,7 +243,12 @@ impl FsCore {
         let mut cell_paths = HashMap::new();
         let mut editable_cells = Vec::new();
         for cell in &config.cells {
-            inode_map.insert(next_ino, InodePath::Cell { name: cell.name.clone() });
+            inode_map.insert(
+                next_ino,
+                InodePath::Cell {
+                    name: cell.name.clone(),
+                },
+            );
             cell_paths.insert(cell.name.clone(), cell.source_path.clone());
             if cell.editable {
                 editable_cells.push(cell.name.clone());
@@ -680,9 +707,7 @@ impl FsCore {
 
         let removed_count = inodes_to_remove.len();
 
-        path_map.retain(|path, _| {
-            !cell_source_paths.iter().any(|cp| path.starts_with(cp))
-        });
+        path_map.retain(|path, _| !cell_source_paths.iter().any(|cp| path.starts_with(cp)));
 
         for ino in inodes_to_remove {
             if let Some(InodePath::Real { .. }) = inode_map.get(&ino) {
@@ -765,7 +790,6 @@ impl FsCore {
                 };
             }
         }
-
 
         // --- output mount branch ---
         for om in &self.config.output_mounts {
@@ -859,7 +883,8 @@ fn glob_match(pattern: &str, name: &str) -> bool {
         if suffix.is_empty() {
             return name.starts_with(prefix); // "prefix*"
         }
-        return name.starts_with(prefix) && name.ends_with(suffix)
+        return name.starts_with(prefix)
+            && name.ends_with(suffix)
             && name.len() >= prefix.len() + suffix.len(); // "pre*suf"
     }
 
@@ -946,10 +971,7 @@ mod tests {
     fn test_resolve_path_source() {
         let config = CompositionConfig::new("/mnt", "/repo");
         let core = test_core(config, PathBuf::from("/repo"));
-        assert!(matches!(
-            core.resolve_path("/root"),
-            ResolvedPath::Source
-        ));
+        assert!(matches!(core.resolve_path("/root"), ResolvedPath::Source));
     }
 
     #[test]

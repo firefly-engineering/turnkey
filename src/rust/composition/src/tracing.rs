@@ -26,14 +26,14 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use log::{debug, info, trace, warn};
 
-use crate::state::StateObserver;
 use crate::BackendStatus;
+use crate::state::StateObserver;
 
 /// Configuration for tracing and debugging
 #[derive(Debug, Clone)]
@@ -174,10 +174,7 @@ impl StateObserver for StateLogger {
                 info!("State: Stopped → Ready (backend mounted and ready)");
             }
             (BackendStatus::Ready, BackendStatus::Updating { cells }) => {
-                info!(
-                    "State: Ready → Updating (cells: {})",
-                    cells.join(", ")
-                );
+                info!("State: Ready → Updating (cells: {})", cells.join(", "));
             }
             (BackendStatus::Updating { .. }, BackendStatus::Building { message, .. }) => {
                 let msg = message.as_deref().unwrap_or("starting build");
@@ -189,7 +186,13 @@ impl StateObserver for StateLogger {
             (BackendStatus::Transitioning, BackendStatus::Ready) => {
                 info!("State: Transitioning → Ready (update complete)");
             }
-            (_, BackendStatus::Error { message, recoverable }) => {
+            (
+                _,
+                BackendStatus::Error {
+                    message,
+                    recoverable,
+                },
+            ) => {
                 if *recoverable {
                     warn!("State: → Error (recoverable): {}", message);
                 } else {
@@ -488,7 +491,10 @@ impl FuseTracer {
             }
 
             // Log if tracing
-            if self.config.trace_fuse_ops && self.op_counter.load(Ordering::Relaxed) % (self.config.fuse_sample_rate as u64) == 0 {
+            if self.config.trace_fuse_ops
+                && self.op_counter.load(Ordering::Relaxed) % (self.config.fuse_sample_rate as u64)
+                    == 0
+            {
                 trace!("FUSE {} end: {} ({}μs)", op_name, result, duration_us);
             }
         }

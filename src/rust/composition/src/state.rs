@@ -426,11 +426,9 @@ impl ConsistencyStateMachine {
                 self.notify_state_change();
                 Ok(())
             }
-            BackendStatus::Error { recoverable, .. } if !recoverable => {
-                Err(Error::StateTransitionError(
-                    "error is not recoverable".into(),
-                ))
-            }
+            BackendStatus::Error { recoverable, .. } if !recoverable => Err(
+                Error::StateTransitionError("error is not recoverable".into()),
+            ),
             status => Err(Error::StateTransitionError(format!(
                 "cannot recover from {:?}",
                 status

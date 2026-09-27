@@ -135,11 +135,7 @@ impl PatchGenerator {
         file.write_all(diff.as_bytes())?;
 
         let size = diff.len() as u64;
-        debug!(
-            "Generated patch: {} ({} bytes)",
-            patch_path.display(),
-            size
-        );
+        debug!("Generated patch: {} ({} bytes)", patch_path.display(), size);
 
         Ok(Some(PatchInfo {
             cell_name: cell_name.to_string(),
@@ -427,14 +423,13 @@ fn build_hunks(original: &[String], modified: &[String], lcs: &[(usize, usize)])
 
     while orig_idx < original.len() || mod_idx < modified.len() {
         // Check if current positions are in LCS (context)
-        let in_lcs = lcs_idx < lcs.len()
-            && orig_idx == lcs[lcs_idx].0
-            && mod_idx == lcs[lcs_idx].1;
+        let in_lcs = lcs_idx < lcs.len() && orig_idx == lcs[lcs_idx].0 && mod_idx == lcs[lcs_idx].1;
 
         if in_lcs {
             // This is a common line (context)
             if let Some(ref mut hunk) = current_hunk {
-                hunk.lines.push(DiffLine::Context(original[orig_idx].clone()));
+                hunk.lines
+                    .push(DiffLine::Context(original[orig_idx].clone()));
                 hunk.orig_count += 1;
                 hunk.mod_count += 1;
             }
@@ -472,7 +467,8 @@ fn build_hunks(original: &[String], modified: &[String], lcs: &[(usize, usize)])
 
             // Add removed lines (in original but not in LCS at current position)
             while orig_idx < original.len() && !lcs_orig.contains(&orig_idx) {
-                hunk.lines.push(DiffLine::Removed(original[orig_idx].clone()));
+                hunk.lines
+                    .push(DiffLine::Removed(original[orig_idx].clone()));
                 hunk.orig_count += 1;
                 orig_idx += 1;
             }
@@ -517,9 +513,12 @@ fn build_hunks(original: &[String], modified: &[String], lcs: &[(usize, usize)])
                     // Add trailing context
                     let mut hunk = current_hunk.take().unwrap();
                     let trailing_end = (orig_idx + CONTEXT_LINES).min(original.len());
-                    while orig_idx < trailing_end && lcs_idx < lcs.len() && orig_idx == lcs[lcs_idx].0
+                    while orig_idx < trailing_end
+                        && lcs_idx < lcs.len()
+                        && orig_idx == lcs[lcs_idx].0
                     {
-                        hunk.lines.push(DiffLine::Context(original[orig_idx].clone()));
+                        hunk.lines
+                            .push(DiffLine::Context(original[orig_idx].clone()));
                         hunk.orig_count += 1;
                         hunk.mod_count += 1;
                         orig_idx += 1;

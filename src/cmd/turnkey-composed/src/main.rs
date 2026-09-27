@@ -11,19 +11,19 @@
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use composition::watcher::{ManifestWatcher, WatcherConfig, WatcherEvent};
 use composition::compose_config::ComposeFile;
 use composition::discover;
-use composition::{create_backend, BackendType, CompositionConfig};
-use nix_eval::CliNixClient;
+use composition::watcher::{ManifestWatcher, WatcherConfig, WatcherEvent};
+use composition::{BackendType, CompositionConfig, create_backend};
 use log::{debug, error, info, warn};
+use nix_eval::CliNixClient;
 use serde::{Deserialize, Serialize};
 
 /// Default socket path for IPC
@@ -189,8 +189,8 @@ fn main() -> Result<()> {
             // Build composition config
             let composition_config = if let Some(config_path) = config {
                 // Explicit config file
-                let compose = ComposeFile::read(&config_path)
-                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+                let compose =
+                    ComposeFile::read(&config_path).map_err(|e| anyhow::anyhow!("{}", e))?;
                 let mut cfg = compose.into_composition_config();
                 if let Some(mp) = mount_point {
                     cfg.mount_point = mp;
@@ -201,10 +201,8 @@ fn main() -> Result<()> {
                 cfg
             } else {
                 // Auto-discover: build cell derivations directly via nix build
-                let mp = mount_point
-                    .ok_or_else(|| anyhow::anyhow!("--mount-point is required"))?;
-                let rr = repo_root
-                    .ok_or_else(|| anyhow::anyhow!("--repo-root is required"))?;
+                let mp = mount_point.ok_or_else(|| anyhow::anyhow!("--mount-point is required"))?;
+                let rr = repo_root.ok_or_else(|| anyhow::anyhow!("--repo-root is required"))?;
                 let nix = CliNixClient::new(&rr);
                 let mut cfg = discover::build_and_configure(&nix, &mp, &rr)
                     .map_err(|e| anyhow::anyhow!("{}", e))?;
@@ -228,7 +226,9 @@ fn main() -> Result<()> {
                     composition_config.repo_root.clone(),
                 )]);
                 match composition::vcs_wrappers::generate_wrappers(
-                    &vcs_wrap, &mount_map, &composition_config.source_dir_name,
+                    &vcs_wrap,
+                    &mount_map,
+                    &composition_config.source_dir_name,
                 ) {
                     Ok(dir) => info!("VCS wrappers at {}", dir.display()),
                     Err(e) => warn!("Failed to generate VCS wrappers: {}", e),
@@ -246,8 +246,7 @@ fn main() -> Result<()> {
             use composition::service;
 
             // Find the turnkey-composed binary path
-            let binary = std::env::current_exe()
-                .context("Failed to determine binary path")?;
+            let binary = std::env::current_exe().context("Failed to determine binary path")?;
             let config_path = ServeConfig::default_path();
 
             // Ensure config file exists with a helpful template
@@ -275,8 +274,7 @@ fn main() -> Result<()> {
             println!("Config file: {}", config_path.display());
 
             if start {
-                service::load_service()
-                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+                service::load_service().map_err(|e| anyhow::anyhow!("{}", e))?;
                 println!("Service started");
             } else {
                 println!("Run with --start to also start the service, or:");
@@ -290,8 +288,7 @@ fn main() -> Result<()> {
         }
         Commands::Uninstall => {
             use composition::service;
-            service::unload_service()
-                .map_err(|e| anyhow::anyhow!("{}", e))?;
+            service::unload_service().map_err(|e| anyhow::anyhow!("{}", e))?;
 
             let path = service::service_install_path();
             if path.exists() {
@@ -313,8 +310,7 @@ fn run_serve(config_path: &Path) -> Result<()> {
     use composition::serve_config::ServeConfig;
 
     info!("Reading service config from {:?}", config_path);
-    let config = ServeConfig::read(config_path)
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+    let config = ServeConfig::read(config_path).map_err(|e| anyhow::anyhow!("{}", e))?;
 
     if config.mounts.is_empty() {
         anyhow::bail!("No mounts configured in {:?}", config_path);
@@ -333,11 +329,16 @@ fn run_serve(config_path: &Path) -> Result<()> {
 
     // Start each mount in its own thread
     let mut handles: Vec<(String, thread::JoinHandle<()>)> = Vec::new();
-    let mut backends: Vec<Arc<std::sync::Mutex<Box<dyn composition::CompositionBackend>>>> = Vec::new();
+    let mut backends: Vec<Arc<std::sync::Mutex<Box<dyn composition::CompositionBackend>>>> =
+        Vec::new();
 
     for entry in &config.mounts {
         let backend_type = BackendType::from_str(&entry.backend).ok_or_else(|| {
-            anyhow::anyhow!("Invalid backend type '{}' for {:?}", entry.backend, entry.repo)
+            anyhow::anyhow!(
+                "Invalid backend type '{}' for {:?}",
+                entry.backend,
+                entry.repo
+            )
         })?;
 
         info!(
@@ -349,8 +350,13 @@ fn run_serve(config_path: &Path) -> Result<()> {
 
         // Ensure mount point exists (creates synthetic firmlinks on macOS if needed)
         #[cfg(target_os = "macos")]
-        composition::synthetic::ensure_mount_point(&entry.mount_point)
-            .map_err(|e| anyhow::anyhow!("Failed to prepare mount point {:?}: {}", entry.mount_point, e))?;
+        composition::synthetic::ensure_mount_point(&entry.mount_point).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to prepare mount point {:?}: {}",
+                entry.mount_point,
+                e
+            )
+        })?;
 
         #[cfg(not(target_os = "macos"))]
         std::fs::create_dir_all(&entry.mount_point)
@@ -358,8 +364,10 @@ fn run_serve(config_path: &Path) -> Result<()> {
 
         // Discover and build cells
         let nix = CliNixClient::new(&entry.repo);
-        let mut composition_config = discover::build_and_configure(&nix, &entry.mount_point, &entry.repo)
-            .map_err(|e| anyhow::anyhow!("Failed to discover cells for {:?}: {}", entry.repo, e))?;
+        let mut composition_config =
+            discover::build_and_configure(&nix, &entry.mount_point, &entry.repo).map_err(|e| {
+                anyhow::anyhow!("Failed to discover cells for {:?}: {}", entry.repo, e)
+            })?;
 
         // Apply exclusion rules from config
         if !entry.exclude.is_empty() {
@@ -370,10 +378,12 @@ fn run_serve(config_path: &Path) -> Result<()> {
         let mut backend = create_backend(backend_type, composition_config)
             .with_context(|| format!("Failed to create backend for {:?}", entry.repo))?;
 
-        backend.mount()
+        backend
+            .mount()
             .with_context(|| format!("Failed to mount {:?}", entry.mount_point))?;
 
-        backend.wait_ready(Some(Duration::from_secs(10)))
+        backend
+            .wait_ready(Some(Duration::from_secs(10)))
             .with_context(|| format!("Mount timed out for {:?}", entry.mount_point))?;
 
         info!("Mounted {:?} at {:?}", entry.repo, entry.mount_point);
@@ -402,7 +412,10 @@ fn run_serve(config_path: &Path) -> Result<()> {
                     while let Some(event) = w.try_recv() {
                         match event {
                             WatcherEvent::ManifestChanged { manifest_name, .. } => {
-                                info!("[{}] Manifest changed: {}, rebuilding cells", mount_label, manifest_name);
+                                info!(
+                                    "[{}] Manifest changed: {}, rebuilding cells",
+                                    mount_label, manifest_name
+                                );
                                 let nix = CliNixClient::new(&repo_root);
                                 match discover::build_all_cells(&nix, nix_eval::current_system()) {
                                     Ok(cells) => {
@@ -413,7 +426,9 @@ fn run_serve(config_path: &Path) -> Result<()> {
                                             }
                                         }
                                     }
-                                    Err(e) => error!("[{}] Cell rebuild failed: {}", mount_label, e),
+                                    Err(e) => {
+                                        error!("[{}] Cell rebuild failed: {}", mount_label, e)
+                                    }
                                 }
                             }
                             WatcherEvent::Error { message } => {
@@ -483,7 +498,11 @@ fn run_serve(config_path: &Path) -> Result<()> {
                         match ServeConfig::read(&config_path_owned) {
                             Ok(new_config) => {
                                 let new_mount_points: std::collections::HashSet<PathBuf> =
-                                    new_config.mounts.iter().map(|m| m.mount_point.clone()).collect();
+                                    new_config
+                                        .mounts
+                                        .iter()
+                                        .map(|m| m.mount_point.clone())
+                                        .collect();
 
                                 // Find removed mounts
                                 for mp in active_mount_points.difference(&new_mount_points) {
@@ -491,43 +510,67 @@ fn run_serve(config_path: &Path) -> Result<()> {
                                     // Find and unmount the backend
                                     // (simplified: we'd need a map of mount_point -> backend index)
                                     // TODO: implement proper removal with backend lookup
-                                    warn!("Hot removal of mounts not yet implemented — restart the service");
+                                    warn!(
+                                        "Hot removal of mounts not yet implemented — restart the service"
+                                    );
                                 }
 
                                 // Find new mounts
                                 for entry in &new_config.mounts {
                                     if !active_mount_points.contains(&entry.mount_point) {
-                                        info!("Adding new mount: {} -> {}", entry.repo.display(), entry.mount_point.display());
+                                        info!(
+                                            "Adding new mount: {} -> {}",
+                                            entry.repo.display(),
+                                            entry.mount_point.display()
+                                        );
 
                                         let backend_type = BackendType::from_str(&entry.backend)
                                             .unwrap_or(BackendType::Auto);
 
                                         #[cfg(target_os = "macos")]
-                                        if let Err(e) = composition::synthetic::ensure_mount_point(&entry.mount_point) {
+                                        if let Err(e) = composition::synthetic::ensure_mount_point(
+                                            &entry.mount_point,
+                                        ) {
                                             error!("Failed to prepare mount point: {}", e);
                                             continue;
                                         }
 
                                         #[cfg(not(target_os = "macos"))]
-                                        if let Err(e) = std::fs::create_dir_all(&entry.mount_point) {
+                                        if let Err(e) = std::fs::create_dir_all(&entry.mount_point)
+                                        {
                                             error!("Failed to create mount point: {}", e);
                                             continue;
                                         }
 
                                         let nix = CliNixClient::new(&entry.repo);
-                                        match discover::build_and_configure(&nix, &entry.mount_point, &entry.repo) {
+                                        match discover::build_and_configure(
+                                            &nix,
+                                            &entry.mount_point,
+                                            &entry.repo,
+                                        ) {
                                             Ok(comp_config) => {
                                                 match create_backend(backend_type, comp_config) {
                                                     Ok(mut backend) => {
                                                         if let Err(e) = backend.mount() {
-                                                            error!("Failed to mount {:?}: {}", entry.mount_point, e);
+                                                            error!(
+                                                                "Failed to mount {:?}: {}",
+                                                                entry.mount_point, e
+                                                            );
                                                         } else {
-                                                            info!("Mounted new entry: {:?}", entry.mount_point);
-                                                            backends.push(Arc::new(std::sync::Mutex::new(backend)));
-                                                            active_mount_points.insert(entry.mount_point.clone());
+                                                            info!(
+                                                                "Mounted new entry: {:?}",
+                                                                entry.mount_point
+                                                            );
+                                                            backends.push(Arc::new(
+                                                                std::sync::Mutex::new(backend),
+                                                            ));
+                                                            active_mount_points
+                                                                .insert(entry.mount_point.clone());
                                                         }
                                                     }
-                                                    Err(e) => error!("Failed to create backend: {}", e),
+                                                    Err(e) => {
+                                                        error!("Failed to create backend: {}", e)
+                                                    }
                                                 }
                                             }
                                             Err(e) => error!("Failed to discover cells: {}", e),
@@ -607,15 +650,22 @@ fn run_daemon(
         "Composition config: mount={}, repo={}, cells={}",
         mount_point.display(),
         repo_root.display(),
-        config.cells.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", ")
+        config
+            .cells
+            .iter()
+            .map(|c| c.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
     );
 
     // Create backend using automatic selection
-    let mut backend = create_backend(backend_type, config)
-        .context("Failed to create composition backend")?;
+    let mut backend =
+        create_backend(backend_type, config).context("Failed to create composition backend")?;
 
     info!("Mounting composition view at {:?}", mount_point);
-    backend.mount().context("Failed to mount composition view")?;
+    backend
+        .mount()
+        .context("Failed to mount composition view")?;
 
     // Wait for backend to be ready
     backend
@@ -634,7 +684,10 @@ fn run_daemon(
                 Some(w)
             }
             Err(e) => {
-                warn!("Failed to create manifest watcher: {}. Continuing without watching.", e);
+                warn!(
+                    "Failed to create manifest watcher: {}. Continuing without watching.",
+                    e
+                );
                 None
             }
         }
@@ -654,7 +707,10 @@ fn run_daemon(
         if let Some(ref w) = watcher {
             while let Some(event) = w.try_recv() {
                 match event {
-                    WatcherEvent::ManifestChanged { path, manifest_name } => {
+                    WatcherEvent::ManifestChanged {
+                        path,
+                        manifest_name,
+                    } => {
                         info!(
                             "Manifest changed: {} ({:?}), re-bootstrapping cells",
                             manifest_name, path
@@ -707,7 +763,9 @@ fn run_daemon(
     // Cleanup
     info!("Shutting down...");
     drop(watcher); // Stop watcher first
-    backend.unmount().context("Failed to unmount FUSE filesystem")?;
+    backend
+        .unmount()
+        .context("Failed to unmount FUSE filesystem")?;
 
     // Remove socket
     if socket_path.exists() {
@@ -726,12 +784,8 @@ fn handle_client(
     watching: bool,
     running: &Arc<AtomicBool>,
 ) -> Result<()> {
-    stream
-        .set_read_timeout(Some(Duration::from_secs(5)))
-        .ok();
-    stream
-        .set_write_timeout(Some(Duration::from_secs(5)))
-        .ok();
+    stream.set_read_timeout(Some(Duration::from_secs(5))).ok();
+    stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
 
     let reader = BufReader::new(stream.try_clone()?);
 
@@ -792,12 +846,8 @@ fn send_command(socket_path: &PathBuf, request: IpcRequest) -> Result<()> {
     let mut stream =
         UnixStream::connect(socket_path).context("Failed to connect to daemon socket")?;
 
-    stream
-        .set_read_timeout(Some(Duration::from_secs(5)))
-        .ok();
-    stream
-        .set_write_timeout(Some(Duration::from_secs(5)))
-        .ok();
+    stream.set_read_timeout(Some(Duration::from_secs(5))).ok();
+    stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
 
     // Send request
     let request_json = serde_json::to_string(&request)?;

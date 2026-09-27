@@ -22,8 +22,8 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 /// Configuration for caching behavior
@@ -219,7 +219,8 @@ impl InodeCache {
                     ino_map.remove(&ino);
                 }
             }
-            self.evictions.fetch_add(to_remove as u64, Ordering::Relaxed);
+            self.evictions
+                .fetch_add(to_remove as u64, Ordering::Relaxed);
         }
 
         // Allocate new inode
@@ -512,7 +513,9 @@ mod tests {
 
     #[test]
     fn test_cache_config_ttl_duration() {
-        let config = CacheConfig::new().with_attr_ttl_secs(10).with_entry_ttl_secs(20);
+        let config = CacheConfig::new()
+            .with_attr_ttl_secs(10)
+            .with_entry_ttl_secs(20);
         assert_eq!(config.attr_ttl(), Duration::from_secs(10));
         assert_eq!(config.entry_ttl(), Duration::from_secs(20));
     }
@@ -717,11 +720,7 @@ mod tests {
         let reader = OptimizedReaddir::new(2);
 
         // Read /tmp with a limit
-        let entries = reader.read_entries(
-            std::path::Path::new("/tmp"),
-            0,
-            |_path| 42,
-        );
+        let entries = reader.read_entries(std::path::Path::new("/tmp"), 0, |_path| 42);
 
         if let Ok(entries) = entries {
             // Should be limited to 2 entries

@@ -8,17 +8,60 @@ use walkdir::WalkDir;
 
 /// Node.js built-in modules.
 const NODE_BUILTINS: &[&str] = &[
-    "assert", "async_hooks", "buffer", "child_process", "cluster", "console",
-    "constants", "crypto", "dgram", "diagnostics_channel", "dns", "domain",
-    "events", "fs", "http", "http2", "https", "inspector", "module", "net",
-    "os", "path", "perf_hooks", "process", "punycode", "querystring", "readline",
-    "repl", "stream", "string_decoder", "sys", "timers", "tls", "trace_events",
-    "tty", "url", "util", "v8", "vm", "wasi", "worker_threads", "zlib",
+    "assert",
+    "async_hooks",
+    "buffer",
+    "child_process",
+    "cluster",
+    "console",
+    "constants",
+    "crypto",
+    "dgram",
+    "diagnostics_channel",
+    "dns",
+    "domain",
+    "events",
+    "fs",
+    "http",
+    "http2",
+    "https",
+    "inspector",
+    "module",
+    "net",
+    "os",
+    "path",
+    "perf_hooks",
+    "process",
+    "punycode",
+    "querystring",
+    "readline",
+    "repl",
+    "stream",
+    "string_decoder",
+    "sys",
+    "timers",
+    "tls",
+    "trace_events",
+    "tty",
+    "url",
+    "util",
+    "v8",
+    "vm",
+    "wasi",
+    "worker_threads",
+    "zlib",
 ];
 
 /// Default directories to exclude.
 const DEFAULT_EXCLUDES: &[&str] = &[
-    "node_modules", "dist", "build", ".next", "coverage", ".git", ".hg", ".svn",
+    "node_modules",
+    "dist",
+    "build",
+    ".next",
+    "coverage",
+    ".git",
+    ".hg",
+    ".svn",
 ];
 
 /// Extract TypeScript/JavaScript imports from a directory.
@@ -135,13 +178,18 @@ pub fn extract(dir: &Path, exclude_patterns: &[&str]) -> anyhow::Result<Result> 
 
                 if !seen.contains(&pkg_name) {
                     seen.insert(pkg_name.clone());
-                    imports.push(Import { path: pkg_name, kind });
+                    imports.push(Import {
+                        path: pkg_name,
+                        kind,
+                    });
                 }
             }
         }
 
         // Add to package
-        let pkg = packages.entry(pkg_dir.clone()).or_insert_with(|| Package::new(pkg_dir));
+        let pkg = packages
+            .entry(pkg_dir.clone())
+            .or_insert_with(|| Package::new(pkg_dir));
         pkg.files.push(filename);
 
         for imp in imports {
@@ -206,7 +254,11 @@ fn get_package_name(module_path: &str) -> String {
         }
     } else {
         // Regular package
-        module_path.split('/').next().unwrap_or(module_path).to_string()
+        module_path
+            .split('/')
+            .next()
+            .unwrap_or(module_path)
+            .to_string()
     }
 }
 

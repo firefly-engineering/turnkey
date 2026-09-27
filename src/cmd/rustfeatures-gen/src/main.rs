@@ -193,9 +193,7 @@ fn collect_dependency_features(
             let features = extract_features(dep_value);
 
             if !features.is_empty() {
-                let entry = crate_features
-                    .entry(crate_name.clone())
-                    .or_default();
+                let entry = crate_features.entry(crate_name.clone()).or_default();
                 entry.features.extend(features);
                 entry.sources.push(source_name.to_string());
             }
@@ -235,7 +233,9 @@ fn generate_output(crate_features: &BTreeMap<String, CrateFeatures>, annotate: b
     output.push_str("# from Cargo.lock, ensuring local workspace members have access\n");
     output.push_str("# to the features they need.\n");
     output.push_str("#\n");
-    output.push_str("# Regenerate with: rustfeatures-gen --cargo-toml Cargo.toml -o rust-features.toml\n");
+    output.push_str(
+        "# Regenerate with: rustfeatures-gen --cargo-toml Cargo.toml -o rust-features.toml\n",
+    );
     output.push_str("\n[overrides]\n");
 
     for (crate_name, cf) in crate_features {

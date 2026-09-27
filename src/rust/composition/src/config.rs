@@ -141,7 +141,11 @@ impl CompositionConfig {
     }
 
     /// Add an output mount (virtual directory at mount root → real directory)
-    pub fn with_output_mount(mut self, mount_as: impl Into<String>, real_path: impl Into<PathBuf>) -> Self {
+    pub fn with_output_mount(
+        mut self,
+        mount_as: impl Into<String>,
+        real_path: impl Into<PathBuf>,
+    ) -> Self {
         self.output_mounts.push(OutputMount {
             mount_as: mount_as.into(),
             real_path: real_path.into(),

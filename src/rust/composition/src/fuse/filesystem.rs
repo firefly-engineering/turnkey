@@ -33,13 +33,13 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::fs_core::{
-    FsAttr, FsCore, FsFileType, InodePath, VirtualFile, BUCKCONFIG_INO, BUCKROOT_INO,
-    CELL_PREFIX_INO, ROOT_INO, SOURCE_INO,
+    BUCKCONFIG_INO, BUCKROOT_INO, CELL_PREFIX_INO, FsAttr, FsCore, FsFileType, InodePath, ROOT_INO,
+    SOURCE_INO, VirtualFile,
 };
+use crate::CompositionConfig;
 use crate::performance::CacheConfig;
 use crate::policy::{BoxedPolicy, OperationType};
 use crate::state::ConsistencyStateMachine;
-use crate::CompositionConfig;
 
 // ---------------------------------------------------------------------------
 // Type conversions: FsCore <-> fuser
@@ -184,8 +184,9 @@ impl Filesystem for CompositionFs {
             }
             Some(InodePath::CellPrefix) => {
                 if let Some(ino) = self.core.find_cell_inode(&name_str) {
-                    if let Err(errno) =
-                        self.core.check_cell_policy(&name_str, OperationType::Lookup)
+                    if let Err(errno) = self
+                        .core
+                        .check_cell_policy(&name_str, OperationType::Lookup)
                     {
                         reply.error(to_fuser_errno(errno));
                         return;
@@ -205,19 +206,21 @@ impl Filesystem for CompositionFs {
             }
             Some(InodePath::Source) => {
                 if name_str == ".buckconfig" {
-                    let content =
-                        self.core.get_virtual_file_content(VirtualFile::BuckConfig);
+                    let content = self.core.get_virtual_file_content(VirtualFile::BuckConfig);
                     let attr = to_fuser_attr(
-                        &self.core.virtual_file_attr(BUCKCONFIG_INO, content.len() as u64),
+                        &self
+                            .core
+                            .virtual_file_attr(BUCKCONFIG_INO, content.len() as u64),
                     );
                     reply.entry(&self.core.attr_ttl(), &attr, Generation(0));
                     return;
                 }
                 if name_str == ".buckroot" {
-                    let content =
-                        self.core.get_virtual_file_content(VirtualFile::BuckRoot);
+                    let content = self.core.get_virtual_file_content(VirtualFile::BuckRoot);
                     let attr = to_fuser_attr(
-                        &self.core.virtual_file_attr(BUCKROOT_INO, content.len() as u64),
+                        &self
+                            .core
+                            .virtual_file_attr(BUCKROOT_INO, content.len() as u64),
                     );
                     reply.entry(&self.core.attr_ttl(), &attr, Generation(0));
                     return;
@@ -234,8 +237,9 @@ impl Filesystem for CompositionFs {
                 reply.error(Errno::ENOENT);
             }
             Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
-                if let Err(errno) =
-                    self.core.check_inode_policy(parent_raw, OperationType::Lookup)
+                if let Err(errno) = self
+                    .core
+                    .check_inode_policy(parent_raw, OperationType::Lookup)
                 {
                     reply.error(to_fuser_errno(errno));
                     return;
@@ -268,9 +272,8 @@ impl Filesystem for CompositionFs {
             }
             Some(InodePath::Virtual { file }) => {
                 let content = self.core.get_virtual_file_content(file);
-                let attr = to_fuser_attr(
-                    &self.core.virtual_file_attr(ino_raw, content.len() as u64),
-                );
+                let attr =
+                    to_fuser_attr(&self.core.virtual_file_attr(ino_raw, content.len() as u64));
                 reply.attr(&self.core.attr_ttl(), &attr);
             }
             Some(InodePath::Source) => {
@@ -284,8 +287,9 @@ impl Filesystem for CompositionFs {
                 reply.error(Errno::ENOENT);
             }
             Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
-                if let Err(errno) =
-                    self.core.check_inode_policy(ino_raw, OperationType::Getattr)
+                if let Err(errno) = self
+                    .core
+                    .check_inode_policy(ino_raw, OperationType::Getattr)
                 {
                     reply.error(to_fuser_errno(errno));
                     return;
@@ -490,17 +494,15 @@ impl Filesystem for CompositionFs {
         match self.core.get_inode_path(ino_raw) {
             Some(InodePath::Virtual { file }) => {
                 let content = self.core.get_virtual_file_content(file);
-                let attr = to_fuser_attr(
-                    &self.core.virtual_file_attr(ino_raw, content.len() as u64),
-                );
+                let attr =
+                    to_fuser_attr(&self.core.virtual_file_attr(ino_raw, content.len() as u64));
                 reply.attr(&self.core.attr_ttl(), &attr);
             }
             Some(_) => {
                 if let Some(path) = self.core.resolve_real_path(ino_raw) {
                     let attr_path = self.core.get_edit_overlay_path(&path).unwrap_or(path);
                     if let Ok(meta) = fs::symlink_metadata(&attr_path) {
-                        let attr =
-                            to_fuser_attr(&self.core.metadata_to_attr(ino_raw, &meta));
+                        let attr = to_fuser_attr(&self.core.metadata_to_attr(ino_raw, &meta));
                         reply.attr(&self.core.attr_ttl(), &attr);
                         return;
                     }
@@ -595,8 +597,7 @@ impl Filesystem for CompositionFs {
                                     continue;
                                 }
 
-                                let child_ino =
-                                    INodeNo(self.core.get_or_alloc_inode(&child_path));
+                                let child_ino = INodeNo(self.core.get_or_alloc_inode(&child_path));
                                 let kind = entry
                                     .file_type()
                                     .map(std_to_fuser_file_type)
@@ -634,8 +635,9 @@ impl Filesystem for CompositionFs {
                 reply.error(Errno::ENOTDIR);
             }
             Some(InodePath::Cell { .. }) | Some(InodePath::Real { .. }) => {
-                if let Err(errno) =
-                    self.core.check_inode_policy(ino_raw, OperationType::Readdir)
+                if let Err(errno) = self
+                    .core
+                    .check_inode_policy(ino_raw, OperationType::Readdir)
                 {
                     reply.error(to_fuser_errno(errno));
                     return;
@@ -805,7 +807,8 @@ mod tests {
 
         let content = fs.core.get_virtual_file_content(VirtualFile::BuckConfig);
         let attr = to_fuser_attr(
-            &fs.core.virtual_file_attr(BUCKCONFIG_INO, content.len() as u64),
+            &fs.core
+                .virtual_file_attr(BUCKCONFIG_INO, content.len() as u64),
         );
 
         assert_eq!(attr.ino, INodeNo(BUCKCONFIG_INO));

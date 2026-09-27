@@ -117,7 +117,10 @@ mount_point = "/firefly/myproject"
 "#;
         let config: ServeConfig = toml::from_str(toml).unwrap();
         assert_eq!(config.mounts.len(), 1);
-        assert_eq!(config.mounts[0].repo, PathBuf::from("/home/user/src/myproject"));
+        assert_eq!(
+            config.mounts[0].repo,
+            PathBuf::from("/home/user/src/myproject")
+        );
         assert_eq!(config.mounts[0].backend, "auto");
     }
 

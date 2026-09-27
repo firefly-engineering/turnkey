@@ -6,7 +6,7 @@
 #![cfg(target_os = "macos")]
 #![allow(unsafe_op_in_unsafe_fn)]
 
-use std::ffi::{c_void, CStr, CString};
+use std::ffi::{CStr, CString, c_void};
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
 use std::os::raw::{c_char, c_int};
@@ -142,7 +142,6 @@ unsafe fn fill_stat_from_metadata(stbuf: *mut bindings::fuse_darwin_attr, meta: 
     (*stbuf).ctimespec = ts(meta.ctime() as libc::time_t);
 }
 
-
 // ---------------------------------------------------------------------------
 // Callbacks
 // ---------------------------------------------------------------------------
@@ -161,7 +160,10 @@ impl Drop for TimedOp {
 
 macro_rules! timed {
     ($op:ident) => {
-        let _timer = TimedOp { start: Instant::now(), op: metrics::$op };
+        let _timer = TimedOp {
+            start: Instant::now(),
+            op: metrics::$op,
+        };
     };
 }
 
@@ -213,8 +215,14 @@ unsafe extern "C" fn fuse_getattr(
             fill_symlink_stat(stbuf, 100, target.len(), core.uid, core.gid);
             0
         }
-        ResolvedPath::OutputMount { real_path, symlink: true }
-        | ResolvedPath::OutputChild { real_path, symlink: true } => {
+        ResolvedPath::OutputMount {
+            real_path,
+            symlink: true,
+        }
+        | ResolvedPath::OutputChild {
+            real_path,
+            symlink: true,
+        } => {
             // Symlink output mounts (e.g., bin/) bypass FUSE
             let target = real_path.to_string_lossy();
             fill_symlink_stat(stbuf, 101, target.len(), core.uid, core.gid);
@@ -223,15 +231,13 @@ unsafe extern "C" fn fuse_getattr(
         ResolvedPath::SourceChild { real_path }
         | ResolvedPath::CellChild { real_path, .. }
         | ResolvedPath::OutputMount { real_path, .. }
-        | ResolvedPath::OutputChild { real_path, .. } => {
-            match fs::symlink_metadata(&real_path) {
-                Ok(meta) => {
-                    fill_stat_from_metadata(stbuf, &meta);
-                    0
-                }
-                Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+        | ResolvedPath::OutputChild { real_path, .. } => match fs::symlink_metadata(&real_path) {
+            Ok(meta) => {
+                fill_stat_from_metadata(stbuf, &meta);
+                0
             }
-        }
+            Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+        },
         ResolvedPath::NotFound => -libc::ENOENT,
     }
 }
@@ -310,28 +316,23 @@ unsafe extern "C" fn fuse_readdir(
         | ResolvedPath::Cell { real_path, .. }
         | ResolvedPath::CellChild { real_path, .. }
         | ResolvedPath::OutputMount { real_path, .. }
-        | ResolvedPath::OutputChild { real_path, .. } => {
-            match fs::read_dir(&real_path) {
-                Ok(entries) => {
-                    for entry in entries.flatten() {
-                        if let Some(name) = entry.file_name().to_str() {
-                            fill(name);
-                        }
+        | ResolvedPath::OutputChild { real_path, .. } => match fs::read_dir(&real_path) {
+            Ok(entries) => {
+                for entry in entries.flatten() {
+                    if let Some(name) = entry.file_name().to_str() {
+                        fill(name);
                     }
-                    0
                 }
-                Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+                0
             }
-        }
+            Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+        },
         ResolvedPath::VirtualFile { .. } => -libc::ENOTDIR,
         ResolvedPath::NotFound => -libc::ENOENT,
     }
 }
 
-unsafe extern "C" fn fuse_open(
-    _path: *const c_char,
-    _fi: *mut bindings::fuse_file_info,
-) -> c_int {
+unsafe extern "C" fn fuse_open(_path: *const c_char, _fi: *mut bindings::fuse_file_info) -> c_int {
     timed!(open);
     0
 }
@@ -437,27 +438,26 @@ unsafe extern "C" fn fuse_readlink(
         ResolvedPath::Cell { real_path, .. } => {
             copy_link_target(buf, size, real_path.as_os_str().as_encoded_bytes())
         }
-        ResolvedPath::OutputMount { real_path, symlink: true }
-        | ResolvedPath::OutputChild { real_path, symlink: true } => {
-            copy_link_target(buf, size, real_path.as_os_str().as_encoded_bytes())
+        ResolvedPath::OutputMount {
+            real_path,
+            symlink: true,
         }
+        | ResolvedPath::OutputChild {
+            real_path,
+            symlink: true,
+        } => copy_link_target(buf, size, real_path.as_os_str().as_encoded_bytes()),
         ResolvedPath::SourceChild { real_path }
         | ResolvedPath::CellChild { real_path, .. }
-        | ResolvedPath::OutputChild { real_path, .. } => {
-            match fs::read_link(&real_path) {
-                Ok(target) => copy_link_target(buf, size, target.as_os_str().as_encoded_bytes()),
-                Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
-            }
-        }
+        | ResolvedPath::OutputChild { real_path, .. } => match fs::read_link(&real_path) {
+            Ok(target) => copy_link_target(buf, size, target.as_os_str().as_encoded_bytes()),
+            Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
+        },
         ResolvedPath::NotFound => -libc::ENOENT,
         _ => -libc::EINVAL,
     }
 }
 
-unsafe extern "C" fn fuse_statfs(
-    _path: *const c_char,
-    stbuf: *mut libc::statvfs,
-) -> c_int {
+unsafe extern "C" fn fuse_statfs(_path: *const c_char, stbuf: *mut libc::statvfs) -> c_int {
     timed!(statfs);
     ptr::write_bytes(stbuf, 0, 1);
     (*stbuf).f_bsize = 512;
@@ -480,8 +480,8 @@ unsafe extern "C" fn fuse_init(
     // Source files and virtual configs don't change during a build,
     // so aggressive caching is safe.
     if !cfg.is_null() {
-        (*cfg).entry_timeout = 300.0;    // cache name lookups for 5 min
-        (*cfg).attr_timeout = 300.0;     // cache file attributes for 5 min
+        (*cfg).entry_timeout = 300.0; // cache name lookups for 5 min
+        (*cfg).attr_timeout = 300.0; // cache file attributes for 5 min
         // negative_timeout MUST be 0 on macFUSE FSKit. With a non-zero
         // value, libfuse converts ENOENT lookups into "negative entry"
         // replies with ino=0 (a Linux kernel convention for caching
@@ -491,8 +491,8 @@ unsafe extern "C" fn fuse_init(
         // for nodeid=0, which makes libfuse's get_node() abort with
         // "fuse internal error: node 0 not found".
         (*cfg).negative_timeout = 0.0;
-        (*cfg).kernel_cache = 1;         // allow kernel to cache file contents
-        (*cfg).auto_cache = 1;           // invalidate cache when mtime changes
+        (*cfg).kernel_cache = 1; // allow kernel to cache file contents
+        (*cfg).auto_cache = 1; // invalidate cache when mtime changes
     }
 
     let ctx = bindings::fuse_get_context();
@@ -506,21 +506,30 @@ unsafe extern "C" fn fuse_destroy(_private_data: *mut c_void) {
 /// Get the real path for a writable resolved path, or return EROFS
 fn writable_real_path(resolved: &ResolvedPath) -> Result<&std::path::Path, c_int> {
     match resolved {
-        ResolvedPath::OutputMount { real_path, symlink: false }
-        | ResolvedPath::OutputChild { real_path, symlink: false } => Ok(real_path),
+        ResolvedPath::OutputMount {
+            real_path,
+            symlink: false,
+        }
+        | ResolvedPath::OutputChild {
+            real_path,
+            symlink: false,
+        } => Ok(real_path),
         _ => Err(-libc::EROFS),
     }
 }
 
-unsafe extern "C" fn fuse_mkdir(
-    path: *const c_char,
-    _mode: libc::mode_t,
-) -> c_int {
+unsafe extern "C" fn fuse_mkdir(path: *const c_char, _mode: libc::mode_t) -> c_int {
     timed!(mkdir);
     let core = get_core();
-    let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
+    let path = match path_str(path) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     let resolved = core.resolve_path(path);
-    let real = match writable_real_path(&resolved) { Ok(p) => p, Err(e) => return e };
+    let real = match writable_real_path(&resolved) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     match std::fs::create_dir(real) {
         Ok(()) => 0,
         Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
@@ -530,9 +539,15 @@ unsafe extern "C" fn fuse_mkdir(
 unsafe extern "C" fn fuse_unlink(path: *const c_char) -> c_int {
     timed!(unlink);
     let core = get_core();
-    let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
+    let path = match path_str(path) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     let resolved = core.resolve_path(path);
-    let real = match writable_real_path(&resolved) { Ok(p) => p, Err(e) => return e };
+    let real = match writable_real_path(&resolved) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     match std::fs::remove_file(real) {
         Ok(()) => 0,
         Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
@@ -542,9 +557,15 @@ unsafe extern "C" fn fuse_unlink(path: *const c_char) -> c_int {
 unsafe extern "C" fn fuse_rmdir(path: *const c_char) -> c_int {
     timed!(rmdir);
     let core = get_core();
-    let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
+    let path = match path_str(path) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     let resolved = core.resolve_path(path);
-    let real = match writable_real_path(&resolved) { Ok(p) => p, Err(e) => return e };
+    let real = match writable_real_path(&resolved) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     match std::fs::remove_dir(real) {
         Ok(()) => 0,
         Err(e) if e.raw_os_error() == Some(libc::ENOTEMPTY) => {
@@ -576,9 +597,15 @@ unsafe extern "C" fn fuse_create(
 ) -> c_int {
     timed!(create);
     let core = get_core();
-    let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
+    let path = match path_str(path) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     let resolved = core.resolve_path(path);
-    let real = match writable_real_path(&resolved) { Ok(p) => p, Err(e) => return e };
+    let real = match writable_real_path(&resolved) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     match std::fs::File::create(real) {
         Ok(_) => {
             // Set the requested permissions
@@ -603,9 +630,15 @@ unsafe extern "C" fn fuse_write(
 ) -> c_int {
     timed!(write);
     let core = get_core();
-    let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
+    let path = match path_str(path) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     let resolved = core.resolve_path(path);
-    let real = match writable_real_path(&resolved) { Ok(p) => p, Err(e) => return e };
+    let real = match writable_real_path(&resolved) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
 
     use std::io::Write;
     let mut file = match std::fs::OpenOptions::new().write(true).open(real) {
@@ -629,9 +662,15 @@ unsafe extern "C" fn fuse_truncate(
 ) -> c_int {
     timed!(truncate);
     let core = get_core();
-    let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
+    let path = match path_str(path) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     let resolved = core.resolve_path(path);
-    let real = match writable_real_path(&resolved) { Ok(p) => p, Err(e) => return e };
+    let real = match writable_real_path(&resolved) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     match std::fs::File::options().write(true).open(real) {
         Ok(f) => match f.set_len(size as u64) {
             Ok(()) => 0,
@@ -648,9 +687,15 @@ unsafe extern "C" fn fuse_chmod(
 ) -> c_int {
     timed!(chmod);
     let core = get_core();
-    let path = match path_str(path) { Ok(p) => p, Err(e) => return e };
+    let path = match path_str(path) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     let resolved = core.resolve_path(path);
-    let real = match writable_real_path(&resolved) { Ok(p) => p, Err(e) => return e };
+    let real = match writable_real_path(&resolved) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -661,7 +706,9 @@ unsafe extern "C" fn fuse_chmod(
         }
     }
     #[cfg(not(unix))]
-    { 0 }
+    {
+        0
+    }
 }
 
 unsafe extern "C" fn fuse_rename(
@@ -671,28 +718,46 @@ unsafe extern "C" fn fuse_rename(
 ) -> c_int {
     timed!(rename);
     let core = get_core();
-    let from_path = match path_str(from) { Ok(p) => p, Err(e) => return e };
-    let to_path = match path_str(to) { Ok(p) => p, Err(e) => return e };
+    let from_path = match path_str(from) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
+    let to_path = match path_str(to) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     let from_resolved = core.resolve_path(from_path);
     let to_resolved = core.resolve_path(to_path);
-    let from_real = match writable_real_path(&from_resolved) { Ok(p) => p, Err(e) => return e };
-    let to_real = match writable_real_path(&to_resolved) { Ok(p) => p, Err(e) => return e };
+    let from_real = match writable_real_path(&from_resolved) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
+    let to_real = match writable_real_path(&to_resolved) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     match std::fs::rename(from_real, to_real) {
         Ok(()) => 0,
         Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
     }
 }
 
-unsafe extern "C" fn fuse_symlink(
-    from: *const c_char,
-    to: *const c_char,
-) -> c_int {
+unsafe extern "C" fn fuse_symlink(from: *const c_char, to: *const c_char) -> c_int {
     timed!(symlink);
     let core = get_core();
-    let to_path = match path_str(to) { Ok(p) => p, Err(e) => return e };
+    let to_path = match path_str(to) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     let to_resolved = core.resolve_path(to_path);
-    let to_real = match writable_real_path(&to_resolved) { Ok(p) => p, Err(e) => return e };
-    let from_str = match path_str(from) { Ok(p) => p, Err(e) => return e };
+    let to_real = match writable_real_path(&to_resolved) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
+    let from_str = match path_str(from) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
     match std::os::unix::fs::symlink(from_str, to_real) {
         Ok(()) => 0,
         Err(e) => -(e.raw_os_error().unwrap_or(libc::EIO)),
@@ -703,10 +768,7 @@ unsafe extern "C" fn fuse_symlink(
 // Public API
 // ---------------------------------------------------------------------------
 
-unsafe extern "C" fn fuse_access(
-    _path: *const c_char,
-    _mask: c_int,
-) -> c_int {
+unsafe extern "C" fn fuse_access(_path: *const c_char, _mask: c_int) -> c_int {
     timed!(access);
     0 // Allow all access
 }

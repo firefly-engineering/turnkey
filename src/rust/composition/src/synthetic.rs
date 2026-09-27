@@ -35,8 +35,16 @@ pub fn needs_synthetic(mount_point: &Path) -> Option<String> {
 
     // These are standard writable directories on macOS — no synthetic needed
     let writable = [
-        "Users", "Volumes", "tmp", "private", "var", "opt", "usr",
-        "Applications", "Library", "System",
+        "Users",
+        "Volumes",
+        "tmp",
+        "private",
+        "var",
+        "opt",
+        "usr",
+        "Applications",
+        "Library",
+        "System",
     ];
     if writable.contains(&first.as_str()) {
         return None;
@@ -71,7 +79,10 @@ pub fn has_synthetic_entry(name: &str) -> bool {
 /// Returns Ok(true) if a new entry was created, Ok(false) if it already existed.
 pub fn ensure_synthetic(name: &str) -> Result<bool, SyntheticError> {
     if has_synthetic_entry(name) {
-        info!("Synthetic firmlink '{}' already in /etc/synthetic.conf", name);
+        info!(
+            "Synthetic firmlink '{}' already in /etc/synthetic.conf",
+            name
+        );
 
         // Entry exists but directory might not be activated yet
         let top_level = PathBuf::from("/").join(name);
@@ -81,7 +92,10 @@ pub fn ensure_synthetic(name: &str) -> Result<bool, SyntheticError> {
         return Ok(false);
     }
 
-    info!("Adding synthetic firmlink '{}' to /etc/synthetic.conf", name);
+    info!(
+        "Adding synthetic firmlink '{}' to /etc/synthetic.conf",
+        name
+    );
 
     // Append to /etc/synthetic.conf (requires sudo)
     let output = Command::new("sudo")
@@ -134,7 +148,10 @@ fn activate_synthetics() -> Result<(), SyntheticError> {
     info!("Activating synthetic firmlinks via apfs.util -t");
 
     let output = Command::new("sudo")
-        .args(["/System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util", "-t"])
+        .args([
+            "/System/Library/Filesystems/apfs.fs/Contents/Resources/apfs.util",
+            "-t",
+        ])
         .output()
         .map_err(|e| SyntheticError::Io {
             message: format!("failed to run apfs.util: {}", e),
@@ -142,7 +159,10 @@ fn activate_synthetics() -> Result<(), SyntheticError> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        warn!("apfs.util -t returned non-zero (may be normal): {}", stderr.trim());
+        warn!(
+            "apfs.util -t returned non-zero (may be normal): {}",
+            stderr.trim()
+        );
         // Non-zero exit from apfs.util is sometimes normal (e.g., already activated)
     }
 

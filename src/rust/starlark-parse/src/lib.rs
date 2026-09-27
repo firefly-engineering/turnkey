@@ -140,18 +140,16 @@ pub fn parse_targets(source: &str) -> Result<Vec<Target>> {
 }
 
 /// Parse an argument_list node into a map of keyword arguments.
-fn parse_argument_list(
-    node: tree_sitter::Node,
-    source: &str,
-) -> Result<HashMap<String, Value>> {
+fn parse_argument_list(node: tree_sitter::Node, source: &str) -> Result<HashMap<String, Value>> {
     let mut args = HashMap::new();
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
         if child.kind() == "keyword_argument" {
-            if let (Some(name_node), Some(value_node)) =
-                (child.child_by_field_name("name"), child.child_by_field_name("value"))
-            {
+            if let (Some(name_node), Some(value_node)) = (
+                child.child_by_field_name("name"),
+                child.child_by_field_name("value"),
+            ) {
                 let name = name_node.utf8_text(source.as_bytes())?;
                 let value = parse_value(value_node, source)?;
                 args.insert(name.to_string(), value);
@@ -299,7 +297,10 @@ python_binary(
 )
 "#;
         let targets = parse_targets(source).unwrap();
-        assert_eq!(targets[0].args.get("main").and_then(|v| v.as_str()), Some("main.py"));
+        assert_eq!(
+            targets[0].args.get("main").and_then(|v| v.as_str()),
+            Some("main.py")
+        );
         let srcs = targets[0].args.get("srcs").unwrap();
         let patterns = srcs.collect_patterns();
         assert_eq!(patterns, vec!["main.py", "utils.py"]);

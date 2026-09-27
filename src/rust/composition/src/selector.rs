@@ -33,7 +33,7 @@ use log::info;
 use crate::{CompositionBackend, CompositionConfig, Error, Result, SymlinkBackend};
 
 #[cfg(any(feature = "fuse", feature = "fuse-t"))]
-use crate::fuse::{check_fuse_availability, FuseAvailability, FuseBackend, Platform};
+use crate::fuse::{FuseAvailability, FuseBackend, Platform, check_fuse_availability};
 
 /// Backend type for composition
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -117,9 +117,7 @@ pub fn select_backend(requested: BackendType) -> BackendSelection {
                     implementation,
                     version,
                 } => {
-                    let version_str = version
-                        .map(|v| format!(" ({})", v))
-                        .unwrap_or_default();
+                    let version_str = version.map(|v| format!(" ({})", v)).unwrap_or_default();
                     BackendSelection {
                         backend_type: BackendType::Fuse,
                         reason: format!(
@@ -223,9 +221,9 @@ fn create_fuse_backend(config: CompositionConfig) -> Result<Box<dyn CompositionB
             "FUSE is not installed.\n\n{}",
             install_instructions
         ))),
-        FuseAvailability::UnsupportedPlatform => {
-            Err(Error::FuseUnavailable("FUSE is not supported on this platform".to_string()))
-        }
+        FuseAvailability::UnsupportedPlatform => Err(Error::FuseUnavailable(
+            "FUSE is not supported on this platform".to_string(),
+        )),
     }
 }
 
@@ -277,7 +275,10 @@ mod tests {
         assert_eq!(BackendType::from_str("fuse"), Some(BackendType::Fuse));
         assert_eq!(BackendType::from_str("FUSE"), Some(BackendType::Fuse));
         assert_eq!(BackendType::from_str("symlink"), Some(BackendType::Symlink));
-        assert_eq!(BackendType::from_str("symlinks"), Some(BackendType::Symlink));
+        assert_eq!(
+            BackendType::from_str("symlinks"),
+            Some(BackendType::Symlink)
+        );
         assert_eq!(BackendType::from_str("invalid"), None);
     }
 
