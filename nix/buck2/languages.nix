@@ -11,6 +11,8 @@
 # Each record has:
 #   name         the option name under turnkey.buck2 (e.g. "go")
 #   cellName     the Buck2 cell and the .turnkey/<cellName> symlink
+#   cellLink     added to every record: that symlink's path, relative to
+#                the project root (the devenv module creates it)
 #   description  shown by the shell in verbose mode
 #   depsFile     langCfg -> the deps file, relative to the project root:
 #                what the language's sync rules write and rules sync
@@ -60,8 +62,11 @@ let
   # Whether a language has a cell to keep in sync: a built one or a deps
   # file to build it from.
   hasCell = langCfg: langCfg.enable && (langCfg.cell != null || langCfg.depsFile != null);
+
+  # Where a cell is linked into the project, relative to its root
+  cellLink = cellName: ".turnkey/${cellName}";
 in
-[
+map (language: language // { cellLink = cellLink language.cellName; }) [
   rec {
     name = "go";
     cellName = "godeps";
@@ -350,6 +355,14 @@ in
           langCfg.packageJsonFile
           "--pnpm-lock"
           langCfg.pnpmLockFile
+          # The file this run replaces: git packages whose pin is unchanged
+          # keep the remapping target recorded there
+          "--previous"
+          (depsFile langCfg)
+          # Where the cell vendors packages (nix/lib/deps-cell), which
+          # remapping overrides in foundry.toml must point inside
+          "--vendor-dir"
+          "${cellLink cellName}/vendor/"
         ];
       };
   }

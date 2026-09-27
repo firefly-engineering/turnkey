@@ -995,6 +995,11 @@
                   name = "forge-std";
                   remapping = "forge-std/=lib/forge-std/src/";
                 };
+                # A git dependency without a foundry.toml: its repository root
+                "solmate/=vendor/solmate/" = {
+                  name = "solmate";
+                  remapping = "solmate/=lib/solmate/";
+                };
                 # An npm dependency, scoped name
                 "@openzeppelin/contracts/=vendor/@openzeppelin/contracts/" = {
                   name = "@openzeppelin/contracts";

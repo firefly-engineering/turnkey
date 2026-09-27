@@ -154,7 +154,7 @@ let
         language:
         lib.nameValuePair language.cellName {
           name = language.cellName;
-          path = ".turnkey/${language.cellName}";
+          path = language.cellLink;
           derivation = if cfg.${language.name}.enable then cfg.${language.name}.cell else null;
           inherit (language) description;
         }

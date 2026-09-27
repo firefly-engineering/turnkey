@@ -49,6 +49,20 @@ struct Args {
     #[arg(long)]
     pnpm_lock: Option<PathBuf>,
 
+    /// The previously generated solidity-deps.toml, which this run replaces
+    /// (optional). A git package whose pin is unchanged keeps the remapping
+    /// target recorded there, without looking it up again; that is the only
+    /// way to get one without prefetching
+    #[arg(long)]
+    previous: Option<PathBuf>,
+
+    /// The directory the soldeps cell vendors packages into, one `<name>/`
+    /// per package, relative to the project root. Remapping overrides in
+    /// foundry.toml must point inside it; the sync rule passes the cell
+    /// link's (nix/buck2/languages.nix)
+    #[arg(long)]
+    vendor_dir: Option<String>,
+
     #[command(flatten)]
     output: OutputArgs,
 
@@ -59,12 +73,23 @@ struct Args {
     prefetch: PrefetchArgs,
 }
 
-/// Represents a package in the output TOML
-#[derive(Debug, Serialize)]
+/// Where a package comes from
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum Source {
+    /// A Foundry-style git dependency, from foundry.toml
+    Git,
+    /// An npm package, from package.json
+    Npm,
+}
+
+/// A package in solidity-deps.toml: what this run writes, and what it reads
+/// back from the previous one (--previous)
+#[derive(Debug, Serialize, Deserialize)]
 struct OutputPackage {
     name: String,
     version: String,
-    source: String, // "git" or "npm"
+    source: Source,
     #[serde(skip_serializing_if = "Option::is_none")]
     url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -76,9 +101,16 @@ struct OutputPackage {
     /// Nix SRI hash of the unpacked `url` archive (git packages only)
     #[serde(skip_serializing_if = "Option::is_none")]
     hash: Option<String>,
-    /// Auto-generated remapping for this package
+    /// The package's remapping, in a Foundry checkout's layout: its target
+    /// sits under lib/<name>/ (git) or node_modules/<name>/ (npm), which the
+    /// soldeps cell moves to vendor/<name>/
     #[serde(skip_serializing_if = "Option::is_none")]
     remapping: Option<String>,
+    /// Set when `remapping` comes from the root foundry.toml's `remappings`
+    /// rather than from the package itself, so a later run without the
+    /// override does not reuse it
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    remapping_overridden: bool,
 }
 
 /// Foundry configuration structure
@@ -86,21 +118,36 @@ struct OutputPackage {
 struct FoundryConfig {
     #[serde(default)]
     dependencies: BTreeMap<String, String>,
-    /// Profile configurations - parsed for schema completeness
     #[serde(default)]
-    #[allow(dead_code)]
     profile: BTreeMap<String, FoundryProfile>,
 }
 
-/// Foundry profile configuration
-/// Parsed for schema completeness; remappings may be used in future enhancements.
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
+/// The foundry profile keys soldeps-gen reads
+#[derive(Debug, Default, Deserialize)]
 struct FoundryProfile {
+    /// Where the project's sources live; a git dependency's remapping
+    /// targets its own
+    src: Option<String>,
+    /// In the root foundry.toml: per-package overrides of the remapping
     #[serde(default)]
     remappings: Vec<String>,
+}
+
+/// The profile forge uses when none is selected
+const DEFAULT_PROFILE: &str = "default";
+
+/// Forge's default `src`, for a foundry.toml that does not set one
+///
+/// A literal rather than `foundry_config::Config::default().src`: that
+/// crate pulls in a large part of Foundry (compilers, alloy, ...) for one
+/// string that has not changed since forge's first release.
+const FORGE_DEFAULT_SRC: &str = "src";
+
+/// The previous solidity-deps.toml, as far as reusing remappings needs it
+#[derive(Debug, Default, Deserialize)]
+struct PreviousToml {
     #[serde(default)]
-    libs: Vec<String>,
+    package: Vec<OutputPackage>,
 }
 
 /// package.json structure (simplified)
@@ -165,35 +212,39 @@ fn parse_foundry_dep(name: &str, spec: &str) -> OutputPackage {
         repo
     };
 
-    // Generate remapping - point to lib/<name>/src/ for Foundry-style deps
-    let remapping = format!("{}/=lib/{}/src/", name, name);
-
     OutputPackage {
         name: name.to_string(),
         version: rev.clone().unwrap_or_else(|| "main".to_string()),
-        source: "git".to_string(),
+        source: Source::Git,
         url: None,
         integrity: None,
         repo: Some(full_repo),
         rev,
         hash: None,
-        remapping: Some(remapping),
+        // Derived from the dependency's own foundry.toml once it is pinned
+        // (assign_remapping)
+        remapping: None,
+        remapping_overridden: false,
     }
 }
 
 /// Build the output entry for an npm package at a resolved version
 fn npm_package(name: &str, version: &str, integrity: Option<String>) -> OutputPackage {
-    OutputPackage {
+    let mut pkg = OutputPackage {
         name: name.to_string(),
         version: version.to_string(),
-        source: "npm".to_string(),
+        source: Source::Npm,
         url: Some(npm_tarball_url(name, version)),
         integrity,
         repo: None,
         rev: None,
         hash: None,
-        remapping: Some(format!("{}/=node_modules/{}/", name, name)),
-    }
+        remapping: None,
+        remapping_overridden: false,
+    };
+    // An npm package maps to its root
+    pkg.remapping = Some(remapping_to(&pkg, ""));
+    pkg
 }
 
 /// Check if a package is a Solidity-related npm package
@@ -234,6 +285,13 @@ fn npm_tarball_url(name: &str, version: &str) -> String {
             name, name, clean_version
         )
     }
+}
+
+/// Read the solidity-deps.toml a run replaces
+fn read_previous(path: &PathBuf) -> Result<PreviousToml> {
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
+    toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))
 }
 
 /// Parse pnpm-lock.yaml to extract integrity hashes
@@ -321,8 +379,8 @@ fn is_commit_hash(rev: &str) -> bool {
     rev.len() == 40 && rev.chars().all(|c| c.is_ascii_hexdigit())
 }
 
-/// URL of GitHub's source archive of a commit, if the repository is on GitHub
-fn github_archive_url(repo: &str, commit: &str) -> Option<String> {
+/// Owner and name of a repository, if it is on GitHub
+fn github_repo(repo: &str) -> Option<(&str, &str)> {
     let path = repo.strip_prefix("https://github.com/")?;
     let path = path.trim_end_matches('/');
     let path = path.strip_suffix(".git").unwrap_or(path);
@@ -330,76 +388,400 @@ fn github_archive_url(repo: &str, commit: &str) -> Option<String> {
     if owner.is_empty() || name.is_empty() || name.contains('/') {
         return None;
     }
+    Some((owner, name))
+}
+
+/// URL of GitHub's source archive of a commit, if the repository is on GitHub
+fn github_archive_url(repo: &str, commit: &str) -> Option<String> {
+    let (owner, name) = github_repo(repo)?;
     Some(format!(
         "https://github.com/{}/{}/archive/{}.tar.gz",
         owner, name, commit
     ))
 }
 
-/// Pin a package for Nix, leaving it as it was on any lookup failure
+/// The seam through which prefetching reads a file of a git dependency, at
+/// the commit it is pinned to
+///
+/// deps-gen-kit's Prefetcher only yields hashes (a prefetch-cache hit never
+/// touches the store), so a dependency's own foundry.toml is read here.
+trait SourceReader {
+    /// Contents of `path` in `repo` at `commit`, or None if the commit has
+    /// no such file
+    fn read_file(&mut self, repo: &str, commit: &str, path: &str) -> Result<Option<String>>;
+}
+
+/// SourceReader backed by GitHub's raw file downloads
+///
+/// A commit is immutable, and a package reads it only when its pin
+/// changed (assign_remapping), so nothing is cached.
+struct GitHubRawReader {
+    agent: ureq::Agent,
+}
+
+impl GitHubRawReader {
+    /// How long a download may take, so a stalled connection cannot hang
+    /// `tk sync`
+    const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+    fn new() -> Self {
+        Self {
+            agent: ureq::AgentBuilder::new().timeout(Self::TIMEOUT).build(),
+        }
+    }
+}
+
+impl SourceReader for GitHubRawReader {
+    fn read_file(&mut self, repo: &str, commit: &str, path: &str) -> Result<Option<String>> {
+        let (owner, name) = github_repo(repo).ok_or_else(|| {
+            anyhow::anyhow!(
+                "{} is not on GitHub, the only host files are read from",
+                repo
+            )
+        })?;
+        let url = format!(
+            "https://raw.githubusercontent.com/{}/{}/{}/{}",
+            owner, name, commit, path
+        );
+        match self.agent.get(&url).call() {
+            Ok(response) => response
+                .into_string()
+                .map(Some)
+                .with_context(|| format!("Failed to read {}", url)),
+            Err(ureq::Error::Status(404, _)) => Ok(None),
+            Err(e) => Err(e).with_context(|| format!("Failed to fetch {}", url)),
+        }
+    }
+}
+
+/// An in-memory SourceReader for tests: answers from a fixed table and
+/// records every call
+#[cfg(test)]
+#[derive(Debug, Default)]
+struct MemorySourceReader {
+    /// (repo, commit, path) -> contents, None for a file the commit lacks
+    files: BTreeMap<(String, String, String), Option<String>>,
+    /// Every (repo, commit, path) asked for, in order
+    calls: Vec<(String, String, String)>,
+}
+
+#[cfg(test)]
+impl MemorySourceReader {
+    /// This reader, answering `contents` for `path` in `repo` at `commit`
+    fn with(mut self, repo: &str, commit: &str, path: &str, contents: Option<&str>) -> Self {
+        self.files.insert(
+            (repo.to_string(), commit.to_string(), path.to_string()),
+            contents.map(str::to_string),
+        );
+        self
+    }
+}
+
+#[cfg(test)]
+impl SourceReader for MemorySourceReader {
+    fn read_file(&mut self, repo: &str, commit: &str, path: &str) -> Result<Option<String>> {
+        let key = (repo.to_string(), commit.to_string(), path.to_string());
+        self.calls.push(key.clone());
+        self.files
+            .get(&key)
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("cannot read {} in {} at {}", path, repo, commit))
+    }
+}
+
+/// The directory a git dependency's remapping targets, relative to its
+/// repository root, given its foundry.toml (None when it has none)
+///
+/// That is the file's `[profile.default] src`, forge's default `src` when
+/// the file does not set it, and the repository root without the file.
+/// The result is empty for the root, and ends in `/` otherwise.
+fn source_subpath(foundry_toml: Option<&str>) -> Result<String> {
+    /// A dependency's foundry.toml, as far as its `src` goes
+    #[derive(Deserialize)]
+    struct Profiles {
+        #[serde(default)]
+        profile: BTreeMap<String, FoundryProfile>,
+    }
+
+    let Some(content) = foundry_toml else {
+        return Ok(String::new());
+    };
+    let profiles: Profiles = toml::from_str(content).context("Failed to parse its foundry.toml")?;
+    let src = profiles
+        .profile
+        .get(DEFAULT_PROFILE)
+        .and_then(|profile| profile.src.as_deref())
+        .unwrap_or(FORGE_DEFAULT_SRC);
+    relative_dir(src).ok_or_else(|| {
+        anyhow::anyhow!("its foundry.toml's src `{}` is outside the repository", src)
+    })
+}
+
+/// `path` as a directory relative to its root: empty for the root itself,
+/// ending in `/` otherwise, or None if it leaves the root
+fn relative_dir(path: &str) -> Option<String> {
+    if path.starts_with('/') {
+        return None;
+    }
+    let mut dir = String::new();
+    for component in path.split('/') {
+        match component {
+            "" | "." => {}
+            ".." => return None,
+            name => {
+                dir.push_str(name);
+                dir.push('/');
+            }
+        }
+    }
+    Some(dir)
+}
+
+/// Where a Foundry checkout puts a package, as soldeps-gen's remappings
+/// record it (the soldeps cell moves it to vendor/<name>/)
+fn layout_root(pkg: &OutputPackage) -> String {
+    match pkg.source {
+        Source::Git => format!("lib/{}/", pkg.name),
+        Source::Npm => format!("node_modules/{}/", pkg.name),
+    }
+}
+
+/// A package's remapping to `subpath` inside it
+fn remapping_to(pkg: &OutputPackage, subpath: &str) -> String {
+    format!("{}/={}{}", pkg.name, layout_root(pkg), subpath)
+}
+
+/// Whether `previous` records `pkg` at the same pin: the same repository
+/// and declared ref and, once prefetching resolved the ref, the same commit
+fn same_pin(pkg: &OutputPackage, previous: &OutputPackage) -> bool {
+    previous.source == pkg.source
+        && previous.repo == pkg.repo
+        && previous.version == pkg.version
+        && match pkg.rev.as_deref() {
+            Some(rev) if is_commit_hash(rev) => previous.rev.as_deref() == Some(rev),
+            _ => true,
+        }
+}
+
+/// Per-package remapping overrides from the root foundry.toml's
+/// `remappings`: package name -> the target's path inside the package
+///
+/// Each entry is an ordinary forge remapping, `<name>/=<vendor>/<name>/...`
+/// with `<vendor>` the directory the soldeps cell vendors packages into
+/// (--vendor-dir). Its prefix must name a declared package: the rules
+/// mapper maps an import's first path segment to the package, so there are
+/// no aliases. Its target must stay inside that package.
+fn parse_overrides(
+    remappings: &[String],
+    packages: &[OutputPackage],
+    vendor_dir: Option<&str>,
+) -> Result<BTreeMap<String, String>> {
+    let mut overrides = BTreeMap::new();
+    for entry in remappings {
+        let invalid =
+            |why: String| anyhow::anyhow!("remapping `{}` in foundry.toml: {}", entry, why);
+        let vendor_dir = vendor_dir
+            .and_then(relative_dir)
+            .filter(|dir| !dir.is_empty())
+            .ok_or_else(|| {
+                invalid("overrides need --vendor-dir, the soldeps cell's vendor directory".into())
+            })?;
+        let (prefix, target) = entry
+            .split_once('=')
+            .ok_or_else(|| invalid("not a `<prefix>=<target>` remapping".to_string()))?;
+        let pkg = prefix
+            .strip_suffix('/')
+            .and_then(|name| packages.iter().find(|pkg| pkg.name == name))
+            .ok_or_else(|| {
+                invalid(format!(
+                    "`{}` is not `<name>/` for a declared package; an import's first \
+                     path segment names its package, so remappings cannot alias",
+                    prefix
+                ))
+            })?;
+        let subpath = target
+            .strip_prefix(vendor_dir.as_str())
+            .and_then(|rest| rest.strip_prefix(pkg.name.as_str()))
+            .and_then(|rest| rest.strip_prefix('/'))
+            .and_then(relative_dir)
+            .ok_or_else(|| {
+                invalid(format!(
+                    "the target is not inside {}{}/",
+                    vendor_dir, pkg.name
+                ))
+            })?;
+        if overrides.insert(pkg.name.clone(), subpath).is_some() {
+            return Err(invalid(format!("{} is remapped more than once", pkg.name)));
+        }
+    }
+    Ok(overrides)
+}
+
+/// What prefetching did for a package, as far as deriving its remapping
+/// target goes
+enum Prefetch<'a> {
+    /// Prefetching was off (--no-prefetch)
+    Skipped,
+    /// Prefetching ran but could not pin or fetch the package
+    Failed(&'a anyhow::Error),
+    /// Prefetching ran and pinned the package; `reader` reads its files
+    Done(&'a mut dyn SourceReader),
+}
+
+/// Give a package its remapping
+///
+/// An override wins. Otherwise an npm package maps to its root, as it
+/// already does, and a git package keeps the target recorded in `previous`
+/// while its pin is unchanged. Failing that, the target is derived from the
+/// package's foundry.toml at its pinned commit. Without a recorded target or
+/// a way to derive one, this fails: guessing would write a remapping to a
+/// directory that may not exist.
+fn assign_remapping(
+    pkg: &mut OutputPackage,
+    overrides: &BTreeMap<String, String>,
+    previous: Option<&OutputPackage>,
+    prefetch: Prefetch,
+) -> Result<()> {
+    if let Some(subpath) = overrides.get(&pkg.name) {
+        pkg.remapping = Some(remapping_to(pkg, subpath));
+        pkg.remapping_overridden = true;
+        return Ok(());
+    }
+    pkg.remapping_overridden = false;
+    match pkg.source {
+        Source::Npm => return Ok(()),
+        Source::Git => {}
+    }
+
+    if let Some(recorded) = previous
+        .filter(|previous| same_pin(pkg, previous) && !previous.remapping_overridden)
+        .and_then(|previous| previous.remapping.clone())
+    {
+        pkg.remapping = Some(recorded);
+        return Ok(());
+    }
+
+    let repo = pkg.repo.clone().unwrap_or_default();
+    let pin = format!("{}@{}", repo, pkg.version);
+    let reader = match prefetch {
+        Prefetch::Skipped => anyhow::bail!(
+            "{}: no remapping target is recorded for {}; run a prefetching sync \
+             (`tk sync`, without --no-prefetch) to derive one",
+            pkg.name,
+            pin
+        ),
+        Prefetch::Failed(e) => anyhow::bail!(
+            "{}: cannot derive the remapping target of {}, and none is recorded for \
+             it: {:#}",
+            pkg.name,
+            pin,
+            e
+        ),
+        Prefetch::Done(reader) => reader,
+    };
+    let Some(commit) = pkg.rev.clone().filter(|rev| is_commit_hash(rev)) else {
+        anyhow::bail!("{}: {} was not pinned to a commit", pkg.name, pin);
+    };
+    if github_repo(&repo).is_none() {
+        anyhow::bail!(
+            "{}: cannot derive the remapping target of {}: soldeps-gen reads a git \
+             dependency's foundry.toml only from GitHub. Add a `{}/=` remapping to \
+             the root foundry.toml's [profile.default] remappings, targeting its \
+             sources inside the soldeps vendor directory",
+            pkg.name,
+            pin,
+            pkg.name
+        );
+    }
+    let cannot_derive = || {
+        format!(
+            "{}: cannot derive the remapping target of {} at {}, and none is \
+             recorded for it",
+            pkg.name, pin, commit
+        )
+    };
+    let foundry_toml = reader
+        .read_file(&repo, &commit, "foundry.toml")
+        .with_context(cannot_derive)?;
+    // GitHub answers 404 for a private repository too. The archive of the
+    // same commit, fetched while prefetching, proves the repository is
+    // readable, so only then does a 404 mean the commit has no foundry.toml.
+    if foundry_toml.is_none() && pkg.hash.is_none() {
+        return Err(anyhow::anyhow!(
+            "foundry.toml was not found, and the archive of the commit was not \
+             fetched to tell a missing file from an unreadable repository"
+        ))
+        .with_context(cannot_derive);
+    }
+    let subpath = source_subpath(foundry_toml.as_deref()).with_context(cannot_derive)?;
+    pkg.remapping = Some(remapping_to(pkg, &subpath));
+    Ok(())
+}
+
+/// Pin a package for Nix
 ///
 /// A git package gets its ref resolved to a commit and, on GitHub, the
 /// archive of that commit and its hash, which the soldeps cell fetches as a
 /// fixed-output derivation. An npm package the pnpm lock gave no integrity
-/// gets the hash of its tarball.
+/// gets the hash of its tarball. A failed lookup leaves the package as far
+/// as it got and is returned.
 fn prefetch_package(
     pkg: &mut OutputPackage,
     refs: &dyn RefResolver,
     prefetcher: &mut dyn Prefetcher,
-) {
-    match pkg.source.as_str() {
-        "git" => {
-            let Some(repo) = pkg.repo.clone() else { return };
+) -> Result<()> {
+    match pkg.source {
+        Source::Git => {
+            let Some(repo) = pkg.repo.clone() else {
+                return Ok(());
+            };
             let git_ref = pkg.rev.clone().unwrap_or_else(|| "HEAD".to_string());
 
             let commit = if is_commit_hash(&git_ref) {
                 git_ref
             } else {
                 eprintln!("  resolving {}@{}...", repo, git_ref);
-                match refs.resolve_ref(&repo, &git_ref) {
-                    Ok(commit) => {
-                        eprintln!("  {} -> {}", git_ref, &commit[..12.min(commit.len())]);
-                        commit
-                    }
-                    Err(e) => {
-                        eprintln!("  warning: failed to resolve {}: {}", git_ref, e);
-                        return;
-                    }
-                }
+                let commit = refs
+                    .resolve_ref(&repo, &git_ref)
+                    .with_context(|| format!("failed to resolve {}", git_ref))?;
+                eprintln!("  {} -> {}", git_ref, &commit[..12.min(commit.len())]);
+                commit
             };
             pkg.rev = Some(commit.clone());
 
             let Some(url) = github_archive_url(&repo, &commit) else {
                 eprintln!("  {}: not on GitHub, pinned by commit only", pkg.name);
-                return;
+                return Ok(());
             };
-            match prefetcher.prefetch(&url, true) {
-                Ok(hash) => {
-                    pkg.url = Some(url);
-                    pkg.hash = Some(hash);
-                }
-                Err(e) => eprintln!("  warning: failed to prefetch {}: {}", url, e),
-            }
+            let hash = prefetcher
+                .prefetch(&url, true)
+                .with_context(|| format!("failed to prefetch {}", url))?;
+            pkg.url = Some(url);
+            pkg.hash = Some(hash);
         }
-        "npm" => {
+        Source::Npm => {
             if pkg.integrity.is_some() {
-                return;
+                return Ok(());
             }
-            let Some(url) = pkg.url.clone() else { return };
+            let Some(url) = pkg.url.clone() else {
+                return Ok(());
+            };
             eprintln!("  prefetching {}...", url);
-            match prefetcher.prefetch(&url, false) {
-                Ok(hash) => pkg.integrity = Some(hash),
-                Err(e) => eprintln!("  warning: failed to prefetch {}: {}", url, e),
-            }
+            let hash = prefetcher
+                .prefetch(&url, false)
+                .with_context(|| format!("failed to prefetch {}", url))?;
+            pkg.integrity = Some(hash);
         }
-        _ => {}
     }
+    Ok(())
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
 
     let mut output_packages: Vec<OutputPackage> = Vec::new();
+    // The root foundry.toml's remappings: per-package overrides
+    let mut override_remappings: Vec<String> = Vec::new();
 
     // Parse pnpm-lock.yaml for integrity hashes if provided
     let integrity_map = if let Some(pnpm_lock_path) = &args.pnpm_lock {
@@ -432,6 +814,10 @@ fn main() -> Result<()> {
 
         for (name, spec) in &foundry_config.dependencies {
             output_packages.push(parse_foundry_dep(name, spec));
+        }
+
+        if let Some(profile) = foundry_config.profile.get(DEFAULT_PROFILE) {
+            override_remappings = profile.remappings.clone();
         }
     } else {
         eprintln!(
@@ -506,11 +892,41 @@ fn main() -> Result<()> {
         }
     }
 
+    // Before any network work, so an invalid override fails fast
+    let overrides = parse_overrides(
+        &override_remappings,
+        &output_packages,
+        args.vendor_dir.as_deref(),
+    )
+    .with_context(|| format!("Invalid remappings in {}", args.foundry.display()))?;
+    let previous = match &args.previous {
+        Some(path) if path.exists() => read_previous(path)?,
+        _ => PreviousToml::default(),
+    };
+
+    // Each package's prefetch failure, None where prefetching succeeded
+    let mut failures: Vec<Option<anyhow::Error>> = Vec::new();
+    let mut reader = None;
     if let Some(mut prefetcher) = args.prefetch.prefetcher() {
         eprintln!("Prefetching...");
         for pkg in &mut output_packages {
-            prefetch_package(pkg, &GitRefResolver, &mut prefetcher);
+            let result = prefetch_package(pkg, &GitRefResolver, &mut prefetcher);
+            if let Err(e) = &result {
+                eprintln!("  warning: {}: {:#}", pkg.name, e);
+            }
+            failures.push(result.err());
         }
+        reader = Some(GitHubRawReader::new());
+    }
+
+    for (i, pkg) in output_packages.iter_mut().enumerate() {
+        let recorded = previous.package.iter().find(|p| p.name == pkg.name);
+        let prefetch = match (&mut reader, failures.get(i).and_then(Option::as_ref)) {
+            (None, _) => Prefetch::Skipped,
+            (Some(_), Some(e)) => Prefetch::Failed(e),
+            (Some(reader), None) => Prefetch::Done(reader),
+        };
+        assign_remapping(pkg, &overrides, recorded, prefetch)?;
     }
 
     // Sort packages by name for deterministic output
@@ -538,7 +954,7 @@ mod tests {
     fn test_parse_foundry_dep_simple() {
         let pkg = parse_foundry_dep("solady", "https://github.com/vectorized/solady");
         assert_eq!(pkg.name, "solady");
-        assert_eq!(pkg.source, "git");
+        assert_eq!(pkg.source, Source::Git);
         assert_eq!(
             pkg.repo,
             Some("https://github.com/vectorized/solady".to_string())
@@ -619,7 +1035,7 @@ mod tests {
             "forge-std",
             "https://github.com/foundry-rs/forge-std@v1.8.0",
         );
-        prefetch_package(&mut pkg, &refs, &mut hashes);
+        prefetch_package(&mut pkg, &refs, &mut hashes).unwrap();
 
         assert_eq!(pkg.version, "v1.8.0");
         assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
@@ -641,7 +1057,7 @@ mod tests {
         );
 
         let mut pkg = parse_foundry_dep("solady", "https://github.com/vectorized/solady");
-        prefetch_package(&mut pkg, &refs, &mut hashes);
+        prefetch_package(&mut pkg, &refs, &mut hashes).unwrap();
 
         assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
         assert_eq!(pkg.hash.as_deref(), Some("sha256-solady"));
@@ -660,7 +1076,7 @@ mod tests {
             "forge-std",
             &format!("https://github.com/foundry-rs/forge-std@{COMMIT}"),
         );
-        prefetch_package(&mut pkg, &refs, &mut hashes);
+        prefetch_package(&mut pkg, &refs, &mut hashes).unwrap();
 
         assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
         assert!(refs.calls.borrow().is_empty());
@@ -676,7 +1092,7 @@ mod tests {
         let mut hashes = MemoryPrefetcher::default();
 
         let mut pkg = parse_foundry_dep("lib", "https://gitlab.com/acme/lib@v1");
-        prefetch_package(&mut pkg, &refs, &mut hashes);
+        prefetch_package(&mut pkg, &refs, &mut hashes).unwrap();
 
         assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
         assert_eq!(pkg.url, None);
@@ -690,7 +1106,8 @@ mod tests {
         let mut hashes = MemoryPrefetcher::default();
 
         let mut pkg = parse_foundry_dep("forge-std", "https://github.com/foundry-rs/forge-std@v9");
-        prefetch_package(&mut pkg, &refs, &mut hashes);
+        let err = prefetch_package(&mut pkg, &refs, &mut hashes).unwrap_err();
+        assert!(format!("{err:#}").contains("v9"), "{err:#}");
 
         assert_eq!(pkg.rev.as_deref(), Some("v9"));
         assert_eq!(pkg.hash, None);
@@ -703,7 +1120,7 @@ mod tests {
         let mut hashes = MemoryPrefetcher::default().with(&url, false, "sha256-oz");
 
         let mut pkg = npm_package("@openzeppelin/contracts", "5.4.0", None);
-        prefetch_package(&mut pkg, &refs, &mut hashes);
+        prefetch_package(&mut pkg, &refs, &mut hashes).unwrap();
 
         assert_eq!(pkg.integrity.as_deref(), Some("sha256-oz"));
     }
@@ -718,7 +1135,7 @@ mod tests {
             "5.4.0",
             Some("sha512-lock".into()),
         );
-        prefetch_package(&mut pkg, &refs, &mut hashes);
+        prefetch_package(&mut pkg, &refs, &mut hashes).unwrap();
 
         assert_eq!(pkg.integrity.as_deref(), Some("sha512-lock"));
         assert!(refs.calls.borrow().is_empty());
@@ -805,5 +1222,413 @@ mod tests {
             url,
             "https://registry.npmjs.org/@openzeppelin%2fcontracts/-/contracts-5.0.0.tgz"
         );
+    }
+
+    // -- Remapping targets ---------------------------------------------------
+
+    #[test]
+    fn test_source_subpath_is_the_dependencys_src() {
+        for src in ["contracts", "./contracts", "contracts/", "./contracts/"] {
+            let toml = format!("[profile.default]\nsrc = \"{src}\"\n");
+            assert_eq!(source_subpath(Some(&toml)).unwrap(), "contracts/", "{src}");
+        }
+        let nested = "[profile.default]\nsrc = \"packages/core/src\"\n";
+        assert_eq!(source_subpath(Some(nested)).unwrap(), "packages/core/src/");
+        let root = "[profile.default]\nsrc = \".\"\n";
+        assert_eq!(source_subpath(Some(root)).unwrap(), "");
+    }
+
+    #[test]
+    fn test_source_subpath_defaults_to_forges_src_when_unset() {
+        // forge-std's foundry.toml sets no src
+        let unset = "[profile.default]\nfs_permissions = []\n\n[rpc_endpoints]\nmainnet = \"x\"\n";
+        assert_eq!(source_subpath(Some(unset)).unwrap(), "src/");
+        // Another profile's src is not the default profile's
+        let other = "[profile.ci]\nsrc = \"contracts\"\n";
+        assert_eq!(source_subpath(Some(other)).unwrap(), "src/");
+        assert_eq!(source_subpath(Some("")).unwrap(), "src/");
+    }
+
+    #[test]
+    fn test_source_subpath_is_the_root_without_foundry_toml() {
+        assert_eq!(source_subpath(None).unwrap(), "");
+    }
+
+    #[test]
+    fn test_source_subpath_rejects_src_outside_the_repository() {
+        for src in ["../elsewhere", "/abs/src", "src/../../x"] {
+            let toml = format!("[profile.default]\nsrc = \"{src}\"\n");
+            assert!(source_subpath(Some(&toml)).is_err(), "{src}");
+        }
+        assert!(source_subpath(Some("not = [toml")).is_err());
+    }
+
+    fn declared() -> Vec<OutputPackage> {
+        vec![
+            parse_foundry_dep("solady", "https://github.com/vectorized/solady@v0.1.0"),
+            npm_package("@openzeppelin/contracts", "5.4.0", None),
+        ]
+    }
+
+    fn remappings(entries: &[&str]) -> Vec<String> {
+        entries.iter().map(|e| e.to_string()).collect()
+    }
+
+    const VENDOR: Option<&str> = Some(".turnkey/soldeps/vendor");
+
+    #[test]
+    fn test_parse_overrides_maps_package_to_path_inside_it() {
+        let overrides = parse_overrides(
+            &remappings(&[
+                "solady/=.turnkey/soldeps/vendor/solady/src/",
+                "@openzeppelin/contracts/=.turnkey/soldeps/vendor/@openzeppelin/contracts/",
+            ]),
+            &declared(),
+            VENDOR,
+        )
+        .unwrap();
+        assert_eq!(
+            overrides,
+            BTreeMap::from([
+                ("solady".to_string(), "src/".to_string()),
+                ("@openzeppelin/contracts".to_string(), String::new()),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_parse_overrides_rejects_prefix_that_is_not_a_package() {
+        for entry in [
+            // An alias
+            "sol/=.turnkey/soldeps/vendor/solady/src/",
+            // A package's subdirectory
+            "solady/utils/=.turnkey/soldeps/vendor/solady/src/utils/",
+            // No trailing slash
+            "solady=.turnkey/soldeps/vendor/solady/src/",
+            // A context-scoped remapping
+            "examples:solady/=.turnkey/soldeps/vendor/solady/src/",
+            // Not a remapping
+            "solady/",
+        ] {
+            let err = parse_overrides(&remappings(&[entry]), &declared(), VENDOR).unwrap_err();
+            assert!(format!("{err:#}").contains(entry), "{entry}: {err:#}");
+        }
+    }
+
+    #[test]
+    fn test_parse_overrides_rejects_target_outside_the_vendored_package() {
+        for entry in [
+            "solady/=lib/solady/src/",
+            "solady/=.turnkey/soldeps/vendor/solady",
+            "solady/=.turnkey/soldeps/vendor/@openzeppelin/contracts/",
+            "solady/=.turnkey/soldeps/vendor/solady/../other/",
+        ] {
+            let err = parse_overrides(&remappings(&[entry]), &declared(), VENDOR).unwrap_err();
+            assert!(format!("{err:#}").contains(entry), "{entry}: {err:#}");
+        }
+    }
+
+    #[test]
+    fn test_parse_overrides_needs_the_vendor_dir() {
+        let entry = remappings(&["solady/=.turnkey/soldeps/vendor/solady/src/"]);
+        assert!(parse_overrides(&entry, &declared(), None).is_err());
+        assert!(parse_overrides(&[], &declared(), None).unwrap().is_empty());
+        // The vendor directory is what the flag says, not a fixed path
+        let elsewhere = remappings(&["solady/=cells/sol/vendor/solady/src/"]);
+        assert!(parse_overrides(&elsewhere, &declared(), VENDOR).is_err());
+        assert_eq!(
+            parse_overrides(&elsewhere, &declared(), Some("cells/sol/vendor/")).unwrap()["solady"],
+            "src/"
+        );
+    }
+
+    const SOLADY: &str = "https://github.com/vectorized/solady";
+
+    /// solady@v0.1.0 as prefetching leaves it: pinned to COMMIT, with the
+    /// archive of that commit fetched
+    fn pinned_solady() -> OutputPackage {
+        let mut pkg = parse_foundry_dep("solady", &format!("{SOLADY}@v0.1.0"));
+        pkg.rev = Some(COMMIT.to_string());
+        pkg.hash = Some("sha256-solady".to_string());
+        pkg
+    }
+
+    /// solady as the previous solidity-deps.toml recorded it
+    fn recorded_solady(rev: &str, remapping: &str) -> OutputPackage {
+        let mut pkg = parse_foundry_dep("solady", &format!("{SOLADY}@v0.1.0"));
+        pkg.rev = Some(rev.into());
+        pkg.remapping = Some(remapping.into());
+        pkg
+    }
+
+    fn no_overrides() -> BTreeMap<String, String> {
+        BTreeMap::new()
+    }
+
+    fn derive(foundry_toml: Option<&str>) -> OutputPackage {
+        let mut reader =
+            MemorySourceReader::default().with(SOLADY, COMMIT, "foundry.toml", foundry_toml);
+        let mut pkg = pinned_solady();
+        assign_remapping(&mut pkg, &no_overrides(), None, Prefetch::Done(&mut reader)).unwrap();
+        assert_eq!(reader.calls.len(), 1);
+        pkg
+    }
+
+    #[test]
+    fn test_assign_remapping_derives_the_dependencys_src() {
+        let pkg = derive(Some("[profile.default]\nsrc = \"contracts\"\n"));
+        assert_eq!(
+            pkg.remapping.as_deref(),
+            Some("solady/=lib/solady/contracts/")
+        );
+        assert!(!pkg.remapping_overridden);
+    }
+
+    #[test]
+    fn test_assign_remapping_derives_forges_default_src_when_unset() {
+        let pkg = derive(Some("[profile.default]\nout = \"out\"\n"));
+        assert_eq!(pkg.remapping.as_deref(), Some("solady/=lib/solady/src/"));
+    }
+
+    #[test]
+    fn test_assign_remapping_derives_the_root_without_foundry_toml() {
+        let pkg = derive(None);
+        assert_eq!(pkg.remapping.as_deref(), Some("solady/=lib/solady/"));
+    }
+
+    #[test]
+    fn test_assign_remapping_404_without_fetched_archive_is_not_a_missing_file() {
+        // GitHub also answers 404 for a private repository: without the
+        // archive, a missing foundry.toml proves nothing
+        let mut reader = MemorySourceReader::default().with(SOLADY, COMMIT, "foundry.toml", None);
+        let mut pkg = pinned_solady();
+        pkg.hash = None;
+
+        let err = assign_remapping(&mut pkg, &no_overrides(), None, Prefetch::Done(&mut reader))
+            .unwrap_err();
+
+        assert!(format!("{err:#}").contains("archive"), "{err:#}");
+        assert_eq!(pkg.remapping, None);
+    }
+
+    #[test]
+    fn test_assign_remapping_non_github_dep_points_at_overrides() {
+        let mut reader = MemorySourceReader::default();
+        let mut pkg = parse_foundry_dep("lib", "https://gitlab.com/acme/lib@v1");
+        pkg.rev = Some(COMMIT.to_string());
+
+        let err = assign_remapping(&mut pkg, &no_overrides(), None, Prefetch::Done(&mut reader))
+            .unwrap_err();
+
+        let message = format!("{err:#}");
+        assert!(message.contains("remappings"), "{message}");
+        assert!(message.contains("`lib/=`"), "{message}");
+        assert!(reader.calls.is_empty());
+    }
+
+    #[test]
+    fn test_assign_remapping_override_wins() {
+        let overrides = BTreeMap::from([("solady".to_string(), "src/utils/".to_string())]);
+        let recorded = recorded_solady(COMMIT, "solady/=lib/solady/src/");
+        let mut reader = MemorySourceReader::default();
+
+        let mut pkg = pinned_solady();
+        assign_remapping(
+            &mut pkg,
+            &overrides,
+            Some(&recorded),
+            Prefetch::Done(&mut reader),
+        )
+        .unwrap();
+
+        assert_eq!(
+            pkg.remapping.as_deref(),
+            Some("solady/=lib/solady/src/utils/")
+        );
+        assert!(pkg.remapping_overridden);
+        assert!(reader.calls.is_empty());
+    }
+
+    #[test]
+    fn test_assign_remapping_override_of_npm_package() {
+        let overrides =
+            BTreeMap::from([("@openzeppelin/contracts".to_string(), "token/".to_string())]);
+        let mut pkg = npm_package("@openzeppelin/contracts", "5.4.0", None);
+        assign_remapping(&mut pkg, &overrides, None, Prefetch::Skipped).unwrap();
+        assert_eq!(
+            pkg.remapping.as_deref(),
+            Some("@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/token/")
+        );
+        assert!(pkg.remapping_overridden);
+    }
+
+    #[test]
+    fn test_assign_remapping_npm_package_maps_to_its_root() {
+        let mut pkg = npm_package("@openzeppelin/contracts", "5.4.0", None);
+        assign_remapping(&mut pkg, &no_overrides(), None, Prefetch::Skipped).unwrap();
+        assert_eq!(
+            pkg.remapping.as_deref(),
+            Some("@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/")
+        );
+        assert!(!pkg.remapping_overridden);
+    }
+
+    #[test]
+    fn test_assign_remapping_reuses_recorded_target_while_pin_is_unchanged() {
+        let recorded = recorded_solady(COMMIT, "solady/=lib/solady/contracts/");
+        let mut reader = MemorySourceReader::default();
+
+        let mut pkg = pinned_solady();
+        assign_remapping(
+            &mut pkg,
+            &no_overrides(),
+            Some(&recorded),
+            Prefetch::Done(&mut reader),
+        )
+        .unwrap();
+
+        assert_eq!(
+            pkg.remapping.as_deref(),
+            Some("solady/=lib/solady/contracts/")
+        );
+        assert!(reader.calls.is_empty());
+    }
+
+    #[test]
+    fn test_assign_remapping_without_prefetch_reuses_recorded_target() {
+        // Without prefetching, the declared tag is not resolved to a commit
+        let recorded = recorded_solady(COMMIT, "solady/=lib/solady/contracts/");
+        let mut pkg = parse_foundry_dep("solady", &format!("{SOLADY}@v0.1.0"));
+        assign_remapping(
+            &mut pkg,
+            &no_overrides(),
+            Some(&recorded),
+            Prefetch::Skipped,
+        )
+        .unwrap();
+        assert_eq!(
+            pkg.remapping.as_deref(),
+            Some("solady/=lib/solady/contracts/")
+        );
+    }
+
+    #[test]
+    fn test_assign_remapping_without_prefetch_fails_when_pin_changed() {
+        let mut recorded = recorded_solady(COMMIT, "solady/=lib/solady/contracts/");
+        recorded.version = "v0.0.9".into();
+
+        for recorded in [None, Some(&recorded)] {
+            let mut pkg = parse_foundry_dep("solady", &format!("{SOLADY}@v0.1.0"));
+            let err = assign_remapping(&mut pkg, &no_overrides(), recorded, Prefetch::Skipped)
+                .unwrap_err();
+            assert!(format!("{err:#}").contains("prefetching sync"), "{err:#}");
+            assert_eq!(pkg.remapping, None);
+        }
+    }
+
+    #[test]
+    fn test_assign_remapping_reports_the_prefetch_failure_when_pin_changed() {
+        // Prefetching ran, but the ref did not resolve
+        let failure = anyhow::anyhow!("failed to resolve v0.1.0: ls-remote exploded");
+        let mut pkg = parse_foundry_dep("solady", &format!("{SOLADY}@v0.1.0"));
+
+        let err = assign_remapping(&mut pkg, &no_overrides(), None, Prefetch::Failed(&failure))
+            .unwrap_err();
+
+        let message = format!("{err:#}");
+        assert!(message.contains("ls-remote exploded"), "{message}");
+        assert!(!message.contains("prefetching sync"), "{message}");
+    }
+
+    #[test]
+    fn test_assign_remapping_reuses_recorded_target_when_prefetch_failed() {
+        let failure = anyhow::anyhow!("offline");
+        let recorded = recorded_solady(COMMIT, "solady/=lib/solady/contracts/");
+        let mut pkg = parse_foundry_dep("solady", &format!("{SOLADY}@v0.1.0"));
+        assign_remapping(
+            &mut pkg,
+            &no_overrides(),
+            Some(&recorded),
+            Prefetch::Failed(&failure),
+        )
+        .unwrap();
+        assert_eq!(
+            pkg.remapping.as_deref(),
+            Some("solady/=lib/solady/contracts/")
+        );
+    }
+
+    #[test]
+    fn test_assign_remapping_fails_when_read_fails_and_pin_changed() {
+        // Recorded at another commit; the reader cannot read the new one
+        let recorded = recorded_solady(
+            "0000000000000000000000000000000000000000",
+            "solady/=lib/solady/contracts/",
+        );
+        let mut reader = MemorySourceReader::default();
+
+        let mut pkg = pinned_solady();
+        let err = assign_remapping(
+            &mut pkg,
+            &no_overrides(),
+            Some(&recorded),
+            Prefetch::Done(&mut reader),
+        )
+        .unwrap_err();
+
+        assert!(format!("{err:#}").contains("cannot read"), "{err:#}");
+        assert_eq!(pkg.remapping, None);
+    }
+
+    #[test]
+    fn test_assign_remapping_does_not_reuse_a_dropped_override() {
+        let mut recorded = recorded_solady(COMMIT, "solady/=lib/solady/src/utils/");
+        recorded.remapping_overridden = true;
+
+        // Without prefetching there is nothing to fall back on
+        let mut pkg = pinned_solady();
+        assert!(
+            assign_remapping(
+                &mut pkg,
+                &no_overrides(),
+                Some(&recorded),
+                Prefetch::Skipped
+            )
+            .is_err()
+        );
+
+        // With it, the target is derived again
+        let mut reader = MemorySourceReader::default().with(SOLADY, COMMIT, "foundry.toml", None);
+        let mut pkg = pinned_solady();
+        assign_remapping(
+            &mut pkg,
+            &no_overrides(),
+            Some(&recorded),
+            Prefetch::Done(&mut reader),
+        )
+        .unwrap();
+        assert_eq!(pkg.remapping.as_deref(), Some("solady/=lib/solady/"));
+        assert!(!pkg.remapping_overridden);
+    }
+
+    #[test]
+    fn test_previous_toml_round_trips_output_packages() {
+        let mut pkg = pinned_solady();
+        pkg.remapping = Some("solady/=lib/solady/src/utils/".into());
+        pkg.remapping_overridden = true;
+        let doc = OutputToml {
+            meta: OutputMeta {
+                generator: "soldeps-gen test".into(),
+            },
+            packages: vec![pkg, npm_package("@openzeppelin/contracts", "5.4.0", None)],
+        };
+        let text = deps_gen_kit::render("soldeps-gen", "foundry.toml", &doc).unwrap();
+        let previous: PreviousToml = toml::from_str(&text).unwrap();
+
+        assert_eq!(previous.package.len(), 2);
+        assert_eq!(previous.package[0].source, Source::Git);
+        assert!(previous.package[0].remapping_overridden);
+        assert_eq!(previous.package[1].source, Source::Npm);
+        assert!(!previous.package[1].remapping_overridden);
     }
 }

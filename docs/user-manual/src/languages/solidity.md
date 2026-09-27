@@ -134,6 +134,33 @@ repository it also records that commit's source archive and its Nix hash, so the
 `pnpm-lock.yaml` gives no integrity for gets the hash of its tarball. Hashes go
 through turnkey's prefetch cache, so a regeneration only fetches what changed.
 
+#### Remappings
+
+Each package is imported under its own name: `forge-std/...` resolves inside
+forge-std. An npm package maps to its root. A git dependency maps to the
+directory its own `foundry.toml` names as `[profile.default] src`, to forge's
+default `src/` when its `foundry.toml` sets none, and to the repository root
+when it has no `foundry.toml`. `soldeps-gen` reads that file at the pinned
+commit while prefetching, and records the result as the package's `remapping`
+in `solidity-deps.toml`. Later syncs reuse the recorded target while the
+package's pin is unchanged, so a sync with `--no-prefetch` works for them; a
+new or re-pinned git dependency needs a prefetching sync.
+
+`soldeps-gen` reads a dependency's `foundry.toml` only from GitHub. For a git
+dependency hosted elsewhere, the sync fails rather than guess; give it an
+override (below) naming where its sources live.
+
+To point a package elsewhere, add a remapping to the root `foundry.toml`:
+
+```toml
+[profile.default]
+remappings = ["solady/=.turnkey/soldeps/vendor/solady/src/"]
+```
+
+Its prefix must be `<name>/` of a declared package (remappings cannot alias
+one package under another name), and its target must lie inside
+`.turnkey/soldeps/vendor/<name>/`. `tk sync` rejects anything else.
+
 ## Compiler Version
 
 You can specify the Solidity compiler version per-target:
