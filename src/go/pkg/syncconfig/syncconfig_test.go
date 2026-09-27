@@ -155,6 +155,39 @@ target = "go-deps.toml"
 			wantErr: true,
 		},
 		{
+			name: "language without a cell",
+			config: `
+[[languages]]
+name = "go"
+deps_file = "go-deps.toml"
+`,
+			wantErr: true,
+		},
+		{
+			name: "language without a deps file",
+			config: `
+[[languages]]
+name = "go"
+cell = "godeps"
+`,
+			wantErr: true,
+		},
+		{
+			name: "language listed twice",
+			config: `
+[[languages]]
+name = "go"
+cell = "godeps"
+deps_file = "go-deps.toml"
+
+[[languages]]
+name = "go"
+cell = "otherdeps"
+deps_file = "go-deps.toml"
+`,
+			wantErr: true,
+		},
+		{
 			name:    "empty config",
 			config:  "",
 			wantErr: false,
@@ -267,5 +300,32 @@ cpu = "arm64"
 	}
 	if got := len(cfg.Conditions.Space().Configurations); got != 2 {
 		t.Errorf("space has %d configurations, want 2", got)
+	}
+}
+
+// Each language's cell and deps file are read from [[languages]], in order.
+func TestLoadLanguages(t *testing.T) {
+	cfg, err := Parse([]byte(`[[languages]]
+name = "go"
+cell = "godeps"
+deps_file = "go-deps.toml"
+
+[[languages]]
+name = "javascript"
+cell = "jsdeps"
+deps_file = "web/js-deps.toml"
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Language{
+		{Name: "go", Cell: "godeps", DepsFile: "go-deps.toml"},
+		{Name: "javascript", Cell: "jsdeps", DepsFile: "web/js-deps.toml"},
+	}
+	if !reflect.DeepEqual(cfg.Languages, want) {
+		t.Errorf("languages = %+v, want %+v", cfg.Languages, want)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("Validate: %v", err)
 	}
 }

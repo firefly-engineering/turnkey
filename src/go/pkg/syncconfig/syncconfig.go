@@ -18,6 +18,11 @@
 //	target = "rust-deps.toml"
 //	generator = ["cargo-deps-gen"]
 //
+//	[[languages]]
+//	name = "go"
+//	cell = "godeps"
+//	deps_file = "go-deps.toml"
+//
 //	[conditions]
 //	settings = "toolchains//conditions"
 //
@@ -61,6 +66,25 @@ type Config struct {
 	// Conditions are the build configurations rules sync evaluates, for
 	// deps that differ between them.
 	Conditions ConditionsConfig `toml:"conditions"`
+
+	// Languages are the languages turnkey manages dependencies for, one per
+	// language record (turnkey's nix/buck2/languages.nix).
+	Languages []Language `toml:"languages"`
+}
+
+// Language is what rules sync knows of a language from its record: where
+// the language's external deps are.
+type Language struct {
+	// Name is the record's name, e.g. "go" or "javascript".
+	Name string `toml:"name"`
+
+	// Cell is the Buck2 cell holding the language's external deps
+	// (e.g. "godeps").
+	Cell string `toml:"cell"`
+
+	// DepsFile is the deps file the cell is built from, relative to the
+	// project root (e.g. "go-deps.toml").
+	DepsFile string `toml:"deps_file"`
 }
 
 // ConditionsConfig describes the build configurations rules sync
@@ -322,6 +346,23 @@ func (c *Config) Validate() error {
 		}
 		if len(r.Generator) == 0 {
 			return fmt.Errorf("buck rule %q: generator command is required", r.Name)
+		}
+	}
+
+	seen := make(map[string]bool)
+	for i, l := range c.Languages {
+		if l.Name == "" {
+			return fmt.Errorf("language %d: name is required", i)
+		}
+		if seen[l.Name] {
+			return fmt.Errorf("language %q: listed twice", l.Name)
+		}
+		seen[l.Name] = true
+		if l.Cell == "" {
+			return fmt.Errorf("language %q: cell is required", l.Name)
+		}
+		if l.DepsFile == "" {
+			return fmt.Errorf("language %q: deps_file is required", l.Name)
 		}
 	}
 

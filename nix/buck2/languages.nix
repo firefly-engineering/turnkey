@@ -5,12 +5,16 @@
 # writes it and the sync rules that say when to run it. The flake-parts
 # module builds the cells from these records, and the devenv module derives
 # the cell symlinks, the shell's generators and .turnkey/sync.toml from them,
-# so adding a language is a change to this file.
+# so adding a language is a change to this file. sync.toml carries each
+# record's cell and deps file to rules sync (src/go/pkg/mapper).
 #
 # Each record has:
 #   name         the option name under turnkey.buck2 (e.g. "go")
 #   cellName     the Buck2 cell and the .turnkey/<cellName> symlink
 #   description  shown by the shell in verbose mode
+#   depsFile     langCfg -> the deps file, relative to the project root:
+#                what the language's sync rules write and rules sync
+#                maps deps to cellName from (sync.toml's [[languages]])
 #   generator    the package providing the deps file's generator
 #   mkCell       { cellName, langCfg, userPatchesDir, conditions } -> the
 #                cell named cellName (the record's), built from
@@ -55,10 +59,11 @@ let
   hasCell = langCfg: langCfg.enable && (langCfg.cell != null || langCfg.depsFile != null);
 in
 [
-  {
+  rec {
     name = "go";
     cellName = "godeps";
     description = "Go deps";
+    depsFile = langCfg: depsFileName langCfg "go-deps.toml";
     generator = import ../packages/godeps-gen.nix { inherit pkgs lib; };
     mkCell =
       {
@@ -82,7 +87,7 @@ in
           langCfg.modFile
           langCfg.sumFile
         ];
-        target = depsFileName langCfg "go-deps.toml";
+        target = depsFile langCfg;
         generator = [
           "godeps-gen"
           "--go-mod"
@@ -109,10 +114,11 @@ in
     };
   }
 
-  {
+  rec {
     name = "rust";
     cellName = "rustdeps";
     description = "Rust deps";
+    depsFile = langCfg: depsFileName langCfg "rust-deps.toml";
     generator = import ../packages/rustdeps-gen.nix { inherit pkgs lib; };
     mkCell =
       {
@@ -148,7 +154,7 @@ in
           langCfg.cargoTomlFile
           langCfg.cargoLockFile
         ];
-        target = depsFileName langCfg "rust-deps.toml";
+        target = depsFile langCfg;
         generator = [
           "rustdeps-gen"
           "--cargo-lock"
@@ -172,10 +178,11 @@ in
     };
   }
 
-  {
+  rec {
     name = "python";
     cellName = "pydeps";
     description = "Python deps";
+    depsFile = langCfg: depsFileName langCfg "python-deps.toml";
     generator = import ../packages/pydeps-gen.nix { inherit pkgs lib; };
     mkCell =
       {
@@ -222,7 +229,7 @@ in
             # uv.lock holds the dependency graph: each dependency's marker,
             # each package's extras
             sources = [ langCfg.lockFile ] ++ lib.optional (langCfg.uvLockFile != null) langCfg.uvLockFile;
-            target = depsFileName langCfg "python-deps.toml";
+            target = depsFile langCfg;
             generator = [
               "pydeps-gen"
               "--lock"
@@ -237,7 +244,7 @@ in
           {
             name = "python";
             sources = [ langCfg.pyprojectFile ];
-            target = depsFileName langCfg "python-deps.toml";
+            target = depsFile langCfg;
             generator = [
               "pydeps-gen"
               "--pyproject"
@@ -271,10 +278,11 @@ in
     };
   }
 
-  {
+  rec {
     name = "javascript";
     cellName = "jsdeps";
     description = "JavaScript deps";
+    depsFile = langCfg: depsFileName langCfg "js-deps.toml";
     generator = import ../packages/jsdeps-gen.nix { inherit pkgs lib; };
     mkCell =
       {
@@ -293,7 +301,7 @@ in
       lib.optional (hasCell langCfg) {
         name = "javascript";
         sources = [ langCfg.lockFile ];
-        target = depsFileName langCfg "js-deps.toml";
+        target = depsFile langCfg;
         generator = [
           "jsdeps-gen"
           "--lock"
@@ -303,10 +311,11 @@ in
       };
   }
 
-  {
+  rec {
     name = "solidity";
     cellName = "soldeps";
     description = "Solidity deps";
+    depsFile = langCfg: depsFileName langCfg "solidity-deps.toml";
     generator = import ../packages/soldeps-gen.nix { inherit pkgs lib; };
     # The Solidity adapter builds its cell without the generic builder, so
     # it takes no user patches.
@@ -332,7 +341,7 @@ in
           langCfg.packageJsonFile
           langCfg.pnpmLockFile
         ];
-        target = depsFileName langCfg "solidity-deps.toml";
+        target = depsFile langCfg;
         generator = [
           "soldeps-gen"
           "--foundry"
