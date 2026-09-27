@@ -1,0 +1,36 @@
+rust: a Cargo-style feature request on rust_library, rust_binary and rust_test.
+
+Adds `cargo_features` (a list of features) and `default_features` (a bool,
+True by default) to the Rust rules, through rust_common's features_arg.
+The rules ignore them: rustc never sees them. turnkey's rules sync reads
+them as the target's variant, the build Cargo would do for a dependency
+asking for those features, and expands the request into the literal
+`features` and the `deps` it writes. A target setting neither builds what
+`cargo build -p <crate>` builds: its `default` features.
+
+--- a/decls/rust_common.bzl
++++ b/decls/rust_common.bzl
+@@ -39,6 +39,23 @@
+      These are passed to `rustc` with `--cfg feature="{feature}"`, and can be used in the code with `#[cfg(feature = "{feature}")]`.
+ """,
+         ),
++        "cargo_features": attrs.list(
++            attrs.string(),
++            default = [],
++            doc = """
++    The features to build the crate with, as Cargo would be asked for them: turnkey's rules sync
++     expands them (and the crate's `default` features, unless `default_features` is False) into
++     `features` and `deps`. rustc never sees them. A target setting neither this nor
++     `default_features` builds what `cargo build -p <crate>` builds.
++""",
++        ),
++        "default_features": attrs.bool(
++            default = True,
++            doc = """
++    Whether the crate's `default` features are part of the request in `cargo_features`, as Cargo's
++     `default-features`. rustc never sees it.
++""",
++        ),
+     }
+ 
+ def _edition_arg():

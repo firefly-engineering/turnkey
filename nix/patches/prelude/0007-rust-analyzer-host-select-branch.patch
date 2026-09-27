@@ -1,0 +1,61 @@
+rust-analyzer: take the host's branch of a select() it can't configure.
+
+gather_unconfigured_deps reads the attributes of targets it can't
+configure, and resolved every select() to its DEFAULT entry. turnkey's
+rules sync writes select()s keyed on the platform with no DEFAULT
+(config//os:<os>, config//cpu:<cpu>, toolchains//conditions:<os>-<cpu>),
+e.g. a crate's `features` that differ per OS, so that found nothing. It
+now takes the most specific key matching the host, from host_info(), and
+DEFAULT only when none matches. rust-analyzer so sees only the host's
+branch, the accepted cost of decision 12 of
+https://github.com/firefly-engineering/turnkey/issues/109.
+
+--- a/rust/rust-analyzer/resolve_deps.bxl
++++ b/rust/rust-analyzer/resolve_deps.bxl
+@@ -102,8 +102,36 @@
+         "tests": tests,
+     }
+ 
++def _host_select_entry(value: bxl.SelectDict):
++    """The entry of a select() the host's configuration takes.
++
++    turnkey writes select()s keyed on the platform, with no DEFAULT:
++    config//os:<os> (prelude//os:<os>), config//cpu:<cpu>, or a combined
++    toolchains//conditions:<os>-<cpu>. The most specific key matching the
++    host wins; DEFAULT, if any, when none does.
++    """
++    info = host_info()
++    os = "linux" if info.os.is_linux else "macos" if info.os.is_macos else None
++    cpu = "arm64" if info.arch.is_aarch64 else "x86_64" if info.arch.is_x86_64 else None
++    best = None
++    best_rank = 0
++    for key, entry in value.select_items():
++        package, _, name = str(key).partition(":")
++        rank = 0
++        if package.endswith("//os") and name == os:
++            rank = 1
++        elif package.endswith("//cpu") and name == cpu:
++            rank = 1
++        elif package.endswith("//conditions") and os and cpu and name == os + "-" + cpu:
++            rank = 2
++        if rank > best_rank:
++            best, best_rank = entry, rank
++    if best_rank > 0:
++        return best
++    return value.get_select_entry("DEFAULT")
++
+ def _select_assume_default(value):
+-    """Unwrap select() values, assuming the DEFAULT value is always used."""
++    """Unwrap select() values, taking the host's branch (see _host_select_entry)."""
+     if isinstance(value, bxl.SelectConcat):
+         items = []
+         for raw_item in value.select_iter():
+@@ -117,7 +145,7 @@
+         return items
+ 
+     if isinstance(value, bxl.SelectDict):
+-        return value.get_select_entry("DEFAULT")
++        return _host_select_entry(value)
+ 
+     return value
+ 
