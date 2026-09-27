@@ -500,8 +500,14 @@ type PackageMapping struct {
 	// TestDeps are the resolved dependencies for the test target.
 	TestDeps []MappedDep
 
-	// UnmappedImports are imports that couldn't be mapped.
+	// UnmappedImports are the package's non-test imports that couldn't be
+	// mapped. They leave the deps of every target built from the package
+	// incomplete.
 	UnmappedImports []string
+
+	// UnmappedTestImports are test-only imports that couldn't be mapped.
+	// They leave only the test target's deps incomplete.
+	UnmappedTestImports []string
 }
 
 // mapPackage maps a single package's imports to dependencies.
@@ -511,33 +517,26 @@ func (m *Mapper) mapPackage(language string, pkg extraction.Package) PackageMapp
 	switch language {
 	case "go":
 		mapping.Deps, mapping.UnmappedImports = m.mapGoImports(pkg.Imports)
-		testDeps, testUnmapped := m.mapGoImports(pkg.TestImports)
-		mapping.TestDeps = testDeps
-		mapping.UnmappedImports = append(mapping.UnmappedImports, testUnmapped...)
+		mapping.TestDeps, mapping.UnmappedTestImports = m.mapGoImports(pkg.TestImports)
 	case "rust":
 		mapping.Deps, mapping.UnmappedImports = m.mapRustImports(pkg.Imports)
-		testDeps, testUnmapped := m.mapRustImports(pkg.TestImports)
-		mapping.TestDeps = testDeps
-		mapping.UnmappedImports = append(mapping.UnmappedImports, testUnmapped...)
+		mapping.TestDeps, mapping.UnmappedTestImports = m.mapRustImports(pkg.TestImports)
 	case "python":
 		mapping.Deps, mapping.UnmappedImports = m.mapPythonImports(pkg.Imports)
-		testDeps, testUnmapped := m.mapPythonImports(pkg.TestImports)
-		mapping.TestDeps = testDeps
-		mapping.UnmappedImports = append(mapping.UnmappedImports, testUnmapped...)
+		mapping.TestDeps, mapping.UnmappedTestImports = m.mapPythonImports(pkg.TestImports)
 	case "typescript":
 		mapping.Deps, mapping.UnmappedImports = m.mapTypescriptImports(pkg.Imports)
-		testDeps, testUnmapped := m.mapTypescriptImports(pkg.TestImports)
-		mapping.TestDeps = testDeps
-		mapping.UnmappedImports = append(mapping.UnmappedImports, testUnmapped...)
+		mapping.TestDeps, mapping.UnmappedTestImports = m.mapTypescriptImports(pkg.TestImports)
 	case "solidity":
 		mapping.Deps, mapping.UnmappedImports = m.mapSolidityImports(pkg.Imports)
-		testDeps, testUnmapped := m.mapSolidityImports(pkg.TestImports)
-		mapping.TestDeps = testDeps
-		mapping.UnmappedImports = append(mapping.UnmappedImports, testUnmapped...)
+		mapping.TestDeps, mapping.UnmappedTestImports = m.mapSolidityImports(pkg.TestImports)
 	default:
 		// Unknown language, report all as unmapped
 		for _, imp := range pkg.Imports {
 			mapping.UnmappedImports = append(mapping.UnmappedImports, imp.Path)
+		}
+		for _, imp := range pkg.TestImports {
+			mapping.UnmappedTestImports = append(mapping.UnmappedTestImports, imp.Path)
 		}
 	}
 

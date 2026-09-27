@@ -104,6 +104,10 @@ func runRulesCheck(args []string) int {
 			continue
 		}
 		checkedCount++
+		if !quiet {
+			relPath, _ := filepath.Rel(root, result.Path)
+			printKeptDeps(relPath, result.Changes)
+		}
 		if result.Updated {
 			anyNeedsUpdate = true
 			relPath, _ := filepath.Rel(root, result.Path)
@@ -211,6 +215,10 @@ func runRulesSync(args []string) int {
 			}
 		}
 
+		if !quiet {
+			printKeptDeps(relPath, result.Changes)
+		}
+
 		if result.Skipped {
 			skippedCount++
 			if verbose {
@@ -253,6 +261,9 @@ func runRulesSync(args []string) int {
 // printTargetChanges prints each changed target's added and removed deps.
 func printTargetChanges(changes []rulessync.TargetChange, addedLabel, removedLabel string) {
 	for _, c := range changes {
+		if len(c.Added) == 0 && len(c.Removed) == 0 {
+			continue
+		}
 		fmt.Fprintf(os.Stderr, "       :%s\n", c.Target)
 		if len(c.Added) > 0 {
 			fmt.Fprintf(os.Stderr, "         %s: %v\n", addedLabel, c.Added)
@@ -260,6 +271,18 @@ func printTargetChanges(changes []rulessync.TargetChange, addedLabel, removedLab
 		if len(c.Removed) > 0 {
 			fmt.Fprintf(os.Stderr, "         %s: %v\n", removedLabel, c.Removed)
 		}
+	}
+}
+
+// printKeptDeps reports, for each target of a rules.star file, the deps sync
+// kept instead of removing because the target has unmapped imports.
+func printKeptDeps(relPath string, changes []rulessync.TargetChange) {
+	for _, c := range changes {
+		if len(c.Kept) == 0 {
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "KEPT: %s:%s: not removing %v: sources have unmapped imports %v\n",
+			relPath, c.Target, c.Kept, c.Unmapped)
 	}
 }
 
@@ -348,6 +371,10 @@ func runRulesAutoSync() int {
 	// Count results
 	updatedCount := 0
 	for _, result := range results {
+		if !quiet {
+			relPath, _ := filepath.Rel(root, result.Path)
+			printKeptDeps(relPath, result.Changes)
+		}
 		if result.Updated {
 			updatedCount++
 		}

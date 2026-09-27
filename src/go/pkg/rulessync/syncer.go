@@ -84,6 +84,13 @@ type TargetChange struct {
 
 	// Removed lists dependencies that were removed.
 	Removed []string
+
+	// Kept lists dependencies sync would have removed but kept because
+	// the target has unmapped imports (listed in Unmapped).
+	Kept []string
+
+	// Unmapped lists the imports that made sync keep the deps in Kept.
+	Unmapped []string
 }
 
 // SyncDirectory syncs all rules.star files in a directory tree.
@@ -222,6 +229,15 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 	for _, unmapped := range pkgMapping.UnmappedImports {
 		result.Errors = append(result.Errors, fmt.Sprintf("unmapped import: %s", unmapped))
 	}
+	for _, unmapped := range pkgMapping.UnmappedTestImports {
+		result.Errors = append(result.Errors, fmt.Sprintf("unmapped test import: %s", unmapped))
+	}
+
+	// An unmapped import is a dep the mapper doesn't know, not one the
+	// target doesn't use, so a target with any keeps all its existing deps.
+	// Test-only imports affect only test targets.
+	libUnmapped := pkgMapping.UnmappedImports
+	testUnmapped := append(append([]string(nil), libUnmapped...), pkgMapping.UnmappedTestImports...)
 
 	// Apply changes to targets
 	modified := false
@@ -230,16 +246,8 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 	// sources import
 	for _, target := range f.Targets {
 		if isLibraryTarget(target.Rule) || isSyncedBinaryTarget(target.Rule) {
-			oldDeps := target.GetDeps()
-			newDeps := mapper.DepsToTargets(pkgMapping.Deps)
-
-			// Preserve manual deps (outside auto-managed section)
-			newDeps = mergeWithPreserved(oldDeps, newDeps)
-
-			if !stringSlicesEqual(oldDeps, newDeps) {
-				target.SetDeps(newDeps)
+			if result.applyDeps(target, mapper.DepsToTargets(pkgMapping.Deps), libUnmapped) {
 				modified = true
-				result.recordChange(target.Name, oldDeps, newDeps)
 			}
 		}
 
@@ -272,13 +280,8 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 				}
 			}
 
-			// Preserve manual deps
-			newDeps = mergeWithPreserved(oldDeps, newDeps)
-
-			if !stringSlicesEqual(oldDeps, newDeps) {
-				target.SetDeps(newDeps)
+			if result.applyDeps(target, newDeps, testUnmapped) {
 				modified = true
-				result.recordChange(target.Name, oldDeps, newDeps)
 			}
 		}
 	}
@@ -702,6 +705,7 @@ func mergePackageMappings(mappings map[string]mapper.PackageMapping) mapper.Pack
 		}
 		// Collect unmapped imports
 		result.UnmappedImports = append(result.UnmappedImports, m.UnmappedImports...)
+		result.UnmappedTestImports = append(result.UnmappedTestImports, m.UnmappedTestImports...)
 	}
 
 	return result
@@ -732,10 +736,60 @@ func mergeWithPreserved(oldDeps, newDeps []string) []string {
 	return append(preserved, newDeps...)
 }
 
-// recordChange appends the diff between a target's old and new deps.
-func (r *SyncResult) recordChange(target string, oldDeps, newDeps []string) {
-	added, removed := diffDeps(oldDeps, newDeps)
-	r.Changes = append(r.Changes, TargetChange{Target: target, Added: added, Removed: removed})
+// applyDeps sets a target's deps to the mapped ones, preserving manual deps,
+// and records the change. If unmapped is non-empty the mapped deps are
+// incomplete, so no existing dep is removed: those that would have been are
+// recorded as kept instead. It reports whether the target's deps changed.
+func (r *SyncResult) applyDeps(target *starlark.Target, mapped, unmapped []string) bool {
+	oldDeps := target.GetDeps()
+	newDeps := mergeWithPreserved(oldDeps, mapped)
+
+	var kept []string
+	if len(unmapped) > 0 {
+		newDeps, kept = keepExisting(oldDeps, newDeps)
+	}
+
+	changed := !stringSlicesEqual(oldDeps, newDeps)
+	if changed {
+		target.SetDeps(newDeps)
+	}
+	if changed || len(kept) > 0 {
+		added, removed := diffDeps(oldDeps, newDeps)
+		change := TargetChange{Target: target.Name, Added: added, Removed: removed}
+		if len(kept) > 0 {
+			change.Kept = kept
+			change.Unmapped = unmapped
+		}
+		r.Changes = append(r.Changes, change)
+	}
+	return changed
+}
+
+// keepExisting returns oldDeps, in their order, followed by the deps of
+// newDeps that are not already in it, and the old deps newDeps lacks.
+func keepExisting(oldDeps, newDeps []string) (merged, kept []string) {
+	inNew := make(map[string]bool, len(newDeps))
+	for _, d := range newDeps {
+		inNew[d] = true
+	}
+	inOld := make(map[string]bool, len(oldDeps))
+	for _, d := range oldDeps {
+		inOld[d] = true
+		if !inNew[d] {
+			kept = append(kept, d)
+		}
+	}
+	if len(kept) == 0 {
+		return newDeps, nil
+	}
+
+	merged = append([]string(nil), oldDeps...)
+	for _, d := range newDeps {
+		if !inOld[d] {
+			merged = append(merged, d)
+		}
+	}
+	return merged, kept
 }
 
 // diffDeps returns added and removed deps.

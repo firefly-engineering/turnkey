@@ -162,3 +162,84 @@ go_test(
 		t.Errorf("changes = %+v, want %+v", result.Changes, want)
 	}
 }
+
+// parseTarget parses a rules.star source and returns its only target.
+func parseTarget(t *testing.T, src string) *starlark.Target {
+	t.Helper()
+	f, err := starlark.Parse("rules.star", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Targets) != 1 {
+		t.Fatalf("got %d targets, want 1", len(f.Targets))
+	}
+	return f.Targets[0]
+}
+
+const libWithX = `go_library(
+    name = "lib",
+    deps = [
+        # turnkey:auto-start
+        "//pkg/x:x",
+        # turnkey:auto-end
+    ],
+)
+`
+
+// With unmapped imports the mapped deps are incomplete: an existing dep the
+// mapper didn't return is kept, and a newly mapped dep is still added.
+func TestApplyDepsKeepsDepsWhenUnmapped(t *testing.T) {
+	target := parseTarget(t, libWithX)
+	var result SyncResult
+
+	changed := result.applyDeps(target, []string{"//pkg/y:y"}, []string{"example.com/unknown"})
+	if !changed {
+		t.Error("target not changed, want //pkg/y:y added")
+	}
+	if got, want := target.GetDeps(), []string{"//pkg/x:x", "//pkg/y:y"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("deps = %v, want %v", got, want)
+	}
+	want := []TargetChange{{
+		Target:   "lib",
+		Added:    []string{"//pkg/y:y"},
+		Kept:     []string{"//pkg/x:x"},
+		Unmapped: []string{"example.com/unknown"},
+	}}
+	if !reflect.DeepEqual(result.Changes, want) {
+		t.Errorf("changes = %+v, want %+v", result.Changes, want)
+	}
+}
+
+// A kept dep is reported even when nothing else about the target changes.
+func TestApplyDepsReportsKeptWithoutChange(t *testing.T) {
+	target := parseTarget(t, libWithX)
+	var result SyncResult
+
+	if result.applyDeps(target, nil, []string{"example.com/unknown"}) {
+		t.Error("target changed, want deps untouched")
+	}
+	if got, want := target.GetDeps(), []string{"//pkg/x:x"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("deps = %v, want %v", got, want)
+	}
+	if len(result.Changes) != 1 || !reflect.DeepEqual(result.Changes[0].Kept, []string{"//pkg/x:x"}) {
+		t.Errorf("changes = %+v, want //pkg/x:x kept", result.Changes)
+	}
+}
+
+// Without unmapped imports the mapped deps are complete, so a dep the
+// mapper didn't return is removed.
+func TestApplyDepsRemovesWhenAllMapped(t *testing.T) {
+	target := parseTarget(t, libWithX)
+	var result SyncResult
+
+	if !result.applyDeps(target, []string{"//pkg/y:y"}, nil) {
+		t.Error("target not changed")
+	}
+	if got, want := target.GetDeps(), []string{"//pkg/y:y"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("deps = %v, want %v", got, want)
+	}
+	want := []TargetChange{{Target: "lib", Added: []string{"//pkg/y:y"}, Removed: []string{"//pkg/x:x"}}}
+	if !reflect.DeepEqual(result.Changes, want) {
+		t.Errorf("changes = %+v, want %+v", result.Changes, want)
+	}
+}
