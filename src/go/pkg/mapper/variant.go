@@ -7,9 +7,11 @@ import (
 
 // ReadVariant reads a target's variant attributes (attrs) as their values
 // in each configuration of space: a select() is evaluated, and a list
-// followed by a select() is concatenated with the branch that applies. An
-// attribute the target doesn't set, or whose select() has no branch for a
-// configuration, is absent from that configuration's variant. It reports
+// followed by a select() is concatenated with the branch that applies,
+// each label once. An attribute the target doesn't set is absent from
+// every configuration's variant. In a configuration no branch applies to,
+// a list followed by a select() is the list alone, and a select() alone is
+// absent. It reports
 // false, with the attribute, if one can't be read: a select() with a key
 // the space doesn't know, or a concatenation of values that aren't lists.
 func ReadVariant(target *starlark.Target, attrs []string, space conditions.Space) (func(conditions.Configuration) map[string]starlark.AttributeValue, string, bool) {
@@ -52,18 +54,34 @@ func ReadVariant(target *starlark.Target, attrs []string, space conditions.Space
 			variant[name] = value
 		}
 		for name, c := range selects {
-			i := c.matcher.Branch(config)
-			if i < 0 {
+			var value starlark.AttributeValue
+			if i := c.matcher.Branch(config); i >= 0 {
+				value = c.sel.Branches[i].Value
+			}
+			extra, ok := starlark.Labels(value)
+			if !ok {
+				variant[name] = value
 				continue
 			}
-			value := c.sel.Branches[i].Value
-			if c.sel.Common != nil {
-				common, _ := starlark.Labels(c.sel.Common)
-				extra, _ := starlark.Labels(value)
-				value = starlark.StringListValue{Values: append(append([]string(nil), common...), extra...)}
+			if c.sel.Common == nil && value == nil {
+				continue
 			}
-			variant[name] = value
+			common, _ := starlark.Labels(c.sel.Common)
+			variant[name] = starlark.StringListValue{Values: dedupe(append(append([]string(nil), common...), extra...))}
 		}
 		return variant
 	}, "", true
+}
+
+// dedupe returns list without repeated labels, in order.
+func dedupe(list []string) []string {
+	seen := make(map[string]bool, len(list))
+	var result []string
+	for _, s := range list {
+		if !seen[s] {
+			seen[s] = true
+			result = append(result, s)
+		}
+	}
+	return result
 }
