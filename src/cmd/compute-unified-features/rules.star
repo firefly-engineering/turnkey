@@ -5,7 +5,6 @@ python_binary(
     main = "__main__.py",
     deps = [
         "//src/python/cargo:cargo",
-        "//src/python/cfg:cfg",
     ],
     visibility = ["PUBLIC"],
 )

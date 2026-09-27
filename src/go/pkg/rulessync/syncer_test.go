@@ -381,3 +381,19 @@ func TestApplyDepsHonoursPreserveSection(t *testing.T) {
 		t.Errorf("unchanged target reported changes: %+v", result.Changes)
 	}
 }
+
+func TestIsSyncedBinaryTarget(t *testing.T) {
+	for rule, want := range map[string]bool{
+		"go_binary":     true,
+		"rust_binary":   true,
+		"python_binary": true,
+		"go_library":    false,
+		"rust_test":     false,
+		"sh_binary":     false,
+		"genrule":       false,
+	} {
+		if got := isSyncedBinaryTarget(rule); got != want {
+			t.Errorf("isSyncedBinaryTarget(%q) = %v, want %v", rule, got, want)
+		}
+	}
+}

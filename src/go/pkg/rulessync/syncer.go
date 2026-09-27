@@ -440,18 +440,26 @@ func sourcePatterns(language string) []string {
 // detectLanguage determines the language from rules.star content.
 func (s *Syncer) detectLanguage(f *starlark.File) string {
 	for _, target := range f.Targets {
-		switch {
-		case strings.HasPrefix(target.Rule, "go_"):
-			return "go"
-		case strings.HasPrefix(target.Rule, "rust_"):
-			return "rust"
-		case strings.HasPrefix(target.Rule, "python_"):
-			return "python"
-		case strings.HasPrefix(target.Rule, "typescript_"), strings.HasPrefix(target.Rule, "js_"):
-			return "typescript"
-		case strings.HasPrefix(target.Rule, "solidity_"), strings.HasPrefix(target.Rule, "sol_"):
-			return "solidity"
+		if language := ruleLanguage(target.Rule); language != "" {
+			return language
 		}
+	}
+	return ""
+}
+
+// ruleLanguage returns the language a rule kind belongs to, or "".
+func ruleLanguage(rule string) string {
+	switch {
+	case strings.HasPrefix(rule, "go_"):
+		return "go"
+	case strings.HasPrefix(rule, "rust_"):
+		return "rust"
+	case strings.HasPrefix(rule, "python_"):
+		return "python"
+	case strings.HasPrefix(rule, "typescript_"), strings.HasPrefix(rule, "js_"):
+		return "typescript"
+	case strings.HasPrefix(rule, "solidity_"), strings.HasPrefix(rule, "sol_"):
+		return "solidity"
 	}
 	return ""
 }
@@ -655,12 +663,9 @@ func isLibraryTarget(rule string) bool {
 }
 
 // isSyncedBinaryTarget returns true if the rule is a binary target whose deps
-// sync manages. Only go_binary for now: the Go extractor (go list) reports
-// exactly what a package imports, while deps-extract still reports unmapped
-// names for Rust and Python and would strip correct deps from their binaries
-// (see #99).
+// sync manages: a *_binary rule of a language sync supports.
 func isSyncedBinaryTarget(rule string) bool {
-	return rule == "go_binary"
+	return strings.HasSuffix(rule, "_binary") && ruleLanguage(rule) != ""
 }
 
 // isTestTarget returns true if the rule is a test target.
