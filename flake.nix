@@ -369,11 +369,11 @@
                     }
                   ];
                 }).config;
-              syncConfig = import ./nix/buck2/sync-config.nix { inherit lib; } {
+              syncConfig = import ./nix/buck2/sync-config.nix { inherit pkgs lib; } {
                 languages = import ./nix/buck2/languages.nix { inherit pkgs lib; };
                 buck2 = buck2Options;
               };
-              syncToml = builtins.fromTOML syncConfig.content;
+              syncToml = syncConfig.value;
               platforms = import ./nix/buck2/platforms.nix { inherit lib; };
               platformSettings = platforms.settingsBuckFile (map platforms.fromSystem buck2Options.platforms) [ ];
               taggedSettings = platforms.settingsBuckFile (map platforms.fromSystem [ "x86_64-linux" ]) [

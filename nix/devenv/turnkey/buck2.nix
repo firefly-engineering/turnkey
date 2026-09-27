@@ -259,14 +259,11 @@ let
   # ==========================================================================
 
   # .turnkey/sync.toml (nix/buck2/sync-config.nix)
-  syncConfigContent =
-    (import ../../buck2/sync-config.nix { inherit lib; } {
+  syncConfig =
+    (import ../../buck2/sync-config.nix { inherit pkgs lib; } {
       inherit languages;
       buck2 = cfg;
-    }).content;
-
-  # Sync config file derivation
-  syncConfig = pkgs.writeText "turnkey.sync.toml" syncConfigContent;
+    }).file;
 
 in
 {

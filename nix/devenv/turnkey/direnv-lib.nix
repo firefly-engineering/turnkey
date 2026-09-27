@@ -17,7 +17,7 @@ let
   # .turnkey/sync.toml (nix/buck2/sync-config.nix); a shell without Buck2
   # has none
   syncRules = lib.optionals buck2Cfg.enable
-    (import ../../buck2/sync-config.nix { inherit lib; } {
+    (import ../../buck2/sync-config.nix { inherit pkgs lib; } {
       languages = import ../../buck2/languages.nix { inherit pkgs lib; };
       buck2 = buck2Cfg;
     }).rules;
