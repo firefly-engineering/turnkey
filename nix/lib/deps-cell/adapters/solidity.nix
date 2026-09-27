@@ -8,7 +8,7 @@
 #   - npm: Packages like @openzeppelin/contracts
 #   - git: Foundry-style git dependencies (forge-std, solady, etc.)
 #
-# The cell generates a remappings.json that solidity_library uses automatically.
+# The cell generates a remappings.txt that solidity_library and solidity_test read.
 
 {
   pkgs,
@@ -218,22 +218,6 @@ rec {
       # Sanitize name for Buck target
       sanitizeName = name: lib.replaceStrings [ "@" "/" "-" ] [ "" "_" "_" ] name;
 
-      # Generate remappings JSON - maps import prefixes to relative paths within the cell
-      # This is read by solidity_library to auto-generate remappings
-      remappingsJson = builtins.toJSON (
-        builtins.listToAttrs (
-          map (pkg: {
-            name = sanitizeName pkg.name; # Buck target name
-            value = {
-              package = pkg.name;
-              inherit (cellRemapping pkg) prefix;
-              # Path relative to the cell root where the package lives
-              path = "vendor/${pkg.name}";
-            };
-          }) packages
-        )
-      );
-
       # Generate root BUCK file for the cell
       #
       # `bundle` lays out every vendor package at its vendor/<name> path next to
@@ -270,7 +254,7 @@ rec {
         ) packages}
       '';
 
-      # Generate remappings.txt in solc format for convenience
+      # The remappings.txt lines, one per package (cellRemapping)
       remappingsTxt = lib.concatMapStringsSep "\n" (
         pkg:
         let
@@ -287,12 +271,7 @@ rec {
         userPatchesDir
         ;
       mergeCommands = ''
-        # Generate remappings.json for solidity_library to use
-        cat > $out/remappings.json << 'REMAPPINGS_JSON'
-        ${remappingsJson}
-        REMAPPINGS_JSON
-
-        # Generate remappings.txt in solc format for manual use
+        # remappings.txt in solc format: solidity_library and solidity_test read it
         cat > $out/remappings.txt << 'REMAPPINGS'
         ${remappingsTxt}
         REMAPPINGS
