@@ -37,22 +37,33 @@ func ParseFile(path string) (*GoFile, error) {
 		}
 	}
 
-	// Extract //go:build constraints
-	// go/parser with ImportsOnly|ParseComments will include comments.
-	// Build constraints must appear before the package clause.
+	// Extract build constraints, which must appear before the package
+	// clause: //go:build, or in files that predate it, the // +build
+	// lines, which all must hold
+	var plusBuild constraint.Expr
 	for _, cg := range f.Comments {
 		if cg.Pos() >= f.Package {
-			// go:build must be before package clause
 			continue
 		}
 		for _, c := range cg.List {
-			if strings.HasPrefix(c.Text, "//go:build") {
-				expr, err := constraint.Parse(c.Text)
-				if err == nil {
-					gf.Constraint = expr
+			expr, err := constraint.Parse(c.Text)
+			if err != nil {
+				continue
+			}
+			switch {
+			case constraint.IsGoBuild(c.Text):
+				gf.Constraint = expr
+			case constraint.IsPlusBuild(c.Text):
+				if plusBuild == nil {
+					plusBuild = expr
+				} else {
+					plusBuild = &constraint.AndExpr{X: plusBuild, Y: expr}
 				}
 			}
 		}
+	}
+	if gf.Constraint == nil {
+		gf.Constraint = plusBuild
 	}
 
 	// Extract //go:embed directives

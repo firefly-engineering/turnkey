@@ -21,12 +21,14 @@ pkgs.buildGoModule {
       (root + "/src/cmd/buckgen")
       (root + "/src/go/pkg/buckgen")
       (root + "/src/go/pkg/goparse")
+      (root + "/src/go/pkg/conditions")
+      (root + "/src/go/pkg/starlark")
     ];
   };
   subPackages = [ "src/cmd/buckgen" ];
 
   # Use lib.fakeHash initially to get the correct hash:
-  vendorHash = "sha256-jKrzjAYsAqo/YSxtCOqjaFaYAMhMyGuVOHqEiwVf1W4=";
+  vendorHash = "sha256-4sLFkUmpdMTHbYaW01MELSokNtuCA1t+4dCghQYRHcI=";
 
   meta = {
     description = "Generate rules.star files for Go dependencies in Buck2";

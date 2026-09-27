@@ -6,11 +6,12 @@ go_library(
     srcs = [
         "config.go",
         "doc.go",
-        "normalize.go",
         "render.go",
     ],
     deps = [
+        "//src/go/pkg/conditions:conditions",
         "//src/go/pkg/goparse:goparse",
+        "//src/go/pkg/starlark:starlark",
     ],
     visibility = ["PUBLIC"],
 )
@@ -19,6 +20,7 @@ go_test(
     name = "buckgen_test",
     srcs = ["render_test.go"],
     deps = [
+        "//src/go/pkg/conditions:conditions",
         "//src/go/pkg/goparse:goparse",
     ],
     target_under_test = ":buckgen",

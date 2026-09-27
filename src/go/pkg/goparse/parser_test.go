@@ -1,6 +1,7 @@
 package goparse
 
 import (
+	"go/build/constraint"
 	"os"
 	"path/filepath"
 	"testing"
@@ -75,45 +76,49 @@ func TestParseFilenameConstraint(t *testing.T) {
 	}
 }
 
-func TestMatchesPlatform(t *testing.T) {
-	linuxAmd64 := Platform{OS: "linux", Arch: "amd64"}
-	darwinArm64 := Platform{OS: "darwin", Arch: "arm64"}
+func TestBuildContextMatches(t *testing.T) {
+	linuxAmd64 := BuildContext{GOOS: "linux", GOARCH: "amd64", CgoEnabled: true, GoVersion: "1.24"}
+	darwinArm64 := BuildContext{GOOS: "darwin", GOARCH: "arm64", CgoEnabled: true, GoVersion: "1.24"}
+	windows := BuildContext{GOOS: "windows", GOARCH: "amd64", GoVersion: "1.24"}
+	tagged := BuildContext{GOOS: "linux", GOARCH: "amd64", GoVersion: "1.24", Tags: []string{"integration"}}
+	old := BuildContext{GOOS: "linux", GOARCH: "amd64", GoVersion: "1.20"}
+
+	build := func(expr string) constraint.Expr {
+		e, err := constraint.Parse("//go:build " + expr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return e
+	}
 
 	tests := []struct {
-		file     *GoFile
-		platform Platform
-		matches  bool
+		name    string
+		file    *GoFile
+		ctx     BuildContext
+		matches bool
 	}{
-		{
-			file:     &GoFile{Path: "foo.go"},
-			platform: linuxAmd64,
-			matches:  true,
-		},
-		{
-			file:     &GoFile{Path: "foo_linux.go"},
-			platform: linuxAmd64,
-			matches:  true,
-		},
-		{
-			file:     &GoFile{Path: "foo_linux.go"},
-			platform: darwinArm64,
-			matches:  false,
-		},
-		{
-			file:     &GoFile{Path: "foo_amd64.go"},
-			platform: linuxAmd64,
-			matches:  true,
-		},
-		{
-			file:     &GoFile{Path: "foo_windows_amd64.go"},
-			platform: linuxAmd64,
-			matches:  false,
-		},
+		{"plain", &GoFile{Path: "foo.go"}, linuxAmd64, true},
+		{"_linux on linux", &GoFile{Path: "foo_linux.go"}, linuxAmd64, true},
+		{"_linux on darwin", &GoFile{Path: "foo_linux.go"}, darwinArm64, false},
+		{"_amd64", &GoFile{Path: "foo_amd64.go"}, linuxAmd64, true},
+		{"_windows_amd64 on linux", &GoFile{Path: "foo_windows_amd64.go"}, linuxAmd64, false},
+		{"unix on linux", &GoFile{Path: "u.go", Constraint: build("unix")}, linuxAmd64, true},
+		{"unix on macos", &GoFile{Path: "u.go", Constraint: build("unix")}, darwinArm64, true},
+		{"unix on windows", &GoFile{Path: "u.go", Constraint: build("unix")}, windows, false},
+		{"go1.21 with 1.24", &GoFile{Path: "v.go", Constraint: build("go1.21")}, linuxAmd64, true},
+		{"go1.21 with 1.20", &GoFile{Path: "v.go", Constraint: build("go1.21")}, old, false},
+		{"!go1.21 with 1.24", &GoFile{Path: "v.go", Constraint: build("!go1.21")}, linuxAmd64, false},
+		{"custom tag unset", &GoFile{Path: "i.go", Constraint: build("integration")}, linuxAmd64, false},
+		{"custom tag set", &GoFile{Path: "i.go", Constraint: build("integration")}, tagged, true},
+		{"cgo on", &GoFile{Path: "c.go", Constraint: build("cgo")}, linuxAmd64, true},
+		{"cgo off", &GoFile{Path: "c.go", Constraint: build("cgo")}, windows, false},
+		{"import C without cgo", &GoFile{Path: "c.go", HasCgo: true}, windows, false},
+		{"gc", &GoFile{Path: "g.go", Constraint: build("gc && !gccgo")}, linuxAmd64, true},
 	}
 
 	for _, tt := range tests {
-		if got := MatchesPlatform(tt.file, tt.platform); got != tt.matches {
-			t.Errorf("MatchesPlatform(%s, %v) = %v; want %v", tt.file.Path, tt.platform, got, tt.matches)
+		if got := tt.ctx.Matches(tt.file); got != tt.matches {
+			t.Errorf("%s: Matches = %v; want %v", tt.name, got, tt.matches)
 		}
 	}
 }

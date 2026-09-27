@@ -5,24 +5,50 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/goparse"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
 )
 
-// RenderPackage generates a rules.star file for a Go package
-func RenderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) error {
-	if cfg == nil {
-		cfg = DefaultConfig()
+// RenderPackage generates a rules.star file for a Go package. Its deps are
+// resolved in every configuration: on each platform, and for each
+// combination of the allowed build tags its files' constraints use. Deps
+// every configuration has are a plain list; the others are a select()
+// keyed as the conditions core keys them, with no DEFAULT. It reports
+// false, writing nothing, if no configuration builds the package (e.g. a
+// Windows-only package).
+func RenderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) (bool, error) {
+	space := packageSpace(pkg, cfg)
+	deps := make(map[string][]string, len(space.Configurations))
+	built := false
+	for _, config := range space.Configurations {
+		imports, ok := pkg.Imports(buildContext(config, cfg))
+		built = built || ok
+		var targets []string
+		for _, imp := range imports {
+			if isStdLib(imp) {
+				continue
+			}
+			// Skip self-references (package importing itself or parent)
+			if imp == pkg.ImportPath || strings.HasPrefix(pkg.ImportPath, imp+"/") {
+				continue
+			}
+			targets = append(targets, importToTarget(imp, cfg))
+		}
+		deps[config.String()] = targets
+	}
+	if !built {
+		return false, nil
 	}
 
 	if cfg.Buck.Preambule != "" {
 		fmt.Fprintln(w, cfg.Buck.Preambule)
 		fmt.Fprintln(w)
 	}
-
-	normalized := NormalizeDeps(pkg.Imports)
 
 	// Use directory name (last component of import path) as target name for consistency.
 	// This ensures deps can reference targets without knowing the Go package name.
@@ -37,93 +63,73 @@ func RenderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) error {
 	fmt.Fprintf(w, "    header_namespace = \"\",\n")
 	fmt.Fprintf(w, "    visibility = [\"PUBLIC\"],\n")
 
-	// Collect all dependencies (common + platform-specific)
-	var commonDeps []string
-	for _, dep := range normalized.Common {
-		if isStdLib(dep) {
-			continue
-		}
-		// Skip self-references (package importing itself or parent)
-		if dep == pkg.ImportPath || strings.HasPrefix(pkg.ImportPath, dep+"/") {
-			continue
-		}
-		commonDeps = append(commonDeps, importToTarget(dep, cfg))
-	}
-
-	// Collect platform-specific dependencies
-	var platformDeps []struct {
-		constraint string
-		deps       []string
-	}
-	if len(normalized.Platform) > 0 {
-		// Sort platforms for deterministic output
-		var platforms []goparse.Platform
-		for p := range normalized.Platform {
-			platforms = append(platforms, p)
-		}
-		sort.Slice(platforms, func(i, j int) bool {
-			if platforms[i].OS != platforms[j].OS {
-				return platforms[i].OS < platforms[j].OS
-			}
-			return platforms[i].Arch < platforms[j].Arch
-		})
-
-		for _, p := range platforms {
-			deps := normalized.Platform[p]
-			var filteredDeps []string
-			for _, d := range deps {
-				if isStdLib(d) {
-					continue
-				}
-				// Skip self-references
-				if d == pkg.ImportPath || strings.HasPrefix(pkg.ImportPath, d+"/") {
-					continue
-				}
-				filteredDeps = append(filteredDeps, importToTarget(d, cfg))
-			}
-			if len(filteredDeps) > 0 {
-				constraint := findConstraint(p, cfg)
-				platformDeps = append(platformDeps, struct {
-					constraint string
-					deps       []string
-				}{constraint, filteredDeps})
-			}
-		}
-	}
-
+	split := space.Split(func(config conditions.Configuration) []string { return deps[config.String()] })
 	// Only output deps attribute if there are actual dependencies
-	if len(commonDeps) > 0 || len(platformDeps) > 0 {
-		fmt.Fprintf(w, "    %s = [\n", cfg.Buck.DepsAttr)
-		for _, dep := range commonDeps {
-			fmt.Fprintf(w, "        %q,\n", dep)
-		}
-		fmt.Fprintf(w, "    ]")
-
-		if len(platformDeps) > 0 {
-			fmt.Fprintln(w, " + select({")
-			for _, pd := range platformDeps {
-				fmt.Fprintf(w, "        %q: [\n", pd.constraint)
-				for _, d := range pd.deps {
-					fmt.Fprintf(w, "            %q,\n", d)
-				}
-				fmt.Fprintf(w, "        ],\n")
-			}
-			fmt.Fprintln(w, "        \"DEFAULT\": [],")
-			fmt.Fprint(w, "    })")
-		}
-		fmt.Fprintln(w, ",")
+	if len(split.Common) > 0 || split.IsConditional() {
+		fmt.Fprintf(w, "    %s = %s,\n", cfg.Buck.DepsAttr, starlark.RenderIndented(depsValue(split), "    "))
 	}
 	fmt.Fprintln(w, ")")
 
-	return nil
+	return true, nil
+}
+
+// packageSpace returns the configurations a package's deps are resolved
+// for: every platform, crossed with each allowed build tag its files'
+// constraints use.
+func packageSpace(pkg *goparse.GoPackage, cfg *Config) conditions.Space {
+	var dims []string
+	for _, f := range pkg.Files {
+		for _, tag := range f.ConstraintTags() {
+			if slices.Contains(cfg.Conditions.GoTags, tag) {
+				dims = append(dims, conditions.GoTag(tag))
+			}
+		}
+	}
+	return conditions.NewSpace(cfg.Conditions.Platforms, cfg.Conditions.Settings).WithDimensions(dims)
+}
+
+// buildContext returns the Go build of a configuration: its platform's
+// GOOS and GOARCH, cgo, the toolchain's release tags and the tags it sets.
+func buildContext(config conditions.Configuration, cfg *Config) goparse.BuildContext {
+	ctx := goparse.BuildContext{
+		GOOS:       goOS[config[conditions.OS]],
+		GOARCH:     goArch[config[conditions.CPU]],
+		CgoEnabled: true,
+		GoVersion:  cfg.GoVersion,
+	}
+	for dim, value := range config {
+		if tag, ok := strings.CutPrefix(dim, conditions.GoTagPrefix); ok && value == conditions.Set {
+			ctx.Tags = append(ctx.Tags, tag)
+		}
+	}
+	sort.Strings(ctx.Tags)
+	return ctx
+}
+
+// Go's names for Buck2's OS and CPU constraint values
+var (
+	goOS   = map[string]string{"linux": "linux", "macos": "darwin"}
+	goArch = map[string]string{"x86_64": "amd64", "arm64": "arm64"}
+)
+
+// depsValue returns a split as the deps attribute's value.
+func depsValue(split conditions.Split) starlark.AttributeValue {
+	common := starlark.StringListValue{Values: split.Common}
+	if !split.IsConditional() {
+		return common
+	}
+	sel := starlark.SelectValue{}
+	if len(split.Common) > 0 {
+		sel.Common = common
+	}
+	for _, b := range split.Branches {
+		sel.Branches = append(sel.Branches, starlark.SelectBranch{Key: b.Key, Value: starlark.StringListValue{Values: b.Labels}})
+	}
+	return sel
 }
 
 // RenderCell generates rules.star files for all packages in a vendor directory
 func RenderCell(vendorDir string, cfg *Config) ([]string, error) {
-	if cfg == nil {
-		cfg = DefaultConfig()
-	}
-
 	absVendor, err := filepath.Abs(vendorDir)
 	if err != nil {
 		return nil, err
@@ -157,26 +163,23 @@ func RenderCell(vendorDir string, cfg *Config) ([]string, error) {
 		importPath := stripVersionsFromPath(filepath.ToSlash(rel))
 
 		// Try to parse as a Go package
-		pkg, err := goparse.ScanPackage(path, importPath, cfg.PlatformsToGoparse())
+		pkg, err := goparse.ScanPackage(path, importPath)
 		if err != nil || pkg == nil {
 			// Not a go package or other error, just skip
 			return nil
 		}
 
-		// If it has no Go files, skip
-		if len(pkg.GoFiles) == 0 {
-			return nil
-		}
-
-		// Generate rules.star
-		buildFile := filepath.Join(path, cfg.Buck.BuildfileName)
-		f, err := os.Create(buildFile)
+		// Generate rules.star, unless no configuration builds the package
+		var content strings.Builder
+		built, err := RenderPackage(&content, pkg, cfg)
 		if err != nil {
 			return err
 		}
-		defer f.Close()
-
-		if err := RenderPackage(f, pkg, cfg); err != nil {
+		if !built {
+			return nil
+		}
+		buildFile := filepath.Join(path, cfg.Buck.BuildfileName)
+		if err := os.WriteFile(buildFile, []byte(content.String()), 0o644); err != nil {
 			return err
 		}
 
@@ -236,25 +239,4 @@ func importToTarget(importPath string, cfg *Config) string {
 	parts := strings.Split(importPath, "/")
 	name := parts[len(parts)-1]
 	return fmt.Sprintf("%s%s:%s", cfg.Buck.DepsTargetLabelPrefix, importPath, name)
-}
-
-func findConstraint(p goparse.Platform, cfg *Config) string {
-	for _, pc := range cfg.Platforms {
-		if pc.GoOS == p.OS && pc.GoArch == p.Arch {
-			// Prefer OS constraint if available
-			if pc.BuckOS != "" {
-				return cfg.Buck.OSConstraintPrefix + pc.BuckOS
-			}
-		}
-	}
-	return "DEFAULT"
-}
-
-// Helper to convert buckgen.Platform to goparse.Platform
-func (c *Config) PlatformsToGoparse() []goparse.Platform {
-	res := make([]goparse.Platform, len(c.Platforms))
-	for i, p := range c.Platforms {
-		res[i] = goparse.Platform{OS: p.GoOS, Arch: p.GoArch}
-	}
-	return res
 }

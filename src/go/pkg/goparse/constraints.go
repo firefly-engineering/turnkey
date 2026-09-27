@@ -1,42 +1,124 @@
 package goparse
 
 import (
+	"go/build/constraint"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 )
 
-// MatchesPlatform checks if a file should be included for the given platform.
-// Evaluates both:
-// 1. //go:build constraints from file content
-// 2. Filename conventions (*_linux.go, *_amd64.go, etc.)
-func MatchesPlatform(file *GoFile, platform Platform) bool {
-	// 1. Evaluate //go:build
-	if file.Constraint != nil {
-		if !file.Constraint.Eval(func(tag string) bool {
-			// We only care about OS and Arch tags for now.
-			// Other tags (like "cgo") could be handled too if needed.
-			if tag == platform.OS || tag == platform.Arch {
-				return true
-			}
-			if tag == "cgo" && file.HasCgo {
-				return true
-			}
-			return false
-		}) {
-			return false
+// BuildContext is what a file's build constraints are evaluated against,
+// as go/build evaluates them for a build.
+type BuildContext struct {
+	// GOOS and GOARCH are the target's, e.g. "linux" and "arm64".
+	GOOS, GOARCH string
+
+	// CgoEnabled is whether cgo is on: the cgo tag is set, and files
+	// importing "C" are part of the build.
+	CgoEnabled bool
+
+	// GoVersion is the toolchain's Go version, e.g. "1.24": the release
+	// tags go1.1 up to it are set.
+	GoVersion string
+
+	// Tags are the build tags set on the build (-tags).
+	Tags []string
+}
+
+// unixOS are the GOOS values the unix tag is set for (go/build's list).
+var unixOS = map[string]bool{
+	"aix": true, "android": true, "darwin": true, "dragonfly": true, "freebsd": true,
+	"hurd": true, "illumos": true, "ios": true, "linux": true, "netbsd": true,
+	"openbsd": true, "solaris": true,
+}
+
+// Matches reports whether a file is part of the build: its //go:build
+// constraint holds and its name's _GOOS/_GOARCH suffixes match.
+func (ctx BuildContext) Matches(file *GoFile) bool {
+	if file.HasCgo && !ctx.CgoEnabled {
+		return false
+	}
+	if file.Constraint != nil && !file.Constraint.Eval(ctx.HasTag) {
+		return false
+	}
+	osTag, archTag := ParseFilenameConstraint(filepath.Base(file.Path))
+	if osTag != "" && !ctx.HasTag(osTag) {
+		return false
+	}
+	if archTag != "" && archTag != ctx.GOARCH {
+		return false
+	}
+	return true
+}
+
+// HasTag reports whether a build tag is set, as go/build decides: GOOS,
+// GOARCH, unix on a Unix, cgo, gc (the compiler), release tags up to the
+// Go version, and the build's own tags. android implies linux, and ios
+// darwin.
+func (ctx BuildContext) HasTag(tag string) bool {
+	switch {
+	case tag == ctx.GOOS || tag == ctx.GOARCH || tag == "gc":
+		return true
+	case tag == "unix":
+		return unixOS[ctx.GOOS]
+	case tag == "cgo":
+		return ctx.CgoEnabled
+	case tag == "linux" && ctx.GOOS == "android", tag == "darwin" && ctx.GOOS == "ios":
+		return true
+	}
+	if minor, ok := releaseMinor(tag); ok {
+		current, ok := releaseMinor("go" + ctx.GoVersion)
+		return ok && minor <= current
+	}
+	for _, t := range ctx.Tags {
+		if t == tag {
+			return true
 		}
 	}
+	return false
+}
 
-	// 2. Evaluate filename
-	osTag, archTag := ParseFilenameConstraint(filepath.Base(file.Path))
-	if osTag != "" && osTag != platform.OS {
-		return false
+// releaseMinor returns N for a release tag go1.N (or a version go1.N.P).
+func releaseMinor(tag string) (int, bool) {
+	rest, ok := strings.CutPrefix(tag, "go1.")
+	if !ok {
+		return 0, false
 	}
-	if archTag != "" && archTag != platform.Arch {
-		return false
+	if dot := strings.IndexByte(rest, '.'); dot >= 0 {
+		rest = rest[:dot]
 	}
+	minor, err := strconv.Atoi(rest)
+	return minor, err == nil
+}
 
-	return true
+// ConstraintTags returns the tags a file's build constraint names, sorted.
+func (f *GoFile) ConstraintTags() []string {
+	seen := make(map[string]bool)
+	var walk func(constraint.Expr)
+	walk = func(e constraint.Expr) {
+		switch e := e.(type) {
+		case *constraint.TagExpr:
+			seen[e.Tag] = true
+		case *constraint.NotExpr:
+			walk(e.X)
+		case *constraint.AndExpr:
+			walk(e.X)
+			walk(e.Y)
+		case *constraint.OrExpr:
+			walk(e.X)
+			walk(e.Y)
+		}
+	}
+	if f.Constraint != nil {
+		walk(f.Constraint)
+	}
+	tags := make([]string, 0, len(seen))
+	for tag := range seen {
+		tags = append(tags, tag)
+	}
+	sort.Strings(tags)
+	return tags
 }
 
 var knownOS = map[string]bool{

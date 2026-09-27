@@ -36,66 +36,35 @@ func ScanDir(dir string) ([]*GoFile, error) {
 	return goFiles, nil
 }
 
-// ScanPackage scans a directory and aggregates files into a GoPackage.
-// Evaluates constraints for each platform in DefaultPlatforms if platforms is nil.
-func ScanPackage(dir, importPath string, platforms []Platform) (*GoPackage, error) {
-	if platforms == nil {
-		platforms = DefaultPlatforms
-	}
-
+// ScanPackage scans a directory and aggregates its non-test Go files into
+// a GoPackage, or returns nil if it has none. Which files a build includes
+// is decided per build (GoPackage.Imports).
+func ScanPackage(dir, importPath string) (*GoPackage, error) {
 	files, err := ScanDir(dir)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(files) == 0 {
-		return nil, nil // No Go files found
-	}
-
-	pkg := &GoPackage{
-		Dir:        dir,
-		ImportPath: importPath,
-		Name:       files[0].Package, // Assume all files in dir have same package name
-		GoFiles:    make(map[Platform][]string),
-		Imports:    make(map[Platform][]string),
-	}
-
+	pkg := &GoPackage{Dir: dir, ImportPath: importPath}
 	embedSet := make(map[string]bool)
-
-	for _, p := range platforms {
-		importSet := make(map[string]bool)
-		var platformFiles []string
-
-		for _, f := range files {
-			// Skip test files - they shouldn't contribute to library deps
-			if f.IsTest {
-				continue
-			}
-			if MatchesPlatform(f, p) {
-				platformFiles = append(platformFiles, filepath.Base(f.Path))
-				for _, imp := range f.Imports {
-					importSet[imp] = true
-				}
-				for _, embed := range f.EmbedDirs {
-					embedSet[embed] = true
-				}
-				if f.HasCgo {
-					pkg.HasCgo = true
-				}
-			}
+	for _, f := range files {
+		// Test files don't contribute to library deps
+		if f.IsTest {
+			continue
 		}
-
-		if len(platformFiles) > 0 {
-			sort.Strings(platformFiles)
-			pkg.GoFiles[p] = platformFiles
-
-			var imports []string
-			for imp := range importSet {
-				imports = append(imports, imp)
-			}
-			sort.Strings(imports)
-			pkg.Imports[p] = imports
+		if pkg.Name == "" {
+			pkg.Name = f.Package
 		}
+		pkg.Files = append(pkg.Files, f)
+		for _, embed := range f.EmbedDirs {
+			embedSet[embed] = true
+		}
+		if f.HasCgo {
+			pkg.HasCgo = true
+		}
+	}
+	if len(pkg.Files) == 0 {
+		return nil, nil // No Go files found
 	}
 
 	for embed := range embedSet {

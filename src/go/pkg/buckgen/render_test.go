@@ -2,171 +2,210 @@ package buckgen
 
 import (
 	"bytes"
+	"go/build/constraint"
 	"strings"
 	"testing"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/goparse"
 )
 
-func TestNormalizeDeps(t *testing.T) {
-	linux := goparse.Platform{OS: "linux", Arch: "amd64"}
-	darwin := goparse.Platform{OS: "darwin", Arch: "amd64"}
-
-	imports := map[goparse.Platform][]string{
-		linux:  {"fmt", "os", "golang.org/x/sys/unix"},
-		darwin: {"fmt", "os", "syscall"},
+// testConfig is buckgen's configuration for turnkey's default platforms.
+func testConfig() *Config {
+	return &Config{
+		Buck: BuckConfig{
+			GoLibraryRule:         "go_library",
+			DepsTargetLabelPrefix: "godeps//",
+			DepsAttr:              "deps",
+			BuildfileName:         "rules.star",
+		},
+		Conditions: ConditionsConfig{
+			Settings: "toolchains//conditions",
+			Platforms: []conditions.Platform{
+				{OS: "linux", CPU: "x86_64"},
+				{OS: "linux", CPU: "arm64"},
+				{OS: "macos", CPU: "x86_64"},
+				{OS: "macos", CPU: "arm64"},
+			},
+			GoTags: []string{"integration"},
+		},
+		GoVersion: "1.24",
 	}
+}
 
-	norm := NormalizeDeps(imports)
-
-	if len(norm.Common) != 2 {
-		t.Errorf("expected 2 common deps, got %d", len(norm.Common))
+func file(t *testing.T, path, build string, imports ...string) *goparse.GoFile {
+	t.Helper()
+	f := &goparse.GoFile{Path: path, Imports: imports}
+	if build != "" {
+		expr, err := constraint.Parse("//go:build " + build)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.Constraint = expr
 	}
+	return f
+}
 
-	if len(norm.Platform[linux]) != 1 || norm.Platform[linux][0] != "golang.org/x/sys/unix" {
-		t.Errorf("expected linux specific dep golang.org/x/sys/unix, got %v", norm.Platform[linux])
+func render(t *testing.T, pkg *goparse.GoPackage, cfg *Config) string {
+	t.Helper()
+	var buf bytes.Buffer
+	built, err := RenderPackage(&buf, pkg, cfg)
+	if err != nil {
+		t.Fatalf("RenderPackage failed: %v", err)
 	}
-
-	if len(norm.Platform[darwin]) != 1 || norm.Platform[darwin][0] != "syscall" {
-		t.Errorf("expected darwin specific dep syscall, got %v", norm.Platform[darwin])
+	if !built {
+		t.Fatal("package not built on any platform")
 	}
+	return buf.String()
 }
 
 func TestRenderPackage(t *testing.T) {
 	pkg := &goparse.GoPackage{
-		Name:       "testpkg",
 		ImportPath: "github.com/example/testpkg",
-		Imports: map[goparse.Platform][]string{
-			{OS: "linux", Arch: "amd64"}:  {"fmt", "github.com/example/common", "github.com/example/linuxonly"},
-			{OS: "darwin", Arch: "amd64"}: {"fmt", "github.com/example/common", "github.com/example/maconly"},
+		Files: []*goparse.GoFile{
+			file(t, "common.go", "", "fmt", "github.com/example/common"),
+			file(t, "x_linux.go", "", "github.com/example/linuxonly"),
+			file(t, "x_darwin.go", "", "github.com/example/maconly"),
 		},
 	}
-
-	cfg := DefaultConfig()
-	var buf bytes.Buffer
-	err := RenderPackage(&buf, pkg, cfg)
-	if err != nil {
-		t.Fatalf("RenderPackage failed: %v", err)
+	want := `go_library(
+    name = "testpkg",
+    package_name = "github.com/example/testpkg",
+    srcs = native.glob(["*.go", "*.s", "*.h", "*.c", "*.cc", "*.cpp", "*.S"]),
+    header_namespace = "",
+    visibility = ["PUBLIC"],
+    deps = ["godeps//github.com/example/common:common"] + select({
+        "config//os:linux": ["godeps//github.com/example/linuxonly:linuxonly"],
+        "config//os:macos": ["godeps//github.com/example/maconly:maconly"],
+    }),
+)
+`
+	if got := render(t, pkg, testConfig()); got != want {
+		t.Errorf("output:\n%s\nwant:\n%s", got, want)
 	}
+}
 
-	output := buf.String()
-
-	// Check for native.glob with extended file patterns
-	if !strings.Contains(output, "native.glob([\"*.go\", \"*.s\", \"*.h\", \"*.c\", \"*.cc\", \"*.cpp\", \"*.S\"])") {
-		t.Errorf("output missing native.glob with extended patterns: %s", output)
+// A //go:build unix file is included on Linux and macOS, and a go1.21 file
+// with a newer toolchain: their imports are common.
+func TestRenderPackageUnixAndReleaseTags(t *testing.T) {
+	pkg := &goparse.GoPackage{
+		ImportPath: "github.com/example/sys",
+		Files: []*goparse.GoFile{
+			file(t, "unix.go", "unix", "github.com/example/unixdep"),
+			file(t, "new.go", "go1.21", "github.com/example/newdep"),
+			file(t, "future.go", "go1.99", "github.com/example/futuredep"),
+		},
 	}
-
-	// Check for header_namespace
-	if !strings.Contains(output, "header_namespace = \"\"") {
-		t.Errorf("output missing header_namespace: %s", output)
+	got := render(t, pkg, testConfig())
+	want := `    deps = [
+        "godeps//github.com/example/newdep:newdep",
+        "godeps//github.com/example/unixdep:unixdep",
+    ],
+`
+	if !strings.Contains(got, want) {
+		t.Errorf("output:\n%s\nwant deps:\n%s", got, want)
 	}
+}
 
-	// Check for common dep (default prefix is "godeps//", not "godeps//vendor/")
-	if !strings.Contains(output, "\"godeps//github.com/example/common:common\"") {
-		t.Errorf("output missing common dep: %s", output)
+// A linux/arm64-only import is keyed on the combined OS-and-CPU setting,
+// not on a duplicated OS key, and there is no DEFAULT.
+func TestRenderPackageLinuxArm64Only(t *testing.T) {
+	pkg := &goparse.GoPackage{
+		ImportPath: "github.com/example/cpu",
+		Files: []*goparse.GoFile{
+			file(t, "cpu.go", ""),
+			file(t, "cpu_linux_arm64.go", "", "github.com/example/armdep"),
+		},
 	}
+	got := render(t, pkg, testConfig())
+	want := `    deps = select({
+        "toolchains//conditions:linux-arm64": ["godeps//github.com/example/armdep:armdep"],
+        "toolchains//conditions:linux-x86_64": [],
+        "toolchains//conditions:macos-arm64": [],
+        "toolchains//conditions:macos-x86_64": [],
+    }),
+`
+	if !strings.Contains(got, want) || strings.Contains(got, "DEFAULT") {
+		t.Errorf("output:\n%s\nwant deps:\n%s", got, want)
+	}
+}
 
-	// Check for select
-	if !strings.Contains(output, "select({") {
-		t.Errorf("output missing select: %s", output)
+// An allowed tag is a dimension; a tag that isn't allowed is never set.
+func TestRenderPackageTags(t *testing.T) {
+	pkg := &goparse.GoPackage{
+		ImportPath: "github.com/example/tagged",
+		Files: []*goparse.GoFile{
+			file(t, "it.go", "integration", "github.com/example/harness"),
+			file(t, "other.go", "othertag", "github.com/example/never"),
+			file(t, "base.go", ""),
+		},
 	}
-
-	// Check for platform-specific deps
-	if !strings.Contains(output, "\"config//os:linux\": [") {
-		t.Errorf("output missing linux constraint: %s", output)
-	}
-	if !strings.Contains(output, "\"godeps//github.com/example/linuxonly:linuxonly\"") {
-		t.Errorf("output missing linux-only dep: %s", output)
+	got := render(t, pkg, testConfig())
+	want := `    deps = select({
+        "prelude//go/tags/constraints:integration[set]": ["godeps//github.com/example/harness:harness"],
+        "prelude//go/tags/constraints:integration[unset]": [],
+    }),
+`
+	if !strings.Contains(got, want) {
+		t.Errorf("output:\n%s\nwant deps:\n%s", got, want)
 	}
 }
 
 func TestRenderPackageNoDeps(t *testing.T) {
-	// Test that packages with no external dependencies don't have a deps attribute
 	pkg := &goparse.GoPackage{
-		Name:       "nodeps",
-		ImportPath: "golang.org/x/sys/cpu",
-		Imports: map[goparse.Platform][]string{
-			{OS: "linux", Arch: "amd64"}: {"fmt", "os"}, // only stdlib
-		},
+		ImportPath: "github.com/example/nodeps",
+		Files:      []*goparse.GoFile{file(t, "a.go", "", "fmt", "os")},
 	}
-
-	cfg := DefaultConfig()
-	var buf bytes.Buffer
-	err := RenderPackage(&buf, pkg, cfg)
-	if err != nil {
-		t.Fatalf("RenderPackage failed: %v", err)
-	}
-
-	output := buf.String()
-
-	// Should NOT contain deps attribute when there are no external deps
-	if strings.Contains(output, "deps = [") {
-		t.Errorf("output should not have deps attribute when no external deps: %s", output)
-	}
-
-	// Should contain native.glob
-	if !strings.Contains(output, "native.glob") {
-		t.Errorf("output missing native.glob: %s", output)
-	}
-
-	// Should contain header_namespace
-	if !strings.Contains(output, "header_namespace = \"\"") {
-		t.Errorf("output missing header_namespace: %s", output)
+	got := render(t, pkg, testConfig())
+	if strings.Contains(got, "deps =") {
+		t.Errorf("output has a deps attribute:\n%s", got)
 	}
 }
 
-func TestConfig(t *testing.T) {
-	cfg := DefaultConfig()
-	if cfg.Buck.BuildfileName != "rules.star" {
-		t.Errorf("expected default buildfile_name rules.star, got %s", cfg.Buck.BuildfileName)
+// A package no platform builds gets no rules.star.
+func TestRenderPackageNotBuilt(t *testing.T) {
+	pkg := &goparse.GoPackage{
+		ImportPath: "github.com/example/win",
+		Files:      []*goparse.GoFile{file(t, "w_windows.go", "")},
+	}
+	var buf bytes.Buffer
+	built, err := RenderPackage(&buf, pkg, testConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if built || buf.Len() != 0 {
+		t.Errorf("windows-only package rendered:\n%s", buf.String())
 	}
 }
 
 func TestRenderPackageWithLocalReplaces(t *testing.T) {
 	pkg := &goparse.GoPackage{
-		Name:       "testpkg",
 		ImportPath: "github.com/example/testpkg",
-		Imports: map[goparse.Platform][]string{
-			{OS: "linux", Arch: "amd64"}: {
-				"fmt",
-				"github.com/company/shared-lib",         // locally replaced
-				"github.com/company/shared-lib/subpkg", // subpkg of locally replaced
-				"github.com/external/dep",               // not replaced
-			},
-		},
+		Files: []*goparse.GoFile{file(t, "a.go", "",
+			"fmt",
+			"github.com/company/shared-lib",        // locally replaced
+			"github.com/company/shared-lib/subpkg", // subpkg of locally replaced
+			"github.com/external/dep",              // not replaced
+		)},
 	}
-
-	cfg := DefaultConfig()
+	cfg := testConfig()
 	cfg.LocalReplaces = map[string]string{
 		"github.com/company/shared-lib": "//src/shared-lib:shared-lib",
 	}
-
-	var buf bytes.Buffer
-	err := RenderPackage(&buf, pkg, cfg)
-	if err != nil {
-		t.Fatalf("RenderPackage failed: %v", err)
-	}
-
-	output := buf.String()
-
-	// Local replace should use the configured target
-	if !strings.Contains(output, "\"//src/shared-lib:shared-lib\"") {
-		t.Errorf("output missing local replace target: %s", output)
-	}
-
-	// Subpkg of local replace should also be handled
-	if !strings.Contains(output, "\"//src/shared-lib/subpkg:subpkg\"") {
-		t.Errorf("output missing subpkg of local replace: %s", output)
-	}
-
-	// External dep should use the normal godeps prefix
-	if !strings.Contains(output, "\"godeps//github.com/external/dep:dep\"") {
-		t.Errorf("output missing external dep with godeps prefix: %s", output)
+	output := render(t, pkg, cfg)
+	for _, want := range []string{
+		"\"//src/shared-lib:shared-lib\"",
+		"\"//src/shared-lib/subpkg:subpkg\"",
+		"\"godeps//github.com/external/dep:dep\"",
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("output missing %s:\n%s", want, output)
+		}
 	}
 }
 
 func TestImportToTargetWithLocalReplace(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg := testConfig()
 	cfg.LocalReplaces = map[string]string{
 		"github.com/company/mylib": "//libs/mylib:mylib",
 	}

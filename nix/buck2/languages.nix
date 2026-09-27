@@ -53,8 +53,8 @@ in
         conditions,
       }:
       depsCell.mkGoDepsCell {
-        inherit cellName;
-        inherit (langCfg) depsFile;
+        inherit cellName conditions;
+        inherit (langCfg) depsFile allowedBuildTags;
         inherit userPatchesDir;
         buckgen = import ../packages/buckgen.nix { inherit pkgs lib; };
       };

@@ -1,12 +1,9 @@
 package goparse
 
-import "go/build/constraint"
-
-// Platform represents a target OS/arch combination
-type Platform struct {
-	OS   string // e.g., "linux", "darwin", "windows"
-	Arch string // e.g., "amd64", "arm64"
-}
+import (
+	"go/build/constraint"
+	"sort"
+)
 
 // GoFile represents parsed info from a single .go file
 type GoFile struct {
@@ -19,21 +16,35 @@ type GoFile struct {
 	IsTest     bool            // true if *_test.go
 }
 
-// GoPackage represents aggregated info for a Go package directory
+// GoPackage represents the Go files of a package directory
 type GoPackage struct {
-	Dir        string                // directory path
-	ImportPath string                // full import path
-	Name       string                // package name
-	GoFiles    map[Platform][]string // platform -> source files
-	Imports    map[Platform][]string // platform -> import paths
-	EmbedDirs  []string              // embed directories (common)
-	HasCgo     bool                  // any file has cgo
+	Dir        string    // directory path
+	ImportPath string    // full import path
+	Name       string    // package name
+	Files      []*GoFile // its non-test Go files, whatever their constraints
+	EmbedDirs  []string  // embed directories (common)
+	HasCgo     bool      // any file has cgo
 }
 
-// Common platforms for cross-platform analysis
-var DefaultPlatforms = []Platform{
-	{OS: "linux", Arch: "amd64"},
-	{OS: "linux", Arch: "arm64"},
-	{OS: "darwin", Arch: "amd64"},
-	{OS: "darwin", Arch: "arm64"},
+// Imports returns the imports of the package's files that are part of a
+// build in ctx, sorted and without duplicates. It reports false if no file
+// is: the package isn't built there.
+func (p *GoPackage) Imports(ctx BuildContext) ([]string, bool) {
+	seen := make(map[string]bool)
+	built := false
+	for _, f := range p.Files {
+		if !ctx.Matches(f) {
+			continue
+		}
+		built = true
+		for _, imp := range f.Imports {
+			seen[imp] = true
+		}
+	}
+	imports := make([]string, 0, len(seen))
+	for imp := range seen {
+		imports = append(imports, imp)
+	}
+	sort.Strings(imports)
+	return imports, built
 }
