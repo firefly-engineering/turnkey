@@ -441,39 +441,6 @@ func (m *Matcher) Branch(config Configuration) int {
 	return best
 }
 
-// Evaluator gives, for each configuration of a space, the labels of an
-// existing [<common>] + select({...}) value.
-type Evaluator struct {
-	matcher  *Matcher
-	common   []string
-	branches []Branch
-}
-
-// Reader returns an evaluator for a value with common labels and select()
-// branches, or an error if a key is unknown (see Matcher).
-func (s Space) Reader(common []string, branches []Branch) (*Evaluator, error) {
-	keys := make([]string, len(branches))
-	for i, b := range branches {
-		keys[i] = b.Key
-	}
-	m, err := s.Matcher(keys)
-	if err != nil {
-		return nil, err
-	}
-	return &Evaluator{matcher: m, common: common, branches: branches}, nil
-}
-
-// Labels returns the value's labels in config: the common ones, then those
-// of the branch that applies (see Matcher.Branch). A configuration no
-// branch applies to gets only the common labels.
-func (ev *Evaluator) Labels(config Configuration) []string {
-	labels := append([]string(nil), ev.common...)
-	if i := ev.matcher.Branch(config); i >= 0 {
-		labels = append(labels, ev.branches[i].Labels...)
-	}
-	return dedupe(labels)
-}
-
 // dedupe returns list without repeated labels, in order.
 func dedupe(list []string) []string {
 	seen := make(map[string]bool, len(list))

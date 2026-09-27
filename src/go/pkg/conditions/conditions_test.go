@@ -115,59 +115,44 @@ func TestSplitNeverWritesDefault(t *testing.T) {
 	}
 }
 
-// Each platform's value round-trips: reading back what Split wrote gives
-// every configuration the labels it had.
-func TestReaderRoundTrip(t *testing.T) {
+func TestMatcherDefaultAndUnknownKeys(t *testing.T) {
 	space := NewSpace(platforms, "")
-	labels := labelsBy([]string{"//c:c"}, map[string][]string{
-		"cpu=arm64,os=linux": {"//la:la"},
-		"os=macos":           {"//m:m"},
-	})
-	split := space.Split(labels)
-	ev, err := space.Reader(split.Common, split.Branches)
+	m, err := space.Matcher([]string{"config//os:linux", DefaultKey})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, config := range space.Configurations {
-		if got, want := ev.Labels(config), labels(config); !sameSet(got, want) {
-			t.Errorf("%s: labels = %v, want %v", config, got, want)
-		}
+	if got := m.Branch(Configuration{OS: "macos", CPU: "arm64"}); got != 1 {
+		t.Errorf("macos branch = %d, want DEFAULT's", got)
+	}
+	if got := m.Branch(Configuration{OS: "linux", CPU: "arm64"}); got != 0 {
+		t.Errorf("linux branch = %d, want linux's", got)
+	}
+
+	if _, err := space.Matcher([]string{"//my:setting"}); err == nil {
+		t.Error("an unknown key was matched, want an error")
 	}
 }
 
-func TestReaderDefaultAndUnknownKeys(t *testing.T) {
-	space := NewSpace(platforms, "")
-	ev, err := space.Reader(nil, []Branch{
-		{Key: "config//os:linux", Labels: []string{"//l:l"}},
-		{Key: DefaultKey, Labels: []string{"//d:d"}},
-	})
+// With no key matching and no DEFAULT, no branch applies.
+func TestMatcherWithoutABranch(t *testing.T) {
+	m, err := NewSpace(platforms, "").Matcher([]string{"config//os:linux"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := ev.Labels(Configuration{OS: "macos", CPU: "arm64"}); !reflect.DeepEqual(got, []string{"//d:d"}) {
-		t.Errorf("macos labels = %v, want DEFAULT's", got)
-	}
-	if got := ev.Labels(Configuration{OS: "linux", CPU: "arm64"}); !reflect.DeepEqual(got, []string{"//l:l"}) {
-		t.Errorf("linux labels = %v, want linux's", got)
-	}
-
-	if _, err := space.Reader(nil, []Branch{{Key: "//my:setting"}}); err == nil {
-		t.Error("an unknown key was read, want an error")
+	if got := m.Branch(Configuration{OS: "macos", CPU: "arm64"}); got != -1 {
+		t.Errorf("macos branch = %d, want none", got)
 	}
 }
 
 // The combined key wins over an OS key when both match.
-func TestReaderPrefersTheMostSpecificKey(t *testing.T) {
+func TestMatcherPrefersTheMostSpecificKey(t *testing.T) {
 	space := NewSpace(platforms, "")
-	ev, err := space.Reader(nil, []Branch{
-		{Key: "config//os:linux", Labels: []string{"//l:l"}},
-		{Key: "toolchains//conditions:linux-arm64", Labels: []string{"//la:la"}},
-	})
+	m, err := space.Matcher([]string{"config//os:linux", "toolchains//conditions:linux-arm64"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := ev.Labels(Configuration{OS: "linux", CPU: "arm64"}); !reflect.DeepEqual(got, []string{"//la:la"}) {
-		t.Errorf("labels = %v, want the combined key's", got)
+	if got := m.Branch(Configuration{OS: "linux", CPU: "arm64"}); got != 1 {
+		t.Errorf("branch = %d, want the combined key's", got)
 	}
 }
 
@@ -222,16 +207,5 @@ func TestSplitOnGoTags(t *testing.T) {
 	}
 	if !reflect.DeepEqual(keys, wantKeys) || !reflect.DeepEqual(got[0].Labels, []string{"//it:it"}) {
 		t.Errorf("branches = %+v, want keys %v", got, wantKeys)
-	}
-
-	// Read back
-	ev, err := space.Reader(nil, got)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, c := range space.Configurations {
-		if !sameSet(ev.Labels(c), linuxTagged(c)) {
-			t.Errorf("%s: labels = %v, want %v", c, ev.Labels(c), linuxTagged(c))
-		}
 	}
 }
