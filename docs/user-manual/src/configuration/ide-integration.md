@@ -194,6 +194,29 @@ go_binary(
 
 Dependencies between `preserve-start` and `preserve-end` markers are never modified by sync.
 
+## Where Deps Come From
+
+- **Rust**: the crate's `Cargo.toml`, not its sources. `[dependencies]` go to
+  library and binary targets; test targets get `[dependencies]` plus
+  `[dev-dependencies]`. `workspace = true` entries are resolved against the
+  root `Cargo.toml`, a workspace member maps to its own target, and any other
+  crate maps to `rustdeps//vendor/<package>:<package>` (a renamed dependency
+  maps to its `package`). An existing label that pins a version
+  (`rustdeps//vendor/tokio@1.50.0:tokio`) satisfies the unversioned one.
+  Optional, target-specific (`[target.'cfg(...)'.dependencies]`) and build
+  dependencies are not synced: sync reports them and leaves any existing dep
+  on them alone.
+- **Other languages**: the imports found in the sources, mapped to targets.
+
+Sync never removes a dep it can't account for:
+
+- If a target has imports sync can't map to a target (reported as `unmapped
+  import`), its deps are incomplete, so sync adds what it resolved but removes
+  nothing, and prints a `KEPT:` line naming the deps it kept and why.
+- A target whose `deps` is an expression (`_DEPS`, `_COMMON_DEPS + [...]`)
+  rather than a list of labels is not synced at all.
+- Deps are only added or removed, never reordered.
+
 ## Troubleshooting
 
 ### Sync not running

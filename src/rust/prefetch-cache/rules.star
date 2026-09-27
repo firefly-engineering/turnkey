@@ -11,7 +11,6 @@ rust_library(
         "rustdeps//vendor/dirs:dirs",
         "rustdeps//vendor/serde:serde",
         "rustdeps//vendor/serde_json:serde_json",
-        "rustdeps//vendor/tempfile:tempfile",
     ],
     visibility = ["PUBLIC"],
 )

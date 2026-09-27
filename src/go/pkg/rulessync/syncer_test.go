@@ -192,7 +192,7 @@ func TestApplyDepsKeepsDepsWhenUnmapped(t *testing.T) {
 	target := parseTarget(t, libWithX)
 	var result SyncResult
 
-	changed := result.applyDeps(target, []string{"//pkg/y:y"}, []string{"example.com/unknown"})
+	changed := result.applyDeps(target, []string{"//pkg/y:y"}, []string{"example.com/unknown"}, nil)
 	if !changed {
 		t.Error("target not changed, want //pkg/y:y added")
 	}
@@ -215,7 +215,7 @@ func TestApplyDepsReportsKeptWithoutChange(t *testing.T) {
 	target := parseTarget(t, libWithX)
 	var result SyncResult
 
-	if result.applyDeps(target, nil, []string{"example.com/unknown"}) {
+	if result.applyDeps(target, nil, []string{"example.com/unknown"}, nil) {
 		t.Error("target changed, want deps untouched")
 	}
 	if got, want := target.GetDeps(), []string{"//pkg/x:x"}; !reflect.DeepEqual(got, want) {
@@ -232,7 +232,7 @@ func TestApplyDepsRemovesWhenAllMapped(t *testing.T) {
 	target := parseTarget(t, libWithX)
 	var result SyncResult
 
-	if !result.applyDeps(target, []string{"//pkg/y:y"}, nil) {
+	if !result.applyDeps(target, []string{"//pkg/y:y"}, nil, nil) {
 		t.Error("target not changed")
 	}
 	if got, want := target.GetDeps(), []string{"//pkg/y:y"}; !reflect.DeepEqual(got, want) {
@@ -264,5 +264,66 @@ func TestHasSyncableDeps(t *testing.T) {
 	}
 	if !hasSyncableDeps(parseTarget(t, "rust_library(name = \"lib\")\n")) {
 		t.Error("target without deps is not syncable, want syncable")
+	}
+}
+
+// A target already holding exactly the mapped deps is left as written,
+// whatever their order.
+func TestApplyDepsIgnoresOrder(t *testing.T) {
+	target := parseTarget(t, `rust_library(
+    name = "lib",
+    deps = [
+        "rustdeps//vendor/tree-sitter:tree-sitter",
+        "rustdeps//vendor/tree-sitter-starlark:tree-sitter-starlark",
+    ],
+)
+`)
+	var result SyncResult
+	mapped := []string{
+		"rustdeps//vendor/tree-sitter-starlark:tree-sitter-starlark",
+		"rustdeps//vendor/tree-sitter:tree-sitter",
+	}
+	if result.applyDeps(target, mapped, nil, nil) || len(result.Changes) != 0 {
+		t.Errorf("reordering alone changed the target: %+v", result.Changes)
+	}
+}
+
+// An existing label pinning a version of a mapped target satisfies it.
+func TestApplyDepsKeepsVersionedLabel(t *testing.T) {
+	target := parseTarget(t, `rust_library(
+    name = "lib",
+    deps = ["rustdeps//vendor/tokio@1.50.0:tokio"],
+)
+`)
+	var result SyncResult
+	if result.applyDeps(target, []string{"rustdeps//vendor/tokio:tokio"}, nil, nil) {
+		t.Errorf("versioned label replaced: %+v", result.Changes)
+	}
+}
+
+// An existing dep in the package of an unsynced dep is neither removed
+// nor reported as kept, and an unsynced dep is never added.
+func TestApplyDepsLeavesUnsyncedDeps(t *testing.T) {
+	target := parseTarget(t, `rust_binary(
+    name = "bin",
+    deps = [
+        "//src/rust/composition:composition-full",
+        "rustdeps//vendor/log:log",
+    ],
+)
+`)
+	var result SyncResult
+	if result.applyDeps(target, []string{"rustdeps//vendor/log:log"}, nil, []string{"//src/rust/composition:composition"}) {
+		t.Errorf("target changed: %+v", result.Changes)
+	}
+	if len(result.Changes) != 0 {
+		t.Errorf("changes = %+v, want none", result.Changes)
+	}
+
+	target = parseTarget(t, "rust_binary(\n    name = \"bin\",\n    deps = [],\n)\n")
+	result = SyncResult{}
+	result.applyDeps(target, nil, nil, []string{"//src/rust/composition:composition"})
+	if got := target.GetDeps(); len(got) != 0 {
+		t.Errorf("deps = %v, want unsynced dep not added", got)
 	}
 }

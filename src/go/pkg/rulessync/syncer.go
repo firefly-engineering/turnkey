@@ -200,24 +200,11 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 		}
 	}
 
-	// Run extractor for this package
-	extractResult, err := s.runExtractor(language, pkgDir)
+	pkgMapping, err := s.resolveDeps(language, pkgDir)
 	if err != nil {
-		result.Errors = append(result.Errors, fmt.Sprintf("extractor failed: %v", err))
+		result.Errors = append(result.Errors, err.Error())
 		return result, nil
 	}
-
-	// Map extraction results to Buck2 targets
-	mappings, err := s.mapper.MapExtractionResult(extractResult)
-	if err != nil {
-		result.Errors = append(result.Errors, fmt.Sprintf("mapping failed: %v", err))
-		return result, nil
-	}
-
-	// Merge all package mappings
-	// For languages with subdirectories (like Solidity with src/ and test/),
-	// combine deps from all packages
-	pkgMapping := mergePackageMappings(mappings)
 
 	// Filter out self-references (deps pointing to the current package)
 	// e.g., when syncing src/python/cargo, filter out //src/python/cargo:cargo
@@ -231,6 +218,13 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 	}
 	for _, unmapped := range pkgMapping.UnmappedTestImports {
 		result.Errors = append(result.Errors, fmt.Sprintf("unmapped test import: %s", unmapped))
+	}
+	var unsynced []string
+	for _, u := range pkgMapping.UnsyncedDeps {
+		result.Errors = append(result.Errors, fmt.Sprintf("%s dependency %s not synced", u.Reason, u.Dep.ImportPath))
+		if u.Dep.Target != "" {
+			unsynced = append(unsynced, u.Dep.Target)
+		}
 	}
 
 	// An unmapped import is a dep the mapper doesn't know, not one the
@@ -253,7 +247,7 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 		}
 
 		if isLibraryTarget(target.Rule) || isSyncedBinaryTarget(target.Rule) {
-			if result.applyDeps(target, mapper.DepsToTargets(pkgMapping.Deps), libUnmapped) {
+			if result.applyDeps(target, mapper.DepsToTargets(pkgMapping.Deps), libUnmapped, unsynced) {
 				modified = true
 			}
 		}
@@ -287,7 +281,7 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 				}
 			}
 
-			if result.applyDeps(target, newDeps, testUnmapped) {
+			if result.applyDeps(target, newDeps, testUnmapped, unsynced) {
 				modified = true
 			}
 		}
@@ -462,13 +456,40 @@ func (s *Syncer) detectLanguage(f *starlark.File) string {
 	return ""
 }
 
+// resolveDeps returns the mapped deps of the package in pkgDir. A Rust
+// crate's come from its Cargo.toml; every other language's from its
+// sources' imports.
+func (s *Syncer) resolveDeps(language, pkgDir string) (mapper.PackageMapping, error) {
+	if language == "rust" {
+		mapping, err := s.mapper.MapRustCrate(pkgDir)
+		if err != nil {
+			return mapping, fmt.Errorf("reading Cargo.toml: %w", err)
+		}
+		return mapping, nil
+	}
+
+	extractResult, err := s.runExtractor(language, pkgDir)
+	if err != nil {
+		return mapper.PackageMapping{}, fmt.Errorf("extractor failed: %w", err)
+	}
+
+	// Map extraction results to Buck2 targets
+	mappings, err := s.mapper.MapExtractionResult(extractResult)
+	if err != nil {
+		return mapper.PackageMapping{}, fmt.Errorf("mapping failed: %w", err)
+	}
+
+	// Merge all package mappings
+	// For languages with subdirectories (like Solidity with src/ and test/),
+	// combine deps from all packages
+	return mergePackageMappings(mappings), nil
+}
+
 // runExtractor runs the appropriate extractor for the language.
 func (s *Syncer) runExtractor(language, pkgDir string) (*extraction.Result, error) {
 	switch language {
 	case "go":
 		return s.runGoExtractor(pkgDir)
-	case "rust":
-		return s.runRustExtractor(pkgDir)
 	case "python":
 		return s.runPythonExtractor(pkgDir)
 	case "typescript":
@@ -483,11 +504,6 @@ func (s *Syncer) runExtractor(language, pkgDir string) (*extraction.Result, erro
 // runGoExtractor lists a directory's Go imports with go list.
 func (s *Syncer) runGoExtractor(pkgDir string) (*extraction.Result, error) {
 	return s.extractGoImportsDirectly(pkgDir)
-}
-
-// runRustExtractor runs deps-extract for Rust on a directory.
-func (s *Syncer) runRustExtractor(pkgDir string) (*extraction.Result, error) {
-	return s.runDepsExtract("rust", pkgDir)
 }
 
 // runPythonExtractor runs deps-extract for Python on a directory.
@@ -762,14 +778,28 @@ func mergeWithPreserved(oldDeps, newDeps []string) []string {
 // applyDeps sets a target's deps to the mapped ones, preserving manual deps,
 // and records the change. If unmapped is non-empty the mapped deps are
 // incomplete, so no existing dep is removed: those that would have been are
-// recorded as kept instead. It reports whether the target's deps changed.
-func (r *SyncResult) applyDeps(target *starlark.Target, mapped, unmapped []string) bool {
+// recorded as kept instead. An existing dep in the Buck2 package of an
+// unsynced dep is never removed either. It reports whether the target's
+// deps changed.
+func (r *SyncResult) applyDeps(target *starlark.Target, mapped, unmapped, unsynced []string) bool {
 	oldDeps := target.GetDeps()
-	newDeps := mergeWithPreserved(oldDeps, mapped)
+	newDeps := mergeWithPreserved(oldDeps, preferVersioned(oldDeps, mapped))
 
+	unsyncedPkgs := make(map[string]bool, len(unsynced))
+	for _, d := range unsynced {
+		unsyncedPkgs[labelPackage(d)] = true
+	}
 	var kept []string
-	if len(unmapped) > 0 {
-		newDeps, kept = keepExisting(oldDeps, newDeps)
+	newDeps, kept = keepExisting(oldDeps, newDeps, func(d string) bool {
+		return len(unmapped) > 0 || unsyncedPkgs[labelPackage(d)]
+	})
+	if len(unmapped) == 0 {
+		// Only unsynced deps were kept; they are reported on their own.
+		kept = nil
+	}
+	if sameDepSet(oldDeps, newDeps) {
+		// Sync manages which deps a target has, not their order.
+		newDeps = oldDeps
 	}
 
 	changed := !stringSlicesEqual(oldDeps, newDeps)
@@ -788,9 +818,11 @@ func (r *SyncResult) applyDeps(target *starlark.Target, mapped, unmapped []strin
 	return changed
 }
 
-// keepExisting returns oldDeps, in their order, followed by the deps of
-// newDeps that are not already in it, and the old deps newDeps lacks.
-func keepExisting(oldDeps, newDeps []string) (merged, kept []string) {
+// keepExisting returns the deps of oldDeps that newDeps lacks and keep
+// accepts, as kept. If there are any, merged is oldDeps without the others,
+// in their order, followed by the deps of newDeps that are not in oldDeps;
+// otherwise merged is newDeps.
+func keepExisting(oldDeps, newDeps []string, keep func(string) bool) (merged, kept []string) {
 	inNew := make(map[string]bool, len(newDeps))
 	for _, d := range newDeps {
 		inNew[d] = true
@@ -798,7 +830,7 @@ func keepExisting(oldDeps, newDeps []string) (merged, kept []string) {
 	inOld := make(map[string]bool, len(oldDeps))
 	for _, d := range oldDeps {
 		inOld[d] = true
-		if !inNew[d] {
+		if !inNew[d] && keep(d) {
 			kept = append(kept, d)
 		}
 	}
@@ -806,13 +838,79 @@ func keepExisting(oldDeps, newDeps []string) (merged, kept []string) {
 		return newDeps, nil
 	}
 
-	merged = append([]string(nil), oldDeps...)
+	for _, d := range oldDeps {
+		if inNew[d] || keep(d) {
+			merged = append(merged, d)
+		}
+	}
 	for _, d := range newDeps {
 		if !inOld[d] {
 			merged = append(merged, d)
 		}
 	}
 	return merged, kept
+}
+
+// sameDepSet reports whether a and b hold the same deps, in any order.
+func sameDepSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	count := make(map[string]int, len(a))
+	for _, d := range a {
+		count[d]++
+	}
+	for _, d := range b {
+		if count[d] == 0 {
+			return false
+		}
+		count[d]--
+	}
+	return true
+}
+
+// preferVersioned returns mapped with each label replaced by the existing
+// dep that pins a version of the same target, if there is one:
+// "rustdeps//vendor/tokio@1.50.0:tokio" stands for "rustdeps//vendor/tokio:tokio".
+func preferVersioned(oldDeps, mapped []string) []string {
+	pinned := make(map[string]string)
+	for _, d := range oldDeps {
+		if u := unversioned(d); u != d {
+			pinned[u] = d
+		}
+	}
+	if len(pinned) == 0 {
+		return mapped
+	}
+	result := make([]string, len(mapped))
+	for i, d := range mapped {
+		if p, ok := pinned[d]; ok {
+			d = p
+		}
+		result[i] = d
+	}
+	return result
+}
+
+// unversioned strips an @version suffix from a label's package:
+// "cell//vendor/foo@1.2.3:foo" -> "cell//vendor/foo:foo".
+func unversioned(label string) string {
+	pkg, name, found := strings.Cut(label, ":")
+	slash := strings.LastIndex(pkg, "/")
+	if at := strings.LastIndex(pkg, "@"); at > slash && at > 0 {
+		pkg = pkg[:at]
+	}
+	if !found {
+		return pkg
+	}
+	return pkg + ":" + name
+}
+
+// labelPackage returns a label's Buck2 package, without any @version:
+// "//src/rust/composition:composition-full" -> "//src/rust/composition".
+func labelPackage(label string) string {
+	pkg, _, _ := strings.Cut(unversioned(label), ":")
+	return pkg
 }
 
 // diffDeps returns added and removed deps.

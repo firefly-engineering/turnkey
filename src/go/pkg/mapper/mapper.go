@@ -79,8 +79,13 @@ type RustConfig struct {
 	// ExternalDeps maps crate names to their entries from rust-deps.toml.
 	ExternalDeps map[string]bool
 
-	// WorkspacePackages maps crate names to their relative paths.
+	// WorkspacePackages maps the package names of the workspace's members
+	// to their directories, relative to the project root.
 	WorkspacePackages map[string]string
+
+	// workspace is the workspace root, whose [workspace.dependencies]
+	// workspace = true entries inherit from.
+	workspace *cargoWorkspace
 }
 
 // PythonConfig holds Python-specific configuration.
@@ -166,6 +171,14 @@ func New(cfg Config) (*Mapper, error) {
 		if cfg.Rust.ExternalDeps == nil && cfg.Rust.DepsFile != "" {
 			if deps, err := loadRustDeps(cfg.Rust.DepsFile); err == nil {
 				m.config.Rust.ExternalDeps = deps
+			}
+		}
+		if cfg.Rust.workspace == nil && cfg.Rust.WorkspaceRoot != "" {
+			if ws, members, err := loadCargoWorkspace(cfg.Rust.WorkspaceRoot, cfg.ProjectRoot); err == nil {
+				m.config.Rust.workspace = ws
+				if m.config.Rust.WorkspacePackages == nil {
+					m.config.Rust.WorkspacePackages = members
+				}
 			}
 		}
 	}
@@ -291,6 +304,13 @@ func detectRustConfig(projectRoot string) (*RustConfig, error) {
 		return nil, fmt.Errorf("no Cargo.toml found")
 	}
 	cfg.WorkspaceRoot = projectRoot
+
+	// A root Cargo.toml without [workspace] is a single crate: nothing to
+	// inherit from and no members.
+	if ws, members, err := loadCargoWorkspace(projectRoot, projectRoot); err == nil {
+		cfg.workspace = ws
+		cfg.WorkspacePackages = members
+	}
 
 	// Load rust-deps.toml
 	depsPath := filepath.Join(projectRoot, "rust-deps.toml")
@@ -508,6 +528,11 @@ type PackageMapping struct {
 	// UnmappedTestImports are test-only imports that couldn't be mapped.
 	// They leave only the test target's deps incomplete.
 	UnmappedTestImports []string
+
+	// UnsyncedDeps are declared deps sync doesn't manage (e.g. a Rust
+	// crate's optional or target-specific dependencies): they are neither
+	// added nor removed.
+	UnsyncedDeps []UnsyncedDep
 }
 
 // mapPackage maps a single package's imports to dependencies.
