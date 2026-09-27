@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/mapper"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
 )
 
@@ -325,5 +326,19 @@ func TestApplyDepsLeavesUnsyncedDeps(t *testing.T) {
 	result.applyDeps(target, nil, nil, []string{"//src/rust/composition:composition"})
 	if got := target.GetDeps(); len(got) != 0 {
 		t.Errorf("deps = %v, want unsynced dep not added", got)
+	}
+}
+
+// A member's imports of its own modules map to its own target, which is
+// not a dep of it.
+func TestFilterSelfReference(t *testing.T) {
+	self := computeSelfTarget("/repo/src/python/buck", "/repo")
+	deps := []mapper.MappedDep{
+		{Target: "//src/python/buck:buck", ImportPath: "turnkey.buck.generator"},
+		{Target: "//src/python/cfg:cfg", ImportPath: "turnkey.cfg"},
+	}
+	got := mapper.DepsToTargets(filterSelfReference(deps, self))
+	if want := []string{"//src/python/cfg:cfg"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("deps = %v, want %v", got, want)
 	}
 }

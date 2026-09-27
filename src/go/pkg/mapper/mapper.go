@@ -93,8 +93,10 @@ type PythonConfig struct {
 	// ProjectRoot is the Python project root directory.
 	ProjectRoot string
 
-	// InternalPrefix is the Buck2 path prefix for internal packages (e.g., "src/python").
-	InternalPrefix string
+	// WorkspaceModules maps the packages the uv workspace's members provide,
+	// as dotted module names, to the member's directory relative to the
+	// project root: {"turnkey.cfg": "src/python/cfg"}.
+	WorkspaceModules map[string]string
 
 	// ExternalCell is the Buck2 cell for external deps (e.g., "pydeps").
 	ExternalCell string
@@ -351,9 +353,8 @@ func loadRustDeps(path string) (map[string]bool, error) {
 // detectPythonConfig auto-detects Python configuration from the project.
 func detectPythonConfig(projectRoot string) (*PythonConfig, error) {
 	cfg := &PythonConfig{
-		ExternalCell:   "pydeps",
-		InternalPrefix: "src/python", // Default monorepo layout
-		ExternalDeps:   make(map[string]bool),
+		ExternalCell: "pydeps",
+		ExternalDeps: make(map[string]bool),
 	}
 
 	// Check for pyproject.toml
@@ -362,6 +363,10 @@ func detectPythonConfig(projectRoot string) (*PythonConfig, error) {
 		return nil, fmt.Errorf("no pyproject.toml found")
 	}
 	cfg.ProjectRoot = projectRoot
+
+	if modules, err := loadUVWorkspaceModules(projectRoot); err == nil {
+		cfg.WorkspaceModules = modules
+	}
 
 	// Load python-deps.toml
 	depsPath := filepath.Join(projectRoot, "python-deps.toml")
@@ -896,23 +901,13 @@ func (m *Mapper) mapPythonInternalImport(modulePath string) MappedDep {
 func (m *Mapper) mapPythonExternalImport(modulePath string) MappedDep {
 	cfg := m.config.Python
 
-	// Check for internal monorepo imports first
-	// Pattern: "python.<pkg>.<module>" -> "//src/python/<pkg>:<pkg>"
-	if strings.HasPrefix(modulePath, "python.") {
-		parts := strings.SplitN(modulePath, ".", 3)
-		if len(parts) >= 2 {
-			pkgName := parts[1] // e.g., "cargo" from "python.cargo.toml"
-			// Verify the package directory exists (use full path for stat)
-			pkgDir := filepath.Join(cfg.InternalPrefix, pkgName)
-			fullPkgDir := filepath.Join(cfg.ProjectRoot, pkgDir)
-			if _, err := os.Stat(fullPkgDir); err == nil {
-				target := fmt.Sprintf("//%s:%s", pkgDir, pkgName)
-				return MappedDep{
-					Target:     target,
-					Type:       DependencyInternal,
-					ImportPath: modulePath,
-				}
-			}
+	// A package of a uv workspace member maps to the member's target:
+	// "turnkey.cargo.toml" -> "//src/python/cargo:cargo"
+	if dir, ok := workspaceModuleDir(cfg.WorkspaceModules, modulePath); ok {
+		return MappedDep{
+			Target:     fmt.Sprintf("//%s:%s", dir, filepath.Base(dir)),
+			Type:       DependencyInternal,
+			ImportPath: modulePath,
 		}
 	}
 

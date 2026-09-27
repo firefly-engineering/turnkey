@@ -17,6 +17,9 @@ go_test(
     name = "rulessync_test",
     srcs = glob(["*_test.go"]),
     target_under_test = ":rulessync",
-    deps = ["//src/go/pkg/starlark:starlark"],
+    deps = [
+        "//src/go/pkg/mapper:mapper",
+        "//src/go/pkg/starlark:starlark",
+    ],
     visibility = ["PUBLIC"],
 )

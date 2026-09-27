@@ -66,12 +66,12 @@ pub fn extract(dir: &Path, exclude_patterns: &[&str]) -> anyhow::Result<Result> 
         (import_statement
           name: (aliased_import
             name: (dotted_name) @import))
-        (import_from_statement
-          module_name: (dotted_name) @from_import)
-        (import_from_statement
-          module_name: (relative_import) @relative_import)
+        (import_from_statement) @from_import
         "#,
     )?;
+    let from_import = query
+        .capture_index_for_name("from_import")
+        .expect("query captures from_import");
 
     let abs_dir = dir.canonicalize()?;
     let mut packages: HashMap<String, Package> = HashMap::new();
@@ -127,26 +127,26 @@ pub fn extract(dir: &Path, exclude_patterns: &[&str]) -> anyhow::Result<Result> 
         while let Some(match_) = matches.next() {
             for capture in match_.captures {
                 let node = capture.node;
-                let text = node.utf8_text(source.as_bytes())?;
-
-                // Handle relative imports
-                let (module_name, kind) = if capture.index == 3 {
-                    // relative_import
-                    (text.to_string(), ImportKind::Internal)
+                let modules = if capture.index == from_import {
+                    from_import_modules(node, source.as_bytes())?
                 } else {
-                    classify_import(text)
+                    let text = node.utf8_text(source.as_bytes())?;
+                    vec![classify_import(text)]
                 };
 
-                // Deduplicate by package path (e.g., "python.cargo" from "python.cargo.toml")
-                // This allows both "python.cfg" and "python.cargo" to be captured
-                let pkg_path = get_python_package_path(&module_name);
+                for (module_name, kind) in modules {
+                    // Deduplicate by package path (e.g., "turnkey.cargo" from
+                    // "turnkey.cargo.toml"), so both "turnkey.cfg" and
+                    // "turnkey.cargo" are captured
+                    let pkg_path = get_python_package_path(&module_name);
 
-                if !seen.contains(&pkg_path) {
-                    seen.insert(pkg_path);
-                    imports.push(Import {
-                        path: module_name,
-                        kind,
-                    });
+                    if !seen.contains(&pkg_path) {
+                        seen.insert(pkg_path);
+                        imports.push(Import {
+                            path: module_name,
+                            kind,
+                        });
+                    }
                 }
             }
         }
@@ -179,6 +179,45 @@ pub fn extract(dir: &Path, exclude_patterns: &[&str]) -> anyhow::Result<Result> 
     Ok(result)
 }
 
+/// The modules a `from <module> import <names>` statement imports.
+///
+/// Each name may be a submodule, so `from turnkey import cfg` yields
+/// `turnkey.cfg`: under a namespace package the module alone doesn't say
+/// which package provides the name. A wildcard import yields the module. A
+/// relative import (`from . import x`, `from .x import y`) yields the
+/// relative module, classified internal.
+fn from_import_modules(
+    stmt: tree_sitter::Node,
+    source: &[u8],
+) -> anyhow::Result<Vec<(String, ImportKind)>> {
+    let Some(module) = stmt.child_by_field_name("module_name") else {
+        return Ok(Vec::new());
+    };
+    let module_text = module.utf8_text(source)?;
+    if module.kind() == "relative_import" {
+        return Ok(vec![(module_text.to_string(), ImportKind::Internal)]);
+    }
+
+    let mut walker = stmt.walk();
+    let mut modules = Vec::new();
+    for name in stmt.children_by_field_name("name", &mut walker) {
+        let name = if name.kind() == "aliased_import" {
+            match name.child_by_field_name("name") {
+                Some(n) => n,
+                None => continue,
+            }
+        } else {
+            name
+        };
+        let name_text = name.utf8_text(source)?;
+        modules.push(classify_import(&format!("{module_text}.{name_text}")));
+    }
+    if modules.is_empty() {
+        modules.push(classify_import(module_text));
+    }
+    Ok(modules)
+}
+
 /// Check if a directory/file should be excluded.
 fn should_exclude(name: &str, patterns: &[&str]) -> bool {
     if name.starts_with('.') {
@@ -195,8 +234,8 @@ fn should_exclude(name: &str, patterns: &[&str]) -> bool {
 }
 
 /// Get the package path for deduplication purposes.
-/// "python.cargo.toml" -> "python.cargo"
-/// "python.cfg" -> "python.cfg"
+/// "turnkey.cargo.toml" -> "turnkey.cargo"
+/// "turnkey.cfg" -> "turnkey.cfg"
 /// "requests" -> "requests"
 fn get_python_package_path(module: &str) -> String {
     let parts: Vec<&str> = module.split('.').collect();
@@ -226,4 +265,63 @@ fn classify_import(module: &str) -> (String, ImportKind) {
 
     // Default to external
     (module.to_string(), ImportKind::External)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Extracts the imports of one module, `source`.
+    fn imports_of(source: &str) -> Vec<(String, ImportKind)> {
+        let dir = std::env::temp_dir().join(format!(
+            "deps-extract-python-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("mod.py"), source).unwrap();
+        let result = extract(&dir, &[]);
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        let result = result.unwrap();
+        result.packages[0]
+            .imports
+            .iter()
+            .map(|i| (i.path.clone(), i.kind.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn from_import_qualifies_each_name() {
+        assert_eq!(
+            imports_of("from turnkey import cfg, cargo as c\n"),
+            vec![
+                ("turnkey.cargo".to_string(), ImportKind::External),
+                ("turnkey.cfg".to_string(), ImportKind::External),
+            ]
+        );
+    }
+
+    #[test]
+    fn from_import_of_a_submodule_keeps_its_package() {
+        assert_eq!(
+            imports_of("from turnkey.cargo.toml import parse\nimport requests\n"),
+            vec![
+                ("requests".to_string(), ImportKind::External),
+                ("turnkey.cargo.toml.parse".to_string(), ImportKind::External),
+            ]
+        );
+    }
+
+    #[test]
+    fn wildcard_and_relative_imports() {
+        assert_eq!(
+            imports_of("from os.path import *\nfrom . import sibling\nfrom .x import y\n"),
+            vec![
+                (".".to_string(), ImportKind::Internal),
+                (".x".to_string(), ImportKind::Internal),
+                ("os.path".to_string(), ImportKind::Stdlib),
+            ]
+        );
+    }
 }

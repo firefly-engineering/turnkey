@@ -206,6 +206,12 @@ Dependencies between `preserve-start` and `preserve-end` markers are never modif
   Optional, target-specific (`[target.'cfg(...)'.dependencies]`) and build
   dependencies are not synced: sync reports them and leaves any existing dep
   on them alone.
+- **Python**: the imports found in the sources. An import of a package that a
+  uv workspace member provides (`turnkey.cfg`, `from turnkey import cfg`)
+  maps to that member's target. The packages come from the members listed in
+  the root `pyproject.toml`'s `[tool.uv.workspace]` and their source layout,
+  so a downstream namespace such as `acme.*` works the same way. Any other
+  import maps to `pydeps`.
 - **Other languages**: the imports found in the sources, mapped to targets.
 
 Sync never removes a dep it can't account for:
