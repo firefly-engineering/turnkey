@@ -13,7 +13,7 @@
 //!
 //! Output is always in SRI format (sha256-...) for Nix compatibility.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::Parser;
 use prefetch_cache::PrefetchCache;
 use std::process::Command;
