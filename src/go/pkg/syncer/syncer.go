@@ -43,7 +43,7 @@ type Syncer struct {
 	DryRun bool
 	// Output is where to write status messages.
 	Output io.Writer
-	// Only names the rules to sync or check. Empty means every enabled rule.
+	// Only names the rules to sync or check. Empty means every rule.
 	Only []string
 }
 
@@ -79,10 +79,6 @@ func (s *Syncer) SyncDeps() (*Result, error) {
 // Unlike SyncDeps, it does not check staleness - it always regenerates.
 // This is used by tw when it detects that dependency files have changed.
 func (s *Syncer) SyncRule(rule syncconfig.DepsRule) error {
-	if !rule.IsEnabled() {
-		return nil
-	}
-
 	if !s.Quiet {
 		s.printf("Syncing %s...\n", rule.Target)
 	}
@@ -170,18 +166,18 @@ func (s *Syncer) run(regenerate bool) (*Result, bool, error) {
 	return result, anyStale, nil
 }
 
-// selectedRules returns the enabled rules named by Only, in config order,
-// or every enabled rule when Only is empty. Rules run in config order, so a
+// selectedRules returns the rules named by Only, in config order,
+// or every rule when Only is empty. Rules run in config order, so a
 // rule whose target is another's source comes first in sync.toml.
 func (s *Syncer) selectedRules() ([]syncconfig.DepsRule, error) {
-	rules := s.Config.EnabledDepsRules()
+	rules := s.Config.Deps
 	if len(s.Only) == 0 {
 		return rules, nil
 	}
 	var selected []syncconfig.DepsRule
 	for _, name := range s.Only {
 		if !slices.ContainsFunc(rules, func(r syncconfig.DepsRule) bool { return r.Name == name }) {
-			return nil, fmt.Errorf("no enabled deps rule named %q", name)
+			return nil, fmt.Errorf("no deps rule named %q", name)
 		}
 	}
 	for _, rule := range rules {

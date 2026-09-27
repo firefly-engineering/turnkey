@@ -2,7 +2,8 @@
 //
 // Configuration is stored in .turnkey/sync.toml and defines:
 // - Dependency staleness rules (go.mod → go-deps.toml)
-// - rules.star file staleness rules (coming soon)
+// - Tool wrapper rules, for tw
+// - Rules sync's settings, conditions and languages
 //
 // Example config:
 //
@@ -49,10 +50,6 @@ type Config struct {
 	// These track when dependency files (go.mod, Cargo.toml) change
 	// and need to regenerate dependency declarations.
 	Deps []DepsRule `toml:"deps"`
-
-	// Buck defines rules.star file staleness rules (future).
-	// These track when source files change and need to regenerate rules.star files.
-	Buck []BuckRule `toml:"buck"`
 
 	// Wrappers defines tool wrapper rules for auto-sync.
 	// These configure which native tools (go, cargo, uv) should trigger
@@ -141,25 +138,6 @@ type DepsRule struct {
 	// Generator is the command to run to regenerate the target.
 	// The command is executed from the project root.
 	Generator []string `toml:"generator"`
-
-	// Enabled controls whether this rule is active (default: true).
-	Enabled *bool `toml:"enabled,omitempty"`
-}
-
-// BuckRule defines a staleness rule for rules.star file generation.
-// (Reserved for future implementation)
-type BuckRule struct {
-	// Name is a human-readable identifier for this rule.
-	Name string `toml:"name"`
-
-	// Patterns defines which source files trigger BUCK regeneration.
-	Patterns []string `toml:"patterns"`
-
-	// Generator is the command to regenerate rules.star files.
-	Generator []string `toml:"generator"`
-
-	// Enabled controls whether this rule is active (default: true).
-	Enabled *bool `toml:"enabled,omitempty"`
 }
 
 // WrapperRule defines a tool wrapper configuration for auto-sync.
@@ -188,33 +166,6 @@ type WrapperRule struct {
 	// Each command is run in sequence before the sync operation.
 	// Example: ["go mod tidy"] to clean up go.mod after go get.
 	PostCommands []string `toml:"post_commands"`
-
-	// Enabled controls whether this wrapper is active (default: true).
-	Enabled *bool `toml:"enabled,omitempty"`
-}
-
-// IsEnabled returns whether the rule is enabled.
-func (r *DepsRule) IsEnabled() bool {
-	if r.Enabled == nil {
-		return true
-	}
-	return *r.Enabled
-}
-
-// IsEnabled returns whether the rule is enabled.
-func (r *BuckRule) IsEnabled() bool {
-	if r.Enabled == nil {
-		return true
-	}
-	return *r.Enabled
-}
-
-// IsEnabled returns whether the wrapper is enabled.
-func (r *WrapperRule) IsEnabled() bool {
-	if r.Enabled == nil {
-		return true
-	}
-	return *r.Enabled
 }
 
 // IsMutatingSubcommand returns true if the given subcommand may modify dependency files.
@@ -265,44 +216,11 @@ func Parse(data []byte) (*Config, error) {
 	return &cfg, nil
 }
 
-// EnabledDepsRules returns only the enabled dependency rules.
-func (c *Config) EnabledDepsRules() []DepsRule {
-	var rules []DepsRule
-	for _, r := range c.Deps {
-		if r.IsEnabled() {
-			rules = append(rules, r)
-		}
-	}
-	return rules
-}
-
-// EnabledBuckRules returns only the enabled BUCK rules.
-func (c *Config) EnabledBuckRules() []BuckRule {
-	var rules []BuckRule
-	for _, r := range c.Buck {
-		if r.IsEnabled() {
-			rules = append(rules, r)
-		}
-	}
-	return rules
-}
-
-// EnabledWrapperRules returns only the enabled wrapper rules.
-func (c *Config) EnabledWrapperRules() []WrapperRule {
-	var rules []WrapperRule
-	for _, r := range c.Wrappers {
-		if r.IsEnabled() {
-			rules = append(rules, r)
-		}
-	}
-	return rules
-}
-
 // FindWrapper finds a wrapper rule by command name.
 // Returns nil if no matching wrapper is found.
 func (c *Config) FindWrapper(command string) *WrapperRule {
 	for i := range c.Wrappers {
-		if c.Wrappers[i].Command == command && c.Wrappers[i].IsEnabled() {
+		if c.Wrappers[i].Command == command {
 			return &c.Wrappers[i]
 		}
 	}
@@ -313,7 +231,7 @@ func (c *Config) FindWrapper(command string) *WrapperRule {
 // Returns nil if no matching rule is found.
 func (c *Config) FindDepsRule(name string) *DepsRule {
 	for i := range c.Deps {
-		if c.Deps[i].Name == name && c.Deps[i].IsEnabled() {
+		if c.Deps[i].Name == name {
 			return &c.Deps[i]
 		}
 	}
@@ -334,18 +252,6 @@ func (c *Config) Validate() error {
 		}
 		if len(r.Generator) == 0 {
 			return fmt.Errorf("deps rule %q: generator command is required", r.Name)
-		}
-	}
-
-	for i, r := range c.Buck {
-		if r.Name == "" {
-			return fmt.Errorf("buck rule %d: name is required", i)
-		}
-		if len(r.Patterns) == 0 {
-			return fmt.Errorf("buck rule %q: at least one pattern is required", r.Name)
-		}
-		if len(r.Generator) == 0 {
-			return fmt.Errorf("buck rule %q: generator command is required", r.Name)
 		}
 	}
 

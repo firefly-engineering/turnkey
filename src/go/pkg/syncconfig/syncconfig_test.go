@@ -22,7 +22,6 @@ name = "rust"
 sources = ["Cargo.toml", "Cargo.lock"]
 target = "rust-deps.toml"
 generator = ["cargo-deps-gen"]
-enabled = false
 `)
 
 	cfg, err := Parse(data)
@@ -46,54 +45,6 @@ enabled = false
 	}
 	if len(cfg.Deps[0].Generator) != 5 {
 		t.Errorf("expected 5 generator args, got %d", len(cfg.Deps[0].Generator))
-	}
-	if !cfg.Deps[0].IsEnabled() {
-		t.Error("expected first rule to be enabled")
-	}
-
-	// Check second rule is disabled
-	if cfg.Deps[1].IsEnabled() {
-		t.Error("expected second rule to be disabled")
-	}
-}
-
-func TestEnabledRules(t *testing.T) {
-	data := []byte(`
-[[deps]]
-name = "enabled"
-sources = ["a"]
-target = "b"
-generator = ["cmd"]
-
-[[deps]]
-name = "disabled"
-sources = ["a"]
-target = "b"
-generator = ["cmd"]
-enabled = false
-
-[[deps]]
-name = "also-enabled"
-sources = ["a"]
-target = "b"
-generator = ["cmd"]
-enabled = true
-`)
-
-	cfg, err := Parse(data)
-	if err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-
-	enabled := cfg.EnabledDepsRules()
-	if len(enabled) != 2 {
-		t.Errorf("expected 2 enabled rules, got %d", len(enabled))
-	}
-	if enabled[0].Name != "enabled" {
-		t.Errorf("expected first enabled rule to be 'enabled', got %q", enabled[0].Name)
-	}
-	if enabled[1].Name != "also-enabled" {
-		t.Errorf("expected second enabled rule to be 'also-enabled', got %q", enabled[1].Name)
 	}
 }
 
