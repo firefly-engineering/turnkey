@@ -111,16 +111,27 @@ for arg in "$@"; do
     fi
 done
 
-# Create node_modules symlink in current directory for TypeScript module resolution
-# tsc uses its own module resolution which requires node_modules in cwd or parent dirs
-if [[ -e node_modules ]]; then
-    echo "Warning: node_modules already exists in cwd, skipping symlink" >&2
-else
-    ln -s "$WORK_DIR/node_modules" node_modules
-    trap 'rm -f node_modules; rm -rf "$WORK_DIR"' EXIT
-fi
+# Compile inside WORK_DIR, next to its node_modules: tsc looks for packages
+# in a node_modules above the sources, and the action's working directory
+# (the project root) is shared with every compile running at the same time.
+# The sources (and a tsconfig) are copied in at their relative paths, so tsc
+# lays the output out as it would have; copies, not symlinks, since tsc
+# resolves modules from a symlink's target.
+# A relative path, made absolute before leaving the working directory; a
+# bare command name stays one
+abs() { if [[ "$1" == */* && "$1" != /* ]]; then echo "$PWD/$1"; else echo "$1"; fi; }
+NODE=$(abs "$NODE")
+TSC=$(abs "$TSC")
+mkdir -p "$OUT_DIR"
+OUT_DIR="$(cd "$OUT_DIR" && pwd)"
+for arg in "${SRCS[@]}"; do
+    if [[ -f "$arg" && "$arg" != /* ]]; then
+        mkdir -p "$WORK_DIR/$(dirname "$arg")"
+        cp "$arg" "$WORK_DIR/$arg"
+    fi
+done
+cd "$WORK_DIR"
 
-# Run tsc with node_modules available
 "$NODE" "$TSC" """ + tsc_flags_str + """ "${SRCS[@]}"
 """
 
