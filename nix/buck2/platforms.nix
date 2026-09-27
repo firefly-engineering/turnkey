@@ -59,7 +59,8 @@ in
   # <settings>:<os>-<cpu>, and a branch for every platform, with no
   # DEFAULT. conditions is `conditions`'s result. Returns { common;
   # branches = [ { key; values; } ] sorted by key, empty when every
-  # platform has the same values }.
+  # platform has the same values }. The split-vectors flake check runs the
+  # conditions core's test cases (testdata/split-vectors.json) against it.
   split =
     conditions: valuesOf:
     let

@@ -506,6 +506,63 @@
               "sync.toml: [conditions] go_tags isn't buck2.go.allowedBuildTags";
             pkgs.runCommand "buck2-generators-check" { } "touch $out";
 
+          # nix/buck2/platforms.nix's split agrees with the conditions
+          # module's (src/go/pkg/conditions) on its test cases, and every
+          # combined key it writes names a config_setting settingsBuckFile
+          # defines. Cases with Go build tag dimensions are the Go module's
+          # alone. Checked at evaluation.
+          checks.split-vectors =
+            let
+              platforms = import ./nix/buck2/platforms.nix { inherit lib; };
+              vectors = builtins.fromJSON (builtins.readFile ./src/go/pkg/conditions/testdata/split-vectors.json);
+              cases = builtins.filter (case: case.dimensions == [ ]) vectors.cases;
+              # A platform's labels: those of every rule whose when it includes
+              labelsOf =
+                case: platform:
+                lib.concatMap (
+                  rule:
+                  lib.optionals (lib.all (dim: platform.${dim} == rule.when.${dim}) (
+                    lib.attrNames rule.when
+                  )) rule.labels
+                ) case.labels;
+              got = case: platforms.split { inherit (case) settings platforms; } (labelsOf case);
+              want = case: {
+                inherit (case) common;
+                branches = map (branch: {
+                  inherit (branch) key;
+                  values = branch.labels;
+                }) case.branches;
+              };
+              splitProblems = map (
+                case: "${case.name}: ${builtins.toJSON (got case)}, want ${builtins.toJSON (want case)}"
+              ) (builtins.filter (case: got case != want case) cases);
+              # The <os>-<cpu> part of each combined key
+              settingNames =
+                case:
+                map (branch: lib.removePrefix "${case.settings}:" branch.key) (
+                  builtins.filter (branch: lib.hasPrefix "${case.settings}:" branch.key) case.branches
+                );
+              namingProblems = lib.concatMap (
+                case:
+                let
+                  buckFile = platforms.settingsBuckFile case.platforms [ ];
+                in
+                map (name: "${case.name}: no config_setting named ${name}") (
+                  builtins.filter (name: !(lib.hasInfix ''name = "${name}",'' buckFile)) (settingNames case)
+                )
+              ) cases;
+            in
+            assert lib.assertMsg (
+              cases != [ ] && lib.concatMap settingNames cases != [ ]
+            ) "split vectors: no platform-only cases, or none with a combined key";
+            assert lib.assertMsg (
+              splitProblems == [ ]
+            ) "split vectors: ${lib.concatStringsSep "; " splitProblems}";
+            assert lib.assertMsg (
+              namingProblems == [ ]
+            ) "split vectors: ${lib.concatStringsSep "; " namingProblems}";
+            pkgs.runCommand "split-vectors-check" { } "touch $out";
+
           # The language records (nix/buck2/languages.nix) agree with
           # themselves: rule names are unique, a rule runs after the rule
           # that writes its source, and each wrapper runs a rule of its own
