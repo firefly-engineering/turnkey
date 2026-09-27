@@ -51,7 +51,7 @@ _turnkey_regen_go() {
   if [ ! -f go.mod ]; then return; fi
   if _turnkey_needs_regen "go" "go-deps.toml" go.mod go.sum; then
     echo "turnkey: Regenerating go-deps.toml..."
-    if "$TURNKEY_GODEPS_GEN" --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml.tmp; then
+    if "$TURNKEY_GODEPS_GEN" --go-mod go.mod --go-sum go.sum -o go-deps.toml.tmp; then
       mv go-deps.toml.tmp go-deps.toml
       _turnkey_set_cached_hash "go" "$(_turnkey_hash_files go.mod go.sum)"
       echo "turnkey: Updated go-deps.toml (remember to commit)"

@@ -312,10 +312,11 @@ turnkey.toolchains.buck2.tk.userPatchesDir = ./.turnkey/patches;
 ```
 
 The `genericMkDepsCell` function in `nix/lib/deps-cell/default.nix` applies patches
-after copying dependencies but before running language-specific merge commands:
+after copying dependencies and creating the unversioned symlinks, but before
+running language-specific merge commands:
 
 ```
-Copy deps → Apply user patches → Create symlinks → Run merge commands → Generate .buckconfig
+Copy deps → Create symlinks → Apply user patches → Run merge commands → Generate .buckconfig
 ```
 
 Patch files use unified diff format with paths like `a/vendor/...` and `b/vendor/...`,

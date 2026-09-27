@@ -84,7 +84,7 @@ release in the shell was 2026-09-15.
 | Dev shell | `buck2`, `tk`, `python3`, plus the Rust, Go, Python, TypeScript and Solidity toolchains, because `//...` includes tests in all of those languages. Today these come from the full `toolchain.toml` shell, entered with `direnv exec .` or `nix develop --impure`. |
 | buck2 daemon | Started implicitly by `buck2 test`, one per workspace. Nothing to provision. |
 | Nix store paths | The cells are symlinks into `/nix/store`, for example `.turnkey/rustdeps -> /nix/store/…-rustdeps-cell`. The generated `.buckconfig` hard-codes store paths for `turnkey.test_runner_protocol`, `turnkey.test_path` and `test.v2_test_executor`. |
-| Network | Only to fill a cold nix store, including cell fetchers. Also for `godeps-gen --prefetch` when `go.mod`/`go.sum` changed (`.turnkey/sync.toml`). A warm run made no fetches (`tk sync` reported every deps file "ok"). Whether any of the 30 tests reach the network was not audited. |
+| Network | Only to fill a cold nix store, including cell fetchers. Also for `godeps-gen`'s prefetching when `go.mod`/`go.sum` changed (`.turnkey/sync.toml`). A warm run made no fetches (`tk sync` reported every deps file "ok"). Whether any of the 30 tests reach the network was not audited. |
 | FUSE / turnkey-composed / macFUSE | **Not used** by the suite. Details below. |
 
 ### Why FUSE is not involved

@@ -260,7 +260,7 @@ Paths are relative to the repo root, at `main` (`1f0fca95`).
 | `…/main.rs:196` | npm packages → `name/=node_modules/name/`. | Same. |
 | `…/main.rs:444-465` | Reads only `[dependencies]`. A missing file is not an error. | Unchanged. |
 | `nix/buck2/options.nix:455-461` | `solidity.foundryTomlFile`, default `"foundry.toml"`. | Unchanged. |
-| `nix/buck2/languages.nix:269-291` | The sync rule: sources = foundry.toml + package.json + pnpm lock. It runs `soldeps-gen --foundry … --prefetch`. | Unchanged, unless git deps move out of `foundry.toml` (decision D below). |
+| `nix/buck2/languages.nix:269-291` | The sync rule: sources = foundry.toml + package.json + pnpm lock. It runs `soldeps-gen --foundry …`, which prefetches by default. | Unchanged, unless git deps move out of `foundry.toml` (decision D below). |
 | `flake.nix:497-509` | Self-check: the solidity rule both reads and watches `foundryTomlFile`. | Same as above. |
 | `nix/lib/deps-cell/adapters/solidity.nix:160-178` | Writes `remappings.json`. **Nothing reads it** (grep finds no reader). | Dead output. Drop it or use it. |
 | `…/solidity.nix:213-226` | Writes the cell's `remappings.txt` as `<prefix>=vendor/<name>/`. It keeps only the prefix of soldeps-gen's remapping and **drops its target**, so `forge-std/` loses `src/`. `solc "forge-std/=<cell>/vendor/forge-std/" …Test.sol` → "Source …/vendor/forge-std/Test.sol not found" **(verified)**. No example imports forge-std today, so nothing notices. | This is the natural single source of remappings for both Buck2 and native forge, once it honours the target path. |
