@@ -63,6 +63,21 @@ struct OutputPackage {
     /// Dependencies of this package
     #[serde(skip_serializing_if = "Vec::is_empty")]
     dependencies: Vec<String>,
+    /// Optional dependencies of this package: installed only where their
+    /// own os/cpu/libc allow, like esbuild's per-platform binaries
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    optional_dependencies: Vec<String>,
+    /// The operating systems the package installs on, as npm names them
+    /// (e.g. "darwin", or "!win32" to exclude one); empty for any
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    os: Vec<String>,
+    /// The CPUs the package installs on (e.g. "x64", "arm64"); empty for any
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    cpu: Vec<String>,
+    /// The C libraries the package installs with on Linux (e.g. "glibc",
+    /// "musl"); empty for any
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    libc: Vec<String>,
 }
 
 /// pnpm lockfile structure (v9+)
@@ -72,26 +87,34 @@ struct PnpmLockfile {
     lockfile_version: String,
     #[serde(default)]
     packages: BTreeMap<String, PnpmPackage>,
-    /// Snapshots section (pnpm v9+) - parsed for schema completeness
+    /// Snapshots section (pnpm v9+): each package's dependencies
     #[serde(default)]
-    #[allow(dead_code)]
     snapshots: BTreeMap<String, PnpmSnapshot>,
 }
 
 /// Package entry in pnpm-lock.yaml
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct PnpmPackage {
     resolution: Option<PnpmResolution>,
     #[serde(default)]
     dependencies: BTreeMap<String, String>,
     #[serde(default)]
+    optional_dependencies: BTreeMap<String, String>,
+    #[serde(default)]
     dev: bool,
+    #[serde(default)]
+    os: Vec<String>,
+    #[serde(default)]
+    cpu: Vec<String>,
+    #[serde(default)]
+    libc: Vec<String>,
 }
 
-/// Snapshot entry in pnpm-lock.yaml (v9+)
-/// Parsed for schema completeness; not currently used in processing.
+/// Snapshot entry in pnpm-lock.yaml (v9+): where a package's dependencies
+/// are, keyed like its package entry (plus any peer suffix)
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
+#[serde(rename_all = "camelCase")]
 struct PnpmSnapshot {
     #[serde(default)]
     dependencies: BTreeMap<String, PnpmSnapshotDep>,
@@ -101,7 +124,7 @@ struct PnpmSnapshot {
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-#[allow(dead_code)]
+#[allow(dead_code)] // only the keys are read
 enum PnpmSnapshotDep {
     Simple(String),
     Complex { version: String },
@@ -145,7 +168,10 @@ fn parse_package_spec(spec: &str) -> Option<(String, String)> {
         // Non-scoped package: name@version
         if let Some(at_pos) = spec.find('@') {
             let name = &spec[..at_pos];
-            let version = spec[at_pos + 1..].split('(').next().unwrap_or(&spec[at_pos + 1..]);
+            let version = spec[at_pos + 1..]
+                .split('(')
+                .next()
+                .unwrap_or(&spec[at_pos + 1..]);
             return Some((name.to_string(), version.to_string()));
         }
     }
@@ -224,12 +250,20 @@ fn main() -> Result<()> {
             None => npm_tarball_url(&name, &version),
         };
 
-        // Collect dependencies
-        let dependencies: Vec<String> = pkg
-            .dependencies
-            .keys()
-            .map(|k| k.to_string())
-            .collect();
+        // Collect dependencies: from the package entry (pnpm before v9),
+        // or its snapshot
+        let snapshot = lockfile.snapshots.get(spec);
+        let mut dependencies: Vec<String> = pkg.dependencies.keys().cloned().collect();
+        let mut optional_dependencies: Vec<String> =
+            pkg.optional_dependencies.keys().cloned().collect();
+        if let Some(snapshot) = snapshot {
+            dependencies.extend(snapshot.dependencies.keys().cloned());
+            optional_dependencies.extend(snapshot.optional_dependencies.keys().cloned());
+        }
+        dependencies.sort();
+        dependencies.dedup();
+        optional_dependencies.sort();
+        optional_dependencies.dedup();
 
         output_packages.push(OutputPackage {
             name,
@@ -237,6 +271,10 @@ fn main() -> Result<()> {
             url,
             integrity,
             dependencies,
+            optional_dependencies,
+            os: pkg.os.clone(),
+            cpu: pkg.cpu.clone(),
+            libc: pkg.libc.clone(),
         });
     }
 
@@ -293,6 +331,44 @@ mod tests {
         let (name, version) = parse_package_spec("@babel/core@7.26.0(@swc/core@1.10.14)").unwrap();
         assert_eq!(name, "@babel/core");
         assert_eq!(version, "7.26.0");
+    }
+
+    #[test]
+    fn test_platform_fields_and_optional_deps() {
+        let lock: PnpmLockfile = serde_saphyr::from_str(
+            r#"lockfileVersion: '9.0'
+packages:
+  chokidar@3.6.0:
+    resolution: {integrity: sha512-a}
+  fsevents@2.3.3:
+    resolution: {integrity: sha512-b}
+    os: [darwin]
+  '@swc/core-linux-x64-musl@1.0.0':
+    resolution: {integrity: sha512-c}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+snapshots:
+  chokidar@3.6.0:
+    dependencies:
+      braces: 3.0.3
+    optionalDependencies:
+      fsevents: 2.3.3
+  fsevents@2.3.3:
+    optional: true
+"#,
+        )
+        .unwrap();
+        let fsevents = &lock.packages["fsevents@2.3.3"];
+        assert_eq!(fsevents.os, vec!["darwin"]);
+        let swc = &lock.packages["@swc/core-linux-x64-musl@1.0.0"];
+        assert_eq!(
+            (swc.cpu.clone(), swc.libc.clone()),
+            (vec!["x64".to_string()], vec!["musl".to_string()])
+        );
+        let chokidar = &lock.snapshots["chokidar@3.6.0"];
+        assert!(chokidar.optional_dependencies.contains_key("fsevents"));
+        assert!(chokidar.dependencies.contains_key("braces"));
     }
 
     #[test]
