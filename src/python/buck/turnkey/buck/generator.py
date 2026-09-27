@@ -15,11 +15,7 @@ from turnkey.cargo.features import activate
 from turnkey.cargo.semver import best_match
 from turnkey.buildsystem.native_library import NativeLibrarySpec
 from turnkey.buildsystem.buck2 import buck2_generator
-
-try:
-    from cfg import classify_target_platforms, SUPPORTED_PLATFORMS
-except ImportError:
-    from turnkey.cfg import classify_target_platforms, SUPPORTED_PLATFORMS
+from turnkey.cfg import classify_target_platforms, SUPPORTED_PLATFORMS
 
 
 ALL_PLATFORM_KEYS = set(SUPPORTED_PLATFORMS.keys())

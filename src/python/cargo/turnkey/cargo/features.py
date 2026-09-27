@@ -32,10 +32,7 @@ from .toml import (
     get_dep_package_name,
     is_optional,
 )
-try:
-    from cfg import classify_target_platforms
-except ImportError:
-    from turnkey.cfg import classify_target_platforms
+from turnkey.cfg import classify_target_platforms
 
 
 def parse_feature_forwarding(feature_item: str) -> tuple[str, str] | None:
