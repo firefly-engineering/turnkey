@@ -206,6 +206,30 @@ func LoadDefaultFrom(root string) (*Config, error) {
 	return Load(path)
 }
 
+// FindRoot returns the project root dir is in: the nearest of dir and its
+// ancestors holding a .buckconfig or a .turnkey/sync.toml. ok is false
+// when there is none, dir being outside any project; what to do then is
+// the caller's (tk runs from dir, tw runs the tool untouched).
+//
+// Either file marks a root: tk needs .buckconfig to run buck2, tw needs
+// sync.toml to know what to sync, and a turnkey shell writes both at the
+// project's top, so the nearest of either is the same directory for both.
+func FindRoot(dir string) (root string, ok bool) {
+	dir = filepath.Clean(dir)
+	for {
+		for _, marker := range []string{".buckconfig", DefaultConfigPath} {
+			if _, err := os.Stat(filepath.Join(dir, marker)); err == nil {
+				return dir, true
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", false
+		}
+		dir = parent
+	}
+}
+
 // Parse parses the config from TOML data.
 func Parse(data []byte) (*Config, error) {
 	var cfg Config

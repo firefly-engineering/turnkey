@@ -280,3 +280,59 @@ deps_file = "web/js-deps.toml"
 		t.Errorf("Validate: %v", err)
 	}
 }
+
+func TestFindRoot(t *testing.T) {
+	touch := func(path string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mkdir := func(path string) string {
+		t.Helper()
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+
+	t.Run("buckconfig", func(t *testing.T) {
+		root := t.TempDir()
+		touch(filepath.Join(root, ".buckconfig"))
+		dir := mkdir(filepath.Join(root, "src", "cmd"))
+		if got, ok := FindRoot(dir); !ok || got != root {
+			t.Errorf("FindRoot = %q, %v; want %q, true", got, ok, root)
+		}
+	})
+
+	t.Run("sync.toml", func(t *testing.T) {
+		root := t.TempDir()
+		touch(filepath.Join(root, DefaultConfigPath))
+		dir := mkdir(filepath.Join(root, "src"))
+		if got, ok := FindRoot(dir); !ok || got != root {
+			t.Errorf("FindRoot = %q, %v; want %q, true", got, ok, root)
+		}
+	})
+
+	t.Run("nearest wins", func(t *testing.T) {
+		outer := t.TempDir()
+		touch(filepath.Join(outer, ".buckconfig"))
+		inner := filepath.Join(outer, "examples", "app")
+		touch(filepath.Join(inner, DefaultConfigPath))
+		dir := mkdir(filepath.Join(inner, "src"))
+		if got, ok := FindRoot(dir); !ok || got != inner {
+			t.Errorf("FindRoot = %q, %v; want %q, true", got, ok, inner)
+		}
+	})
+
+	t.Run("a bare .turnkey is not a root", func(t *testing.T) {
+		root := t.TempDir()
+		dir := mkdir(filepath.Join(root, ".turnkey"))
+		if got, ok := FindRoot(filepath.Dir(dir)); ok {
+			t.Errorf("FindRoot = %q, true; want no root", got)
+		}
+	})
+}
