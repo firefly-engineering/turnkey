@@ -10,11 +10,12 @@
 #
 # The cell generates a remappings.json that solidity_library uses automatically.
 
-{ pkgs, lib }:
+{ pkgs, lib, genericBuilder }:
 
 let
   fetchers = import ../fetchers.nix { inherit pkgs lib; };
   fixups = import ../fixups { inherit pkgs lib; };
+  inherit (genericBuilder) genericMkDepsCell;
 in
 rec {
   # Build inputs for per-dependency builds
@@ -155,6 +156,7 @@ rec {
 
     # Optional
     userFixups ? {},    # Additional fixups
+    userPatchesDir ? null, # Path to .turnkey/patches directory (from FUSE edit layer)
   }:
   let
     depsToml = builtins.fromTOML (builtins.readFile depsFile);
@@ -232,44 +234,22 @@ rec {
       in "${r.prefix}=${r.target}"
     ) packages;
   in
-  pkgs.runCommand "${cellName}-cell" {
-    nativeBuildInputs = cellBuildInputs;
-    passthru = {
-      inherit depPackages;
-    };
-  } ''
-    mkdir -p $out/vendor
+  genericMkDepsCell {
+    inherit cellName depPackages rootBuckContent userPatchesDir;
+    mergeCommands = ''
+      # Generate remappings.json for solidity_library to use
+      cat > $out/remappings.json << 'REMAPPINGS_JSON'
+      ${remappingsJson}
+      REMAPPINGS_JSON
 
-    # Copy each dep package into vendor/
-    ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: pkg: ''
-      mkdir -p "$out/vendor/${name}"
-      cp -r ${pkg}/* "$out/vendor/${name}/"
-      chmod -R u+w "$out/vendor/${name}"
-    '') depPackages)}
-
-    # Generate root rules.star file with aliases
-    cat > $out/rules.star << 'RULES'
-    ${rootBuckContent}
-    RULES
-
-    # Generate remappings.json for solidity_library to use
-    cat > $out/remappings.json << 'REMAPPINGS_JSON'
-    ${remappingsJson}
-    REMAPPINGS_JSON
-
-    # Generate remappings.txt in solc format for manual use
-    cat > $out/remappings.txt << 'REMAPPINGS'
-    ${remappingsTxt}
-    REMAPPINGS
-
-    # Generate cell .buckconfig
-    cat > $out/.buckconfig << CELLCONFIG
-    [cells]
-        ${cellName} = .
-        prelude = prelude
-
-    [buildfile]
-        name = rules.star
-    CELLCONFIG
-  '';
+      # Generate remappings.txt in solc format for manual use
+      cat > $out/remappings.txt << 'REMAPPINGS'
+      ${remappingsTxt}
+      REMAPPINGS
+    '';
+    # Packages live at vendor/<name>, unversioned, so no symlinks
+    keyToPath = name: name;
+    createSymlinks = false;
+    cellBuildInputs = cellBuildInputs;
+  };
 }

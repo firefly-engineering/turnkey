@@ -690,7 +690,7 @@
           # src/, so `forge-std/` must point there. Checked at evaluation.
           checks.solidity-remappings =
             let
-              solidity = import ./nix/lib/deps-cell/adapters/solidity.nix { inherit pkgs lib; };
+              inherit ((import ./nix/lib/deps-cell { inherit pkgs lib; }).adapters) solidity;
               remapping =
                 pkg:
                 let

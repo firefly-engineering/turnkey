@@ -316,8 +316,6 @@ in
     description = "Solidity deps";
     depsFile = langCfg: depsFileName langCfg "solidity-deps.toml";
     generator = import ../packages/soldeps-gen.nix { inherit pkgs lib; };
-    # The Solidity adapter builds its cell without the generic builder, so
-    # it takes no user patches.
     mkCell =
       {
         cellName,
@@ -325,9 +323,10 @@ in
         userPatchesDir,
         conditions,
       }:
-      (import ../lib/deps-cell/adapters/solidity.nix { inherit pkgs lib; }).mkSolDepsCell {
+      depsCell.mkSolDepsCell {
         inherit cellName;
         inherit (langCfg) depsFile;
+        inherit userPatchesDir;
       };
     syncRules =
       langCfg:

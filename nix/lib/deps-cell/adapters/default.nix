@@ -15,4 +15,5 @@
   rust = import ./rust.nix { inherit pkgs lib genericBuilder; };
   python = import ./python.nix { inherit pkgs lib genericBuilder; };
   javascript = import ./javascript.nix { inherit pkgs lib genericBuilder; };
+  solidity = import ./solidity.nix { inherit pkgs lib genericBuilder; };
 }

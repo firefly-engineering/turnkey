@@ -168,4 +168,5 @@ rec {
   inherit (adapters.rust) mkRustDepPackage mkRustDepsCell;
   inherit (adapters.python) mkPythonDepPackage mkPythonDepsCell;
   inherit (adapters.javascript) mkJsDepPackage mkJsDepsCell;
+  inherit (adapters.solidity) mkSolDepPackage mkSolDepsCell;
 }
