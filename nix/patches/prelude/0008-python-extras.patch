@@ -1,0 +1,27 @@
+python: an extras attribute on the rules that take deps.
+
+Adds `extras` (a list of strings) to python_library, python_binary and
+python_test (and the other rules with python_common's deps_arg). The build
+ignores it. turnkey's rules sync reads it as the target's variant, the
+extras of its package ([project.optional-dependencies]) it is built with,
+and adds the dependencies they enable to its deps, as it expands a Rust
+target's cargo_features.
+
+--- a/decls/python_common.bzl
++++ b/decls/python_common.bzl
+@@ -146,6 +146,15 @@
+                 dependencies of these rules.
+         """,
+         ),
++        "extras": attrs.list(
++            attrs.string(),
++            default = [],
++            doc = """
++            The extras (`[project.optional-dependencies]`) of the target's
++                package it is built with. turnkey's rules sync adds the
++                dependencies they enable to `deps`; the build ignores it.
++        """,
++        ),
+     }
+ 
+ def _internal_tools_arg():
