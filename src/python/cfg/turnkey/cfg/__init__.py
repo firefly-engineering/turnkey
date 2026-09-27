@@ -10,7 +10,8 @@ from .parser import (
     CfgPredicate,
 )
 from .evaluator import TargetSpec, evaluate_cfg
-from .target import is_linux_compatible_target, classify_target_platforms, SUPPORTED_PLATFORMS
+from .platforms import Platform, Platforms
+from .target import classify_target_platforms
 
 __all__ = [
     "CfgParser",
@@ -22,7 +23,7 @@ __all__ = [
     "CfgPredicate",
     "TargetSpec",
     "evaluate_cfg",
-    "is_linux_compatible_target",
+    "Platform",
+    "Platforms",
     "classify_target_platforms",
-    "SUPPORTED_PLATFORMS",
 ]

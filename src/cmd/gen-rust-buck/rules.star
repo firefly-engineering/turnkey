@@ -6,6 +6,7 @@ python_binary(
     deps = [
         "//src/python/buck:buck",
         "//src/python/cargo:cargo",
+        "//src/python/cfg:cfg",
     ],
     visibility = ["PUBLIC"],
 )

@@ -6,6 +6,7 @@ python_library(
         "turnkey/cfg/__init__.py",
         "turnkey/cfg/evaluator.py",
         "turnkey/cfg/parser.py",
+        "turnkey/cfg/platforms.py",
         "turnkey/cfg/target.py",
     ],
     base_module = "",
@@ -14,7 +15,10 @@ python_library(
 
 python_test(
     name = "test",
-    srcs = ["tests/test_parser.py"],
+    srcs = [
+        "tests/test_parser.py",
+        "tests/test_platforms.py",
+    ],
     base_module = "tests",
     deps = [":cfg"],
 )

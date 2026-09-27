@@ -80,6 +80,11 @@ rec {
     # User patches (from FUSE edit layer)
     userPatchesDir ? null,      # Path to .turnkey/patches directory
 
+    # The platforms to build for, and the package of their combined
+    # config_settings (nix/buck2/platforms.nix's conditions): the select()s
+    # of target-specific deps are keyed on them
+    conditions,
+
     # Tools (must be provided by caller)
     computeUnifiedFeatures ? null,  # Tool for feature unification
     genRustBuck ? null,             # Tool for BUCK generation
@@ -163,12 +168,14 @@ rec {
       else null
     ) deps);
 
+    conditionsJSON = builtins.toJSON conditions;
+
     # Merge commands: feature unification + BUCK generation
     mergeCommands = ''
       # Compute unified features (if tool provided)
       ${if computeUnifiedFeatures != null then ''
         echo "Computing unified features..."
-        UNIFIED_FEATURES=$(compute-unified-features "$out/vendor" ${featuresFileArg} --deps-file ${depsFile})
+        UNIFIED_FEATURES=$(compute-unified-features "$out/vendor" ${featuresFileArg} --deps-file ${depsFile} --platforms '${conditionsJSON}')
         export UNIFIED_FEATURES
       '' else ''
         UNIFIED_FEATURES="{}"
@@ -186,6 +193,7 @@ rec {
               "$UNIFIED_FEATURES" \
               '${builtins.toJSON allRustcFlags}' \
               '${builtins.toJSON nativeLibraryInfo}' \
+              '${conditionsJSON}' \
               > "$dir/rules.star" || echo "# rules.star generation failed" > "$dir/rules.star"
           fi
         done

@@ -32,6 +32,13 @@ class TargetSpec:
             return cls(arch=arches[cpu], vendor="apple", os="macos", env=None, family="unix")
         raise ValueError(f"unknown OS {os!r}")
 
+    def triple(self) -> str:
+        """The Rust target triple, e.g. aarch64-apple-darwin."""
+        if self.os == "macos":
+            return f"{self.arch}-{self.vendor}-darwin"
+        suffix = f"-{self.env}" if self.env else ""
+        return f"{self.arch}-{self.vendor}-{self.os}{suffix}"
+
     @classmethod
     def linux_x86_64(cls) -> "TargetSpec":
         """Create a spec for x86_64-unknown-linux-gnu."""

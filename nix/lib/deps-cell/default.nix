@@ -8,7 +8,11 @@
 #
 # Usage:
 #   let depsCell = import ./nix/lib/deps-cell { inherit pkgs lib; };
-#   in depsCell.mkRustDepsCell { cellName = "rustdeps"; depsFile = ./rust-deps.toml; }
+#   in depsCell.mkRustDepsCell {
+#     cellName = "rustdeps";
+#     depsFile = ./rust-deps.toml;
+#     conditions = (import ../../buck2/platforms.nix { inherit lib; }).conditions [ "x86_64-linux" ];
+#   }
 
 { pkgs, lib }:
 

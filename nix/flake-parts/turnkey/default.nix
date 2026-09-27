@@ -287,6 +287,9 @@ in
       # The languages turnkey manages dependencies for (nix/buck2/languages.nix)
       languages = import ../../buck2/languages.nix { inherit pkgs lib; };
 
+      # The platforms the cells are built for (buck2.platforms)
+      platforms = import ../../buck2/platforms.nix { inherit lib; };
+
       # Each enabled language's cell: built from its deps file, or the cell
       # the consumer set. The deps file may not exist on first run, before
       # tk sync generates it.
@@ -303,6 +306,7 @@ in
               language.mkCell {
                 inherit (language) cellName;
                 inherit langCfg userPatchesDir;
+                conditions = platforms.conditions cfg.buck2.platforms;
               }
             else
               langCfg.cell

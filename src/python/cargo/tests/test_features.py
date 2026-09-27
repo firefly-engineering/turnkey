@@ -8,6 +8,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from turnkey.cfg import Platforms
+
+# turnkey's default platforms
+PLATFORMS = Platforms.from_json(
+    '{"settings": "toolchains//conditions", "platforms": ['
+    '{"os": "linux", "cpu": "x86_64"}, {"os": "linux", "cpu": "arm64"}, '
+    '{"os": "macos", "cpu": "x86_64"}, {"os": "macos", "cpu": "arm64"}]}'
+)
+
 from turnkey.cargo.features import (
     activate,
     compute_unified_features,
@@ -269,7 +278,7 @@ class TestComputeUnifiedFeatures(unittest.TestCase):
     def unify(self, crates, requested, overrides=None):
         with tempfile.TemporaryDirectory() as tmp:
             vendor = write_vendor(Path(tmp), crates)
-            return compute_unified_features(vendor, overrides or {}, requested)
+            return compute_unified_features(vendor, overrides or {}, requested, PLATFORMS)
 
     def futures(self, requested, **extra):
         crates = {

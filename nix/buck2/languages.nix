@@ -12,9 +12,10 @@
 #   cellName     the Buck2 cell and the .turnkey/<cellName> symlink
 #   description  shown by the shell in verbose mode
 #   generator    the package providing the deps file's generator
-#   mkCell       { cellName, langCfg, userPatchesDir } -> the cell named
-#                cellName (the record's), built from langCfg.depsFile
-#                (which must exist)
+#   mkCell       { cellName, langCfg, userPatchesDir, conditions } -> the
+#                cell named cellName (the record's), built from
+#                langCfg.depsFile (which must exist) for the platforms in
+#                conditions (nix/buck2/platforms.nix's conditions)
 #   syncRules    langCfg -> the [[deps]] rules of .turnkey/sync.toml, in
 #                the order tk sync must run them
 #   wrapper      optional: the native tool tw wraps (`tool`), and
@@ -49,6 +50,7 @@ in
         cellName,
         langCfg,
         userPatchesDir,
+        conditions,
       }:
       depsCell.mkGoDepsCell {
         inherit cellName;
@@ -102,6 +104,7 @@ in
         cellName,
         langCfg,
         userPatchesDir,
+        conditions,
       }:
       let
         rustFixups = import ../lib/deps-cell/fixups/rust { inherit pkgs lib; };
@@ -115,6 +118,7 @@ in
             langCfg.featuresFile
           else
             null;
+        inherit conditions;
         genRustBuck = import ../packages/gen-rust-buck.nix { inherit pkgs lib; };
         computeUnifiedFeatures = import ../packages/compute-unified-features.nix { inherit pkgs lib; };
         # The consumer's entries on top of turnkey's defaults
@@ -163,6 +167,7 @@ in
         cellName,
         langCfg,
         userPatchesDir,
+        conditions,
       }:
       depsCell.mkPythonDepsCell {
         inherit cellName;
@@ -254,6 +259,7 @@ in
         cellName,
         langCfg,
         userPatchesDir,
+        conditions,
       }:
       depsCell.mkJsDepsCell {
         inherit cellName;
@@ -287,6 +293,7 @@ in
         cellName,
         langCfg,
         userPatchesDir,
+        conditions,
       }:
       (import ../lib/deps-cell/adapters/solidity.nix { inherit pkgs lib; }).mkSolDepsCell {
         inherit cellName;

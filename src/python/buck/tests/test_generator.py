@@ -6,7 +6,15 @@ Run with: tk test //src/python/buck:test_generator
 
 import unittest
 
-from turnkey.buck.generator import get_dependencies
+from turnkey.buck.generator import generate_buck_file, get_build_script_cfg_flags, get_dependencies
+from turnkey.cfg import Platforms
+
+# turnkey's default platforms
+PLATFORMS = Platforms.from_json(
+    '{"settings": "toolchains//conditions", "platforms": ['
+    '{"os": "linux", "cpu": "x86_64"}, {"os": "linux", "cpu": "arm64"}, '
+    '{"os": "macos", "cpu": "x86_64"}, {"os": "macos", "cpu": "arm64"}]}'
+)
 
 # futures-util 0.3's manifest, trimmed to what matters: futures_01 is a
 # renamed optional dependency on futures 0.1, enabled only by "compat".
@@ -38,34 +46,34 @@ AVAILABLE = {
 
 class TestGetDependencies(unittest.TestCase):
     def test_inactive_renamed_optional_dep_is_dropped(self):
-        deps, named = get_dependencies(FUTURES_UTIL, AVAILABLE, ["std"])
+        deps, named = get_dependencies(FUTURES_UTIL, AVAILABLE, ["std"], PLATFORMS)
         self.assertEqual(deps.common, ["rustdeps//vendor/futures-core@0.3.31:futures-core"])
         self.assertEqual(named.common, {})
 
     def test_active_dep_with_no_matching_version_is_not_resolved(self):
         # compat is on, but futures 0.1 is not vendored: resolving futures_01
         # to futures 0.3 by name is the bug.
-        _, named = get_dependencies(FUTURES_UTIL, AVAILABLE, ["std", "compat"])
+        _, named = get_dependencies(FUTURES_UTIL, AVAILABLE, ["std", "compat"], PLATFORMS)
         self.assertEqual(named.common, {})
 
     def test_active_renamed_dep_resolves_by_version(self):
         available = AVAILABLE | {"futures@0.1.31"}
-        _, named = get_dependencies(FUTURES_UTIL, available, ["std", "compat"])
+        _, named = get_dependencies(FUTURES_UTIL, available, ["std", "compat"], PLATFORMS)
         self.assertEqual(named.common, {"futures_01": "rustdeps//vendor/futures@0.1.31:futures"})
 
     def test_optional_dep_enabled_by_implicit_feature(self):
-        deps, _ = get_dependencies(FUTURES_UTIL, AVAILABLE, ["std", "io", "memchr"])
+        deps, _ = get_dependencies(FUTURES_UTIL, AVAILABLE, ["std", "io", "memchr"], PLATFORMS)
         self.assertIn("rustdeps//vendor/memchr@2.7.4:memchr", deps.common)
 
     def test_picks_the_version_the_requirement_names(self):
         cargo = {"dependencies": {"getrandom": "0.2"}}
         available = {"getrandom@0.2.17", "getrandom@0.3.4", "getrandom"}
-        deps, _ = get_dependencies(cargo, available, [])
+        deps, _ = get_dependencies(cargo, available, [], PLATFORMS)
         self.assertEqual(deps.common, ["rustdeps//vendor/getrandom@0.2.17:getrandom"])
 
     def test_unversioned_only_crate_resolves_by_name(self):
         cargo = {"dependencies": {"quote": "1"}}
-        deps, _ = get_dependencies(cargo, {"quote"}, [])
+        deps, _ = get_dependencies(cargo, {"quote"}, [], PLATFORMS)
         self.assertEqual(deps.common, ["rustdeps//vendor/quote:quote"])
 
     def test_target_specific_optional_dep_follows_features(self):
@@ -74,10 +82,72 @@ class TestGetDependencies(unittest.TestCase):
             "target": {"cfg(unix)": {"dependencies": {"libc": {"version": "0.2", "optional": True}}}},
         }
         available = {"libc@0.2.170", "libc"}
-        off, _ = get_dependencies(cargo, available, [])
-        on, _ = get_dependencies(cargo, available, ["fs"])
+        off, _ = get_dependencies(cargo, available, [], PLATFORMS)
+        on, _ = get_dependencies(cargo, available, ["fs"], PLATFORMS)
         self.assertTrue(off.is_empty())
         self.assertFalse(on.is_empty())
+
+
+    def test_linux_only_dep_is_keyed_on_the_os(self):
+        cargo = {
+            "dependencies": {"libc": "0.2"},
+            "target": {'cfg(target_os = "linux")': {"dependencies": {"inotify": "0.11"}}},
+        }
+        deps, _ = get_dependencies(cargo, {"libc", "inotify"}, [], PLATFORMS)
+        self.assertEqual(deps.common, ["rustdeps//vendor/libc:libc"])
+        self.assertEqual(
+            deps.by_platform,
+            {"config//os:linux": ["rustdeps//vendor/inotify:inotify"], "config//os:macos": []},
+        )
+
+    def test_cpu_difference_within_an_os_uses_the_combined_key(self):
+        cargo = {"target": {"aarch64-apple-darwin": {"dependencies": {"objc": "0.2"}}}}
+        deps, _ = get_dependencies(cargo, {"objc"}, [], PLATFORMS)
+        self.assertEqual(deps.common, [])
+        self.assertEqual(
+            deps.by_platform,
+            {
+                "toolchains//conditions:linux-arm64": [],
+                "toolchains//conditions:linux-x86_64": [],
+                "toolchains//conditions:macos-arm64": ["rustdeps//vendor/objc:objc"],
+                "toolchains//conditions:macos-x86_64": [],
+            },
+        )
+
+    def test_a_dep_every_platform_gets_is_common(self):
+        cargo = {"target": {"cfg(unix)": {"dependencies": {"libc": "0.2"}}}}
+        deps, _ = get_dependencies(cargo, {"libc"}, [], PLATFORMS)
+        self.assertEqual(deps.common, ["rustdeps//vendor/libc:libc"])
+        self.assertEqual(deps.by_platform, {})
+
+    def test_a_dep_no_platform_gets_is_dropped(self):
+        cargo = {"target": {"cfg(windows)": {"dependencies": {"winapi": "0.3"}}}}
+        deps, _ = get_dependencies(cargo, {"winapi"}, [], PLATFORMS)
+        self.assertTrue(deps.is_empty())
+
+
+class TestGenerateBuckFile(unittest.TestCase):
+    def test_select_has_a_branch_per_os_and_no_default(self):
+        cargo = {"target": {'cfg(target_os = "linux")': {"dependencies": {"inotify": "0.11"}}}}
+        deps, named = get_dependencies(cargo, {"inotify"}, [], PLATFORMS)
+        content = generate_buck_file(
+            "watch", "2021", None, deps, named, False, [], {},
+            get_build_script_cfg_flags("watch", "1.0.0", {}, PLATFORMS),
+        )
+        self.assertIn('"config//os:linux": [', content)
+        self.assertIn('"config//os:macos": [],', content)
+        self.assertNotIn("DEFAULT", content)
+
+
+class TestBuildScriptCfgFlags(unittest.TestCase):
+    def test_per_os_flags_keep_their_order(self):
+        registry = {"rustix": {"linux": ["--cfg", "linux_raw"], "all": ["--cfg", "rustix_std"]}}
+        flags = get_build_script_cfg_flags("rustix", "1.0.0", registry, PLATFORMS)
+        self.assertEqual(flags.common, ["--cfg", "rustix_std"])
+        self.assertEqual(
+            flags.by_platform,
+            {"config//os:linux": ["--cfg", "linux_raw"], "config//os:macos": []},
+        )
 
 
 if __name__ == "__main__":

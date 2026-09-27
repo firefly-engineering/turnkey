@@ -19,5 +19,8 @@ python_test(
     name = "test_generator",
     srcs = ["tests/test_generator.py"],
     base_module = "tests",
-    deps = [":buck"],
+    deps = [
+        ":buck",
+        "//src/python/cfg:cfg",
+    ],
 )

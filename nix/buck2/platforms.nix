@@ -36,14 +36,21 @@ let
         os = oses.${os};
         cpu = cpus.${cpu};
       };
-in
-{
-  inherit fromSystem;
 
   # The Buck2 package of the combined config_settings, in the toolchains
-  # cell, and the name of each: "<os>-<cpu>"
+  # cell, each named "<os>-<cpu>"
   settingsPackage = "toolchains//conditions";
-  settingName = platform: "${platform.os}-${platform.cpu}";
+in
+{
+  inherit fromSystem settingsPackage;
+
+  # What the cell generators get: the platforms, in Buck2's names, and the
+  # package of the combined config_settings. As JSON, it is what
+  # turnkey.cfg.Platforms.from_json reads.
+  conditions = systems: {
+    settings = settingsPackage;
+    platforms = map (system: builtins.removeAttrs (fromSystem system) [ "system" ]) systems;
+  };
 
   # The combined config_settings' BUCK file, for platforms (fromSystem's)
   settingsBuckFile =

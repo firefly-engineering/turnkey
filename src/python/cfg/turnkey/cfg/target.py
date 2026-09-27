@@ -1,59 +1,20 @@
-"""Target compatibility checking for cfg() expressions."""
+"""The platforms a cfg() expression or target triple applies to."""
 
 from .parser import CfgParser
-from .evaluator import TargetSpec, evaluate_cfg
+from .evaluator import evaluate_cfg
+from .platforms import Platform
 
 
-# The platforms we support and their Buck2 config_setting targets.
-SUPPORTED_PLATFORMS = {
-    "config//os:linux": TargetSpec.linux_x86_64(),
-    "config//os:macos": TargetSpec.macos_aarch64(),
-}
+def classify_target_platforms(target_spec: str, platforms: list[Platform]) -> set[Platform]:
+    """The platforms a [target.'<spec>'] spec holds on.
 
-
-def classify_target_platforms(target_spec: str) -> set[str]:
-    """Classify which supported platforms a target specification matches.
-
-    Returns a set of Buck2 config_setting keys (e.g., {"config//os:linux"})
-    that the target_spec is compatible with.
+    The spec is a cfg() expression, evaluated for each platform, or a target
+    triple, which holds on the platform whose triple it is.
     """
     target_spec = target_spec.strip()
 
-    # Try parsing as cfg() expression
-    parser = CfgParser(target_spec)
-    predicate = parser.parse()
-
+    predicate = CfgParser(target_spec).parse()
     if predicate:
-        return {
-            platform_key
-            for platform_key, spec in SUPPORTED_PLATFORMS.items()
-            if evaluate_cfg(predicate, spec)
-        }
+        return {p for p in platforms if evaluate_cfg(predicate, p.target_spec())}
 
-    # Fallback for non-cfg expressions (e.g., direct target triples)
-    target = target_spec.lower()
-
-    # Direct target triple matching
-    if "linux" in target or "x86_64-unknown-linux" in target:
-        return {"config//os:linux"}
-
-    if "darwin" in target or "macos" in target or "apple" in target:
-        return {"config//os:macos"}
-
-    # Exclude known non-supported targets
-    if any(
-        os in target
-        for os in ["windows", "ios", "android", "wasm", "wasi"]
-    ):
-        return set()
-
-    # Unknown - assume compatible with all
-    return set(SUPPORTED_PLATFORMS.keys())
-
-
-def is_linux_compatible_target(target_spec: str) -> bool:
-    """Check if a target specification is compatible with Linux x86_64.
-
-    Kept for backward compatibility. Prefer classify_target_platforms().
-    """
-    return "config//os:linux" in classify_target_platforms(target_spec)
+    return {p for p in platforms if p.target_spec().triple() == target_spec}

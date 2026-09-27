@@ -12,6 +12,8 @@ from pathlib import Path
 
 from turnkey.cfg.evaluator import TargetSpec, evaluate_cfg
 from turnkey.cfg.parser import CfgParser
+from turnkey.cfg.platforms import Platform
+from turnkey.cfg.target import classify_target_platforms
 
 # Buck2 passes the exported file; a native run reads it from the tree
 VECTORS = Path(
@@ -32,6 +34,14 @@ class TestSharedVectors(unittest.TestCase):
                 predicate = CfgParser(case["spec"]).parse()
                 self.assertIsNotNone(predicate)
                 matches = {name for name, spec in platforms.items() if evaluate_cfg(predicate, spec)}
+                self.assertEqual(matches, set(case["matches"]))
+
+    def test_target_triples(self):
+        vectors = json.loads(VECTORS.read_text())
+        platforms = [Platform(p["os"], p["cpu"]) for p in vectors["platforms"]]
+        for case in vectors["triples"]:
+            with self.subTest(spec=case["spec"]):
+                matches = {p.name for p in classify_target_platforms(case["spec"], platforms)}
                 self.assertEqual(matches, set(case["matches"]))
 
     def test_unknown_platform(self):

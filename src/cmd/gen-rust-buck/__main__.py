@@ -14,6 +14,7 @@ from turnkey.cargo import (
     get_default_features,
     get_cargo_env,
 )
+from turnkey.cfg import Platforms
 from turnkey.buck import (
     get_dependencies,
     get_build_script_cfg_flags,
@@ -23,21 +24,23 @@ from turnkey.buck import (
 
 
 def main():
-    if len(sys.argv) < 3:
+    if len(sys.argv) != 8:
         print(
             "Usage: gen-rust-buck <crate_dir> <available_crates_json> "
-            "[fixup_crates_json] [unified_features_json] [rustc_flags_registry_json] "
-            "[native_libraries_json]",
+            "<fixup_crates_json> <unified_features_json> <rustc_flags_registry_json> "
+            "<native_libraries_json> <platforms_json>",
             file=sys.stderr,
         )
         sys.exit(1)
 
     crate_dir = Path(sys.argv[1])
     available_crates = set(json.loads(sys.argv[2]))
-    fixup_crates = set(json.loads(sys.argv[3])) if len(sys.argv) > 3 else set()
-    unified_features = json.loads(sys.argv[4]) if len(sys.argv) > 4 else {}
-    rustc_flags_registry = json.loads(sys.argv[5]) if len(sys.argv) > 5 else {}
-    native_libraries_registry = json.loads(sys.argv[6]) if len(sys.argv) > 6 else {}
+    fixup_crates = set(json.loads(sys.argv[3]))
+    unified_features = json.loads(sys.argv[4])
+    rustc_flags_registry = json.loads(sys.argv[5])
+    native_libraries_registry = json.loads(sys.argv[6])
+    # The platforms the cell is built for (turnkey's buck2.platforms)
+    platforms = Platforms.from_json(sys.argv[7])
 
     # Get crate name from directory (format: name@version or just name)
     dir_name = crate_dir.name
@@ -53,7 +56,7 @@ def main():
     crate_root = get_lib_path(cargo, crate_dir)
     proc_macro = is_proc_macro(cargo)
     env = get_cargo_env(cargo, crate_name)
-    rustc_flags = get_build_script_cfg_flags(crate_name, version, rustc_flags_registry)
+    rustc_flags = get_build_script_cfg_flags(crate_name, version, rustc_flags_registry, platforms)
     # Cap lints for vendored crates, as Cargo does for every non-local
     # dependency: a crate's own #![deny(...)] must not break the build when a
     # newer rustc adds lints.
@@ -76,7 +79,7 @@ def main():
 
     # Optional deps are only included when these features activate them
     platform_deps, platform_named_deps = get_dependencies(
-        cargo, available_crates, features
+        cargo, available_crates, features, platforms
     )
 
     # Add OUT_DIR for crates that have build script fixups

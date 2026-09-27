@@ -15,18 +15,16 @@ from turnkey.cargo.features import activate
 from turnkey.cargo.semver import best_match
 from turnkey.buildsystem.native_library import NativeLibrarySpec
 from turnkey.buildsystem.buck2 import buck2_generator
-from turnkey.cfg import classify_target_platforms, SUPPORTED_PLATFORMS
-
-
-ALL_PLATFORM_KEYS = set(SUPPORTED_PLATFORMS.keys())
+from turnkey.cfg import Platforms, classify_target_platforms
 
 
 @dataclass
 class PlatformDeps:
     """Dependencies categorized by platform.
 
-    common: deps needed on all supported platforms
-    by_platform: mapping from config_setting key to platform-specific deps
+    common: deps needed on every platform
+    by_platform: mapping from select() key to the deps it adds; every
+        platform matches one key, or there are none
     """
 
     common: list[str] = field(default_factory=list)
@@ -47,19 +45,13 @@ class PlatformNamedDeps:
         return not self.common and not self.by_platform
 
 
-# Mapping from short platform names (used in Nix fixups) to Buck2 config_setting keys.
-_PLATFORM_SHORT_NAMES = {
-    "linux": "config//os:linux",
-    "macos": "config//os:macos",
-}
-
-
 @dataclass
 class PlatformRustcFlags:
     """Rustc flags categorized by platform.
 
     common: flags applied on all platforms
-    by_platform: mapping from config_setting key to platform-specific flags
+    by_platform: mapping from select() key to the flags it adds; every
+        platform matches one key, or there are none
     """
 
     common: list[str] = field(default_factory=list)
@@ -163,7 +155,7 @@ def extract_deps_from_section(
 
 
 def get_dependencies(
-    cargo: dict, available_crates: set[str], features: list[str]
+    cargo: dict, available_crates: set[str], features: list[str], platforms: Platforms
 ) -> tuple[PlatformDeps, PlatformNamedDeps]:
     """Extract dependencies that exist in our vendored crates.
 
@@ -173,59 +165,54 @@ def get_dependencies(
     Optional dependencies are included only when the crate's enabled
     features activate them.
 
-    Target-specific dependencies are classified by platform and emitted
-    using Buck2 select() so the right deps are used on each OS.
+    A target-specific table applies on the platforms its spec holds on:
+    deps every platform gets are common, the others are keyed as a
+    select() (see turnkey.cfg.Platforms), and a table no platform gets is
+    dropped.
 
     Returns:
-        - PlatformDeps with common and per-platform dependency targets
-        - PlatformNamedDeps with common and per-platform renamed dependencies
+        - PlatformDeps with common and per-key dependency targets
+        - PlatformNamedDeps with common and per-key renamed dependencies
     """
-    platform_deps = PlatformDeps()
-    platform_named = PlatformNamedDeps()
     active_optional = activate(cargo, features).optional_deps
 
-    # Standard dependencies (not build-dependencies) - always common
-    section_deps = cargo.get("dependencies", {})
-    common_deps, common_named = extract_deps_from_section(
-        section_deps, available_crates, active_optional
-    )
-    platform_deps.common.extend(common_deps)
-    platform_named.common.update(common_named)
-
-    # Target-specific dependencies - classify by platform
+    # Each table's deps, and the platforms it applies on
+    sections = [(set(platforms), cargo.get("dependencies", {}))]
     for target_spec, target_config in cargo.get("target", {}).items():
-        matching_platforms = classify_target_platforms(target_spec)
-        if not matching_platforms:
-            continue  # Not compatible with any supported platform
-
-        section_deps = target_config.get("dependencies", {})
-        section_deps_list, section_named = extract_deps_from_section(
-            section_deps, available_crates, active_optional
+        sections.append(
+            (
+                classify_target_platforms(target_spec, list(platforms)),
+                target_config.get("dependencies", {}),
+            )
         )
-        if not section_deps_list and not section_named:
-            continue
+    extracted = [
+        (applies, *extract_deps_from_section(section, available_crates, active_optional))
+        for applies, section in sections
+    ]
 
-        if matching_platforms == ALL_PLATFORM_KEYS:
-            # Matches all platforms - treat as common
-            platform_deps.common.extend(section_deps_list)
-            platform_named.common.update(section_named)
-        else:
-            # Platform-specific
-            for platform_key in matching_platforms:
-                if section_deps_list:
-                    platform_deps.by_platform.setdefault(platform_key, []).extend(
-                        section_deps_list
-                    )
-                if section_named:
-                    platform_named.by_platform.setdefault(platform_key, {}).update(
-                        section_named
-                    )
+    def deps_on(platform):
+        return sorted({d for applies, deps, _ in extracted if platform in applies for d in deps})
 
-    return platform_deps, platform_named
+    def named_on(platform):
+        named = {}
+        for applies, _, section_named in extracted:
+            if platform in applies:
+                named.update(section_named)
+        return sorted(named.items())
+
+    common, by_platform = platforms.split(deps_on)
+    named_common, named_by_platform = platforms.split(named_on)
+    return (
+        PlatformDeps(common=common, by_platform=by_platform),
+        PlatformNamedDeps(
+            common=dict(named_common),
+            by_platform={key: dict(items) for key, items in named_by_platform.items()},
+        ),
+    )
 
 
 def get_build_script_cfg_flags(
-    crate_name: str, version: str, registry: dict
+    crate_name: str, version: str, registry: dict, platforms: Platforms
 ) -> PlatformRustcFlags:
     """Get rustc cfg flags that would be set by a crate's build script.
 
@@ -235,15 +222,18 @@ def get_build_script_cfg_flags(
 
     Values can be either:
     - A list of flags (applied on all platforms)
-    - A dict with platform keys ("linux", "macos") mapping to flag lists
+    - A dict whose keys are OS names (Buck2's, e.g. "linux", "macos"),
+      mapping to the flags for that OS; any other key's flags apply on
+      every platform
 
     Args:
         crate_name: The crate name (e.g., "serde_json")
         version: The crate version (e.g., "1.0.0")
         registry: Dict mapping crate names/keys to lists or dicts of rustc flags
+        platforms: The platforms the cell is built for
 
     Returns:
-        PlatformRustcFlags with common and per-platform flags
+        PlatformRustcFlags with common and per-key flags
     """
     # Try versioned key first (e.g., "rustix@0.39.0")
     versioned_key = f"{crate_name}@{version}"
@@ -257,16 +247,14 @@ def get_build_script_cfg_flags(
         return PlatformRustcFlags(common=entry)
 
     if isinstance(entry, dict):
-        # Dict with platform keys: platform-specific flags
-        result = PlatformRustcFlags()
-        for short_name, config_key in _PLATFORM_SHORT_NAMES.items():
-            if short_name in entry:
-                result.by_platform[config_key] = entry[short_name]
-        # Any keys not in _PLATFORM_SHORT_NAMES are treated as common
-        for key, flags in entry.items():
-            if key not in _PLATFORM_SHORT_NAMES:
-                result.common.extend(flags)
-        return result
+        oses = {p.os for p in platforms}
+        common = [flag for key, flags in entry.items() if key not in oses for flag in flags]
+        # Flags come in pairs (--cfg foo), so each OS's list is kept whole
+        # and in order
+        per_os = platforms.branches(lambda p: list(entry.get(p.os, [])))
+        if per_os is None:
+            return PlatformRustcFlags(common=common + list(entry.get(next(iter(platforms)).os, [])))
+        return PlatformRustcFlags(common=common, by_platform=per_os)
 
     return PlatformRustcFlags()
 
@@ -288,16 +276,18 @@ def _format_select(
     """
     lines = []
     lines.append(f"{indent}select({{")
+    # Every platform matches a key, even with nothing to add: there's no
+    # default branch, so an unlisted platform fails instead of missing values
     for platform_key in sorted(by_platform.keys()):
         items = by_platform[platform_key]
         if not items:
+            lines.append(f'{indent}    "{platform_key}": [],')
             continue
         lines.append(f'{indent}    "{platform_key}": [')
         ordered = sorted(set(items)) if dedup_sort else items
         for item in ordered:
             lines.append(f"{indent}        {format_item(item)},")
         lines.append(f"{indent}    ],")
-    lines.append(f'{indent}    "DEFAULT": [],')
     lines.append(f"{indent}}})")
     return "\n".join(lines)
 
@@ -312,12 +302,12 @@ def _format_named_select(
     for platform_key in sorted(by_platform.keys()):
         items = by_platform[platform_key]
         if not items:
+            lines.append(f'{indent}    "{platform_key}": {{}},')
             continue
         lines.append(f'{indent}    "{platform_key}": {{')
         for local_name, target in sorted(items.items()):
             lines.append(f'{indent}        "{local_name}": "{target}",')
         lines.append(f"{indent}    }},")
-    lines.append(f'{indent}    "DEFAULT": {{}},')
     lines.append(f"{indent}}})")
     return "\n".join(lines)
 

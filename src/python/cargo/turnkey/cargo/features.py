@@ -32,7 +32,7 @@ from .toml import (
     get_dep_package_name,
     is_optional,
 )
-from turnkey.cfg import classify_target_platforms
+from turnkey.cfg import Platforms, classify_target_platforms
 
 
 def parse_feature_forwarding(feature_item: str) -> tuple[str, str] | None:
@@ -165,11 +165,11 @@ def load_vendored_crates(vendor_dir: Path) -> dict[str, dict]:
     return crates
 
 
-def supported_dependency_specs(cargo: dict) -> dict[str, list]:
+def supported_dependency_specs(cargo: dict, platforms: Platforms) -> dict[str, list]:
     """A crate's normal dependency specs by manifest key.
 
-    Covers [dependencies] and the target tables that apply on any supported
-    platform: a crate is built with one feature set everywhere, so it must
+    Covers [dependencies] and the target tables that apply on any of
+    platforms: a crate is built with one feature set everywhere, so it must
     hold what each platform's dependents ask for (dev-dependencies don't
     affect library builds, and build scripts are not built from
     build-dependencies).
@@ -178,7 +178,7 @@ def supported_dependency_specs(cargo: dict) -> dict[str, list]:
     for key, spec in cargo.get("dependencies", {}).items():
         specs[key].append(spec)
     for target_spec, target_config in cargo.get("target", {}).items():
-        if not classify_target_platforms(target_spec):
+        if not classify_target_platforms(target_spec, list(platforms)):
             continue
         for key, spec in target_config.get("dependencies", {}).items():
             specs[key].append(spec)
@@ -188,8 +188,9 @@ def supported_dependency_specs(cargo: dict) -> dict[str, list]:
 class _Unifier:
     """Worklist resolution of features from a set of requests."""
 
-    def __init__(self, crates: dict[str, dict], overrides: dict):
+    def __init__(self, crates: dict[str, dict], overrides: dict, platforms: Platforms):
         self.crates = crates
+        self.platforms = platforms
         # normalized name -> version -> "name@version"
         self.versions: dict[str, dict[str, str]] = defaultdict(dict)
         for key in crates:
@@ -232,7 +233,7 @@ class _Unifier:
         while self.pending:
             key = self.pending.pop()
             activation = self.activation(key, self.requested[key])
-            specs = supported_dependency_specs(self.crates[key])
+            specs = supported_dependency_specs(self.crates[key], self.platforms)
             for dep_key, dep_specs in specs.items():
                 forwarded = activation.dep_features.get(dep_key, set())
                 for spec in dep_specs:
@@ -256,7 +257,10 @@ class _Unifier:
 
 
 def compute_unified_features(
-    vendor_dir: Path, overrides: dict, requested: list[dict] | None = None
+    vendor_dir: Path,
+    overrides: dict,
+    requested: list[dict] | None,
+    platforms: Platforms,
 ) -> dict[str, list[str]]:
     """
     Compute unified features for all crates.
@@ -270,12 +274,14 @@ def compute_unified_features(
             "version", "features", "default-features"}). None when unknown
             (a rust-deps.toml from before rustdeps-gen recorded them): every
             crate is then requested with its defaults.
+        platforms: The platforms the cell is built for: a target table that
+            applies on none of them is not followed
 
     Returns:
         Dict mapping "name@version" to sorted lists of features
     """
     crates = load_vendored_crates(vendor_dir)
-    unifier = _Unifier(crates, overrides)
+    unifier = _Unifier(crates, overrides, platforms)
 
     if requested is None:
         for key in crates:

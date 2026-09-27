@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from turnkey.cargo import compute_unified_features, load_overrides, load_requested
+from turnkey.cfg import Platforms
 
 
 def main():
@@ -23,11 +24,18 @@ def main():
         help="rust-deps.toml, whose [[requested]] entries are the workspace "
         "members' dependency specs to resolve features from",
     )
+    parser.add_argument(
+        "--platforms",
+        required=True,
+        type=Platforms.from_json,
+        help='the platforms the cell is built for, as JSON: {"settings": ..., '
+        '"platforms": [{"os": ..., "cpu": ...}]} (turnkey\'s buck2.platforms)',
+    )
     args = parser.parse_args()
 
     overrides = load_overrides(args.overrides_file)
     requested = load_requested(args.deps_file)
-    unified = compute_unified_features(args.vendor_dir, overrides, requested)
+    unified = compute_unified_features(args.vendor_dir, overrides, requested, args.platforms)
 
     # Output as JSON
     print(json.dumps(unified, indent=2, sort_keys=True))

@@ -19,19 +19,28 @@ python_test(
     name = "test_toml",
     srcs = ["tests/test_toml.py"],
     base_module = "tests",
-    deps = [":cargo"],
+    deps = [
+        ":cargo",
+        "//src/python/cfg:cfg",
+    ],
 )
 
 python_test(
     name = "test_features",
     srcs = ["tests/test_features.py"],
     base_module = "tests",
-    deps = [":cargo"],
+    deps = [
+        ":cargo",
+        "//src/python/cfg:cfg",
+    ],
 )
 
 python_test(
     name = "test_semver",
     srcs = ["tests/test_semver.py"],
     base_module = "tests",
-    deps = [":cargo"],
+    deps = [
+        ":cargo",
+        "//src/python/cfg:cfg",
+    ],
 )
