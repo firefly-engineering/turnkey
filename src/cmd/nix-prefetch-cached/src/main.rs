@@ -13,10 +13,9 @@
 //!
 //! Output is always in SRI format (sha256-...) for Nix compatibility.
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use clap::Parser;
-use prefetch_cache::PrefetchCache;
-use std::process::Command;
+use prefetch_cache::{PrefetchCache, nix_prefetch_url};
 
 /// Caching wrapper around nix-prefetch-url
 #[derive(Parser, Debug)]
@@ -51,92 +50,33 @@ fn main() -> Result<()> {
         bail!("Only sha256 hash type is supported");
     }
 
-    // Build cache key from URL and unpack flag
-    // The key needs to distinguish between packed and unpacked hashes
-    let cache_key = if args.unpack {
-        format!("unpack:{}", args.url)
+    let cache = if args.no_cache {
+        None
     } else {
-        args.url.clone()
-    };
-
-    // Try to use cache
-    if !args.no_cache {
         match PrefetchCache::new() {
-            Ok(cache) => {
-                if let Some(entry) = cache.get(&cache_key) {
-                    if args.verbose {
-                        eprintln!("cache hit: {}", args.url);
-                    }
-                    println!("{}", entry.hash);
-                    return Ok(());
-                }
-                if args.verbose {
-                    eprintln!("cache miss: {}", args.url);
-                }
-            }
+            Ok(cache) => Some(cache),
             Err(e) => {
                 if args.verbose {
                     eprintln!("warning: cache unavailable: {}", e);
                 }
+                None
             }
         }
-    }
+    };
 
-    // Cache miss or caching disabled - run nix-prefetch-url
-    let hash = prefetch_url(&args.url, args.unpack)?;
-
-    // Store in cache
-    if !args.no_cache
-        && let Ok(mut cache) = PrefetchCache::new()
-    {
-        cache.set(cache_key, hash.clone());
-        if let Err(e) = cache.save()
-            && args.verbose
-        {
-            eprintln!("warning: failed to save cache: {}", e);
+    let hash = match cache {
+        Some(mut cache) => {
+            let prefetched = cache.prefetch(&args.url, args.unpack)?;
+            if args.verbose {
+                let status = if prefetched.cached { "hit" } else { "miss" };
+                eprintln!("cache {}: {}", status, args.url);
+            }
+            prefetched.hash
         }
-    }
+        // Caching disabled or unavailable - run nix-prefetch-url
+        None => nix_prefetch_url(&args.url, args.unpack)?,
+    };
 
     println!("{}", hash);
     Ok(())
-}
-
-/// Run nix-prefetch-url and return SRI hash
-fn prefetch_url(url: &str, unpack: bool) -> Result<String> {
-    let mut cmd = Command::new("nix-prefetch-url");
-    cmd.args(["--type", "sha256"]);
-
-    if unpack {
-        cmd.arg("--unpack");
-    }
-
-    cmd.arg(url);
-
-    let output = cmd.output().context("Failed to run nix-prefetch-url")?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("nix-prefetch-url failed: {}", stderr);
-    }
-
-    let base32_hash = String::from_utf8(output.stdout)
-        .context("Invalid UTF-8 from nix-prefetch-url")?
-        .trim()
-        .to_string();
-
-    // Convert to SRI format
-    let sri_output = Command::new("nix")
-        .args(["hash", "to-sri", "--type", "sha256", &base32_hash])
-        .output()
-        .context("Failed to run nix hash to-sri")?;
-
-    if !sri_output.status.success() {
-        // Fallback to base32 if conversion fails (shouldn't happen)
-        return Ok(base32_hash);
-    }
-
-    Ok(String::from_utf8(sri_output.stdout)
-        .context("Invalid UTF-8 from nix hash")?
-        .trim()
-        .to_string())
 }

@@ -1,8 +1,10 @@
 //! Prefetch cache for Nix hash lookups
 //!
 //! This library provides a shared cache for storing Nix SRI hashes
-//! computed during prefetch operations. It's used by godeps-gen,
-//! rustdeps-gen, and pydeps-gen to avoid redundant fetching.
+//! computed during prefetch operations, and the cached lookup itself:
+//! [`PrefetchCache::prefetch`] answers from the cache or runs
+//! `nix-prefetch-url`. nix-prefetch-cached and the deps generators (through
+//! deps-gen-kit) use it to avoid redundant fetching.
 //!
 //! Cache location (in order of precedence):
 //! 1. `--cache-dir` CLI flag
@@ -17,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 /// Current cache format version
 const CACHE_VERSION: u32 = 1;
@@ -181,6 +184,14 @@ impl PrefetchCache {
             return Ok(());
         }
 
+        // Another process may have added entries since this cache was
+        // loaded: keep them, with this cache's entries on top
+        if let Some(on_disk) = Self::read(&self.cache_path) {
+            for (key, entry) in on_disk.entries {
+                self.cache.entries.entry(key).or_insert(entry);
+            }
+        }
+
         let content =
             serde_json::to_string_pretty(&self.cache).context("Failed to serialize cache")?;
 
@@ -196,6 +207,94 @@ impl PrefetchCache {
     pub fn path(&self) -> &Path {
         &self.cache_path
     }
+
+    /// The Nix SRI hash of a URL (of its unpacked contents when `unpack` is
+    /// set): from the cache, or else from `nix-prefetch-url`, and then
+    /// cached and saved at once, so another process sees it too
+    pub fn prefetch(&mut self, url: &str, unpack: bool) -> Result<Prefetched> {
+        let key = url_key(url, unpack);
+        if let Some(entry) = self.get(&key) {
+            return Ok(Prefetched {
+                hash: entry.hash.clone(),
+                cached: true,
+            });
+        }
+
+        let hash = nix_prefetch_url(url, unpack)?;
+        self.set(key, hash.clone());
+        if let Err(e) = self.save() {
+            eprintln!("prefetch-cache: warning: failed to save cache: {}", e);
+        }
+        Ok(Prefetched {
+            hash,
+            cached: false,
+        })
+    }
+
+    /// The cache file at `path`, if it is there and readable
+    fn read(path: &Path) -> Option<CacheFile> {
+        let content = fs::read_to_string(path).ok()?;
+        let cache: CacheFile = serde_json::from_str(&content).ok()?;
+        (cache.version == CACHE_VERSION).then_some(cache)
+    }
+}
+
+/// The hash [`PrefetchCache::prefetch`] found, and whether it came from the
+/// cache
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Prefetched {
+    pub hash: String,
+    pub cached: bool,
+}
+
+/// The cache key of a URL's hash: a packed and an unpacked hash of the same
+/// URL differ
+pub fn url_key(url: &str, unpack: bool) -> String {
+    if unpack {
+        format!("unpack:{}", url)
+    } else {
+        url.to_string()
+    }
+}
+
+/// Run nix-prefetch-url, uncached, and return the hash in SRI form
+pub fn nix_prefetch_url(url: &str, unpack: bool) -> Result<String> {
+    let mut cmd = Command::new("nix-prefetch-url");
+    cmd.args(["--type", "sha256"]);
+
+    if unpack {
+        cmd.arg("--unpack");
+    }
+
+    cmd.arg(url);
+
+    let output = cmd.output().context("Failed to run nix-prefetch-url")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("nix-prefetch-url failed: {}", stderr);
+    }
+
+    let base32_hash = String::from_utf8(output.stdout)
+        .context("Invalid UTF-8 from nix-prefetch-url")?
+        .trim()
+        .to_string();
+
+    // Convert to SRI format
+    let sri_output = Command::new("nix")
+        .args(["hash", "to-sri", "--type", "sha256", &base32_hash])
+        .output()
+        .context("Failed to run nix hash to-sri")?;
+
+    if !sri_output.status.success() {
+        // Fallback to base32 if conversion fails (shouldn't happen)
+        return Ok(base32_hash);
+    }
+
+    Ok(String::from_utf8(sri_output.stdout)
+        .context("Invalid UTF-8 from nix hash")?
+        .trim()
+        .to_string())
 }
 
 impl Drop for PrefetchCache {
@@ -233,6 +332,40 @@ mod tests {
         let cache2 = PrefetchCache::with_dir(dir.path()).unwrap();
         assert!(cache2.contains(&key));
         assert_eq!(cache2.get(&key).unwrap().hash, "sha256-abc123");
+    }
+
+    #[test]
+    fn test_prefetch_answers_from_cache() {
+        let dir = tempdir().unwrap();
+        let mut cache = PrefetchCache::with_dir(dir.path()).unwrap();
+        let url = "https://example.com/a.tar.gz";
+        cache.set(url_key(url, true), "sha256-unpacked".to_string());
+
+        // A hit never runs nix-prefetch-url, which a test can't reach
+        assert_eq!(
+            cache.prefetch(url, true).unwrap(),
+            Prefetched {
+                hash: "sha256-unpacked".to_string(),
+                cached: true
+            }
+        );
+        assert_ne!(url_key(url, true), url_key(url, false));
+    }
+
+    #[test]
+    fn test_save_keeps_entries_another_process_added() {
+        let dir = tempdir().unwrap();
+        let mut ours = PrefetchCache::with_dir(dir.path()).unwrap();
+        let mut theirs = PrefetchCache::with_dir(dir.path()).unwrap();
+
+        theirs.set("theirs".to_string(), "sha256-t".to_string());
+        theirs.save().unwrap();
+        ours.set("ours".to_string(), "sha256-o".to_string());
+        ours.save().unwrap();
+
+        let reloaded = PrefetchCache::with_dir(dir.path()).unwrap();
+        assert!(reloaded.contains("theirs"));
+        assert!(reloaded.contains("ours"));
     }
 
     #[test]
