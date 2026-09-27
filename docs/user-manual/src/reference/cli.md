@@ -202,7 +202,7 @@ When you configure dependency files in your `flake.nix`:
 name = "go"
 sources = ["go.mod", "go.sum"]
 target = "go-deps.toml"
-generator = ["godeps-gen", "--go-mod", "go.mod", "--go-sum", "go.sum", "--prefetch"]
+generator = ["godeps-gen", "--go-mod", "go.mod", "--go-sum", "go.sum"]
 
 [[deps]]
 name = "rust"
@@ -365,7 +365,7 @@ Shows what tw is doing:
 tw: capturing state of [go.mod go.sum]
 tw: detected changes in [go.mod go.sum], running sync
 Syncing go-deps.toml...
-  Running: godeps-gen --go-mod go.mod --go-sum go.sum --prefetch
+  Running: godeps-gen --go-mod go.mod --go-sum go.sum
   Regenerated go-deps.toml
 ```
 
@@ -377,6 +377,21 @@ Commands not in `mutating_subcommands` pass through without any overhead:
 go build ./...    # No snapshot, no sync check - just runs go build
 go version        # Direct passthrough
 ```
+
+## Deps generators
+
+`tk sync` runs a deps generator for each enabled language (the `[[deps]]`
+rules of `.turnkey/sync.toml`), so you rarely run one yourself. When you do,
+every generator takes the same options:
+
+| Option | Description |
+|--------|-------------|
+| `-o, --output PATH` | Output file (default: stdout) |
+| `--no-prefetch` | Skip prefetching the Nix hashes the deps cell fetches with (the file gets placeholder or missing hashes) |
+| `--no-cache` | Always fetch from the network, bypassing turnkey's prefetch cache |
+
+Prefetching is on by default. jsdeps-gen takes only `--output`: the pnpm
+lock's integrity hashes are the ones Nix fetches with.
 
 ## godeps-gen
 
@@ -394,15 +409,16 @@ godeps-gen [OPTIONS]
 |--------|-------------|
 | `--go-mod PATH` | Path to go.mod file (default: go.mod) |
 | `--go-sum PATH` | Path to go.sum file (default: go.sum) |
-| `--prefetch` | Fetch Nix hashes of the modules' proxy.golang.org zips, the source the godeps cell fetches (through `nix-prefetch-cached`) |
 | `--indirect` | Include indirect dependencies (default: true) |
-| `-o, --output PATH` | Output file (default: stdout) |
+
+Prefetching hashes the modules' proxy.golang.org zips, the source the godeps
+cell fetches (through `nix-prefetch-cached`).
 
 ### Examples
 
 ```bash
 # Generate with prefetched hashes
-godeps-gen --prefetch -o go-deps.toml
+godeps-gen -o go-deps.toml
 
 # Use custom paths
 godeps-gen --go-mod src/go.mod --go-sum src/go.sum -o go-deps.toml
@@ -426,8 +442,7 @@ rustdeps-gen [OPTIONS]
 | Option | Description |
 |--------|-------------|
 | `--cargo-lock PATH` | Path to Cargo.lock file (default: Cargo.lock) |
-| `--no-prefetch` | Skip prefetching (produces incorrect hashes) |
-| `-o, --output PATH` | Output file (default: stdout) |
+| `--cargo-toml PATH` | Path to the workspace's root Cargo.toml (default: next to Cargo.lock) |
 
 ### Examples
 
@@ -456,8 +471,7 @@ pydeps-gen [OPTIONS]
 | `--lock PATH` | Path to pylock.toml (PEP 751 lock file) - RECOMMENDED |
 | `--pyproject PATH` | Path to pyproject.toml |
 | `--requirements PATH` | Path to requirements.txt |
-| `-o, --output PATH` | Output file (default: stdout) |
-| `--no-prefetch` | Skip prefetching (produces placeholder hashes) |
+| `--uv-lock PATH` | uv.lock, whose dependency graph is recorded with the `--lock` packages |
 | `--include-dev` | Include dev dependencies |
 
 ### Input Formats
@@ -517,7 +531,10 @@ The generator command failed. Check that:
 ### Sync is slow
 
 If sync takes a long time:
-- Use `--prefetch` with godeps-gen to cache downloads
+- Prefetched hashes are cached (`prefetch-cache.json` under
+  `$TURNKEY_CACHE_DIR`, or else `turnkey/` in the platform cache directory,
+  e.g. `~/.cache/turnkey/` on Linux); check a generator isn't running with
+  `--no-cache`
 - Check if generators are doing unnecessary work
 
 ### Bypass tk

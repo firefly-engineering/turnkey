@@ -174,16 +174,21 @@ turnkey.toolchains.buck2.go = {
 
 ### Generating go-deps.toml
 
+`tk sync` regenerates it when `go.mod` or `go.sum` changes. To run the
+generator yourself:
+
 ```bash
-godeps-gen --prefetch -o go-deps.toml
+godeps-gen -o go-deps.toml
 ```
 
 Options:
 
-- `--prefetch`: Fetch Nix hashes of the modules' proxy.golang.org zips, the
-  source the godeps cell fetches from (required for valid hashes)
+- `--no-prefetch`: Skip fetching the Nix hashes of the modules'
+  proxy.golang.org zips, the source the godeps cell fetches from (the hashes
+  are then invalid)
+- `--no-cache`: Always fetch from the network, bypassing the prefetch cache
 - `--indirect`: Include indirect (transitive) dependencies (default: true)
-- `-o`: Output file (default: stdout)
+- `-o, --output`: Output file (default: stdout)
 
 ### Using Dependencies in Build Files
 
@@ -279,7 +284,8 @@ Options:
 
 - `--cargo-lock`: Path to Cargo.lock file (default: Cargo.lock)
 - `--no-prefetch`: Skip prefetching (produces incorrect hashes)
-- `-o`: Output file (default: stdout)
+- `--no-cache`: Always fetch from the network, bypassing the prefetch cache
+- `-o, --output`: Output file (default: stdout)
 
 ### Handling Special Cases
 
@@ -331,6 +337,7 @@ pydeps-gen --lock pylock.toml -o python-deps.toml
 --requirements <PATH>  Path to requirements.txt
 -o, --output <PATH>    Output file (default: stdout)
 --no-prefetch          Skip prefetching (produces placeholder hashes)
+--no-cache             Always fetch from the network, bypassing the prefetch cache
 --include-dev          Include dev dependencies from optional-dependencies.dev
 ```
 
@@ -389,9 +396,9 @@ If Buck2 can't find a dependency:
 
 If you get hash mismatch errors when building:
 
-1. Regenerate the deps file with `--prefetch`:
+1. Regenerate the deps file with fresh hashes:
    ```bash
-   godeps-gen --prefetch -o go-deps.toml
+   godeps-gen --no-cache -o go-deps.toml
    ```
 
 2. Re-enter the dev shell:

@@ -128,11 +128,11 @@ solady = "vectorized/solady"   # GitHub shorthand; no @ref means HEAD
 `turnkey.toolchains.buck2.solidity` options `foundryTomlFile`, `packageJsonFile`
 and `pnpmLockFile`). It takes git dependencies from `foundry.toml`, and the
 Solidity packages in `package.json` at the versions and integrity hashes the
-lock pins. It runs `soldeps-gen --prefetch`, which pins each git dependency to the commit its ref resolves to. For a GitHub
+lock pins. It runs `soldeps-gen`, which prefetches: it pins each git dependency to the commit its ref resolves to. For a GitHub
 repository it also records that commit's source archive and its Nix hash, so the
 `soldeps` cell fetches it as a fixed-output derivation. An npm package that
 `pnpm-lock.yaml` gives no integrity for gets the hash of its tarball. Hashes go
-through `nix-prefetch-cached`, so a regeneration only fetches what changed.
+through turnkey's prefetch cache, so a regeneration only fetches what changed.
 
 ## Compiler Version
 

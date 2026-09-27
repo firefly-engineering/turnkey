@@ -3,8 +3,8 @@
 # Caching wrapper around nix-prefetch-url that avoids redundant network fetches.
 # Stores hashes in ~/.cache/turnkey/prefetch-cache.json (configurable via TURNKEY_CACHE_DIR).
 #
-# This tool is used by deps-gen tools (rustdeps-gen, pydeps-gen, godeps-gen) to
-# speed up dependency resolution by caching previously fetched hashes.
+# godeps-gen prefetches through this tool; the Rust deps generators link the
+# prefetch-cache crate it is built on (through deps-gen-kit) instead.
 { pkgs, lib }:
 
 let
@@ -17,7 +17,10 @@ pkgs.rustPlatform.buildRustPackage {
 
   src = cargoLib.prunedCargoSource {
     inherit root;
-    members = [ "src/cmd/nix-prefetch-cached" "src/rust/prefetch-cache" ];
+    members = [
+      "src/cmd/nix-prefetch-cached"
+      "src/rust/prefetch-cache"
+    ];
   };
 
   cargoLock = {
@@ -25,8 +28,14 @@ pkgs.rustPlatform.buildRustPackage {
   };
 
   # Only build nix-prefetch-cached
-  cargoBuildFlags = [ "-p" "nix-prefetch-cached" ];
-  cargoTestFlags = [ "-p" "nix-prefetch-cached" ];
+  cargoBuildFlags = [
+    "-p"
+    "nix-prefetch-cached"
+  ];
+  cargoTestFlags = [
+    "-p"
+    "nix-prefetch-cached"
+  ];
 
   nativeBuildInputs = [ pkgs.makeWrapper ];
 

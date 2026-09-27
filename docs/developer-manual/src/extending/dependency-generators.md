@@ -33,6 +33,28 @@ version = "v0.15.0"
 hash = "sha256-abc..."
 ```
 
+### What generators share
+
+A generator's own code is its lock file parsing and its record type. The
+rest is the same for every generator:
+
+- **Flags**: `-o, --output`; prefetching on by default, `--no-prefetch` to
+  skip it; `--no-cache` to bypass turnkey's prefetch cache.
+- **Prefetching**: the Nix SRI hash of a URL, of its unpacked contents for
+  archives fetched with `fetchzip`, cached across runs and generators.
+- **Output**: a header saying which generator wrote the file from what, and
+  that `tk sync` regenerates it, then the record.
+
+The Rust generators take all three from `src/rust/deps-gen-kit`:
+`OutputArgs` and `PrefetchArgs` to flatten into their clap `Args`, the
+`Prefetcher` seam (`NixPrefetcher` on the `prefetch-cache` crate, and
+`MemoryPrefetcher` for tests), and `OutputArgs::write` for a serde-serialized
+record. godeps-gen takes the same flags and prefetches through the
+`nix-prefetch-cached` binary, built on the same crate.
+
+`tk sync` runs a generator from its language's sync rule
+(`nix/buck2/languages.nix`) and reads the deps file from stdout.
+
 ## Existing Generators
 
 ### godeps-gen (Go)
@@ -40,7 +62,7 @@ hash = "sha256-abc..."
 Located at `cmd/godeps-gen/`.
 
 ```bash
-godeps-gen --prefetch -o go-deps.toml
+godeps-gen -o go-deps.toml
 ```
 
 Reads: `go.mod`, `go.sum`
