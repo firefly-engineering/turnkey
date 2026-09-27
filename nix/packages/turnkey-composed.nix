@@ -14,34 +14,40 @@ let
   cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
   isDarwin = pkgs.stdenv.isDarwin;
 in
-pkgs.rustPlatform.buildRustPackage ({
-  pname = "turnkey-composed";
-  version = "0.1.0";
+pkgs.rustPlatform.buildRustPackage (
+  {
+    pname = "turnkey-composed";
+    version = "0.1.0";
 
-  src = cargoLib.prunedCargoSource {
-    inherit root;
-    members = [
-      "src/cmd/turnkey-composed"
-      "src/rust/composition"
-      "src/rust/nix-eval"
+    src = cargoLib.prunedCargoSource {
+      inherit root;
+      members = [
+        "src/cmd/turnkey-composed"
+        "src/rust/composition"
+        "src/rust/nix-eval"
+      ];
+    };
+
+    cargoLock = {
+      lockFile = root + "/Cargo.lock";
+    };
+
+    cargoBuildFlags = [
+      "-p"
+      "turnkey-composed"
     ];
-  };
+    doCheck = false;
 
-  cargoLock = {
-    lockFile = root + "/Cargo.lock";
-  };
-
-  cargoBuildFlags = [ "-p" "turnkey-composed" ];
-  doCheck = false;
-
-  meta = {
-    description = "FUSE composition daemon for Turnkey";
-    homepage = "https://github.com/firefly-engineering/turnkey";
-    license = lib.licenses.mit;
-    mainProgram = "turnkey-composed";
-  };
-} // lib.optionalAttrs isDarwin {
-  # macFUSE installs libfuse3 to /usr/local/lib regardless of arch.
-  # composition/build.rs sets the same path via cargo:rustc-link-search.
-  LIBRARY_PATH = "/usr/local/lib";
-})
+    meta = {
+      description = "FUSE composition daemon for Turnkey";
+      homepage = "https://github.com/firefly-engineering/turnkey";
+      license = lib.licenses.mit;
+      mainProgram = "turnkey-composed";
+    };
+  }
+  // lib.optionalAttrs isDarwin {
+    # macFUSE installs libfuse3 to /usr/local/lib regardless of arch.
+    # composition/build.rs sets the same path via cargo:rustc-link-search.
+    LIBRARY_PATH = "/usr/local/lib";
+  }
+)

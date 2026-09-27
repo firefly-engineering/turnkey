@@ -18,16 +18,18 @@
 
   buildScriptFixups = {
     # thiserror fixup: generates out_dir/private.rs with version-specific module
-    thiserror = { patchVersion, vendorPath, ... }: ''
-      # Fixup: thiserror build script output
-      mkdir -p "$out/${vendorPath}/out_dir"
-      cat > "$out/${vendorPath}/out_dir/private.rs" << 'THISERROR_PRIVATE'
-#[doc(hidden)]
-pub mod __private${patchVersion} {
-    #[doc(hidden)]
-    pub use crate::private::*;
-}
-THISERROR_PRIVATE
-    '';
+    thiserror =
+      { patchVersion, vendorPath, ... }:
+      ''
+              # Fixup: thiserror build script output
+              mkdir -p "$out/${vendorPath}/out_dir"
+              cat > "$out/${vendorPath}/out_dir/private.rs" << 'THISERROR_PRIVATE'
+        #[doc(hidden)]
+        pub mod __private${patchVersion} {
+            #[doc(hidden)]
+            pub use crate::private::*;
+        }
+        THISERROR_PRIVATE
+      '';
   };
 }

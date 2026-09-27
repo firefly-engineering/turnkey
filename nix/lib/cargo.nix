@@ -26,18 +26,22 @@ let
   #   lockFile: Path to Cargo.lock (defaults to root + "/Cargo.lock")
   #
   # Returns: A derivation containing the pruned source
-  prunedCargoSource = {
-    root,
-    members,
-    lockFile ? root + "/Cargo.lock",
-  }:
+  prunedCargoSource =
+    {
+      root,
+      members,
+      lockFile ? root + "/Cargo.lock",
+    }:
     let
       # Build fileset for all member directories plus root files
       memberFilesets = map (m: root + "/${m}") members;
-      fileset = fs.unions ([
-        (root + "/Cargo.toml")
-        lockFile
-      ] ++ memberFilesets);
+      fileset = fs.unions (
+        [
+          (root + "/Cargo.toml")
+          lockFile
+        ]
+        ++ memberFilesets
+      );
 
       # Create initial source with just the members we need
       initialSrc = fs.toSource {
@@ -47,13 +51,15 @@ let
       # Comma-separated list of members for the CLI
       membersArg = lib.concatStringsSep "," members;
     in
-    pkgs.runCommand "pruned-cargo-source" {
-      nativeBuildInputs = [ cargo-prune-workspace ];
-    } ''
-      cp -r ${initialSrc} $out
-      chmod -R u+w $out
-      cargo-prune-workspace --manifest-path $out/Cargo.toml --members ${membersArg}
-    '';
+    pkgs.runCommand "pruned-cargo-source"
+      {
+        nativeBuildInputs = [ cargo-prune-workspace ];
+      }
+      ''
+        cp -r ${initialSrc} $out
+        chmod -R u+w $out
+        cargo-prune-workspace --manifest-path $out/Cargo.toml --members ${membersArg}
+      '';
 
 in
 {

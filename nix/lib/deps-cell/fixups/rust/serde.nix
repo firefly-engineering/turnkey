@@ -19,32 +19,36 @@
 
   buildScriptFixups = {
     # serde_core fixup: generates out_dir/private.rs with version-specific module
-    serde_core = { patchVersion, vendorPath, ... }: ''
-      # Fixup: serde_core build script output
-      mkdir -p "$out/${vendorPath}/out_dir"
-      cat > "$out/${vendorPath}/out_dir/private.rs" << 'SERDE_CORE_PRIVATE'
-#[doc(hidden)]
-pub mod __private${patchVersion} {
-    #[doc(hidden)]
-    pub use crate::private::*;
-}
-SERDE_CORE_PRIVATE
-    '';
+    serde_core =
+      { patchVersion, vendorPath, ... }:
+      ''
+              # Fixup: serde_core build script output
+              mkdir -p "$out/${vendorPath}/out_dir"
+              cat > "$out/${vendorPath}/out_dir/private.rs" << 'SERDE_CORE_PRIVATE'
+        #[doc(hidden)]
+        pub mod __private${patchVersion} {
+            #[doc(hidden)]
+            pub use crate::private::*;
+        }
+        SERDE_CORE_PRIVATE
+      '';
 
     # serde fixup: generates out_dir/private.rs with version-specific module
     # Also includes alias to serde_core_private for serde_derive compatibility
-    serde = { patchVersion, vendorPath, ... }: ''
-      # Fixup: serde build script output (includes serde_core_private alias)
-      mkdir -p "$out/${vendorPath}/out_dir"
-      cat > "$out/${vendorPath}/out_dir/private.rs" << 'SERDE_PRIVATE'
-#[doc(hidden)]
-pub mod __private${patchVersion} {
-    #[doc(hidden)]
-    pub use crate::private::*;
-}
-use serde_core::__private${patchVersion} as serde_core_private;
-SERDE_PRIVATE
-    '';
+    serde =
+      { patchVersion, vendorPath, ... }:
+      ''
+              # Fixup: serde build script output (includes serde_core_private alias)
+              mkdir -p "$out/${vendorPath}/out_dir"
+              cat > "$out/${vendorPath}/out_dir/private.rs" << 'SERDE_PRIVATE'
+        #[doc(hidden)]
+        pub mod __private${patchVersion} {
+            #[doc(hidden)]
+            pub use crate::private::*;
+        }
+        use serde_core::__private${patchVersion} as serde_core_private;
+        SERDE_PRIVATE
+      '';
   };
 
   # ==========================================================================
@@ -55,6 +59,9 @@ SERDE_PRIVATE
     # serde_json uses fast 64-bit arithmetic on x86_64
     # Reference: https://github.com/serde-rs/json/blob/master/build.rs
     # Use separate arguments to avoid Buck2 parsing issues with combined format
-    serde_json = [ "--cfg" ''fast_arithmetic="64"'' ];
+    serde_json = [
+      "--cfg"
+      ''fast_arithmetic="64"''
+    ];
   };
 }

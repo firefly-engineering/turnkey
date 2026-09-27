@@ -256,9 +256,18 @@ in
           versions = builtins.mapAttrs (
             _version: versionEntry:
             if versionEntry ? package then
-              versionEntry // { package = twWrappers.mkWrapper { name = tool; pkg = versionEntry.package; }; }
+              versionEntry
+              // {
+                package = twWrappers.mkWrapper {
+                  name = tool;
+                  pkg = versionEntry.package;
+                };
+              }
             else
-              twWrappers.mkWrapper { name = tool; pkg = versionEntry; }
+              twWrappers.mkWrapper {
+                name = tool;
+                pkg = versionEntry;
+              }
           ) entry.versions;
         };
 
@@ -312,51 +321,57 @@ in
       );
 
       # Create a shell configuration for each declaration file
-      mkShellConfig = shellName: declarationFile:
+      mkShellConfig =
+        shellName: declarationFile:
         let
           # Only the shells listed in buck2.shells get the Buck2 integration
           shellNeedsBuck2 = cfg.buck2.enable && builtins.elem shellName cfg.buck2.shells;
         in
         {
-        imports = [ ../../devenv/turnkey ];
+          imports = [ ../../devenv/turnkey ];
 
-        # Read the devenv-root override (if set) so that CI can evaluate
-        # devShells without an interactive shell. Empty content (the
-        # default /dev/null placeholder) leaves devenv.root unset and
-        # falls back to its usual direnv-driven resolution.
-        devenv.root =
-          let
-            content = builtins.readFile devenvRoot.outPath;
-          in
-          lib.mkIf (content != "") content;
+          # Read the devenv-root override (if set) so that CI can evaluate
+          # devShells without an interactive shell. Empty content (the
+          # default /dev/null placeholder) leaves devenv.root unset and
+          # falls back to its usual direnv-driven resolution.
+          devenv.root =
+            let
+              content = builtins.readFile devenvRoot.outPath;
+            in
+            lib.mkIf (content != "") content;
 
-        # devenv builds its task runner from its own locked nixpkgs by
-        # importing a fetched source at evaluation time, which
-        # `nix flake check --no-build` can't do on a clean store. The devenv
-        # flake exports the same runner as a package; use it when the flake
-        # has a `devenv` input, so evaluation needs no build.
-        task.package = lib.mkIf (inputs' ? devenv && inputs'.devenv.packages ? devenv-tasks) (
-          lib.mkDefault inputs'.devenv.packages.devenv-tasks
-        );
+          # devenv builds its task runner from its own locked nixpkgs by
+          # importing a fetched source at evaluation time, which
+          # `nix flake check --no-build` can't do on a clean store. The devenv
+          # flake exports the same runner as a package; use it when the flake
+          # has a `devenv` input, so evaluation needs no build.
+          task.package = lib.mkIf (inputs' ? devenv && inputs'.devenv.packages ? devenv-tasks) (
+            lib.mkDefault inputs'.devenv.packages.devenv-tasks
+          );
 
-        turnkey = {
-          registry = lib.mkDefault registry;
-          declarationFile = declarationFile;
-          tellerLib = lib.mkDefault turnkeyLib;
+          turnkey = {
+            registry = lib.mkDefault registry;
+            declarationFile = declarationFile;
+            tellerLib = lib.mkDefault turnkeyLib;
 
-          # The Buck2 options as the consumer set them (nix/buck2/options.nix),
-          # plus what this module resolves: whether this shell gets Buck2,
-          # the pinned buck2, turnkey's prelude and the dependency cells.
-          buck2 = builtins.removeAttrs cfg.buck2 [ "shells" "version" ] // {
-            enable = shellNeedsBuck2;
-            package = pinnedBuck2;
-            prelude = cfg.buck2.prelude // {
-              package = turnkeyPrelude;
-            };
-          }
-          // lib.mapAttrs (name: cell: cfg.buck2.${name} // { inherit cell; }) languageCells;
+            # The Buck2 options as the consumer set them (nix/buck2/options.nix),
+            # plus what this module resolves: whether this shell gets Buck2,
+            # the pinned buck2, turnkey's prelude and the dependency cells.
+            buck2 =
+              builtins.removeAttrs cfg.buck2 [
+                "shells"
+                "version"
+              ]
+              // {
+                enable = shellNeedsBuck2;
+                package = pinnedBuck2;
+                prelude = cfg.buck2.prelude // {
+                  package = turnkeyPrelude;
+                };
+              }
+              // lib.mapAttrs (name: cell: cfg.buck2.${name} // { inherit cell; }) languageCells;
+          };
         };
-      };
 
       # Generate shell configurations from declarationFiles
       shellConfigs =
@@ -385,9 +400,7 @@ in
 
       # Expose cell derivations as packages so the composition daemon
       # can build them directly with `nix build .#<cell>-cell`
-      packages = lib.mapAttrs' (name: drv:
-        lib.nameValuePair "${name}-cell" drv
-      ) allCells // {
+      packages = lib.mapAttrs' (name: drv: lib.nameValuePair "${name}-cell" drv) allCells // {
         # Combined toolchain profile with all tools in bin/
         # The daemon exposes this as a virtual bin/ directory at the mount root
         toolchain-profile =

@@ -26,8 +26,14 @@ pkgs.rustPlatform.buildRustPackage {
     lockFile = root + "/Cargo.lock";
   };
 
-  cargoBuildFlags = [ "-p" "check-source-coverage-rs" ];
-  cargoTestFlags = [ "-p" "check-source-coverage-rs" ];
+  cargoBuildFlags = [
+    "-p"
+    "check-source-coverage-rs"
+  ];
+  cargoTestFlags = [
+    "-p"
+    "check-source-coverage-rs"
+  ];
 
   meta = {
     description = "Check that all source files are covered by Buck2 targets";

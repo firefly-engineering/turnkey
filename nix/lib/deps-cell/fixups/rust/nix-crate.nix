@@ -24,12 +24,16 @@
     # Platform-specific flags: dict with linux/macos keys
     nix = {
       linux = [
-        "--cfg" "linux"
-        "--cfg" "linux_android"
+        "--cfg"
+        "linux"
+        "--cfg"
+        "linux_android"
       ];
       macos = [
-        "--cfg" "apple_targets"
-        "--cfg" "bsd"
+        "--cfg"
+        "apple_targets"
+        "--cfg"
+        "bsd"
       ];
     };
   };

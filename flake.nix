@@ -205,11 +205,17 @@
           # flake-parts module or rust-deps-cell builder rather than by
           # name, so they need to be at packages.* for the cachix
           # workflow to publish them under stable names.
-          packages.compute-unified-features = import ./nix/packages/compute-unified-features.nix { inherit pkgs lib; };
+          packages.compute-unified-features = import ./nix/packages/compute-unified-features.nix {
+            inherit pkgs lib;
+          };
           packages.gen-rust-buck = import ./nix/packages/gen-rust-buck.nix { inherit pkgs lib; };
           packages.pytest-uv-shim = import ./nix/packages/pytest-uv-shim.nix { inherit pkgs lib; };
-          packages.check-rust-edition-rs = import ./nix/packages/check-rust-edition-rs.nix { inherit pkgs lib; };
-          packages.check-source-coverage-rs = import ./nix/packages/check-source-coverage-rs.nix { inherit pkgs lib; };
+          packages.check-rust-edition-rs = import ./nix/packages/check-rust-edition-rs.nix {
+            inherit pkgs lib;
+          };
+          packages.check-source-coverage-rs = import ./nix/packages/check-source-coverage-rs.nix {
+            inherit pkgs lib;
+          };
           # tw-<tool>, one per native tool tw wraps (nix/packages/tw-wrappers.nix)
           imports = [
             (
@@ -242,12 +248,14 @@
               release = self.lib.pinnedBuck2Release system;
               shellBuck2 = config.devenv.shells.default.turnkey.buck2;
             in
-            assert lib.assertMsg (release.buck2.version == release.version)
-              "pinned buck2 release: binary is ${release.buck2.version}, not ${release.version}";
+            assert lib.assertMsg (
+              release.buck2.version == release.version
+            ) "pinned buck2 release: binary is ${release.buck2.version}, not ${release.version}";
             assert lib.assertMsg (release.upstreamPrelude.version == release.version)
               "pinned buck2 release: upstream prelude is ${release.upstreamPrelude.version}, not ${release.version}";
-            assert lib.assertMsg (shellBuck2.package.drvPath == release.buck2.drvPath)
-              "pinned buck2 release: the default shell's buck2 is not the pinned binary";
+            assert lib.assertMsg (
+              shellBuck2.package.drvPath == release.buck2.drvPath
+            ) "pinned buck2 release: the default shell's buck2 is not the pinned binary";
             assert lib.assertMsg (
               shellBuck2.prelude.path == null
               && shellBuck2.prelude.package.drvPath == config.packages.turnkey-prelude.drvPath
@@ -283,12 +291,16 @@
                 ];
               strayBuck2 = builtins.filter reachesForBuck2 nixFiles;
             in
-            assert lib.assertMsg (!(builtins.tryEval declaringBuck2).success)
-              "toolchain declaration: declaring buck2 in toolchain.toml resolves instead of failing";
-            assert lib.assertMsg (builtins.any (pkg: pkg.drvPath == release.buck2.drvPath) config.packages.toolchain-profile.toolchainPackages)
-              "toolchain declaration: the toolchain profile lacks the pinned buck2";
+            assert lib.assertMsg (
+              !(builtins.tryEval declaringBuck2).success
+            ) "toolchain declaration: declaring buck2 in toolchain.toml resolves instead of failing";
+            assert lib.assertMsg (builtins.any (pkg: pkg.drvPath == release.buck2.drvPath)
+              config.packages.toolchain-profile.toolchainPackages
+            ) "toolchain declaration: the toolchain profile lacks the pinned buck2";
             assert lib.assertMsg (strayBuck2 == [ ])
-              "toolchain declaration: ${lib.concatMapStringsSep ", " toString strayBuck2} use a buck2 other than the pinned one";
+              "toolchain declaration: ${
+                lib.concatMapStringsSep ", " toString strayBuck2
+              } use a buck2 other than the pinned one";
             pkgs.runCommand "toolchain-declaration-check" { } "touch $out";
 
           # The files turnkey generates for Buck2, through the pure functions
@@ -302,7 +314,9 @@
               registry = lib.mapAttrs (name: _: { outPath = "/nix/store/stand-in-${name}"; }) (
                 self.lib.defaultTellerRegistry system
               );
-              preprocessor = { outPath = "/nix/store/stand-in-mdbook-admonish"; };
+              preprocessor = {
+                outPath = "/nix/store/stand-in-mdbook-admonish";
+              };
               toolchainsCell =
                 args:
                 import ./nix/buck2/toolchains-cell.nix { inherit lib; } (
@@ -392,7 +406,9 @@
               };
 
               # How the shell describes the cache to tk, as tk's tests read it
-              shellContract = builtins.fromJSON (builtins.readFile ./src/go/pkg/testcache/testdata/shell-contract.json);
+              shellContract = builtins.fromJSON (
+                builtins.readFile ./src/go/pkg/testcache/testdata/shell-contract.json
+              );
               describes =
                 example:
                 let
@@ -419,8 +435,9 @@
               "toolchains cell: cxx's actions don't get lld on PATH";
             assert lib.assertMsg (lib.hasInfix ''"${preprocessor}/bin"'' mdbookCell.buckFile)
               "toolchains cell: mdbook lacks the configured preprocessor's bin/";
-            assert lib.assertMsg (!(lib.hasInfix "preprocessor_paths" plainMdbookCell.buckFile))
-              "toolchains cell: mdbook gets preprocessor_paths with none configured";
+            assert lib.assertMsg (
+              !(lib.hasInfix "preprocessor_paths" plainMdbookCell.buckFile)
+            ) "toolchains cell: mdbook gets preprocessor_paths with none configured";
             assert lib.assertMsg (
               lib.hasInfix "godeps = .turnkey/godeps" uncached
               && lib.hasInfix "target:godeps//...->prelude//platforms:default" uncached
@@ -433,37 +450,44 @@
               && lib.hasInfix "action_cache_address = grpc://127.0.0.1:47301" cached
               && lib.hasInfix "tls = false" cached
             ) "buckconfig: the test cache's runner, endpoint or TLS setting is missing";
-            assert lib.assertMsg (map (rule: rule.name) syncToml.deps == [
-              "go"
-              "pylock"
-              "python"
-            ]) "sync.toml: [[deps]] are ${toString (map (rule: rule.name) syncToml.deps)}, not go, pylock, python";
-            assert lib.assertMsg (map (wrapper: wrapper.deps_rule) syncToml.wrappers == [
-              "go"
-              "pylock"
-            ]) "sync.toml: the go and uv wrappers don't run the go and pylock rules";
+            assert lib.assertMsg
+              (
+                map (rule: rule.name) syncToml.deps == [
+                  "go"
+                  "pylock"
+                  "python"
+                ]
+              )
+              "sync.toml: [[deps]] are ${toString (map (rule: rule.name) syncToml.deps)}, not go, pylock, python";
+            assert lib.assertMsg (
+              map (wrapper: wrapper.deps_rule) syncToml.wrappers == [
+                "go"
+                "pylock"
+              ]
+            ) "sync.toml: the go and uv wrappers don't run the go and pylock rules";
             assert lib.assertMsg (lib.all describes shellContract.caches)
               "test cache: the shell doesn't describe the cache as testdata/shell-contract.json says";
             assert lib.assertMsg (
               syncToml.conditions.settings == "toolchains//conditions"
-              && syncToml.conditions.platforms == [
-                {
-                  os = "linux";
-                  cpu = "x86_64";
-                }
-                {
-                  os = "linux";
-                  cpu = "arm64";
-                }
-                {
-                  os = "macos";
-                  cpu = "x86_64";
-                }
-                {
-                  os = "macos";
-                  cpu = "arm64";
-                }
-              ]
+              &&
+                syncToml.conditions.platforms == [
+                  {
+                    os = "linux";
+                    cpu = "x86_64";
+                  }
+                  {
+                    os = "linux";
+                    cpu = "arm64";
+                  }
+                  {
+                    os = "macos";
+                    cpu = "x86_64";
+                  }
+                  {
+                    os = "macos";
+                    cpu = "arm64";
+                  }
+                ]
             ) "sync.toml: [conditions] doesn't list buck2.platforms' default four platforms in Buck2's names";
             assert lib.assertMsg (
               lib.hasInfix ''name = "macos-arm64"'' platformSettings
@@ -476,8 +500,9 @@
             ) "toolchains cell: no config_setting combining the OS and an allowed Go build tag";
             assert lib.assertMsg (lib.hasInfix "allowed_build_tags = integration,e2e" taggedBuckconfig)
               "buckconfig: buck2.go.allowedBuildTags doesn't reach go.allowed_build_tags";
-            assert lib.assertMsg (syncToml.conditions.go_tags == [ ])
-              "sync.toml: [conditions] go_tags isn't buck2.go.allowedBuildTags";
+            assert lib.assertMsg (
+              syncToml.conditions.go_tags == [ ]
+            ) "sync.toml: [conditions] go_tags isn't buck2.go.allowedBuildTags";
             pkgs.runCommand "buck2-generators-check" { } "touch $out";
 
           # nix/buck2/platforms.nix's split agrees with the conditions
@@ -677,8 +702,9 @@
                 goRecord.syncRules ((buck2Options { }).go // { depsFile = ./.turnkey/go-deps.toml; })
               );
             in
-            assert lib.assertMsg (allProblems == [ ])
-              "language records: ${lib.concatStringsSep "; " allProblems}";
+            assert lib.assertMsg (
+              allProblems == [ ]
+            ) "language records: ${lib.concatStringsSep "; " allProblems}";
             assert lib.assertMsg (
               nestedGoRule.target == ".turnkey/go-deps.toml"
             ) "language records: depsFile ./.turnkey/go-deps.toml is synced to ${nestedGoRule.target}";
@@ -723,8 +749,9 @@
               "solidity remappings: ${
                 lib.concatStringsSep "; " (lib.mapAttrsToList (want: pkg: "${remapping pkg}, want ${want}") wrong)
               }";
-            assert lib.assertMsg (!(builtins.tryEval outside.target).success)
-              "solidity remappings: a target outside lib/<name>/ or node_modules/<name>/ is accepted";
+            assert lib.assertMsg (
+              !(builtins.tryEval outside.target).success
+            ) "solidity remappings: a target outside lib/<name>/ or node_modules/<name>/ is accepted";
             pkgs.runCommand "solidity-remappings-check" { } "touch $out";
 
           # Configure turnkey to use our local toolchain files. tellerLib
@@ -777,8 +804,8 @@
               python = {
                 enable = true;
                 depsFile = ./python-deps.toml; # Python package dependencies
-                lockFile = "pylock.toml";      # PEP 751 lock exported from uv
-                uvLockFile = "uv.lock";        # tk sync re-exports pylock.toml from it
+                lockFile = "pylock.toml"; # PEP 751 lock exported from uv
+                uvLockFile = "uv.lock"; # tk sync re-exports pylock.toml from it
               };
 
               # JavaScript/TypeScript dependencies
@@ -804,7 +831,7 @@
                 monorepoDepCheck = true;
                 foundryConfigCheck = true;
                 sourceCoverageCheck = true;
-                sourceScope = "src/";  # Only check source files under src/
+                sourceScope = "src/"; # Only check source files under src/
               };
             };
           };

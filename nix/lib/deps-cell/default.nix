@@ -21,130 +21,158 @@ let
   fixups = import ./fixups { inherit pkgs lib; };
 
   # Import adapters with access to generic builder (see below)
-  mkAdapters = genericBuilder: import ./adapters {
-    inherit pkgs lib genericBuilder;
-  };
+  mkAdapters =
+    genericBuilder:
+    import ./adapters {
+      inherit pkgs lib genericBuilder;
+    };
 
   # Generic cell builder - the core reusable function
-  genericMkDepsCell = {
-    cellName,                          # "godeps", "rustdeps", etc.
-    depPackages,                       # { key -> derivation } - pre-built by adapter
+  genericMkDepsCell =
+    {
+      cellName, # "godeps", "rustdeps", etc.
+      depPackages, # { key -> derivation } - pre-built by adapter
 
-    # Directory structure options
-    keyToPath ? (key: key),            # key -> vendor subdirectory path
-    createSymlinks ? false,            # Create unversioned symlinks
-    parseKeyForSymlink ? null,         # key -> { basePath, version } for symlink grouping
+      # Directory structure options
+      keyToPath ? (key: key), # key -> vendor subdirectory path
+      createSymlinks ? false, # Create unversioned symlinks
+      parseKeyForSymlink ? null, # key -> { basePath, version } for symlink grouping
 
-    # User patches (from FUSE edit layer)
-    userPatchesDir ? null,             # Path to .turnkey/patches directory
+      # User patches (from FUSE edit layer)
+      userPatchesDir ? null, # Path to .turnkey/patches directory
 
-    # Merge phase
-    mergeCommands ? "",                # Shell commands after copy
-    cellBuildInputs ? [],              # Build inputs for merge phase
-    rootBuckContent ? null,            # Optional content for root rules.star
+      # Merge phase
+      mergeCommands ? "", # Shell commands after copy
+      cellBuildInputs ? [ ], # Build inputs for merge phase
+      rootBuckContent ? null, # Optional content for root rules.star
 
-    # Passthru
-    passthru ? {},
-  }:
-  let
-    # Generate symlink creation commands
-    symlinkCommands = if createSymlinks && parseKeyForSymlink != null then
-      let
-        # Parse all keys to get basePath and version
-        parsedKeys = lib.mapAttrs (key: _: parseKeyForSymlink key) depPackages;
-
-        # Group keys by basePath
-        byBasePath = lib.groupBy (key: (parsedKeys.${key}).basePath) (lib.attrNames depPackages);
-
-        # For each basePath, find highest version and create symlink
-        mkSymlink = basePath: keys:
+      # Passthru
+      passthru ? { },
+    }:
+    let
+      # Generate symlink creation commands
+      symlinkCommands =
+        if createSymlinks && parseKeyForSymlink != null then
           let
-            versions = map (key: (parsedKeys.${key}).version) keys;
-            # Sort versions descending (simple string sort works for semver)
-            sortedVersions = lib.sort (a: b: a > b) versions;
-            highestVersion = lib.head sortedVersions;
-            # Find the key with the highest version
-            highestKey = lib.findFirst (key: (parsedKeys.${key}).version == highestVersion) (lib.head keys) keys;
-            targetPath = keyToPath highestKey;
-            # Get parent directory path for mkdir
-            parentDir = lib.concatStringsSep "/" (lib.init (lib.splitString "/" basePath));
-            # Get relative path from basePath to targetPath
-            # For simple cases like "serde" -> "serde@1.0.219", just use the target name
-            baseDepth = lib.length (lib.splitString "/" basePath);
-            targetName = lib.last (lib.splitString "/" targetPath);
-          in ''
-            # Create parent directories for symlink
-            ${if parentDir != "" then ''mkdir -p "$out/vendor/${parentDir}"'' else ""}
-            # Create symlink: ${basePath} -> ${targetPath}
-            ln -sfn "${targetName}" "$out/vendor/${basePath}"
-          '';
-      in
-      lib.concatStringsSep "\n" (lib.mapAttrsToList mkSymlink byBasePath)
-    else "";
-  in
-  pkgs.runCommand "${cellName}-cell" {
-    nativeBuildInputs = cellBuildInputs ++ [ pkgs.patch ];
-    passthru = { inherit depPackages; } // passthru;
-  } ''
-    mkdir -p $out/vendor
+            # Parse all keys to get basePath and version
+            parsedKeys = lib.mapAttrs (key: _: parseKeyForSymlink key) depPackages;
 
-    # Copy each dep package into vendor/
-    ${lib.concatStringsSep "\n" (lib.mapAttrsToList (key: pkg:
-      let
-        dirPath = keyToPath key;
-      in ''
-        mkdir -p "$out/vendor/${dirPath}"
-        cp -r ${pkg}/* "$out/vendor/${dirPath}/"
-        chmod -R u+w "$out/vendor/${dirPath}"
+            # Group keys by basePath
+            byBasePath = lib.groupBy (key: (parsedKeys.${key}).basePath) (lib.attrNames depPackages);
+
+            # For each basePath, find highest version and create symlink
+            mkSymlink =
+              basePath: keys:
+              let
+                versions = map (key: (parsedKeys.${key}).version) keys;
+                # Sort versions descending (simple string sort works for semver)
+                sortedVersions = lib.sort (a: b: a > b) versions;
+                highestVersion = lib.head sortedVersions;
+                # Find the key with the highest version
+                highestKey = lib.findFirst (
+                  key: (parsedKeys.${key}).version == highestVersion
+                ) (lib.head keys) keys;
+                targetPath = keyToPath highestKey;
+                # Get parent directory path for mkdir
+                parentDir = lib.concatStringsSep "/" (lib.init (lib.splitString "/" basePath));
+                # Get relative path from basePath to targetPath
+                # For simple cases like "serde" -> "serde@1.0.219", just use the target name
+                baseDepth = lib.length (lib.splitString "/" basePath);
+                targetName = lib.last (lib.splitString "/" targetPath);
+              in
+              ''
+                # Create parent directories for symlink
+                ${if parentDir != "" then ''mkdir -p "$out/vendor/${parentDir}"'' else ""}
+                # Create symlink: ${basePath} -> ${targetPath}
+                ln -sfn "${targetName}" "$out/vendor/${basePath}"
+              '';
+          in
+          lib.concatStringsSep "\n" (lib.mapAttrsToList mkSymlink byBasePath)
+        else
+          "";
+    in
+    pkgs.runCommand "${cellName}-cell"
+      {
+        nativeBuildInputs = cellBuildInputs ++ [ pkgs.patch ];
+        passthru = {
+          inherit depPackages;
+        }
+        // passthru;
+      }
       ''
-    ) depPackages)}
+        mkdir -p $out/vendor
 
-    # Create symlinks (if enabled)
-    ${symlinkCommands}
+        # Copy each dep package into vendor/
+        ${lib.concatStringsSep "\n" (
+          lib.mapAttrsToList (
+            key: pkg:
+            let
+              dirPath = keyToPath key;
+            in
+            ''
+              mkdir -p "$out/vendor/${dirPath}"
+              cp -r ${pkg}/* "$out/vendor/${dirPath}/"
+              chmod -R u+w "$out/vendor/${dirPath}"
+            ''
+          ) depPackages
+        )}
 
-    # Apply user patches from FUSE edit layer
-    # Patches are in .turnkey/patches/<cellName>/*.patch format
-    # Patch files use a/vendor/... and b/vendor/... paths, so we use -p1
-    ${if userPatchesDir != null then ''
-      patchDir="${userPatchesDir}/${cellName}"
-      if [ -d "$patchDir" ]; then
-        echo "Applying user patches from $patchDir"
-        for patchFile in "$patchDir"/*.patch; do
-          if [ -f "$patchFile" ]; then
-            echo "  Applying: $(basename "$patchFile")"
-            # Use -p1 to strip the a/ or b/ prefix from patch paths.
-            # A patch that doesn't apply fails the cell: building it
-            # without the change the user asked for would be wrong.
-            patch -d "$out" -p1 --forward < "$patchFile" || {
-              echo "error: user patch $(basename "$patchFile") does not apply to the ${cellName} cell"
-              echo "  (from $patchDir; regenerate it with 'tk compose patch' or remove it)"
-              exit 1
-            }
-          fi
-        done
-      fi
-    '' else ""}
+        # Create symlinks (if enabled)
+        ${symlinkCommands}
 
-    # Run language-specific merge commands
-    ${mergeCommands}
+        # Apply user patches from FUSE edit layer
+        # Patches are in .turnkey/patches/<cellName>/*.patch format
+        # Patch files use a/vendor/... and b/vendor/... paths, so we use -p1
+        ${
+          if userPatchesDir != null then
+            ''
+              patchDir="${userPatchesDir}/${cellName}"
+              if [ -d "$patchDir" ]; then
+                echo "Applying user patches from $patchDir"
+                for patchFile in "$patchDir"/*.patch; do
+                  if [ -f "$patchFile" ]; then
+                    echo "  Applying: $(basename "$patchFile")"
+                    # Use -p1 to strip the a/ or b/ prefix from patch paths.
+                    # A patch that doesn't apply fails the cell: building it
+                    # without the change the user asked for would be wrong.
+                    patch -d "$out" -p1 --forward < "$patchFile" || {
+                      echo "error: user patch $(basename "$patchFile") does not apply to the ${cellName} cell"
+                      echo "  (from $patchDir; regenerate it with 'tk compose patch' or remove it)"
+                      exit 1
+                    }
+                  fi
+                done
+              fi
+            ''
+          else
+            ""
+        }
 
-    # Generate root rules.star (if provided)
-    ${if rootBuckContent != null then ''
-      cat > $out/rules.star << 'ROOTRULES'
-      ${rootBuckContent}
-      ROOTRULES
-    '' else ""}
+        # Run language-specific merge commands
+        ${mergeCommands}
 
-    # Generate cell .buckconfig
-    cat > $out/.buckconfig << 'BUCKCONFIG'
-    [cells]
-        ${cellName} = .
-        prelude = prelude
+        # Generate root rules.star (if provided)
+        ${
+          if rootBuckContent != null then
+            ''
+              cat > $out/rules.star << 'ROOTRULES'
+              ${rootBuckContent}
+              ROOTRULES
+            ''
+          else
+            ""
+        }
 
-    [buildfile]
-        name = rules.star
-    BUCKCONFIG
-  '';
+        # Generate cell .buckconfig
+        cat > $out/.buckconfig << 'BUCKCONFIG'
+        [cells]
+            ${cellName} = .
+            prelude = prelude
+
+        [buildfile]
+            name = rules.star
+        BUCKCONFIG
+      '';
 
   # Build generic builder for adapters
   genericBuilder = {

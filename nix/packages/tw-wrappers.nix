@@ -11,20 +11,26 @@
 # nixpkgs' <tool>, for use outside a turnkey shell: one per native tool a
 # language record names (nix/buck2/languages.nix), so tw-go, tw-cargo and
 # tw-uv.
-{ pkgs, lib, tw }:
+{
+  pkgs,
+  lib,
+  tw,
+}:
 
 let
   # Create a wrapper script that shadows a tool
   # The wrapper exports TURNKEY_REAL_<TOOL> so tw can find the real binary
-  mkWrapper = { name, pkg }: pkgs.writeShellScriptBin name ''
-    # If TURNKEY_NO_WRAP is set, bypass tw and use the real tool
-    if [ -n "''${TURNKEY_NO_WRAP:-}" ]; then
-      exec "${pkg}/bin/${name}" "$@"
-    fi
-    # Tell tw where the real tool is (avoids infinite recursion)
-    export TURNKEY_REAL_${lib.toUpper name}="${pkg}/bin/${name}"
-    exec "${tw}/bin/tw" "${name}" "$@"
-  '';
+  mkWrapper =
+    { name, pkg }:
+    pkgs.writeShellScriptBin name ''
+      # If TURNKEY_NO_WRAP is set, bypass tw and use the real tool
+      if [ -n "''${TURNKEY_NO_WRAP:-}" ]; then
+        exec "${pkg}/bin/${name}" "$@"
+      fi
+      # Tell tw where the real tool is (avoids infinite recursion)
+      export TURNKEY_REAL_${lib.toUpper name}="${pkg}/bin/${name}"
+      exec "${tw}/bin/tw" "${name}" "$@"
+    '';
 
   # The native tools tw wraps: one per language that has a wrapper
   # (nix/buck2/languages.nix)

@@ -138,23 +138,27 @@ in
         description = "Check TOML syntax validity";
         files = "\\.toml$";
         # Exclude devenv/turnkey state directories and lock files
-        excludes = [ "^\\.devenv/" "^\\.turnkey/" "^buck-out/" ];
+        excludes = [
+          "^\\.devenv/"
+          "^\\.turnkey/"
+          "^buck-out/"
+        ];
         pass_filenames = true;
         entry = ''
-          ${pkgs.python3}/bin/python -c '
-import tomllib
-import sys
-errors = 0
-for path in sys.argv[1:]:
-    try:
-        with open(path, "rb") as f:
-            tomllib.load(f)
-    except Exception as e:
-        print(f"TOML syntax error in {path}: {e}", file=sys.stderr)
-        errors += 1
-if errors:
-    sys.exit(1)
-'
+                    ${pkgs.python3}/bin/python -c '
+          import tomllib
+          import sys
+          errors = 0
+          for path in sys.argv[1:]:
+              try:
+                  with open(path, "rb") as f:
+                      tomllib.load(f)
+              except Exception as e:
+                  print(f"TOML syntax error in {path}: {e}", file=sys.stderr)
+                  errors += 1
+          if errors:
+              sys.exit(1)
+          '
         '';
       };
 
@@ -165,23 +169,27 @@ if errors:
         description = "Check JSON syntax validity";
         files = "\\.json$";
         # Exclude devenv/turnkey state directories
-        excludes = [ "^\\.devenv/" "^\\.turnkey/" "^buck-out/" ];
+        excludes = [
+          "^\\.devenv/"
+          "^\\.turnkey/"
+          "^buck-out/"
+        ];
         pass_filenames = true;
         entry = ''
-          ${pkgs.python3}/bin/python -c '
-import json
-import sys
-errors = 0
-for path in sys.argv[1:]:
-    try:
-        with open(path, "r") as f:
-            json.load(f)
-    except Exception as e:
-        print(f"JSON syntax error in {path}: {e}", file=sys.stderr)
-        errors += 1
-if errors:
-    sys.exit(1)
-'
+                    ${pkgs.python3}/bin/python -c '
+          import json
+          import sys
+          errors = 0
+          for path in sys.argv[1:]:
+              try:
+                  with open(path, "r") as f:
+                      json.load(f)
+              except Exception as e:
+                  print(f"JSON syntax error in {path}: {e}", file=sys.stderr)
+                  errors += 1
+          if errors:
+              sys.exit(1)
+          '
         '';
       };
     };

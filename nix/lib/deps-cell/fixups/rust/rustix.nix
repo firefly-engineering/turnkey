@@ -21,14 +21,20 @@
     # generates select() in Buck2 BUCK files
     rustix = {
       linux = [
-        "--cfg" "libc"
-        "--cfg" "linux_like"
-        "--cfg" "linux_kernel"
+        "--cfg"
+        "libc"
+        "--cfg"
+        "linux_like"
+        "--cfg"
+        "linux_kernel"
       ];
       macos = [
-        "--cfg" "libc"
-        "--cfg" "apple"
-        "--cfg" "bsd"
+        "--cfg"
+        "libc"
+        "--cfg"
+        "apple"
+        "--cfg"
+        "bsd"
       ];
     };
   };

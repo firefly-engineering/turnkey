@@ -12,13 +12,34 @@
   # SYMBOLS_TO_RENAME: symbols that get renamed without prefix
   # These map old OpenSSL-style names to ring's new names
   symbolRenames = [
-    { old = "ecp_nistz256_point_double"; new = "p256_point_double"; }
-    { old = "ecp_nistz256_point_add"; new = "p256_point_add"; }
-    { old = "ecp_nistz256_point_add_affine"; new = "p256_point_add_affine"; }
-    { old = "ecp_nistz256_ord_mul_mont"; new = "p256_scalar_mul_mont"; }
-    { old = "ecp_nistz256_ord_sqr_mont"; new = "p256_scalar_sqr_rep_mont"; }
-    { old = "ecp_nistz256_mul_mont"; new = "p256_mul_mont"; }
-    { old = "ecp_nistz256_sqr_mont"; new = "p256_sqr_mont"; }
+    {
+      old = "ecp_nistz256_point_double";
+      new = "p256_point_double";
+    }
+    {
+      old = "ecp_nistz256_point_add";
+      new = "p256_point_add";
+    }
+    {
+      old = "ecp_nistz256_point_add_affine";
+      new = "p256_point_add_affine";
+    }
+    {
+      old = "ecp_nistz256_ord_mul_mont";
+      new = "p256_scalar_mul_mont";
+    }
+    {
+      old = "ecp_nistz256_ord_sqr_mont";
+      new = "p256_scalar_sqr_rep_mont";
+    }
+    {
+      old = "ecp_nistz256_mul_mont";
+      new = "p256_mul_mont";
+    }
+    {
+      old = "ecp_nistz256_sqr_mont";
+      new = "p256_sqr_mont";
+    }
   ];
 
   # SYMBOLS_TO_PREFIX: symbols that get prefixed with ring_core_0_17_<patch>__

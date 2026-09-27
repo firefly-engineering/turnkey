@@ -35,10 +35,12 @@ pkgs.buildGoModule {
   # Wrap the binary to include the prefetcher in PATH
   postInstall = ''
     wrapProgram $out/bin/godeps-gen \
-      --prefix PATH : ${lib.makeBinPath [
-        pkgs.nix
-        nix-prefetch-cached
-      ]}
+      --prefix PATH : ${
+        lib.makeBinPath [
+          pkgs.nix
+          nix-prefetch-cached
+        ]
+      }
   '';
 
   meta = {

@@ -17,7 +17,8 @@ let
     nix
   ];
 
-in pkgs.writeShellApplication {
+in
+pkgs.writeShellApplication {
   name = "turnkey-e2e-runner";
 
   runtimeInputs = testDeps;

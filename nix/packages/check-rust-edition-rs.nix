@@ -26,8 +26,14 @@ pkgs.rustPlatform.buildRustPackage {
     lockFile = root + "/Cargo.lock";
   };
 
-  cargoBuildFlags = [ "-p" "check-rust-edition-rs" ];
-  cargoTestFlags = [ "-p" "check-rust-edition-rs" ];
+  cargoBuildFlags = [
+    "-p"
+    "check-rust-edition-rs"
+  ];
+  cargoTestFlags = [
+    "-p"
+    "check-rust-edition-rs"
+  ];
 
   meta = {
     description = "Check Rust edition consistency between Cargo.toml and rules.star";

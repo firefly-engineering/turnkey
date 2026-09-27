@@ -19,6 +19,9 @@
   rustcFlags = {
     # fuser mount implementation flag for Linux (pure-rust, no libfuse)
     # Use separate arguments to avoid Buck2 parsing issues with combined format
-    fuser = [ "--cfg" ''fuser_mount_impl="pure-rust"'' ];
+    fuser = [
+      "--cfg"
+      ''fuser_mount_impl="pure-rust"''
+    ];
   };
 }

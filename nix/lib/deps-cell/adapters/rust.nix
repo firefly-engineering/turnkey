@@ -7,7 +7,11 @@
 # Rust dependencies are fetched from crates.io.
 # Feature unification and BUCK generation happen during merge phase.
 
-{ pkgs, lib, genericBuilder }:
+{
+  pkgs,
+  lib,
+  genericBuilder,
+}:
 
 let
   fetchers = import ../fetchers.nix { inherit pkgs lib; };
@@ -16,7 +20,10 @@ let
 in
 rec {
   # Build inputs for per-dependency builds
-  buildInputs = with pkgs; [ stdenv.cc perl ];
+  buildInputs = with pkgs; [
+    stdenv.cc
+    perl
+  ];
 
   # Build inputs for cell builds
   cellBuildInputs = with pkgs; [ python3 ];
@@ -26,176 +33,219 @@ rec {
   # ==========================================================================
 
   # Build a single Rust crate package
-  mkRustDepPackage = {
-    name,               # Crate name (e.g., "serde")
-    version,            # Version string (e.g., "1.0.219")
-    sha256,             # SRI hash of the source
+  mkRustDepPackage =
+    {
+      name, # Crate name (e.g., "serde")
+      version, # Version string (e.g., "1.0.219")
+      sha256, # SRI hash of the source
 
-    # Optional
-    buildScriptFixup ? null,  # Fixup commands for build.rs emulation
-    rustcFlags ? [],          # --cfg flags for rustc
-  }:
-  let
-    fetchSpec = fetchers.mkCratesIOSpec {
-      crateName = name;
-      inherit version sha256;
-    };
-  in
-  pkgs.runCommand "dep-rust-${name}-${version}" {
-    nativeBuildInputs = buildInputs;
-    src = fetchers.fetch fetchSpec;
-    passthru = {
-      inherit name version rustcFlags;
-    };
-  } ''
-    mkdir -p $out
-    cp -r $src/* $out/
-    chmod -R u+w $out
+      # Optional
+      buildScriptFixup ? null, # Fixup commands for build.rs emulation
+      rustcFlags ? [ ], # --cfg flags for rustc
+    }:
+    let
+      fetchSpec = fetchers.mkCratesIOSpec {
+        crateName = name;
+        inherit version sha256;
+      };
+    in
+    pkgs.runCommand "dep-rust-${name}-${version}"
+      {
+        nativeBuildInputs = buildInputs;
+        src = fetchers.fetch fetchSpec;
+        passthru = {
+          inherit name version rustcFlags;
+        };
+      }
+      ''
+        mkdir -p $out
+        cp -r $src/* $out/
+        chmod -R u+w $out
 
-    # Apply build script fixup if provided
-    cd $out
-    ${if buildScriptFixup != null then buildScriptFixup else ""}
-  '';
+        # Apply build script fixup if provided
+        cd $out
+        ${if buildScriptFixup != null then buildScriptFixup else ""}
+      '';
 
   # Build a complete Rust dependency cell
-  mkRustDepsCell = {
-    cellName,                   # The cell's name (nix/buck2/languages.nix)
-    depsFile,                   # Path to rust-deps.toml
-    featuresFile ? null,        # Path to rust-features.toml (optional)
-    buildScriptFixups ? {},     # Additional build script fixups
-    rustcFlagsRegistry ? {},    # Additional rustc flags
+  mkRustDepsCell =
+    {
+      cellName, # The cell's name (nix/buck2/languages.nix)
+      depsFile, # Path to rust-deps.toml
+      featuresFile ? null, # Path to rust-features.toml (optional)
+      buildScriptFixups ? { }, # Additional build script fixups
+      rustcFlagsRegistry ? { }, # Additional rustc flags
 
-    # User patches (from FUSE edit layer)
-    userPatchesDir ? null,      # Path to .turnkey/patches directory
+      # User patches (from FUSE edit layer)
+      userPatchesDir ? null, # Path to .turnkey/patches directory
 
-    # The platforms to build for, and the package of their combined
-    # config_settings (nix/buck2/platforms.nix's conditions): the select()s
-    # of target-specific deps are keyed on them
-    conditions,
+      # The platforms to build for, and the package of their combined
+      # config_settings (nix/buck2/platforms.nix's conditions): the select()s
+      # of target-specific deps are keyed on them
+      conditions,
 
-    # Tools (must be provided by caller)
-    computeUnifiedFeatures ? null,  # Tool for feature unification
-    genRustBuck ? null,             # Tool for BUCK generation
-  }:
-  let
-    depsToml = builtins.fromTOML (builtins.readFile depsFile);
-    deps = depsToml.deps or {};
+      # Tools (must be provided by caller)
+      computeUnifiedFeatures ? null, # Tool for feature unification
+      genRustBuck ? null, # Tool for BUCK generation
+    }:
+    let
+      depsToml = builtins.fromTOML (builtins.readFile depsFile);
+      deps = depsToml.deps or { };
 
-    # Merge built-in fixups with user-provided
-    allBuildScriptFixups = (fixups.builtinFixups.rust.buildScriptFixups or {}) // buildScriptFixups;
-    allRustcFlags = (fixups.builtinFixups.rust.rustcFlags or {}) // rustcFlagsRegistry;
-    allNativeLibraries = fixups.builtinFixups.rust.nativeLibraries or {};
+      # Merge built-in fixups with user-provided
+      allBuildScriptFixups = (fixups.builtinFixups.rust.buildScriptFixups or { }) // buildScriptFixups;
+      allRustcFlags = (fixups.builtinFixups.rust.rustcFlags or { }) // rustcFlagsRegistry;
+      allNativeLibraries = fixups.builtinFixups.rust.nativeLibraries or { };
 
-    # Build individual dep packages
-    depPackages = lib.mapAttrs (key: depSpec:
-      let
-        # Parse name from key (may be "name@version" format)
-        parts = lib.splitString "@" key;
-        crateName = depSpec.name or (lib.head parts);
-        version = depSpec.version;
-        patchVersion = lib.last (lib.splitString "." version);
+      # Build individual dep packages
+      depPackages = lib.mapAttrs (
+        key: depSpec:
+        let
+          # Parse name from key (may be "name@version" format)
+          parts = lib.splitString "@" key;
+          crateName = depSpec.name or (lib.head parts);
+          version = depSpec.version;
+          patchVersion = lib.last (lib.splitString "." version);
 
-        # Look up fixup
-        fixupFn = allBuildScriptFixups.${key} or allBuildScriptFixups.${crateName} or null;
-        fixup = if fixupFn != null then
-          if builtins.isFunction fixupFn then
-            fixupFn { inherit crateName version patchVersion key; vendorPath = "."; }
+          # Look up fixup
+          fixupFn = allBuildScriptFixups.${key} or allBuildScriptFixups.${crateName} or null;
+          fixup =
+            if fixupFn != null then
+              if builtins.isFunction fixupFn then
+                fixupFn {
+                  inherit
+                    crateName
+                    version
+                    patchVersion
+                    key
+                    ;
+                  vendorPath = ".";
+                }
+              else
+                fixupFn
+            else
+              null;
+
+          # Look up rustc flags
+          flags = allRustcFlags.${key} or allRustcFlags.${crateName} or [ ];
+        in
+        mkRustDepPackage {
+          name = crateName;
+          inherit version;
+          sha256 = depSpec.hash;
+          buildScriptFixup = fixup;
+          rustcFlags = flags;
+        }
+      ) deps;
+
+      # Features file argument for compute-unified-features
+      featuresFileArg = if featuresFile != null then "${featuresFile}" else "";
+
+      # Key to path: Rust keys are already "name@version" format
+      keyToPath = key: key;
+
+      # Parse key for symlink: extract crate name (basePath) and version
+      parseKeyForSymlink =
+        key:
+        let
+          parts = lib.splitString "@" key;
+        in
+        {
+          basePath = lib.head parts;
+          version = if lib.length parts > 1 then lib.elemAt parts 1 else "";
+        };
+
+      # Include both versioned and unversioned crate names for gen-rust-buck
+      versionedNames = lib.attrNames deps;
+      unversionedNames = lib.unique (map (key: lib.head (lib.splitString "@" key)) versionedNames);
+      allCrateNames = versionedNames ++ unversionedNames;
+
+      # Build native library info map (evaluate functions with crate context)
+      nativeLibraryInfo = lib.filterAttrs (k: v: v != null) (
+        lib.mapAttrs (
+          key: depSpec:
+          let
+            parts = lib.splitString "@" key;
+            crateName = depSpec.name or (lib.head parts);
+            version = depSpec.version;
+            patchVersion = lib.last (lib.splitString "." version);
+            nativeLibFn = allNativeLibraries.${key} or allNativeLibraries.${crateName} or null;
+          in
+          if nativeLibFn != null then
+            if builtins.isFunction nativeLibFn then
+              nativeLibFn {
+                inherit
+                  crateName
+                  version
+                  patchVersion
+                  key
+                  ;
+              }
+            else
+              nativeLibFn
           else
-            fixupFn
-        else null;
+            null
+        ) deps
+      );
 
-        # Look up rustc flags
-        flags = allRustcFlags.${key} or allRustcFlags.${crateName} or [];
-      in
-      mkRustDepPackage {
-        name = crateName;
-        inherit version;
-        sha256 = depSpec.hash;
-        buildScriptFixup = fixup;
-        rustcFlags = flags;
-      }
-    ) deps;
+      conditionsJSON = builtins.toJSON conditions;
 
-    # Features file argument for compute-unified-features
-    featuresFileArg = if featuresFile != null
-      then "${featuresFile}"
-      else "";
+      # Merge commands: feature unification + BUCK generation
+      mergeCommands = ''
+        # Compute unified features (if tool provided)
+        ${
+          if computeUnifiedFeatures != null then
+            ''
+              echo "Computing unified features..."
+              UNIFIED_FEATURES=$(compute-unified-features "$out/vendor" ${featuresFileArg} --deps-file ${depsFile} --platforms '${conditionsJSON}')
+              export UNIFIED_FEATURES
+            ''
+          else
+            ''
+              UNIFIED_FEATURES="{}"
+              export UNIFIED_FEATURES
+            ''
+        }
 
-    # Key to path: Rust keys are already "name@version" format
-    keyToPath = key: key;
-
-    # Parse key for symlink: extract crate name (basePath) and version
-    parseKeyForSymlink = key:
-      let parts = lib.splitString "@" key;
-      in {
-        basePath = lib.head parts;
-        version = if lib.length parts > 1 then lib.elemAt parts 1 else "";
-      };
-
-    # Include both versioned and unversioned crate names for gen-rust-buck
-    versionedNames = lib.attrNames deps;
-    unversionedNames = lib.unique (map (key:
-      lib.head (lib.splitString "@" key)
-    ) versionedNames);
-    allCrateNames = versionedNames ++ unversionedNames;
-
-    # Build native library info map (evaluate functions with crate context)
-    nativeLibraryInfo = lib.filterAttrs (k: v: v != null) (lib.mapAttrs (key: depSpec:
-      let
-        parts = lib.splitString "@" key;
-        crateName = depSpec.name or (lib.head parts);
-        version = depSpec.version;
-        patchVersion = lib.last (lib.splitString "." version);
-        nativeLibFn = allNativeLibraries.${key} or allNativeLibraries.${crateName} or null;
-      in
-      if nativeLibFn != null then
-        if builtins.isFunction nativeLibFn then
-          nativeLibFn { inherit crateName version patchVersion key; }
-        else
-          nativeLibFn
-      else null
-    ) deps);
-
-    conditionsJSON = builtins.toJSON conditions;
-
-    # Merge commands: feature unification + BUCK generation
-    mergeCommands = ''
-      # Compute unified features (if tool provided)
-      ${if computeUnifiedFeatures != null then ''
-        echo "Computing unified features..."
-        UNIFIED_FEATURES=$(compute-unified-features "$out/vendor" ${featuresFileArg} --deps-file ${depsFile} --platforms '${conditionsJSON}')
-        export UNIFIED_FEATURES
-      '' else ''
-        UNIFIED_FEATURES="{}"
-        export UNIFIED_FEATURES
-      ''}
-
-      # Generate BUCK files (if tool provided)
-      ${if genRustBuck != null then ''
-        echo "Generating BUCK files..."
-        for dir in "$out/vendor"/*; do
-          if [ -d "$dir" ] && [ -f "$dir/Cargo.toml" ]; then
-            gen-rust-buck "$dir" \
-              '${builtins.toJSON allCrateNames}' \
-              '${builtins.toJSON (lib.attrNames allBuildScriptFixups)}' \
-              "$UNIFIED_FEATURES" \
-              '${builtins.toJSON allRustcFlags}' \
-              '${builtins.toJSON nativeLibraryInfo}' \
-              '${conditionsJSON}' \
-              > "$dir/rules.star" || echo "# rules.star generation failed" > "$dir/rules.star"
-          fi
-        done
-      '' else ''
-        echo "No gen-rust-buck tool provided, skipping BUCK generation"
-      ''}
-    '';
-  in
-  genericMkDepsCell {
-    inherit cellName depPackages keyToPath parseKeyForSymlink mergeCommands userPatchesDir;
-    createSymlinks = true;
-    cellBuildInputs = cellBuildInputs ++
-      (if computeUnifiedFeatures != null then [ computeUnifiedFeatures ] else []) ++
-      (if genRustBuck != null then [ genRustBuck ] else []);
-  };
+        # Generate BUCK files (if tool provided)
+        ${
+          if genRustBuck != null then
+            ''
+              echo "Generating BUCK files..."
+              for dir in "$out/vendor"/*; do
+                if [ -d "$dir" ] && [ -f "$dir/Cargo.toml" ]; then
+                  gen-rust-buck "$dir" \
+                    '${builtins.toJSON allCrateNames}' \
+                    '${builtins.toJSON (lib.attrNames allBuildScriptFixups)}' \
+                    "$UNIFIED_FEATURES" \
+                    '${builtins.toJSON allRustcFlags}' \
+                    '${builtins.toJSON nativeLibraryInfo}' \
+                    '${conditionsJSON}' \
+                    > "$dir/rules.star" || echo "# rules.star generation failed" > "$dir/rules.star"
+                fi
+              done
+            ''
+          else
+            ''
+              echo "No gen-rust-buck tool provided, skipping BUCK generation"
+            ''
+        }
+      '';
+    in
+    genericMkDepsCell {
+      inherit
+        cellName
+        depPackages
+        keyToPath
+        parseKeyForSymlink
+        mergeCommands
+        userPatchesDir
+        ;
+      createSymlinks = true;
+      cellBuildInputs =
+        cellBuildInputs
+        ++ (if computeUnifiedFeatures != null then [ computeUnifiedFeatures ] else [ ])
+        ++ (if genRustBuck != null then [ genRustBuck ] else [ ]);
+    };
 
 }

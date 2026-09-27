@@ -22,7 +22,12 @@
 #     };
 #   };
 
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.services.turnkey-composed;
@@ -40,7 +45,11 @@ let
       };
 
       backend = lib.mkOption {
-        type = lib.types.enum [ "auto" "fuse" "symlink" ];
+        type = lib.types.enum [
+          "auto"
+          "fuse"
+          "symlink"
+        ];
         default = "auto";
         description = "Backend type: auto, fuse, or symlink";
       };

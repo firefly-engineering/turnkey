@@ -25,35 +25,47 @@ rec {
 
   # Get fixup for a dependency
   # Lookup order: version-specific key -> name -> null
-  getFixup = {
-    language,
-    name,
-    version,
-    userFixups ? {},
-  }:
-  let
-    defaults = builtinFixups.${language} or {};
-    merged = defaults // userFixups;
-    versionedKey = "${name}@${version}";
-  in
-  merged.${versionedKey} or merged.${name} or null;
+  getFixup =
+    {
+      language,
+      name,
+      version,
+      userFixups ? { },
+    }:
+    let
+      defaults = builtinFixups.${language} or { };
+      merged = defaults // userFixups;
+      versionedKey = "${name}@${version}";
+    in
+    merged.${versionedKey} or merged.${name} or null;
 
   # Check if a fixup exists for a dependency
   hasFixup = args: (getFixup args) != null;
 
   # Merge built-in fixups with user-provided fixups
-  mergeFixups = { language, userFixups ? {} }:
-    (builtinFixups.${language} or {}) // userFixups;
+  mergeFixups =
+    {
+      language,
+      userFixups ? { },
+    }:
+    (builtinFixups.${language} or { }) // userFixups;
 
   # Helper to create a fixup entry
   # commands can be:
   #   - A string of shell commands
   #   - A function: context -> string
-  mkFixup = { name, version ? null, commands }:
+  mkFixup =
+    {
+      name,
+      version ? null,
+      commands,
+    }:
     let
       key = if version != null then "${name}@${version}" else name;
     in
-    { ${key} = commands; };
+    {
+      ${key} = commands;
+    };
 
   # Export language-specific fixups for direct access
   inherit rustFixups goFixups pythonFixups;

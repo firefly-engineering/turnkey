@@ -28,22 +28,18 @@ let
   fixupDir = ./.;
   allFiles = builtins.attrNames (builtins.readDir fixupDir);
 
-  isFixupFile = name:
-    lib.hasSuffix ".nix" name
-    && name != "default.nix"
-    && !lib.hasSuffix "-symbols.nix" name;
+  isFixupFile =
+    name: lib.hasSuffix ".nix" name && name != "default.nix" && !lib.hasSuffix "-symbols.nix" name;
 
   fixupFiles = builtins.filter isFixupFile allFiles;
 
   # Import each fixup file
-  importFixup = filename:
-    import (fixupDir + "/${filename}") { inherit lib; };
+  importFixup = filename: import (fixupDir + "/${filename}") { inherit lib; };
 
   allFixups = map importFixup fixupFiles;
 
   # Merge a specific attribute from all fixups
-  mergeAttr = attrName: fixups:
-    lib.foldl' (acc: fixup: acc // (fixup.${attrName} or {})) {} fixups;
+  mergeAttr = attrName: fixups: lib.foldl' (acc: fixup: acc // (fixup.${attrName} or { })) { } fixups;
 
 in
 rec {

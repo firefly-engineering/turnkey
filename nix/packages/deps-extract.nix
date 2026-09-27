@@ -41,14 +41,18 @@ pkgs.rustPlatform.buildRustPackage {
 
   # Build with selected features only (no default features)
   cargoBuildFlags = [
-    "-p" "deps-extract"
+    "-p"
+    "deps-extract"
     "--no-default-features"
-    "--features" features
+    "--features"
+    features
   ];
   cargoTestFlags = [
-    "-p" "deps-extract"
+    "-p"
+    "deps-extract"
     "--no-default-features"
-    "--features" features
+    "--features"
+    features
   ];
 
   meta = {

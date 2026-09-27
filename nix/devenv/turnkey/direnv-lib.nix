@@ -4,7 +4,11 @@
 # that handles dependency regeneration (tk sync), symlink syncing, and
 # watch_file declarations for the shell's deps rules.
 
-{ lib, pkgs, config }:
+{
+  lib,
+  pkgs,
+  config,
+}:
 
 let
   cfg = config.turnkey;
@@ -16,16 +20,16 @@ let
   # The deps rules tk sync runs, as buck2.nix writes them into
   # .turnkey/sync.toml (nix/buck2/sync-config.nix); a shell without Buck2
   # has none
-  syncRules = lib.optionals buck2Cfg.enable
-    (import ../../buck2/sync-config.nix { inherit pkgs lib; } {
-      languages = import ../../buck2/languages.nix { inherit pkgs lib; };
-      buck2 = buck2Cfg;
-    }).rules;
+  syncRules =
+    lib.optionals buck2Cfg.enable
+      (import ../../buck2/sync-config.nix { inherit pkgs lib; } {
+        languages = import ../../buck2/languages.nix { inherit pkgs lib; };
+        buck2 = buck2Cfg;
+      }).rules;
   ruleNames = map (rule: rule.name) syncRules;
 
   # turnkey's tk, from the registry (it is built in), or whatever tk is on PATH
-  tk =
-    if cfg.registry ? tk then "${turnkeyLib.resolveTool cfg.registry "tk" { }}/bin/tk" else "tk";
+  tk = if cfg.registry ? tk then "${turnkeyLib.resolveTool cfg.registry "tk" { }}/bin/tk" else "tk";
 
   # Helper functions (always included)
   helperFunctions = ''
@@ -104,15 +108,13 @@ let
       elif [[ -n "''${TURNKEY_SKIP_ALL:-}" ]]; then
         # SKIP_ALL mode: start empty, add ENABLE_* rules
         ${lib.concatMapStringsSep "\n    " (
-          name:
-          ''[[ -n "''${TURNKEY_ENABLE_${lib.toUpper name}:-}" ]] && rules="$rules ${name}"''
+          name: ''[[ -n "''${TURNKEY_ENABLE_${lib.toUpper name}:-}" ]] && rules="$rules ${name}"''
         ) ruleNames}
       else
         # Default mode: every rule, minus SKIP_* rules
         rules="${lib.concatStringsSep " " ruleNames}"
         ${lib.concatMapStringsSep "\n    " (
-          name:
-          ''[[ -n "''${TURNKEY_SKIP_${lib.toUpper name}:-}" ]] && skip_rules="$skip_rules ${name}"''
+          name: ''[[ -n "''${TURNKEY_SKIP_${lib.toUpper name}:-}" ]] && skip_rules="$skip_rules ${name}"''
         ) ruleNames}
       fi
 

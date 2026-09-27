@@ -452,13 +452,15 @@ in
         load = "@prelude//mdbook:toolchain.bzl";
         visibility = [ "PUBLIC" ];
         # Dynamic attrs resolved at build time from registry
-        dynamicAttrs = registry: {
-          mdbook_path = "${tool registry "mdbook"}/bin/mdbook";
-          python_path = "${tool registry "python"}/bin/python3";
-          # Output served books to .turnkey/books/ to keep source tree clean
-          serve_output_dir = ".turnkey/books";
-        }
-        // mdbookPreprocessorAttrs registry;
+        dynamicAttrs =
+          registry:
+          {
+            mdbook_path = "${tool registry "mdbook"}/bin/mdbook";
+            python_path = "${tool registry "python"}/bin/python3";
+            # Output served books to .turnkey/books/ to keep source tree clean
+            serve_output_dir = ".turnkey/books";
+          }
+          // mdbookPreprocessorAttrs registry;
       }
     ];
     implicitDependencies = [ ];
@@ -475,12 +477,14 @@ in
         rule = "system_mdbook_toolchain";
         load = "@prelude//mdbook:toolchain.bzl";
         visibility = [ "PUBLIC" ];
-        dynamicAttrs = registry: {
-          mdbook_path = "${tool registry "mdbook-toolchain"}/bin/mdbook";
-          python_path = "${tool registry "python"}/bin/python3";
-          serve_output_dir = ".turnkey/books";
-        }
-        // mdbookPreprocessorAttrs registry;
+        dynamicAttrs =
+          registry:
+          {
+            mdbook_path = "${tool registry "mdbook-toolchain"}/bin/mdbook";
+            python_path = "${tool registry "python"}/bin/python3";
+            serve_output_dir = ".turnkey/books";
+          }
+          // mdbookPreprocessorAttrs registry;
       }
     ];
     implicitDependencies = [ ];

@@ -39,10 +39,12 @@ let
 
   # Resolve runtime dependencies to actual packages from versioned registry
   runtimePackages = builtins.filter (p: p != null) (
-    map (name:
-      let entry = turnkeyCfg.registry.${name} or null;
-      in if entry == null then null
-         else turnkeyLib.resolveTool turnkeyCfg.registry name {}
+    map (
+      name:
+      let
+        entry = turnkeyCfg.registry.${name} or null;
+      in
+      if entry == null then null else turnkeyLib.resolveTool turnkeyCfg.registry name { }
     ) runtimeDeps
   );
 
@@ -50,8 +52,8 @@ let
   # This allows mappings.nix dynamicAttrs functions to use ${registry.clang}/bin/clang
   # Declared toolchains resolve at their declared version, so a path baked into
   # the toolchains cell is the same package the dev shell provides.
-  resolvedRegistry = builtins.mapAttrs (name: entry:
-    turnkeyLib.resolveTool turnkeyCfg.registry name (declaredToolchains.${name} or { })
+  resolvedRegistry = builtins.mapAttrs (
+    name: entry: turnkeyLib.resolveTool turnkeyCfg.registry name (declaredToolchains.${name} or { })
   ) turnkeyCfg.registry;
 
   # The languages turnkey manages dependencies for (nix/buck2/languages.nix)
@@ -60,20 +62,21 @@ let
 
   # Internal generator packages (not exposed through registry, added to shell automatically)
   # These are turnkey implementation details, not user-configurable toolchains
-  internalPackages = let
-    # deps-extract is the unified tree-sitter based import extractor for rules.star sync
-    # Built with only the features needed for enabled languages
-    depsExtract = import ../../packages/deps-extract.nix {
-      inherit pkgs lib;
-      enablePython = cfg.python.enable;
-      enableRust = cfg.rust.enable;
-      enableTypescript = cfg.javascript.enable;
-      enableSolidity = cfg.solidity.enable;
-    };
-    # Shim that routes `pytest` through `uv run pytest`, so workspace
-    # editable installs are visible to the test runner.
-    pytestShim = import ../../packages/pytest-uv-shim.nix { inherit pkgs lib; };
-  in
+  internalPackages =
+    let
+      # deps-extract is the unified tree-sitter based import extractor for rules.star sync
+      # Built with only the features needed for enabled languages
+      depsExtract = import ../../packages/deps-extract.nix {
+        inherit pkgs lib;
+        enablePython = cfg.python.enable;
+        enableRust = cfg.rust.enable;
+        enableTypescript = cfg.javascript.enable;
+        enableSolidity = cfg.solidity.enable;
+      };
+      # Shim that routes `pytest` through `uv run pytest`, so workspace
+      # editable installs are visible to the test runner.
+      pytestShim = import ../../packages/pytest-uv-shim.nix { inherit pkgs lib; };
+    in
     map (language: language.generator) enabledLanguages
     ++ lib.optional cfg.python.enable pytestShim
     # Always include deps-extract (used by tk rules sync for all non-Go languages)
@@ -168,29 +171,28 @@ let
   # The symlinks the shell keeps pointing at what it generated
   # (managed-links.nix)
   managedLinks = import ./managed-links.nix { inherit lib; };
-  links =
-    [
-      {
-        path = ".buckconfig";
-        target = buckconfig;
-        label = ".buckconfig";
-      }
-      {
-        path = ".turnkey/sync.toml";
-        target = syncConfig;
-        label = "sync.toml";
-      }
-      {
-        path = toolchainsCellPath;
-        target = toolchainsCell;
-        label = "toolchains cell";
-      }
-    ]
-    ++ map (cell: {
-      inherit (cell) path;
-      target = cell.derivation;
-      label = "${cell.name} cell";
-    }) (lib.attrValues nixCells);
+  links = [
+    {
+      path = ".buckconfig";
+      target = buckconfig;
+      label = ".buckconfig";
+    }
+    {
+      path = ".turnkey/sync.toml";
+      target = syncConfig;
+      label = "sync.toml";
+    }
+    {
+      path = toolchainsCellPath;
+      target = toolchainsCell;
+      label = "toolchains cell";
+    }
+  ]
+  ++ map (cell: {
+    inherit (cell) path;
+    target = cell.derivation;
+    label = "${cell.name} cell";
+  }) (lib.attrValues nixCells);
 
   # Generate info output for all Nix-backed cells
   nixCellsInfo = lib.concatStringsSep "\n" (
@@ -199,10 +201,8 @@ let
 
   # Generate env vars for all Nix-backed cells (for .envrc symlink sync)
   # Format: TURNKEY_CELL_<NAME> = "<path>:<derivation>"
-  nixCellsEnvVars = lib.mapAttrs' (_: cell:
-    lib.nameValuePair
-      "TURNKEY_CELL_${lib.toUpper cell.name}"
-      "${cell.path}:${cell.derivation}"
+  nixCellsEnvVars = lib.mapAttrs' (
+    _: cell: lib.nameValuePair "TURNKEY_CELL_${lib.toUpper cell.name}" "${cell.path}:${cell.derivation}"
   ) nixCells;
 
   # The pinned buck2 release (docs/adr/0002-turnkey-owns-the-buck2-version.md)
@@ -322,21 +322,22 @@ in
       TURNKEY_BUCK2_SYNC_CONFIG = "${syncConfig}";
       TURNKEY_BUCK2_TOOLCHAINS = lib.concatStringsSep "," finalToolchains;
       TURNKEY_BUCK2_RUNTIME_DEPS = lib.concatStringsSep "," runtimeDeps;
-    } // nixCellsEnvVars
-      # Generated protocol code for Cargo builds of turnkey-test-runner
-      // {
-        TURNKEY_TEST_RUNNER_PROTOCOL = "${testRunnerProtocol}";
-      }
-      # The test result cache, as tk reads it (src/go/pkg/testcache)
-      // testCache.env
-      # Store tk's share path for shell completion setup
-      // lib.optionalAttrs (turnkeyCfg.registry ? tk) {
-        TURNKEY_TK_SHARE = "${resolvedRegistry.tk}/share";
-      }
-      # Suppress devenv task trace output when quiet mode is enabled
-      // lib.optionalAttrs cfg.quiet {
-        DEVENV_TASKS_QUIET = "true";
-      };
+    }
+    // nixCellsEnvVars
+    # Generated protocol code for Cargo builds of turnkey-test-runner
+    // {
+      TURNKEY_TEST_RUNNER_PROTOCOL = "${testRunnerProtocol}";
+    }
+    # The test result cache, as tk reads it (src/go/pkg/testcache)
+    // testCache.env
+    # Store tk's share path for shell completion setup
+    // lib.optionalAttrs (turnkeyCfg.registry ? tk) {
+      TURNKEY_TK_SHARE = "${resolvedRegistry.tk}/share";
+    }
+    # Suppress devenv task trace output when quiet mode is enabled
+    // lib.optionalAttrs cfg.quiet {
+      DEVENV_TASKS_QUIET = "true";
+    };
 
     # Create symlinks on shell entry
     enterShell = ''

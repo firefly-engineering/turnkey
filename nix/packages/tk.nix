@@ -55,7 +55,10 @@ pkgs.buildGoModule {
 
   # buck2 is needed at build time to generate shell completions: the pinned
   # one, so they describe the buck2 the shell runs
-  nativeBuildInputs = [ buck2 pkgs.installShellFiles ];
+  nativeBuildInputs = [
+    buck2
+    pkgs.installShellFiles
+  ];
 
   postInstall = ''
     # Generate and install shell completions

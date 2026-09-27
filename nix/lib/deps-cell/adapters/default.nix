@@ -8,7 +8,11 @@
 #   - buildInputs: Build inputs for per-dependency builds
 #   - cellBuildInputs: Build inputs for cell builds
 
-{ pkgs, lib, genericBuilder }:
+{
+  pkgs,
+  lib,
+  genericBuilder,
+}:
 
 {
   go = import ./go.nix { inherit pkgs lib genericBuilder; };
