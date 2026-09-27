@@ -75,6 +75,66 @@ deps = [
 ]
 ```
 
+### `python-deps.toml`
+
+`pydeps-gen` writes it from `pylock.toml` (what to fetch) and `uv.lock` (the
+dependency graph). Schema 2 records markers and extras:
+
+```toml
+schema_version = 2
+
+[deps.requests]
+version = "2.32.3"
+hash = "sha256-..."
+url = "https://files.pythonhosted.org/..."
+# The lock's marker for installing the package at all, when it has one
+marker = "python_version >= '3.8'"
+# Its dependencies: each package's key, with its marker and the extras it
+# asks for, when it has them
+dependencies = [
+    { name = "urllib3" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+]
+# The extras some package or workspace member asks it for
+requested_extras = ["socks"]
+
+# Its extras, and the dependencies each adds
+[deps.requests.extras]
+"socks" = [{ name = "pysocks" }]
+```
+
+The pydeps cell uses them: a package's target depends on its dependencies
+and on those of its requested extras, each where its marker holds. Markers
+are evaluated on every platform in `buck2.platforms`, for the Python
+toolchain's version: a dependency some platforms get is a `select()` on the
+platform, and one none gets is left out.
+
+## Markers and Extras
+
+Rules sync reads a workspace member's `pyproject.toml` as well as its
+imports:
+
+- A dependency in `[project] dependencies` with a **platform marker**
+  (`sys_platform`, `platform_system`, `platform_machine`, `os_name`) is
+  written as a `select()` over the platforms, like any
+  platform-conditional dep.
+- **Other markers** (`python_version`, `implementation_name`, ...) are
+  fixed by the Python toolchain: they are evaluated once, for the `python3`
+  of the shell, and a dependency whose marker doesn't hold is left out.
+- **Extras** are a variant: a target declares the extras it's built with on
+  turnkey's prelude attribute `extras` (possibly a `select()`), and sync
+  adds the dependencies they enable, whether its sources import them or
+  not. A dependency declared only as an extra's is kept only on a target
+  built with that extra.
+
+```python
+python_library(
+    name = "app-full",
+    extras = ["socks"],
+    deps = [...],  # sync adds the socks extra's dependencies
+)
+```
+
 ## Auto-Sync
 
 The `uv` command is wrapped to auto-sync:

@@ -35,6 +35,7 @@ pkgs.buildGoModule {
       (root + "/src/go/pkg/conditions")
       (root + "/src/go/pkg/cargocfg")
       (root + "/src/go/pkg/cargofeatures")
+      (root + "/src/go/pkg/pep508")
       (root + "/src/go/pkg/syncer")
       (root + "/src/go/pkg/staleness")
       # rulessync and its dependencies

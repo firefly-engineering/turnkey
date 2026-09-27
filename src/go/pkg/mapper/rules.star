@@ -9,6 +9,7 @@ go_library(
         "//src/go/pkg/cargofeatures:cargofeatures",
         "//src/go/pkg/conditions:conditions",
         "//src/go/pkg/extraction:extraction",
+        "//src/go/pkg/pep508:pep508",
         "//src/go/pkg/starlark:starlark",
         "//src/go/pkg/syncconfig:syncconfig",
         "godeps//vendor/github.com/pelletier/go-toml/v2:v2",

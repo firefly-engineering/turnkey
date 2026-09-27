@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
 	"github.com/pelletier/go-toml/v2"
 )
@@ -40,15 +41,37 @@ var pythonRules = map[string]TargetKind{
 // pythonLanguage resolves a Python package's deps from the imports
 // deps-extract finds in its sources.
 type pythonLanguage struct {
-	unconditional
-
 	projectRoot string
 	cfg         *PythonConfig
+
+	// members are the uv workspace's members, with their declared deps
+	members []*pyMember
+
+	// extracted caches deps-extract's mapping of each package dir
+	extracted map[string]PackageMapping
+
+	// version is the Python toolchain's version, once looked up
+	version *string
 }
 
 func newPythonLanguage(projectRoot string) Language {
 	cfg, _ := detectPythonConfig(projectRoot)
-	return &pythonLanguage{projectRoot: projectRoot, cfg: cfg}
+	l := &pythonLanguage{projectRoot: projectRoot, cfg: cfg, extracted: make(map[string]PackageMapping)}
+	if cfg != nil {
+		l.members, _ = loadPyMembers(projectRoot)
+	}
+	return l
+}
+
+// Dimensions: a dependency's platform marker (sys_platform, ...) makes the
+// deps depend on the platform.
+func (l *pythonLanguage) Dimensions(string) ([]string, error) {
+	return []string{conditions.OS, conditions.CPU}, nil
+}
+
+// VariantAttributes: a Python target builds its package with extras.
+func (l *pythonLanguage) VariantAttributes(TargetKind) []string {
+	return []string{"extras"}
 }
 
 func (l *pythonLanguage) Name() string { return "python" }
@@ -62,8 +85,31 @@ func (l *pythonLanguage) DepsAttribute() string { return "deps" }
 
 func (l *pythonLanguage) SourcePatterns() []string { return []string{"*.py"} }
 
-func (l *pythonLanguage) ResolveDeps(pkgDir string, _ Request) (PackageMapping, error) {
-	return resolveWithDepsExtract(l, l.projectRoot, pkgDir)
+// ResolveDeps maps the imports deps-extract finds in pkgDir; in a uv
+// workspace member, it then applies the markers and extras its
+// pyproject.toml declares (applyMarkers) for the configuration.
+func (l *pythonLanguage) ResolveDeps(pkgDir string, req Request) (PackageMapping, error) {
+	mapping, ok := l.extracted[pkgDir]
+	if !ok {
+		var err error
+		mapping, err = resolveWithDepsExtract(l, l.projectRoot, pkgDir)
+		if err != nil {
+			return mapping, err
+		}
+		l.extracted[pkgDir] = mapping
+	}
+	rel, err := filepath.Rel(l.projectRoot, pkgDir)
+	if err != nil {
+		return mapping, nil
+	}
+	member := l.memberOf(filepath.ToSlash(rel))
+	if member == nil {
+		return mapping, nil
+	}
+	mapping.Deps = append([]MappedDep(nil), mapping.Deps...)
+	mapping.TestDeps = append([]MappedDep(nil), mapping.TestDeps...)
+	mapping.UnmappedImports = append([]string(nil), mapping.UnmappedImports...)
+	return l.applyMarkers(mapping, member, req), nil
 }
 
 // detectPythonConfig auto-detects Python configuration from the project.

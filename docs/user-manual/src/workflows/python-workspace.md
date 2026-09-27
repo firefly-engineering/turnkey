@@ -207,7 +207,9 @@ tk sync
    `uv export --all-packages --no-dev --format pylock.toml`.
    `--all-packages` includes externals from every member, and `--no-dev`
    keeps dev tooling (pytest etc.) out of the pydeps cell.
-2. **python** regenerates `python-deps.toml` from `pylock.toml`.
+2. **python** regenerates `python-deps.toml` from `pylock.toml`, and from
+   `uv.lock` the dependency graph: each dependency's environment marker and
+   each package's extras.
 
 The pylock rule exists when the flake sets `buck2.python.uvLockFile`
 (turnkey's own flake sets it to `uv.lock`) along with
