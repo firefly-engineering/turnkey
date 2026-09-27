@@ -36,11 +36,27 @@ type RustConfig struct {
 }
 
 // rustRules are the Rust rule kinds. A Rust target can ask for features
-// in Cargo's terms.
+// in Cargo's terms, and a dep pinning a crate's version stands for the
+// crate's target.
 var rustRules = map[string]Rule{
-	"rust_library": {Kind: Library, DepsAttribute: "deps", Variant: cargoVariantAttributes},
-	"rust_binary":  {Kind: Binary, DepsAttribute: "deps", Variant: cargoVariantAttributes},
-	"rust_test":    {Kind: Test, DepsAttribute: "deps", Variant: cargoVariantAttributes},
+	"rust_library": {Kind: Library, DepsAttribute: "deps", Variant: cargoVariantAttributes, Canonical: unversioned},
+	"rust_binary":  {Kind: Binary, DepsAttribute: "deps", Variant: cargoVariantAttributes, Canonical: unversioned},
+	"rust_test":    {Kind: Test, DepsAttribute: "deps", Variant: cargoVariantAttributes, Canonical: unversioned},
+}
+
+// unversioned strips an @version suffix from a label's package: the
+// rustdeps cell's "rustdeps//vendor/tokio@1.50.0:tokio" pins a version of
+// "rustdeps//vendor/tokio:tokio".
+func unversioned(label string) string {
+	pkg, name, found := strings.Cut(label, ":")
+	slash := strings.LastIndex(pkg, "/")
+	if at := strings.LastIndex(pkg, "@"); at > slash && at > 0 {
+		pkg = pkg[:at]
+	}
+	if !found {
+		return pkg
+	}
+	return pkg + ":" + name
 }
 
 // rustLanguage resolves a Rust crate's deps from its Cargo.toml.

@@ -340,19 +340,6 @@ func TestApplyDepsIgnoresOrder(t *testing.T) {
 	}
 }
 
-// An existing label pinning a version of a mapped target satisfies it.
-func TestApplyDepsKeepsVersionedLabel(t *testing.T) {
-	target := parseTarget(t, `rust_library(
-    name = "lib",
-    deps = ["rustdeps//vendor/tokio@1.50.0:tokio"],
-)
-`)
-	var result SyncResult
-	if result.applyDeps(target, "deps", []string{"rustdeps//vendor/tokio:tokio"}, nil, nil) {
-		t.Errorf("versioned label replaced: %+v", result.Changes)
-	}
-}
-
 // An existing dep in the package of an unsynced dep is neither removed
 // nor reported as kept, and an unsynced dep is never added.
 func TestApplyDepsLeavesUnsyncedDeps(t *testing.T) {

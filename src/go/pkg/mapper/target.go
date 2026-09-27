@@ -79,12 +79,24 @@ type Want struct {
 	// Unsynced are the targets of deps sync doesn't own: an existing dep
 	// in the Buck2 package of one should never be removed.
 	Unsynced []string
+
+	// Canonical is the rule's Rule.Canonical.
+	Canonical func(label string) string
+}
+
+// StandsFor returns the label an existing dep stands for: the label
+// itself, unless the rule says otherwise (Rule.Canonical).
+func (w Want) StandsFor(label string) string {
+	if w.Canonical == nil {
+		return label
+	}
+	return w.Canonical(label)
 }
 
 // Target is what sync wants for one target of a package.
 type Target struct {
 	pkg     *Package
-	kind    TargetKind
+	rule    Rule
 	variant func(conditions.Configuration) map[string]starlark.AttributeValue
 
 	// underTest is set for a test with a target_under_test.
@@ -100,7 +112,7 @@ func (p *Package) Target(target *starlark.Target, rule Rule) (*Target, string, b
 	}
 	return &Target{
 		pkg:       p,
-		kind:      rule.Kind,
+		rule:      rule,
 		variant:   variant,
 		underTest: target.GetStringAttr("target_under_test") != "",
 	}, "", true
@@ -109,14 +121,16 @@ func (p *Package) Target(target *starlark.Target, rule Rule) (*Target, string, b
 // Deps returns what the target wants in its deps in config, where it has
 // old.
 func (t *Target) Deps(config conditions.Configuration, old []string) (Want, error) {
-	m, err := t.pkg.resolve(config, t.kind, t.variant(config))
+	m, err := t.pkg.resolve(config, t.rule.Kind, t.variant(config))
 	if err != nil {
 		return Want{}, err
 	}
 	// A test with a target_under_test or a same-package dep (":foo") gets
 	// its library's deps through it.
 	withLibrary := !t.underTest && !hasLocalDep(old)
-	return composeDeps(m, t.kind, withLibrary), nil
+	w := composeDeps(m, t.rule.Kind, withLibrary)
+	w.Canonical = t.rule.Canonical
+	return w, nil
 }
 
 // Owned returns the attributes other than the deps that the language sets
@@ -124,7 +138,7 @@ func (t *Target) Deps(config conditions.Configuration, old []string) (Want, erro
 func (t *Target) Owned() ([]string, error) {
 	var names []string
 	for _, config := range t.pkg.space.Configurations {
-		m, err := t.pkg.resolve(config, t.kind, t.variant(config))
+		m, err := t.pkg.resolve(config, t.rule.Kind, t.variant(config))
 		if err != nil {
 			return nil, err
 		}
@@ -141,7 +155,7 @@ func (t *Target) Owned() ([]string, error) {
 // Attr returns the value the target wants for name, an attribute Owned
 // returns, in config.
 func (t *Target) Attr(config conditions.Configuration, name string) ([]string, error) {
-	m, err := t.pkg.resolve(config, t.kind, t.variant(config))
+	m, err := t.pkg.resolve(config, t.rule.Kind, t.variant(config))
 	return m.Attrs[name], err
 }
 

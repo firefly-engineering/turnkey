@@ -619,14 +619,14 @@ func (r *SyncResult) applyOwned(target *starlark.Target, attr string, space cond
 // Buck2 package of an unsynced dep is never removed either (nor reported
 // as kept). Deps that are oldDeps in another order are oldDeps.
 func mergeDeps(oldDeps []string, w mapper.Want, preserved []string) (newDeps, kept []string) {
-	newDeps = mergeWithPreserved(oldDeps, preferVersioned(oldDeps, w.Labels), preserved)
+	newDeps = mergeWithPreserved(oldDeps, preferExisting(oldDeps, w), preserved)
 
 	unsyncedPkgs := make(map[string]bool, len(w.Unsynced))
 	for _, d := range w.Unsynced {
-		unsyncedPkgs[labelPackage(d)] = true
+		unsyncedPkgs[labelPackage(w.StandsFor(d))] = true
 	}
 	newDeps, kept = keepExisting(oldDeps, newDeps, func(d string) bool {
-		return len(w.Unmapped) > 0 || unsyncedPkgs[labelPackage(d)]
+		return len(w.Unmapped) > 0 || unsyncedPkgs[labelPackage(w.StandsFor(d))]
 	})
 	if len(w.Unmapped) == 0 {
 		// Only unsynced deps were kept; they are reported on their own.
@@ -700,47 +700,32 @@ func sameDepSet(a, b []string) bool {
 	return true
 }
 
-// preferVersioned returns mapped with each label replaced by the existing
-// dep that pins a version of the same target, if there is one:
-// "rustdeps//vendor/tokio@1.50.0:tokio" stands for "rustdeps//vendor/tokio:tokio".
-func preferVersioned(oldDeps, mapped []string) []string {
-	pinned := make(map[string]string)
+// preferExisting returns w's labels with each replaced by the existing
+// dep that stands for it, if there is one (see mapper.Want.StandsFor).
+func preferExisting(oldDeps []string, w mapper.Want) []string {
+	existing := make(map[string]string)
 	for _, d := range oldDeps {
-		if u := unversioned(d); u != d {
-			pinned[u] = d
+		if u := w.StandsFor(d); u != d {
+			existing[u] = d
 		}
 	}
-	if len(pinned) == 0 {
-		return mapped
+	if len(existing) == 0 {
+		return w.Labels
 	}
-	result := make([]string, len(mapped))
-	for i, d := range mapped {
-		if p, ok := pinned[d]; ok {
-			d = p
+	result := make([]string, len(w.Labels))
+	for i, d := range w.Labels {
+		if e, ok := existing[d]; ok {
+			d = e
 		}
 		result[i] = d
 	}
 	return result
 }
 
-// unversioned strips an @version suffix from a label's package:
-// "cell//vendor/foo@1.2.3:foo" -> "cell//vendor/foo:foo".
-func unversioned(label string) string {
-	pkg, name, found := strings.Cut(label, ":")
-	slash := strings.LastIndex(pkg, "/")
-	if at := strings.LastIndex(pkg, "@"); at > slash && at > 0 {
-		pkg = pkg[:at]
-	}
-	if !found {
-		return pkg
-	}
-	return pkg + ":" + name
-}
-
-// labelPackage returns a label's Buck2 package, without any @version:
+// labelPackage returns a label's Buck2 package:
 // "//src/rust/composition:composition-full" -> "//src/rust/composition".
 func labelPackage(label string) string {
-	pkg, _, _ := strings.Cut(unversioned(label), ":")
+	pkg, _, _ := strings.Cut(label, ":")
 	return pkg
 }
 

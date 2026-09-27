@@ -71,6 +71,12 @@ type Rule struct {
 	// Sync reads them from the target, evaluating a select() for each
 	// configuration, and passes them to ResolveDeps.
 	Variant []string
+
+	// Canonical returns the label an existing dep of its targets stands
+	// for, when that isn't the label itself: sync keeps an existing dep in
+	// place of a wanted label it stands for. nil when every label stands
+	// for itself.
+	Canonical func(label string) string
 }
 
 // Request is what one resolution of a package's deps is for.

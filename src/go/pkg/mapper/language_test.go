@@ -156,3 +156,20 @@ func TestRuleLanguage(t *testing.T) {
 		}
 	}
 }
+
+// A Rust dep pinning a crate's version stands for the crate's target; any
+// other label stands for itself.
+func TestRustLabelsStandForTheirUnversionedTarget(t *testing.T) {
+	rule, _ := newRustLanguage(testConfig(t.TempDir()), testLanguage("rust")).Rule("rust_library")
+	for label, want := range map[string]string{
+		"rustdeps//vendor/tokio@1.50.0:tokio":               "rustdeps//vendor/tokio:tokio",
+		"rustdeps//vendor/ring@0.17.14:ring_core_0_17_14__": "rustdeps//vendor/ring:ring_core_0_17_14__",
+		"rustdeps//vendor/tokio:tokio":                      "rustdeps//vendor/tokio:tokio",
+		"//src/rust/composition:composition-full":           "//src/rust/composition:composition-full",
+		"//a@b/c:c": "//a@b/c:c",
+	} {
+		if got := rule.Canonical(label); got != want {
+			t.Errorf("Canonical(%q) = %q, want %q", label, got, want)
+		}
+	}
+}

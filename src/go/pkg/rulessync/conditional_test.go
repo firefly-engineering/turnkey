@@ -27,12 +27,15 @@ var defaultPlatforms = []conditions.Platform{
 type fakeLanguage struct {
 	// requests records what was resolved.
 	requests []mapper.Request
+
+	// canonical is its rule's Rule.Canonical.
+	canonical func(string) string
 }
 
 func (l *fakeLanguage) Name() string { return "fake" }
 
 func (l *fakeLanguage) Rule(rule string) (mapper.Rule, bool) {
-	return mapper.Rule{Kind: mapper.Library, DepsAttribute: "deps", Variant: []string{"features"}}, rule == "fake_library"
+	return mapper.Rule{Kind: mapper.Library, DepsAttribute: "deps", Variant: []string{"features"}, Canonical: l.canonical}, rule == "fake_library"
 }
 
 func (l *fakeLanguage) SourcePatterns() []string { return []string{"*.fake"} }
@@ -197,6 +200,43 @@ func TestSyncFilePassesVariants(t *testing.T) {
 	slices.Sort(variants)
 	if w := []string{`linux:["a"]`, "macos:[\n    \"a\",\n    \"b\",\n]"}; !reflect.DeepEqual(variants, w) {
 		t.Errorf("variants = %q, want %q", variants, w)
+	}
+}
+
+// An existing dep the rule says stands for a wanted label (as a Rust dep
+// pinning a crate's version stands for the crate's target) is kept in its
+// place, and one that stands for no wanted label is removed.
+func TestSyncFileKeepsEquivalentLabel(t *testing.T) {
+	lang := &fakeLanguage{canonical: func(label string) string {
+		pkg, name, _ := strings.Cut(label, ":")
+		pkg, _, _ = strings.Cut(pkg, "@")
+		return pkg + ":" + name
+	}}
+	result, out := syncFake(t, lang, nil, `fake_library(
+    name = "lib",
+    deps = [
+        "//unix@2:unix",
+        "//gone@1:gone",
+    ],
+)
+`)
+	want := `fake_library(
+    name = "lib",
+    deps = ["//unix@2:unix"],
+)
+`
+	if out != want {
+		t.Errorf("rules.star:\n%s\nwant:\n%s", out, want)
+	}
+	wantChanges := []TargetChange{{Target: "lib", Removed: []string{"//gone@1:gone"}}}
+	if !reflect.DeepEqual(result.Changes, wantChanges) {
+		t.Errorf("changes = %+v, want %+v", result.Changes, wantChanges)
+	}
+
+	// Without the rule's say, the pinned dep is replaced
+	_, out = syncFake(t, &fakeLanguage{}, nil, "fake_library(\n    name = \"lib\",\n    deps = [\"//unix@2:unix\"],\n)\n")
+	if !strings.Contains(out, `"//unix:unix"`) || strings.Contains(out, "@2") {
+		t.Errorf("rules.star:\n%s\nwant //unix@2:unix replaced by //unix:unix", out)
 	}
 }
 
