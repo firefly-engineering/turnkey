@@ -210,18 +210,19 @@
           packages.pytest-uv-shim = import ./nix/packages/pytest-uv-shim.nix { inherit pkgs lib; };
           packages.check-rust-edition-rs = import ./nix/packages/check-rust-edition-rs.nix { inherit pkgs lib; };
           packages.check-source-coverage-rs = import ./nix/packages/check-source-coverage-rs.nix { inherit pkgs lib; };
-          packages.tw-go = (import ./nix/packages/tw-wrappers.nix {
-            inherit pkgs lib;
-            tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
-          }).tw-go;
-          packages.tw-cargo = (import ./nix/packages/tw-wrappers.nix {
-            inherit pkgs lib;
-            tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
-          }).tw-cargo;
-          packages.tw-uv = (import ./nix/packages/tw-wrappers.nix {
-            inherit pkgs lib;
-            tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
-          }).tw-uv;
+          # tw-<tool>, one per native tool tw wraps (nix/packages/tw-wrappers.nix)
+          imports = [
+            (
+              { pkgs, lib, ... }:
+              {
+                packages =
+                  (import ./nix/packages/tw-wrappers.nix {
+                    inherit pkgs lib;
+                    tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
+                  }).packages;
+              }
+            )
+          ];
 
           # turnkey-test-runner, built for the pinned buck2 release
           packages.turnkey-test-runner = import ./nix/packages/turnkey-test-runner.nix {

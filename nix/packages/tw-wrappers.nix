@@ -7,8 +7,10 @@
 # can invoke the real tool without recursion.
 #
 # The flake-parts module wraps the registry's own packages with mkWrapper,
-# so the wrapped tool is the one toolchain.toml resolves. tw-go, tw-cargo
-# and tw-uv wrap nixpkgs' tools, for use outside a turnkey shell.
+# so the wrapped tool is the one toolchain.toml resolves. tw-<tool> wraps
+# nixpkgs' <tool>, for use outside a turnkey shell: one per native tool a
+# language record names (nix/buck2/languages.nix), so tw-go, tw-cargo and
+# tw-uv.
 { pkgs, lib, tw }:
 
 let
@@ -24,15 +26,25 @@ let
     exec "${tw}/bin/tw" "${name}" "$@"
   '';
 
-in {
-  inherit mkWrapper;
+  # The native tools tw wraps: one per language that has a wrapper
+  # (nix/buck2/languages.nix)
+  languages = import ../buck2/languages.nix { inherit pkgs lib; };
+  tools = map (language: language.wrapper.tool) (
+    builtins.filter (language: language ? wrapper) languages
+  );
 
-  # Go wrapper - shadows `go` command
-  tw-go = mkWrapper { name = "go"; pkg = pkgs.go; };
+in
+{
+  inherit mkWrapper tools;
 
-  # Cargo wrapper - shadows `cargo` command
-  tw-cargo = mkWrapper { name = "cargo"; pkg = pkgs.cargo; };
-
-  # UV wrapper - shadows `uv` command
-  tw-uv = mkWrapper { name = "uv"; pkg = pkgs.uv; };
+  # tw-<tool> for each tool, wrapping nixpkgs' <tool>
+  packages = lib.listToAttrs (
+    map (
+      tool:
+      lib.nameValuePair "tw-${tool}" (mkWrapper {
+        name = tool;
+        pkg = pkgs.${tool};
+      })
+    ) tools
+  );
 }

@@ -245,10 +245,7 @@ in
       twWrappers = import ../../packages/tw-wrappers.nix { inherit pkgs lib tw; };
 
       # The native tools tw wraps: one per language that has a wrapper
-      # (nix/buck2/languages.nix)
-      wrappableTools = map (language: language.wrapper.tool) (
-        builtins.filter (language: language ? wrapper) languages
-      );
+      wrappableTools = twWrappers.tools;
 
       # Wrap every version of a registry entry. A version is a package, or
       # an attrset whose `package` carries deprecation metadata alongside.
