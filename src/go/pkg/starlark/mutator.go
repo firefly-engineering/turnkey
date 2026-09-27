@@ -46,6 +46,49 @@ func (t *Target) SetLabels(name string, deps []string) {
 	t.setStringList(name, deps)
 }
 
+// SetSelect sets a label-list attribute to
+// [<common>] + select({<key>: [<labels>], ...}), with branches' keys and
+// values as given, or to the plain list common when there are no branches.
+// As with SetLabels, the markers of the attribute's plain part are kept:
+// common becomes its auto-managed section.
+func (t *Target) SetSelect(name string, common []string, branches []SelectBranch) {
+	var plain AttributeValue = StringListValue{Values: common}
+	if attr := t.GetAttribute(name); attr != nil {
+		prev := attr.Value
+		if sel, ok := prev.(SelectValue); ok {
+			prev = sel.Common
+		}
+		if deps, ok := prev.(DepsValue); ok && deps.HasMarkers {
+			plain = DepsValue{AutoDeps: common, PreservedDeps: deps.PreservedDeps, HasMarkers: true}
+		}
+	}
+	if len(branches) == 0 {
+		t.setValue(name, plain)
+		return
+	}
+	if list, ok := plain.(StringListValue); ok && len(list.Values) == 0 {
+		plain = nil
+	}
+	t.setValue(name, SelectValue{Common: plain, Branches: branches})
+}
+
+// setValue sets an attribute's value, creating the attribute if needed. A
+// value written the same as the current one is no change.
+func (t *Target) setValue(name string, value AttributeValue) {
+	attr := t.GetAttribute(name)
+	if attr == nil {
+		attr = &Attribute{Name: name}
+		t.Attributes[name] = attr
+		t.AttributeOrder = append(t.AttributeOrder, name)
+	} else if attr.Value != nil && renderValue(attr.Value, "") == renderValue(value, "") {
+		return
+	}
+	attr.Value = value
+	attr.modified = true
+	t.modified = true
+	t.modifiedAttrs[name] = true
+}
+
 // AddDep adds a dependency to the target.
 func (t *Target) AddDep(dep string) {
 	current := t.GetDeps()

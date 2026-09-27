@@ -102,6 +102,10 @@ type Attribute struct {
 	// span is the original byte range in the source.
 	span Span
 
+	// original is the value as parsed, nil for a new attribute. The
+	// writer compares it with Value to rewrite only what changed.
+	original AttributeValue
+
 	// modified tracks whether this attribute has been modified.
 	modified bool
 }
@@ -126,6 +130,7 @@ const (
 	TypeInt
 	TypeIdent
 	TypeDict
+	TypeSelect
 	TypeExpr // Catch-all for complex expressions
 )
 
@@ -175,6 +180,43 @@ func (v DepsValue) AllDeps() []string {
 	result = append(result, v.AutoDeps...)
 	result = append(result, v.PreservedDeps...)
 	return result
+}
+
+// SelectValue is a value that depends on the build configuration, written
+// [<common>] + select({<key>: <value>, ...}), or select({...}) alone.
+type SelectValue struct {
+	// Common is the part every configuration has: a StringListValue, or a
+	// DepsValue when it carries turnkey markers. Nil for a select() alone.
+	Common AttributeValue
+
+	// Branches are the select() entries, in source order.
+	Branches []SelectBranch
+}
+
+func (v SelectValue) Type() AttributeType { return TypeSelect }
+func (v SelectValue) String() string      { return "[...] + select({...})" }
+
+// SelectBranch is one select() entry.
+type SelectBranch struct {
+	// Key is the entry's key, e.g. "config//os:linux" or "DEFAULT".
+	Key string
+
+	// Value is the entry's value, e.g. a StringListValue.
+	Value AttributeValue
+}
+
+// Labels returns a label-list value's labels: a StringListValue's values,
+// or all of a DepsValue's. It reports false for any other value.
+func Labels(v AttributeValue) ([]string, bool) {
+	switch v := v.(type) {
+	case nil:
+		return nil, true
+	case StringListValue:
+		return v.Values, true
+	case DepsValue:
+		return v.AllDeps(), true
+	}
+	return nil, false
 }
 
 // BoolValue is a boolean attribute value.
@@ -303,16 +345,30 @@ func (t *Target) GetPreservedDeps() []string {
 }
 
 // GetPreservedLabels returns only the preserved labels of a label-list
-// attribute with markers.
+// attribute with markers, which may be the common part of a select().
 func (t *Target) GetPreservedLabels(name string) []string {
 	attr := t.GetAttribute(name)
 	if attr == nil {
 		return nil
 	}
-	if deps, ok := attr.Value.(DepsValue); ok {
+	value := attr.Value
+	if sel, ok := value.(SelectValue); ok {
+		value = sel.Common
+	}
+	if deps, ok := value.(DepsValue); ok {
 		return deps.PreservedDeps
 	}
 	return nil
+}
+
+// GetSelect returns an attribute written as [<common>] + select({...}).
+func (t *Target) GetSelect(name string) (SelectValue, bool) {
+	attr := t.GetAttribute(name)
+	if attr == nil {
+		return SelectValue{}, false
+	}
+	sel, ok := attr.Value.(SelectValue)
+	return sel, ok
 }
 
 // GetStringAttr returns a string attribute value, or empty string if not present.

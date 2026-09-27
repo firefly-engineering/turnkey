@@ -136,16 +136,70 @@ func parseAttribute(name string, expr *syntax.BinaryExpr, source []byte) (*Attri
 		span: spanFromNode(expr, source),
 	}
 
-	// A list may carry turnkey markers (deps, npm_deps, ...); one without
-	// markers parses as a plain list
-	if list, ok := expr.Y.(*syntax.ListExpr); ok {
-		attr.Value = parseDepsValue(list, source)
-		return attr, nil
-	}
-
-	attr.Value = parseValue(expr.Y, source)
+	attr.Value = parseAttributeValue(expr.Y, source)
+	attr.original = attr.Value
 
 	return attr, nil
+}
+
+// parseAttributeValue parses an attribute's value: a list may carry turnkey
+// markers (deps, npm_deps, ...), and [...] + select({...}) or select({...})
+// parses as a SelectValue.
+func parseAttributeValue(expr syntax.Expr, source []byte) AttributeValue {
+	if list, ok := expr.(*syntax.ListExpr); ok {
+		return parseDepsValue(list, source)
+	}
+	if sel, ok := parseSelect(expr, source); ok {
+		return sel
+	}
+	return parseValue(expr, source)
+}
+
+// parseSelect parses [<list>] + select({...}) or select({...}), whose keys
+// are strings. Any other shape is not a SelectValue.
+func parseSelect(expr syntax.Expr, source []byte) (SelectValue, bool) {
+	var common AttributeValue
+	call := expr
+	if bin, ok := expr.(*syntax.BinaryExpr); ok && bin.Op == syntax.PLUS {
+		list, ok := bin.X.(*syntax.ListExpr)
+		if !ok {
+			return SelectValue{}, false
+		}
+		common = parseDepsValue(list, source)
+		if _, ok := Labels(common); !ok {
+			return SelectValue{}, false
+		}
+		call = bin.Y
+	}
+
+	c, ok := call.(*syntax.CallExpr)
+	if !ok || len(c.Args) != 1 {
+		return SelectValue{}, false
+	}
+	if fn, ok := c.Fn.(*syntax.Ident); !ok || fn.Name != "select" {
+		return SelectValue{}, false
+	}
+	dict, ok := c.Args[0].(*syntax.DictExpr)
+	if !ok {
+		return SelectValue{}, false
+	}
+
+	sel := SelectValue{Common: common}
+	for _, e := range dict.List {
+		entry, ok := e.(*syntax.DictEntry)
+		if !ok {
+			return SelectValue{}, false
+		}
+		key, ok := entry.Key.(*syntax.Literal)
+		if !ok || key.Token != syntax.STRING {
+			return SelectValue{}, false
+		}
+		sel.Branches = append(sel.Branches, SelectBranch{
+			Key:   key.Value.(string),
+			Value: parseAttributeValue(entry.Value, source),
+		})
+	}
+	return sel, true
 }
 
 // parseValue parses an expression into an AttributeValue.
@@ -242,7 +296,8 @@ func parseDepsValue(list *syntax.ListExpr, source []byte) AttributeValue {
 		}
 		lit, ok := elem.(*syntax.Literal)
 		if !ok || lit.Token != syntax.STRING {
-			continue
+			// Rewriting the labels would drop it: not a label list
+			return ExprValue{Expr: list, originalText: extractText(list, source)}
 		}
 		dep := lit.Value.(string)
 		if inAutoSection {
