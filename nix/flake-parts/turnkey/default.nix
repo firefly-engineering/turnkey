@@ -127,6 +127,27 @@ in
                 platforms = lib.mkDefault flakeSystems;
               }
               {
+                options.fixups = mkOption {
+                  type = types.deferredModule;
+                  default = { };
+                  example = lib.literalExpression ''
+                    {
+                      imports = [ inputs.acme-fixups.modules.turnkeyFixups.default ];
+                      rust.my-crate.buildScript.skip = true;
+                    }
+                  '';
+                  description = ''
+                    The fixup sets the dependency cells are built with
+                    (docs/adr/0003-fixup-sets-are-modules.md): a module of
+                    class turnkeyFixups (nix/lib/fixups/schema.nix). Sets
+                    come in through `imports`, such as another flake's
+                    `modules.turnkeyFixups.<name>`; fixups written here are
+                    this repository's own, and warn when they match no
+                    locked dependency.
+                  '';
+                };
+              }
+              {
                 options.shells = mkOption {
                   type = types.listOf types.str;
                   default = [ "default" ];
@@ -153,6 +174,7 @@ in
   config.perSystem =
     {
       config,
+      options,
       pkgs,
       system,
       inputs',
@@ -296,6 +318,39 @@ in
       # The platforms the cells are built for (buck2.platforms)
       platforms = import ../../buck2/platforms.nix { inherit lib; };
 
+      # The fixup sets (buck2.fixups), with turnkey's fixup registries
+      # still merged in until they are a published set
+      fixupsLib = import ../../lib/fixups { inherit lib; };
+      evaluatedFixups = fixupsLib.evalFixups {
+        inherit pkgs;
+        modules = [
+          cfg.buck2.fixups
+          (import ../../lib/fixups/legacy.nix { inherit lib; } (
+            let
+              builtin = import ../../lib/deps-cell/fixups/rust { inherit pkgs lib; };
+            in
+            {
+              buildScriptFixups = builtin.buildScriptFixups // cfg.buck2.rust.buildScriptFixups;
+              rustcFlags = builtin.rustcFlags // cfg.buck2.rust.rustcFlagsRegistry;
+              inherit (builtin) nativeLibraries;
+            }
+          ))
+        ];
+      };
+      # Fixups written in buck2.fixups itself are this repository's own:
+      # their definitions carry the files that define buck2
+      inlineFixupFiles = map (d: d.file) options.turnkey.toolchains.buck2.definitionsWithLocations;
+      resolveFixups =
+        language: deps:
+        fixupsLib.apply (
+          fixupsLib.resolve {
+            evaluated = evaluatedFixups;
+            inherit language deps pkgs;
+            platform = platforms.fromSystem pkgs.stdenv.hostPlatform.system;
+            inlineFiles = inlineFixupFiles;
+          }
+        );
+
       # Each enabled language's cell: built from its deps file, or the cell
       # the consumer set. The deps file may not exist on first run, before
       # tk sync generates it.
@@ -312,6 +367,7 @@ in
               language.mkCell {
                 inherit (language) cellName;
                 inherit langCfg userPatchesDir;
+                resolveFixups = resolveFixups language.name;
                 conditions = platforms.conditions cfg.buck2.platforms;
               }
             else
@@ -360,6 +416,7 @@ in
             buck2 =
               builtins.removeAttrs cfg.buck2 [
                 "shells"
+                "fixups"
                 "version"
               ]
               // {

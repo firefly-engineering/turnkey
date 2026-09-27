@@ -16,10 +16,13 @@
 #                what the language's sync rules write and rules sync
 #                maps deps to cellName from (sync.toml's [[languages]])
 #   generator    the package providing the deps file's generator
-#   mkCell       { cellName, langCfg, userPatchesDir, conditions } -> the
-#                cell named cellName (the record's), built from
-#                langCfg.depsFile (which must exist) for the platforms in
-#                conditions (nix/buck2/platforms.nix's conditions)
+#   mkCell       { cellName, langCfg, userPatchesDir, conditions,
+#                resolveFixups } -> the cell named cellName (the
+#                record's), built from langCfg.depsFile (which must exist)
+#                for the platforms in conditions (nix/buck2/platforms.nix's
+#                conditions), each locked dependency with its fixup:
+#                resolveFixups is nix/lib/fixups's resolve for the
+#                language, applied
 #   syncRules    langCfg -> the [[deps]] rules of .turnkey/sync.toml, in
 #                the order tk sync must run them
 #   wrapper      optional: the native tool tw wraps (`tool`), and
@@ -71,11 +74,12 @@ in
         langCfg,
         userPatchesDir,
         conditions,
+        resolveFixups,
       }:
       depsCell.mkGoDepsCell {
         inherit cellName conditions;
         inherit (langCfg) depsFile allowedBuildTags;
-        inherit userPatchesDir;
+        inherit userPatchesDir resolveFixups;
         buckgen = import ../packages/buckgen.nix { inherit pkgs lib; };
       };
     # go-deps.toml has a default name, so an enabled Go always has a rule
@@ -125,14 +129,12 @@ in
         langCfg,
         userPatchesDir,
         conditions,
+        resolveFixups,
       }:
-      let
-        rustFixups = import ../lib/deps-cell/fixups/rust { inherit pkgs lib; };
-      in
       depsCell.mkRustDepsCell {
         inherit cellName;
         inherit (langCfg) depsFile;
-        inherit userPatchesDir;
+        inherit userPatchesDir resolveFixups;
         featuresFile =
           if langCfg.featuresFile != null && builtins.pathExists langCfg.featuresFile then
             langCfg.featuresFile
@@ -141,9 +143,6 @@ in
         inherit conditions;
         genRustBuck = import ../packages/gen-rust-buck.nix { inherit pkgs lib; };
         computeUnifiedFeatures = import ../packages/compute-unified-features.nix { inherit pkgs lib; };
-        # The consumer's entries on top of turnkey's defaults
-        buildScriptFixups = rustFixups.buildScriptFixups // langCfg.buildScriptFixups;
-        rustcFlagsRegistry = rustFixups.rustcFlags // langCfg.rustcFlagsRegistry;
       };
     syncRules =
       langCfg:
@@ -189,12 +188,13 @@ in
         langCfg,
         userPatchesDir,
         conditions,
+        resolveFixups,
       }:
       depsCell.mkPythonDepsCell {
         inherit cellName conditions;
         pydepsCell = import ../packages/pydeps-cell.nix { inherit pkgs lib; };
         inherit (langCfg) depsFile;
-        inherit userPatchesDir;
+        inherit userPatchesDir resolveFixups;
       };
     # With a uv lock, pylock.toml is exported from it first, so a `uv add`
     # reaches python-deps.toml in one tk sync.
@@ -289,11 +289,12 @@ in
         langCfg,
         userPatchesDir,
         conditions,
+        resolveFixups,
       }:
       depsCell.mkJsDepsCell {
         inherit cellName conditions;
         inherit (langCfg) depsFile;
-        inherit userPatchesDir;
+        inherit userPatchesDir resolveFixups;
       };
     syncRules =
       langCfg:
@@ -322,11 +323,12 @@ in
         langCfg,
         userPatchesDir,
         conditions,
+        resolveFixups,
       }:
       depsCell.mkSolDepsCell {
         inherit cellName;
         inherit (langCfg) depsFile;
-        inherit userPatchesDir;
+        inherit userPatchesDir resolveFixups;
       };
     syncRules =
       langCfg:

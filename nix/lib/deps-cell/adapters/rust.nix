@@ -15,7 +15,7 @@
 
 let
   fetchers = import ../fetchers.nix { inherit pkgs lib; };
-  fixups = import ../fixups { inherit pkgs lib; };
+  platforms = import ../../../buck2/platforms.nix { inherit lib; };
   inherit (genericBuilder) genericMkDepsCell;
 in
 rec {
@@ -39,9 +39,9 @@ rec {
       version, # Version string (e.g., "1.0.219")
       sha256, # SRI hash of the source
 
-      # Optional
-      buildScriptFixup ? null, # Fixup commands for build.rs emulation
-      rustcFlags ? [ ], # --cfg flags for rustc
+      # Optional: the crate's fixup's commands (nix/lib/fixups): its
+      # patches, then what stands in for its build.rs
+      fixupCommands ? "",
     }:
     let
       fetchSpec = fetchers.mkCratesIOSpec {
@@ -54,7 +54,7 @@ rec {
         nativeBuildInputs = buildInputs;
         src = fetchers.fetch fetchSpec;
         passthru = {
-          inherit name version rustcFlags;
+          inherit name version;
         };
       }
       ''
@@ -62,9 +62,9 @@ rec {
         cp -r $src/* $out/
         chmod -R u+w $out
 
-        # Apply build script fixup if provided
+        # Apply the crate's fixup
         cd $out
-        ${if buildScriptFixup != null then buildScriptFixup else ""}
+        ${fixupCommands}
       '';
 
   # Build a complete Rust dependency cell
@@ -73,8 +73,10 @@ rec {
       cellName, # The cell's name (nix/buck2/languages.nix)
       depsFile, # Path to rust-deps.toml
       featuresFile ? null, # Path to rust-features.toml (optional)
-      buildScriptFixups ? { }, # Additional build script fixups
-      rustcFlagsRegistry ? { }, # Additional rustc flags
+
+      # The locked crates' fixups: [ { key; name; version; } ] ->
+      # { <key> = { commands; gen; }; } (nix/lib/fixups's resolve)
+      resolveFixups ? (_: { }),
 
       # User patches (from FUSE edit layer)
       userPatchesDir ? null, # Path to .turnkey/patches directory
@@ -92,51 +94,36 @@ rec {
       depsToml = builtins.fromTOML (builtins.readFile depsFile);
       deps = depsToml.deps or { };
 
-      # Merge built-in fixups with user-provided
-      allBuildScriptFixups = (fixups.builtinFixups.rust.buildScriptFixups or { }) // buildScriptFixups;
-      allRustcFlags = (fixups.builtinFixups.rust.rustcFlags or { }) // rustcFlagsRegistry;
-      allNativeLibraries = fixups.builtinFixups.rust.nativeLibraries or { };
+      # The locked crates, and their fixups
+      locked = lib.mapAttrsToList (key: depSpec: {
+        inherit key;
+        name = depSpec.name or (lib.head (lib.splitString "@" key));
+        inherit (depSpec) version;
+      }) deps;
+      fixups = resolveFixups locked;
 
       # Build individual dep packages
-      depPackages = lib.mapAttrs (
-        key: depSpec:
-        let
-          # Parse name from key (may be "name@version" format)
-          parts = lib.splitString "@" key;
-          crateName = depSpec.name or (lib.head parts);
-          version = depSpec.version;
-          patchVersion = lib.last (lib.splitString "." version);
+      depPackages = lib.listToAttrs (
+        map (
+          crate:
+          lib.nameValuePair crate.key (mkRustDepPackage {
+            inherit (crate) name version;
+            sha256 = deps.${crate.key}.hash;
+            fixupCommands = fixups.${crate.key}.commands or "";
+          })
+        ) locked
+      );
 
-          # Look up fixup
-          fixupFn = allBuildScriptFixups.${key} or allBuildScriptFixups.${crateName} or null;
-          fixup =
-            if fixupFn != null then
-              if builtins.isFunction fixupFn then
-                fixupFn {
-                  inherit
-                    crateName
-                    version
-                    patchVersion
-                    key
-                    ;
-                  vendorPath = ".";
-                }
-              else
-                fixupFn
-            else
-              null;
+      # What gen-rust-buck reads of each crate's fixup
+      fixupsFile = pkgs.writeText "${cellName}-fixups.json" (
+        builtins.toJSON (lib.mapAttrs (_: fixup: fixup.gen) fixups)
+      );
 
-          # Look up rustc flags
-          flags = allRustcFlags.${key} or allRustcFlags.${crateName} or [ ];
-        in
-        mkRustDepPackage {
-          name = crateName;
-          inherit version;
-          sha256 = depSpec.hash;
-          buildScriptFixup = fixup;
-          rustcFlags = flags;
-        }
-      ) deps;
+      # The platform the cell is built on: what fixups build natively
+      # exists only for it
+      hostJSON = builtins.toJSON (
+        builtins.removeAttrs (platforms.fromSystem pkgs.stdenv.hostPlatform.system) [ "system" ]
+      );
 
       # Features file argument for compute-unified-features
       featuresFileArg = if featuresFile != null then "${featuresFile}" else "";
@@ -159,34 +146,6 @@ rec {
       versionedNames = lib.attrNames deps;
       unversionedNames = lib.unique (map (key: lib.head (lib.splitString "@" key)) versionedNames);
       allCrateNames = versionedNames ++ unversionedNames;
-
-      # Build native library info map (evaluate functions with crate context)
-      nativeLibraryInfo = lib.filterAttrs (k: v: v != null) (
-        lib.mapAttrs (
-          key: depSpec:
-          let
-            parts = lib.splitString "@" key;
-            crateName = depSpec.name or (lib.head parts);
-            version = depSpec.version;
-            patchVersion = lib.last (lib.splitString "." version);
-            nativeLibFn = allNativeLibraries.${key} or allNativeLibraries.${crateName} or null;
-          in
-          if nativeLibFn != null then
-            if builtins.isFunction nativeLibFn then
-              nativeLibFn {
-                inherit
-                  crateName
-                  version
-                  patchVersion
-                  key
-                  ;
-              }
-            else
-              nativeLibFn
-          else
-            null
-        ) deps
-      );
 
       conditionsJSON = builtins.toJSON conditions;
 
@@ -216,11 +175,10 @@ rec {
                 if [ -d "$dir" ] && [ -f "$dir/Cargo.toml" ]; then
                   gen-rust-buck "$dir" \
                     '${builtins.toJSON allCrateNames}' \
-                    '${builtins.toJSON (lib.attrNames allBuildScriptFixups)}' \
+                    ${fixupsFile} \
                     "$UNIFIED_FEATURES" \
-                    '${builtins.toJSON allRustcFlags}' \
-                    '${builtins.toJSON nativeLibraryInfo}' \
                     '${conditionsJSON}' \
+                    '${hostJSON}' \
                     > "$dir/rules.star" || echo "# rules.star generation failed" > "$dir/rules.star"
                 fi
               done

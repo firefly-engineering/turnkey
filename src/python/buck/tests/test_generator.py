@@ -6,7 +6,14 @@ Run with: tk test //src/python/buck:test_generator
 
 import unittest
 
-from turnkey.buck.generator import generate_buck_file, get_build_script_cfg_flags, get_dependencies
+from turnkey.buck.generator import (
+    CrateFixup,
+    PlatformRustcFlags,
+    generate_buck_file,
+    get_dependencies,
+    get_fixup_env,
+    get_fixup_rustc_flags,
+)
 from turnkey.cfg import Platforms
 
 # turnkey's default platforms
@@ -131,23 +138,76 @@ class TestGenerateBuckFile(unittest.TestCase):
         cargo = {"target": {'cfg(target_os = "linux")': {"dependencies": {"inotify": "0.11"}}}}
         deps, named = get_dependencies(cargo, {"inotify"}, [], PLATFORMS)
         content = generate_buck_file(
-            "watch", "2021", None, deps, named, False, [], {},
-            get_build_script_cfg_flags("watch", "1.0.0", {}, PLATFORMS),
+            "watch", "2021", None, deps, named, False, [], {}, PlatformRustcFlags(),
         )
         self.assertIn('"config//os:linux": [', content)
         self.assertIn('"config//os:macos": [],', content)
         self.assertNotIn("DEFAULT", content)
 
 
-class TestBuildScriptCfgFlags(unittest.TestCase):
+class TestFixupRustcFlags(unittest.TestCase):
     def test_per_os_flags_keep_their_order(self):
-        registry = {"rustix": {"linux": ["--cfg", "linux_raw"], "all": ["--cfg", "rustix_std"]}}
-        flags = get_build_script_cfg_flags("rustix", "1.0.0", registry, PLATFORMS)
+        fixup = CrateFixup.from_dict(
+            {"rustcFlags": {"common": ["--cfg", "rustix_std"], "os": {"linux": ["--cfg", "linux_raw"]}, "cpu": {}}}
+        )
+        flags = get_fixup_rustc_flags(fixup, PLATFORMS)
         self.assertEqual(flags.common, ["--cfg", "rustix_std"])
         self.assertEqual(
             flags.by_platform,
             {"config//os:linux": ["--cfg", "linux_raw"], "config//os:macos": []},
         )
+
+    def test_per_cpu_flags_are_keyed_on_the_cpu(self):
+        fixup = CrateFixup.from_dict({"rustcFlags": {"common": [], "os": {}, "cpu": {"x86_64": ["--cfg", "x"]}}})
+        flags = get_fixup_rustc_flags(fixup, PLATFORMS)
+        self.assertEqual(flags.by_platform, {"config//cpu:arm64": [], "config//cpu:x86_64": ["--cfg", "x"]})
+
+    def test_flags_every_platform_gets_are_common(self):
+        fixup = CrateFixup.from_dict(
+            {"rustcFlags": {"common": ["--cfg", "a"], "os": {"linux": ["--cfg", "b"], "macos": ["--cfg", "b"]}, "cpu": {}}}
+        )
+        flags = get_fixup_rustc_flags(fixup, PLATFORMS)
+        self.assertEqual(flags.common, ["--cfg", "a", "--cfg", "b"])
+        self.assertEqual(flags.by_platform, {})
+
+    def test_no_fixup_means_no_flags(self):
+        self.assertTrue(get_fixup_rustc_flags(CrateFixup(), PLATFORMS).is_empty())
+
+
+class TestFixupEnv(unittest.TestCase):
+    def test_env_differing_by_os_is_a_select(self):
+        fixup = CrateFixup.from_dict({"env": {"common": {"A": "1"}, "os": {"macos": {"B": "2"}}, "cpu": {}}})
+        common, by_platform = get_fixup_env(fixup, PLATFORMS)
+        self.assertEqual(common, {"A": "1"})
+        self.assertEqual(by_platform, {"config//os:linux": {}, "config//os:macos": {"B": "2"}})
+        content = generate_buck_file(
+            "c", "2021", None, get_dependencies({}, set(), [], PLATFORMS)[0],
+            get_dependencies({}, set(), [], PLATFORMS)[1], False, [], common, PlatformRustcFlags(),
+            env_by_platform=by_platform,
+        )
+        self.assertIn('    env = {\n        "A": "1",\n    } |\n    select({', content)
+
+
+class TestNativeLibraries(unittest.TestCase):
+    def test_native_library_is_linked_on_the_host_only(self):
+        deps, named = get_dependencies({}, set(), [], PLATFORMS)
+        content = generate_buck_file(
+            "ring", "2021", None, deps, named, False, [], {}, PlatformRustcFlags(common=["--cap-lints", "allow"]),
+            native_libraries=[{"lib_name": "ring_core", "static_lib_path": "out_dir/libring_core.a"}],
+            host_key="toolchains//conditions:macos-arm64",
+        )
+        self.assertIn('prebuilt_cxx_library(\n    name = "ring_core",', content)
+        self.assertIn('    deps = select({\n        "toolchains//conditions:macos-arm64": [\n            ":ring_core",', content)
+        self.assertIn('    ] +\n    select({\n        "toolchains//conditions:macos-arm64": [\n            "-Lnative=out_dir",', content)
+        self.assertEqual(content.count("select({"), 2)
+
+    def test_native_library_without_a_host_is_an_error(self):
+        deps, named = get_dependencies({}, set(), [], PLATFORMS)
+        with self.assertRaises(ValueError):
+            generate_buck_file(
+                "ring", "2021", None, deps, named, False, [], {}, PlatformRustcFlags(),
+                native_libraries=[{"lib_name": "r", "static_lib_path": "out_dir/libr.a"}],
+            )
 
 
 if __name__ == "__main__":

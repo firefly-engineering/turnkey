@@ -211,52 +211,61 @@ def get_dependencies(
     )
 
 
-def get_build_script_cfg_flags(
-    crate_name: str, version: str, registry: dict, platforms: Platforms
-) -> PlatformRustcFlags:
-    """Get rustc cfg flags that would be set by a crate's build script.
+@dataclass
+class CrateFixup:
+    """A crate's fixup, as turnkey resolved it for one locked version.
 
-    Looks up flags from the registry, which supports:
-    - Version-specific keys: "crate@version" (takes precedence)
-    - Catch-all keys: "crate" (fallback)
-
-    Values can be either:
-    - A list of flags (applied on all platforms)
-    - A dict whose keys are OS names (Buck2's, e.g. "linux", "macos"),
-      mapping to the flags for that OS; any other key's flags apply on
-      every platform
-
-    Args:
-        crate_name: The crate name (e.g., "serde_json")
-        version: The crate version (e.g., "1.0.0")
-        registry: Dict mapping crate names/keys to lists or dicts of rustc flags
-        platforms: The platforms the cell is built for
-
-    Returns:
-        PlatformRustcFlags with common and per-key flags
+    Written by nix/lib/fixups/resolve.nix, one per "name@version":
+    rustc flags and env are layered as the flags every platform gets
+    (common) and those a platform's OS or CPU adds; native libraries exist
+    only for the platform the cell was built on.
     """
-    # Try versioned key first (e.g., "rustix@0.39.0")
-    versioned_key = f"{crate_name}@{version}"
-    entry = registry.get(versioned_key) or registry.get(crate_name)
 
-    if entry is None:
-        return PlatformRustcFlags()
+    out_dir: bool = False
+    rustc_flags: dict = field(default_factory=lambda: {"common": [], "os": {}, "cpu": {}})
+    env: dict = field(default_factory=lambda: {"common": {}, "os": {}, "cpu": {}})
+    native_libraries: list[dict] = field(default_factory=list)
 
-    if isinstance(entry, list):
-        # Simple list: common flags for all platforms
-        return PlatformRustcFlags(common=entry)
+    @classmethod
+    def from_dict(cls, d: dict) -> "CrateFixup":
+        return cls(
+            out_dir=d.get("outDir", False),
+            rustc_flags=d.get("rustcFlags", {"common": [], "os": {}, "cpu": {}}),
+            env=d.get("env", {"common": {}, "os": {}, "cpu": {}}),
+            native_libraries=d.get("nativeLibraries", []),
+        )
 
-    if isinstance(entry, dict):
-        oses = {p.os for p in platforms}
-        common = [flag for key, flags in entry.items() if key not in oses for flag in flags]
-        # Flags come in pairs (--cfg foo), so each OS's list is kept whole
-        # and in order
-        per_os = platforms.branches(lambda p: list(entry.get(p.os, [])))
-        if per_os is None:
-            return PlatformRustcFlags(common=common + list(entry.get(next(iter(platforms)).os, [])))
-        return PlatformRustcFlags(common=common, by_platform=per_os)
 
-    return PlatformRustcFlags()
+def get_fixup_rustc_flags(fixup: CrateFixup, platforms: Platforms) -> PlatformRustcFlags:
+    """The rustc flags a crate's fixup gives it, as common flags and select() branches.
+
+    Flags come in pairs (--cfg foo), so each platform's list is kept whole
+    and in order: its OS's flags, then its CPU's.
+    """
+    flags = fixup.rustc_flags
+    common = list(flags.get("common", []))
+
+    def on(p):
+        return tuple(flags.get("os", {}).get(p.os, [])) + tuple(flags.get("cpu", {}).get(p.cpu, []))
+
+    per = platforms.branches(on)
+    if per is None:
+        return PlatformRustcFlags(common=common + list(on(next(iter(platforms)))))
+    return PlatformRustcFlags(common=common, by_platform={k: list(v) for k, v in per.items()})
+
+
+def get_fixup_env(fixup: CrateFixup, platforms: Platforms) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+    """The env a crate's fixup gives it: common entries, and select() branches when platforms differ."""
+    env = fixup.env
+    common = dict(env.get("common", {}))
+
+    def on(p):
+        return {**env.get("os", {}).get(p.os, {}), **env.get("cpu", {}).get(p.cpu, {})}
+
+    per = platforms.branches(on)
+    if per is None:
+        return {**common, **on(next(iter(platforms)))}, {}
+    return common, per
 
 
 def _format_select(
@@ -312,6 +321,60 @@ def _format_named_select(
     return "\n".join(lines)
 
 
+def _escape(value: str) -> str:
+    """A string's content, escaped for a Starlark double-quoted literal on one line."""
+    value = value.replace("\n", " ").replace("\r", " ")
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _list_literal(items: list[str], format_item) -> str:
+    """A multi-line list literal, its first line unindented (it follows `name = `)."""
+    lines = ["["] + [f"        {format_item(i)}," for i in items] + ["    ]"]
+    return "\n".join(lines)
+
+
+def _dict_literal(items: dict[str, str]) -> str:
+    """A multi-line dict literal of strings, its first line unindented."""
+    lines = ["{"] + [f'        "{_escape(k)}": "{_escape(v)}",' for k, v in sorted(items.items())] + ["    }"]
+    return "\n".join(lines)
+
+
+def _format_env_select(by_platform: dict[str, dict[str, str]], indent: str) -> str:
+    """Format a select() expression for platform-specific env entries."""
+    lines = [f"{indent}select({{"]
+    for platform_key in sorted(by_platform.keys()):
+        items = by_platform[platform_key]
+        if not items:
+            lines.append(f'{indent}    "{platform_key}": {{}},')
+            continue
+        lines.append(f'{indent}    "{platform_key}": {{')
+        for key, value in sorted(items.items()):
+            lines.append(f'{indent}        "{_escape(key)}": "{_escape(value)}",')
+        lines.append(f"{indent}    }},")
+    lines.append(f"{indent}}})")
+    return "\n".join(lines)
+
+
+def _host_select(host_key: str, items: list[str], format_item) -> str:
+    """A select() with only the host platform's branch.
+
+    What a fixup builds natively exists only for the platform the cell was
+    built on, so configuring the crate for any other platform fails here
+    ("no condition matched") instead of linking a missing library.
+    """
+    lines = ["    select({", f'        "{host_key}": [']
+    lines += [f"            {format_item(i)}," for i in items]
+    lines += ["        ],", "    })"]
+    return "\n".join(lines)
+
+
+def _attr(lines: list[str], name: str, parts: list[str], operator: str = "+") -> None:
+    """Append `name = part1 <op> part2 ...,` when there are parts; each part's first line is unindented."""
+    if not parts:
+        return
+    lines.append(f"    {name} = " + f" {operator}\n    ".join(part.lstrip() for part in parts) + ",")
+
+
 def generate_buck_file(
     crate_name: str,
     edition: str,
@@ -322,46 +385,37 @@ def generate_buck_file(
     features: list[str],
     env: dict[str, str],
     rustc_flags: PlatformRustcFlags,
-    native_lib_info: dict | None = None,
+    native_libraries: list[dict] | None = None,
+    host_key: str | None = None,
+    env_by_platform: dict[str, dict[str, str]] | None = None,
 ) -> str:
-    """Generate BUCK file content."""
-    # Initialize linker_flags
-    linker_flags = []
+    """Generate BUCK file content.
 
-    # Determine which rules we need to load
+    native_libraries are the fixup's pre-built libraries (NativeLibrarySpec
+    dicts); they are linked only on host_key, the combined config_setting
+    of the platform the cell was built on.
+    """
     rules_to_load = ["rust_library"]
+    native_lib_content = []
+    native_deps: list[str] = []
+    native_flags: list[str] = []
 
-    # Native library rules prefix content
-    native_lib_content = ""
+    for info in native_libraries or []:
+        generated = buck2_generator.generate(NativeLibrarySpec.from_dict(info))
+        rules_to_load.extend(r for r in generated.rules_to_load if r not in rules_to_load)
+        native_lib_content.append(generated.rules_content)
+        native_deps += generated.extra_deps
+        native_flags += generated.extra_rustc_flags
+    if native_deps and host_key is None:
+        raise ValueError(f"{crate_name}: native libraries need the host platform's key")
 
-    # Collect all deps from common to pass to native library
-    deps = list(platform_deps.common)
-
-    # Generate native library rules using the abstraction
-    if native_lib_info:
-        spec = NativeLibrarySpec.from_dict(native_lib_info)
-        generated = buck2_generator.generate(spec)
-
-        rules_to_load.extend(generated.rules_to_load)
-        native_lib_content = generated.rules_content
-        deps = deps + generated.extra_deps
-        rustc_flags = PlatformRustcFlags(
-            common=rustc_flags.common + generated.extra_rustc_flags,
-            by_platform=rustc_flags.by_platform,
-        )
-
-    # Format rules for load statement: "rule1", "rule2"
     rules_str = ", ".join(f'"{r}"' for r in rules_to_load)
-
     lines = [
         "# Auto-generated by turnkey rust-deps-cell",
         f'load("@prelude//:rules.bzl", {rules_str})',
         "",
     ]
-
-    # Add native library rules if present
-    if native_lib_content:
-        lines.append(native_lib_content)
+    lines.extend(native_lib_content)
 
     lines.extend(
         [
@@ -384,104 +438,44 @@ def generate_buck_file(
     if crate_root:
         lines.append(f'    crate_root = "{crate_root}",')
 
-    # Deps: common deps + optional select() for platform-specific
-    has_common_deps = bool(deps)
-    has_platform_deps = bool(platform_deps.by_platform)
+    quoted = lambda d: f'"{d}"'
 
-    if has_common_deps and has_platform_deps:
-        lines.append("    deps = [")
-        for dep in sorted(set(deps)):
-            lines.append(f'        "{dep}",')
-        lines.append("    ] +")
-        select_str = _format_select(
-            platform_deps.by_platform, "    ", lambda d: f'"{d}"'
-        )
-        lines.append(select_str + ",")
-    elif has_common_deps:
-        lines.append("    deps = [")
-        for dep in sorted(set(deps)):
-            lines.append(f'        "{dep}",')
-        lines.append("    ],")
-    elif has_platform_deps:
-        lines.append("    deps =")
-        select_str = _format_select(
-            platform_deps.by_platform, "    ", lambda d: f'"{d}"'
-        )
-        lines.append(select_str + ",")
+    # Deps: common, then per platform, then the host's native libraries
+    deps = []
+    if platform_deps.common:
+        deps.append(_list_literal(sorted(set(platform_deps.common)), quoted))
+    if platform_deps.by_platform:
+        deps.append(_format_select(platform_deps.by_platform, "    ", quoted))
+    if native_deps:
+        deps.append(_host_select(host_key, native_deps, quoted))
+    _attr(lines, "deps", deps)
 
     # Named deps: common + optional select() for platform-specific
-    named_deps = platform_named_deps.common
-    has_common_named = bool(named_deps)
-    has_platform_named = bool(platform_named_deps.by_platform)
+    named = []
+    if platform_named_deps.common:
+        named.append(_dict_literal(platform_named_deps.common))
+    if platform_named_deps.by_platform:
+        named.append(_format_named_select(platform_named_deps.by_platform, "    "))
+    _attr(lines, "named_deps", named, operator="|")
 
-    if has_common_named and has_platform_named:
-        lines.append("    named_deps = {")
-        for local_name, target in sorted(named_deps.items()):
-            lines.append(f'        "{local_name}": "{target}",')
-        lines.append("    } |")
-        named_select_str = _format_named_select(
-            platform_named_deps.by_platform, "    "
-        )
-        lines.append(named_select_str + ",")
-    elif has_common_named:
-        lines.append("    named_deps = {")
-        for local_name, target in sorted(named_deps.items()):
-            lines.append(f'        "{local_name}": "{target}",')
-        lines.append("    },")
-    elif has_platform_named:
-        lines.append("    named_deps =")
-        named_select_str = _format_named_select(
-            platform_named_deps.by_platform, "    "
-        )
-        lines.append(named_select_str + ",")
-
-    # Add Cargo environment variables
+    # Cargo's and the fixup's environment variables
+    envs = []
     if env:
-        lines.append("    env = {")
-        for key, value in sorted(env.items()):
-            # Escape special characters and normalize whitespace
-            # Replace newlines with spaces for single-line values
-            escaped_value = value.replace("\n", " ").replace("\r", " ")
-            escaped_value = escaped_value.replace("\\", "\\\\").replace('"', '\\"')
-            lines.append(f'        "{key}": "{escaped_value}",')
-        lines.append("    },")
+        envs.append(_dict_literal(env))
+    if env_by_platform:
+        envs.append(_format_env_select(env_by_platform, "    "))
+    _attr(lines, "env", envs, operator="|")
 
-    # Add rustc flags (for build script cfg emulation)
-    has_common_flags = bool(rustc_flags.common)
-    has_platform_flags = bool(rustc_flags.by_platform)
-
-    def _escape_flag(flag):
-        return flag.replace("\\", "\\\\").replace('"', '\\"')
-
-    if has_common_flags and has_platform_flags:
-        lines.append("    rustc_flags = [")
-        for flag in rustc_flags.common:
-            lines.append(f'        "{_escape_flag(flag)}",')
-        lines.append("    ] +")
-        select_str = _format_select(
-            rustc_flags.by_platform, "    ", lambda f: f'"{_escape_flag(f)}"',
-            dedup_sort=False,
-        )
-        lines.append(select_str + ",")
-    elif has_common_flags:
-        lines.append("    rustc_flags = [")
-        for flag in rustc_flags.common:
-            lines.append(f'        "{_escape_flag(flag)}",')
-        lines.append("    ],")
-    elif has_platform_flags:
-        lines.append("    rustc_flags =")
-        select_str = _format_select(
-            rustc_flags.by_platform, "    ", lambda f: f'"{_escape_flag(f)}"',
-            dedup_sort=False,
-        )
-        lines.append(select_str + ",")
-
-    # Add exported_linker_flags for native libraries (propagates to dependents)
-    if linker_flags:
-        lines.append("    exported_linker_flags = [")
-        for flag in linker_flags:
-            lines.append(f'        "{flag}",')
-        lines.append("    ],")
+    # Rustc flags (build script cfg emulation), kept in order: they come in pairs
+    flag = lambda f: f'"{_escape(f)}"'
+    flags = []
+    if rustc_flags.common:
+        flags.append(_list_literal(rustc_flags.common, flag))
+    if rustc_flags.by_platform:
+        flags.append(_format_select(rustc_flags.by_platform, "    ", flag, dedup_sort=False))
+    if native_flags:
+        flags.append(_host_select(host_key, native_flags, flag))
+    _attr(lines, "rustc_flags", flags)
 
     lines.extend(
         [

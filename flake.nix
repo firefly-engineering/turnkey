@@ -732,6 +732,184 @@
             ) "language records: depsFile ./.turnkey/go-deps.toml is synced to ${nestedGoRule.target}";
             pkgs.runCommand "language-records-check" { } "touch $out";
 
+          # Fixup sets (docs/adr/0003-fixup-sets-are-modules.md): sets
+          # published by other flakes merge with a repository's own
+          # fixups, per field; conflicts fail; enable = false drops a
+          # fixup; only the repository's own unused fixups warn; version
+          # entries and OS/CPU overlays resolve per locked dependency.
+          # Fixtures in nix/lib/testdata/fixups. Checked at evaluation.
+          checks.fixup-sets =
+            let
+              fixups = import ./nix/lib/fixups { inherit lib; };
+              testdata = ./nix/lib/testdata/fixups;
+              acme = import (testdata + "/acme.nix");
+              other = import (testdata + "/other.nix");
+              conflicting = import (testdata + "/conflicting.nix");
+              inline = {
+                _file = "inline.nix";
+                rust.serde.rustcFlags = [
+                  "--cfg"
+                  "mine"
+                ];
+                rust.typo-crate.buildScript.skip = true;
+              };
+              platform = {
+                system = "x86_64-linux";
+                os = "linux";
+                cpu = "x86_64";
+              };
+              locked = [
+                {
+                  key = "serde@1.0.219";
+                  name = "serde";
+                  version = "1.0.219";
+                }
+                {
+                  key = "ring@0.17.14";
+                  name = "ring";
+                  version = "0.17.14";
+                }
+                {
+                  key = "ring@0.16.20";
+                  name = "ring";
+                  version = "0.16.20";
+                }
+                {
+                  key = "rustix@1.0.7";
+                  name = "rustix";
+                  version = "1.0.7";
+                }
+              ];
+              resolveWith =
+                modules: language: deps:
+                fixups.resolve {
+                  evaluated = fixups.evalFixups { inherit pkgs modules; };
+                  inherit language deps platform;
+                  inlineFiles = [ "inline.nix" ];
+                };
+              rust = resolveWith [
+                acme
+                other
+                inline
+              ] "rust" locked;
+              fails = value: !(builtins.tryEval (builtins.deepSeq value value)).success;
+              serde = rust.fixups."serde@1.0.219";
+              ring17 = rust.fixups."ring@0.17.14";
+              ring16 = rust.fixups."ring@0.16.20";
+              after =
+                first: second: text:
+                lib.hasInfix second (lib.last (lib.splitString first text));
+
+              go = resolveWith [ acme ] "go" [
+                {
+                  key = "github.com/acme/lib@v1.2.0";
+                  name = "github.com/acme/lib";
+                  version = "v1.2.0";
+                }
+              ];
+
+              # turnkey's registries of before fixup sets, as a module
+              legacy =
+                (resolveWith [
+                  (import ./nix/lib/fixups/legacy.nix { inherit lib; } (
+                    let
+                      builtin = import ./nix/lib/deps-cell/fixups/rust { inherit pkgs lib; };
+                    in
+                    {
+                      inherit (builtin) buildScriptFixups rustcFlags nativeLibraries;
+                    }
+                  ))
+                ] "rust" locked).fixups;
+
+              expectations = {
+                "sets and inline fixups merge per field" =
+                  serde.gen.rustcFlags.common == [
+                    "--cfg"
+                    "from_other"
+                    "--cfg"
+                    "mine"
+                  ]
+                  && serde.gen.outDir;
+                "patches apply in import order, before the build script" =
+                  after "first.patch" "second.patch" serde.commands
+                  && after "second.patch" "echo serde 219" serde.commands;
+                "version entries apply to the versions their bounds hold for" =
+                  ring17.gen.rustcFlags.common == [
+                    "--cfg"
+                    "ring_017"
+                  ]
+                  &&
+                    ring16.gen.rustcFlags.common == [
+                      "--cfg"
+                      "ring_016"
+                    ];
+                "overlays stay per OS and per CPU" =
+                  ring17.gen.rustcFlags.os.linux == [
+                    "--cfg"
+                    "linux_like"
+                  ]
+                  &&
+                    ring17.gen.env.cpu.x86_64 == {
+                      RING_X86 = "1";
+                    };
+                "the build script sees the platform the cell is built on" =
+                  lib.hasInfix "ring for linux-x86_64" ring17.commands;
+                "native library names are computed per version" =
+                  (builtins.head ring17.gen.nativeLibraries).lib_name == "ring_core_0_17_14__";
+                "a crate no set fixes has no fixup" = !(rust.fixups ? "rustix@1.0.7");
+                "only the repository's own unused fixups warn" =
+                  builtins.length rust.warnings == 1
+                  && lib.hasInfix "typo-crate" (builtins.head rust.warnings)
+                  && rust.errors == [ ];
+                "two sets giving one build script conflict" = fails (
+                  (resolveWith [
+                    acme
+                    conflicting
+                  ] "rust" locked).fixups."serde@1.0.219".commands
+                );
+                "enable = false drops an imported fixup" =
+                  !(
+                    (resolveWith [
+                      acme
+                      { rust.ring.enable = false; }
+                    ] "rust" locked).fixups ? "ring@0.17.14"
+                  );
+                "a build script in an overlay is a type error" = fails (
+                  (resolveWith [ { rust.serde.os.linux.buildScript.skip = true; } ] "rust" locked).fixups
+                );
+                "a build script with both generate and skip is an error" =
+                  lib.any (lib.hasInfix "both generate and skip")
+                    (
+                      (resolveWith [
+                        {
+                          rust.serde.buildScript = {
+                            generate = "true";
+                            skip = true;
+                          };
+                        }
+                      ] "rust" locked).errors
+                    );
+                "every language's fixups apply patches" =
+                  lib.hasInfix "first.patch"
+                    go.fixups."github.com/acme/lib@v1.2.0".commands;
+                "env isn't supported outside Rust yet" =
+                  (resolveWith [ { go."github.com/acme/lib".env.X = "1"; } ] "go" [
+                    {
+                      key = "github.com/acme/lib@v1.2.0";
+                      name = "github.com/acme/lib";
+                      version = "v1.2.0";
+                    }
+                  ]).errors != [ ];
+                "the old registries resolve as they used to" =
+                  lib.hasInfix "__private219" legacy."serde@1.0.219".commands
+                  && legacy."rustix@1.0.7".gen.rustcFlags.os.linux != [ ]
+                  && (builtins.head legacy."ring@0.17.14".gen.nativeLibraries).lib_name == "ring_core_0_17_14__";
+              };
+              failed = builtins.attrNames (lib.filterAttrs (_: ok: !ok) expectations);
+            in
+            assert lib.assertMsg (failed == [ ]) "fixup sets: ${lib.concatStringsSep "; " failed}";
+            pkgs.runCommand "fixup-sets-check" { } "touch $out";
+
           # The soldeps cell's remappings.txt keeps the subdirectory of each
           # remapping soldeps-gen emits, moved from its lib/ or node_modules/
           # layout to the cell's vendor/ one: forge-std's sources live in
