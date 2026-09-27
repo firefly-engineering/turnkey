@@ -34,3 +34,51 @@ func TestTagDimensionKeys(t *testing.T) {
 		t.Errorf("branches = %+v, want %+v", split.Branches, want)
 	}
 }
+
+// A configuration's platform, in Buck2's names, is its Go build's GOOS and
+// GOARCH, with cgo on and the tags it sets.
+func TestConfigContext(t *testing.T) {
+	cases := []struct {
+		os, cpu      string
+		goos, goarch string
+	}{
+		{"linux", "x86_64", "linux", "amd64"},
+		{"linux", "arm64", "linux", "arm64"},
+		{"macos", "x86_64", "darwin", "amd64"},
+		{"macos", "arm64", "darwin", "arm64"},
+	}
+	for _, c := range cases {
+		config := conditions.Configuration{
+			conditions.OS:                    c.os,
+			conditions.CPU:                   c.cpu,
+			TagDimension("integration").Name: conditions.Set,
+		}
+		ctx, ok := ConfigContext(config)
+		want := BuildContext{GOOS: c.goos, GOARCH: c.goarch, CgoEnabled: true, Tags: []string{"integration"}}
+		if !ok || !reflect.DeepEqual(ctx, want) {
+			t.Errorf("ConfigContext(%s) = %+v, %v; want %+v, true", config, ctx, ok, want)
+		}
+		wantEnv := []string{"GOOS=" + c.goos, "GOARCH=" + c.goarch, "CGO_ENABLED=1"}
+		if got := ctx.Environ(); !reflect.DeepEqual(got, wantEnv) {
+			t.Errorf("Environ(%s) = %v, want %v", config, got, wantEnv)
+		}
+	}
+}
+
+// Without a platform Go has names for, a configuration's Go build has no
+// GOOS or GOARCH, and the go command gets the host's.
+func TestConfigContextWithoutPlatform(t *testing.T) {
+	for _, config := range []conditions.Configuration{
+		{},
+		{conditions.OS: "windows", conditions.CPU: "x86_64"},
+		{conditions.OS: "linux", conditions.CPU: "riscv64"},
+	} {
+		ctx, ok := ConfigContext(config)
+		if ok || ctx.GOOS != "" || ctx.GOARCH != "" {
+			t.Errorf("ConfigContext(%s) = %+v, %v; want no platform", config, ctx, ok)
+		}
+		if env := ctx.Environ(); env != nil {
+			t.Errorf("Environ(%s) = %v, want none", config, env)
+		}
+	}
+}
