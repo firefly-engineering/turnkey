@@ -210,6 +210,12 @@ func Render(value AttributeValue) string {
 	return renderValue(value, "")
 }
 
+// RenderIndented returns an attribute value as written on a line indented
+// by indent, e.g. an attribute of a rule call ("    ").
+func RenderIndented(value AttributeValue, indent string) string {
+	return renderValue(value, indent)
+}
+
 // renderValue returns an attribute value as written on a line indented by
 // indent.
 func renderValue(value AttributeValue, indent string) string {
