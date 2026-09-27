@@ -42,7 +42,8 @@ type Config struct {
 	Languages []syncconfig.Language
 
 	// Conditions are the build configurations sync evaluates; Go's
-	// allowed build tags come from them.
+	// allowed build tags come from them, and the platforms the Rust
+	// plug-in reads a member target's variant in.
 	Conditions syncconfig.ConditionsConfig
 }
 

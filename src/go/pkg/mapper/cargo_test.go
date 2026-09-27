@@ -343,14 +343,14 @@ rust_library(
 `,
 		"crates/app/Cargo.toml": "[package]\nname = \"app\"\n\n[dependencies]\n" + appDeps,
 	})
-	m, err := New(testConfig(root))
+	cfg := testConfig(root)
+	cfg.Conditions.Platforms = []conditions.Platform{{OS: "linux", CPU: "x86_64"}, {OS: "macos", CPU: "arm64"}}
+	m, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return root, m.Language("rust")
 }
-
-var twoPlatforms = conditions.NewSpace([]conditions.Platform{{OS: "linux", CPU: "x86_64"}, {OS: "macos", CPU: "arm64"}}, "")
 
 func linux() conditions.Configuration {
 	return conditions.Configuration{"os": "linux", "cpu": "x86_64"}
@@ -361,7 +361,7 @@ func macos() conditions.Configuration { return conditions.Configuration{"os": "m
 // features, expanded, and the optional dependencies they activate.
 func TestRustPrimaryTargetBuildsDefaults(t *testing.T) {
 	root, lang := featuresFixture(t, "")
-	mapping, err := lang.ResolveDeps(filepath.Join(root, "crates/lib"), Request{Config: linux(), Space: twoPlatforms})
+	mapping, err := lang.ResolveDeps(filepath.Join(root, "crates/lib"), Request{Config: linux()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,7 +418,7 @@ func TestRustDependencyMapsToVariantTarget(t *testing.T) {
 lib = { workspace = true, features = ["watch", "fuse"] }
 `)
 	for _, config := range []conditions.Configuration{linux(), macos()} {
-		mapping, err := lang.ResolveDeps(filepath.Join(root, "crates/app"), Request{Config: config, Space: twoPlatforms})
+		mapping, err := lang.ResolveDeps(filepath.Join(root, "crates/app"), Request{Config: config})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -432,7 +432,7 @@ lib = { workspace = true, features = ["watch", "fuse"] }
 // dependency is unmapped, and the report names the features.
 func TestRustDependencyWithoutMatchingTarget(t *testing.T) {
 	root, lang := featuresFixture(t, `lib = { workspace = true, features = ["fuse"] }`)
-	mapping, err := lang.ResolveDeps(filepath.Join(root, "crates/app"), Request{Config: linux(), Space: twoPlatforms})
+	mapping, err := lang.ResolveDeps(filepath.Join(root, "crates/app"), Request{Config: linux()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -445,7 +445,7 @@ func TestRustDependencyWithoutMatchingTarget(t *testing.T) {
 	// and features = ["base"]
 	root, lang = featuresFixture(t, `lib = { path = "../lib", default-features = false, features = ["base"] }`)
 	writeTree(t, root, map[string]string{"crates/lib/rules.star": "rust_library(name = \"lib\")\n\nrust_library(\n    name = \"lib-base\",\n    cargo_features = [\"base\"],\n    default_features = False,\n)\n"})
-	mapping, err = lang.ResolveDeps(filepath.Join(root, "crates/app"), Request{Config: linux(), Space: twoPlatforms})
+	mapping, err = lang.ResolveDeps(filepath.Join(root, "crates/app"), Request{Config: linux()})
 	if err != nil {
 		t.Fatal(err)
 	}

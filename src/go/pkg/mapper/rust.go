@@ -64,13 +64,17 @@ type rustLanguage struct {
 	projectRoot string
 	cfg         *RustConfig
 
+	// space holds the configurations a member target's variant is read
+	// in: the platforms, all a crate's deps depend on
+	space conditions.Space
+
 	// rules caches the members' parsed rules.star, by member directory
 	rules map[string]*starlark.File
 }
 
 func newRustLanguage(mcfg Config, lang syncconfig.Language) Language {
 	cfg, _ := detectRustConfig(mcfg.ProjectRoot, lang)
-	return &rustLanguage{projectRoot: mcfg.ProjectRoot, cfg: cfg}
+	return &rustLanguage{projectRoot: mcfg.ProjectRoot, cfg: cfg, space: mcfg.Conditions.Space()}
 }
 
 func (l *rustLanguage) Name() string { return "rust" }

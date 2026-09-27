@@ -483,7 +483,7 @@ func (l *rustLanguage) memberTarget(memberDir string, features []string, default
 		if t.Rule != "rust_library" {
 			continue
 		}
-		variant, _, ok := ReadVariant(t, cargoVariantAttributes, req.Space)
+		variant, _, ok := ReadVariant(t, cargoVariantAttributes, l.space)
 		if !ok {
 			continue
 		}

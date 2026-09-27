@@ -91,10 +91,6 @@ type Request struct {
 	// Variant holds the target's variant attributes (Rule.Variant)
 	// that it sets, as they are in the configuration being resolved.
 	Variant map[string]starlark.AttributeValue
-
-	// Space is the space Config belongs to, for evaluating the select()s
-	// of other targets (e.g. a dependency's variant) in Config.
-	Space conditions.Space
 }
 
 // unconditional is embedded by a language whose deps don't depend on the

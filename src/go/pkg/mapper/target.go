@@ -194,7 +194,7 @@ func composeDeps(m PackageMapping, kind TargetKind, withLibrary bool) Want {
 // Deps on the package's own target are dropped (e.g. when syncing
 // src/python/cargo, //src/python/cargo:cargo).
 func (p *Package) resolve(config conditions.Configuration, kind TargetKind, variant map[string]starlark.AttributeValue) (PackageMapping, error) {
-	req := Request{Config: config.Project(p.dims), Kind: kind, Variant: variant, Space: p.space}
+	req := Request{Config: config.Project(p.dims), Kind: kind, Variant: variant}
 	key := fmt.Sprintf("%s|%d|%s", req.Config, kind, variantKey(variant))
 	if m, ok := p.cache[key]; ok {
 		return m, nil
