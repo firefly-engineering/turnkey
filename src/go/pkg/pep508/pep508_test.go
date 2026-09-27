@@ -98,3 +98,17 @@ func TestMarkerVariables(t *testing.T) {
 		t.Errorf("variables = %v, want %v", got, want)
 	}
 }
+
+func TestPlatformEnv(t *testing.T) {
+	env, ok := PlatformEnv("linux", "arm64", "3.13.12")
+	if !ok || env["sys_platform"] != "linux" || env["platform_machine"] != "aarch64" || env["python_version"] != "3.13" {
+		t.Errorf("linux-arm64 env = %v", env)
+	}
+	env, ok = PlatformEnv("macos", "arm64", "3.13.12")
+	if !ok || env["sys_platform"] != "darwin" || env["platform_machine"] != "arm64" || env["platform_system"] != "Darwin" {
+		t.Errorf("macos-arm64 env = %v", env)
+	}
+	if _, ok := PlatformEnv("windows", "x86_64", "3.13.12"); ok {
+		t.Error("windows has an env, want none")
+	}
+}

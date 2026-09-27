@@ -170,7 +170,8 @@ in
         conditions,
       }:
       depsCell.mkPythonDepsCell {
-        inherit cellName;
+        inherit cellName conditions;
+        pydepsCell = import ../packages/pydeps-cell.nix { inherit pkgs lib; };
         inherit (langCfg) depsFile;
         inherit userPatchesDir;
       };

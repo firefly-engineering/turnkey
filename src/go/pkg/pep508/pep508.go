@@ -529,3 +529,49 @@ func isAlnum(c byte) bool {
 }
 
 func isNameChar(c byte) bool { return isAlnum(c) || c == '-' || c == '_' || c == '.' }
+
+// PlatformEnv returns the marker environment of a platform, in Buck2's
+// names (os "linux" or "macos", cpu "x86_64" or "arm64"), for a CPython of
+// the given full version (e.g. "3.13.12"), with no extra. Values it can't
+// know (platform_release, platform_version) are empty. It reports false for
+// a platform it doesn't know.
+func PlatformEnv(os, cpu, pythonVersion string) (Env, bool) {
+	env := Env{
+		"os_name":                        "posix",
+		"implementation_name":            "cpython",
+		"platform_python_implementation": "CPython",
+		"python_full_version":            pythonVersion,
+		"implementation_version":         pythonVersion,
+		"python_version":                 majorMinor(pythonVersion),
+		"platform_release":               "",
+		"platform_version":               "",
+		"extra":                          "",
+	}
+	switch os {
+	case "linux":
+		env["sys_platform"], env["platform_system"] = "linux", "Linux"
+		env["platform_machine"] = map[string]string{"x86_64": "x86_64", "arm64": "aarch64"}[cpu]
+	case "macos":
+		env["sys_platform"], env["platform_system"] = "darwin", "Darwin"
+		env["platform_machine"] = map[string]string{"x86_64": "x86_64", "arm64": "arm64"}[cpu]
+	default:
+		return nil, false
+	}
+	if env["platform_machine"] == "" {
+		return nil, false
+	}
+	return env, true
+}
+
+// PlatformVariables are the marker variables whose values depend on the
+// platform, rather than on the Python toolchain or the extra.
+var PlatformVariables = []string{"os_name", "sys_platform", "platform_machine", "platform_system", "platform_release", "platform_version"}
+
+// majorMinor returns "3.13" for "3.13.12".
+func majorMinor(version string) string {
+	parts := strings.SplitN(version, ".", 3)
+	if len(parts) < 2 {
+		return version
+	}
+	return parts[0] + "." + parts[1]
+}

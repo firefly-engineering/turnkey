@@ -88,6 +88,15 @@ rec {
     cellName,           # The cell's name (nix/buck2/languages.nix)
     depsFile,           # Path to python-deps.toml
 
+    # The platforms to build for and their combined settings
+    # (nix/buck2/platforms.nix's conditions), and the tool that writes the
+    # packages' rules.star with the dependencies between them, each
+    # dependency's marker evaluated per platform (nix/packages/pydeps-cell.nix)
+    conditions,
+    pydepsCell,
+    # The Python toolchain's version the markers are evaluated for
+    pythonVersion ? pkgs.python3.version,
+
     # Optional
     userFixups ? {},    # Additional fixups
     userPatchesDir ? null, # Path to .turnkey/patches directory (from FUSE edit layer)
@@ -112,6 +121,12 @@ rec {
   in
   genericMkDepsCell {
     inherit cellName depPackages userPatchesDir;
+    mergeCommands = ''
+      cat > $out/pydeps-cell.json << 'PYDEPSCELL'
+      ${builtins.toJSON (conditions // { python_version = pythonVersion; })}
+      PYDEPSCELL
+      ${lib.getExe pydepsCell} $out ${depsFile}
+    '';
     # Python uses simple name-only paths, no versioning or symlinks
     keyToPath = name: name;
     createSymlinks = false;
