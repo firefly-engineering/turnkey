@@ -266,40 +266,4 @@
     "pregenerated/sha256-armv8-ios64.S"
     "pregenerated/sha512-armv8-ios64.S"
   ];
-
-  # Legacy aliases (backward compat)
-  cSources = [
-    "crypto/curve25519/curve25519.c"
-    "crypto/fipsmodule/aes/aes_nohw.c"
-    "crypto/fipsmodule/bn/montgomery.c"
-    "crypto/fipsmodule/bn/montgomery_inv.c"
-    "crypto/fipsmodule/ec/ecp_nistz.c"
-    "crypto/fipsmodule/ec/gfp_p256.c"
-    "crypto/fipsmodule/ec/gfp_p384.c"
-    "crypto/fipsmodule/ec/p256.c"
-    "crypto/fipsmodule/ec/p256-nistz.c"
-    "crypto/limbs/limbs.c"
-    "crypto/mem.c"
-    "crypto/poly1305/poly1305.c"
-    "crypto/crypto.c"
-    "crypto/cpu_intel.c"
-    "crypto/curve25519/curve25519_64_adx.c"
-  ];
-
-  asmSources = [
-    "pregenerated/chacha-x86_64-elf.S"
-    "pregenerated/aesni-gcm-x86_64-elf.S"
-    "pregenerated/aesni-x86_64-elf.S"
-    "pregenerated/ghash-x86_64-elf.S"
-    "pregenerated/vpaes-x86_64-elf.S"
-    "pregenerated/x86_64-mont-elf.S"
-    "pregenerated/x86_64-mont5-elf.S"
-    "pregenerated/p256-x86_64-asm-elf.S"
-    "pregenerated/sha256-x86_64-elf.S"
-    "pregenerated/sha512-x86_64-elf.S"
-    "pregenerated/chacha20_poly1305_x86_64-elf.S"
-    "pregenerated/aes-gcm-avx2-x86_64-elf.S"
-    "third_party/fiat/asm/fiat_curve25519_adx_mul.S"
-    "third_party/fiat/asm/fiat_curve25519_adx_square.S"
-  ];
 }

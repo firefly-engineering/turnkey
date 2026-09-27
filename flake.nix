@@ -141,6 +141,11 @@
         };
       };
 
+      # turnkey's own fixup set, one module per family plus `default`
+      # (nix/fixups, docs/adr/0003-fixup-sets-are-modules.md): what
+      # turnkey's repository needs, for other repositories to import
+      flake.modules.turnkeyFixups = import ./nix/fixups;
+
       # Export home-manager module for turnkey-composed service
       flake.homeManagerModules = {
         turnkey-composed = ./nix/home-manager/turnkey-composed.nix;
@@ -159,6 +164,8 @@
       # (same closure consumers receive).
       imports = [
         inputs.devenv.flakeModule
+        # flake.modules, where the fixup set is published
+        flake-parts.flakeModules.modules
         (import ./nix/flake-parts/turnkey {
           turnkeyLib = self.lib;
           devenvRoot = inputs.devenv-root;
@@ -808,18 +815,41 @@
                 }
               ];
 
-              # turnkey's registries of before fixup sets, as a module
+              # The registries of before fixup sets, as a module
               legacy =
                 (resolveWith [
-                  (import ./nix/lib/fixups/legacy.nix { inherit lib; } (
-                    let
-                      builtin = import ./nix/lib/deps-cell/fixups/rust { inherit pkgs lib; };
-                    in
-                    {
-                      inherit (builtin) buildScriptFixups rustcFlags nativeLibraries;
-                    }
-                  ))
+                  (import ./nix/lib/fixups/legacy.nix { inherit lib; } {
+                    buildScriptFixups.serde = { patchVersion, vendorPath, ... }: "echo ${vendorPath} ${patchVersion}";
+                    rustcFlags."rustix@1.0.7".linux = [
+                      "--cfg"
+                      "old"
+                    ];
+                    nativeLibraries.ring =
+                      { patchVersion, ... }:
+                      {
+                        lib_name = "ring_${patchVersion}";
+                        static_lib_path = "out_dir/libring.a";
+                      };
+                  })
                 ] "rust" locked).fixups;
+
+              # turnkey's own set, as another repository imports it, on
+              # two platforms
+              turnkeySet =
+                platform: modules:
+                (fixups.resolve {
+                  evaluated = fixups.evalFixups { inherit pkgs modules; };
+                  language = "rust";
+                  deps = locked;
+                  inherit platform;
+                }).fixups;
+              ownOnLinux = turnkeySet platform [ self.modules.turnkeyFixups.default ];
+              ownOnIntelMac = turnkeySet {
+                system = "x86_64-darwin";
+                os = "macos";
+                cpu = "x86_64";
+              } [ self.modules.turnkeyFixups.default ];
+              serdeOnly = turnkeySet platform [ self.modules.turnkeyFixups.serde ];
 
               expectations = {
                 "sets and inline fixups merge per field" =
@@ -901,9 +931,25 @@
                     }
                   ]).errors != [ ];
                 "the old registries resolve as they used to" =
-                  lib.hasInfix "__private219" legacy."serde@1.0.219".commands
-                  && legacy."rustix@1.0.7".gen.rustcFlags.os.linux != [ ]
-                  && (builtins.head legacy."ring@0.17.14".gen.nativeLibraries).lib_name == "ring_core_0_17_14__";
+                  lib.hasInfix "echo . 219" legacy."serde@1.0.219".commands
+                  &&
+                    legacy."rustix@1.0.7".gen.rustcFlags.os.linux == [
+                      "--cfg"
+                      "old"
+                    ]
+                  && (builtins.head legacy."ring@0.17.14".gen.nativeLibraries).lib_name == "ring_14";
+                "turnkey's published set fixes the crates it locks" =
+                  lib.hasInfix "pub mod __private219" ownOnLinux."serde@1.0.219".commands
+                  && ownOnLinux."rustix@1.0.7".gen.rustcFlags.os.macos != [ ]
+                  && (builtins.head ownOnLinux."ring@0.17.14".gen.nativeLibraries).lib_name == "ring_core_0_17_14__";
+                "ring's build script assembles the platform's own object format" =
+                  lib.hasInfix "chacha-x86_64-elf.S" ownOnLinux."ring@0.17.14".commands
+                  && lib.hasInfix "chacha-x86_64-macosx.S" ownOnIntelMac."ring@0.17.14".commands
+                  && !(lib.hasInfix "-elf.S" ownOnIntelMac."ring@0.17.14".commands);
+                "turnkey's ring fixup is for ring 0.17 only" =
+                  !ownOnLinux."ring@0.16.20".accounted && ownOnLinux."ring@0.16.20".commands == "";
+                "a family module brings its family only" =
+                  serdeOnly ? "serde@1.0.219" && !(serdeOnly ? "ring@0.17.14");
               };
               failed = builtins.attrNames (lib.filterAttrs (_: ok: !ok) expectations);
             in
@@ -986,6 +1032,9 @@
               enable = true;
               # prelude.strategy defaults to "nix" - uses turnkey-prelude derivation
               welcomeMessage = "Welcome to turnkey dev shell";
+
+              # The fixups the crates turnkey locks need: its own set
+              fixups.imports = [ self.modules.turnkeyFixups.default ];
 
               # Go dependencies
               go = {

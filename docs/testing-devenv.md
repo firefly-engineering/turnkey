@@ -113,7 +113,7 @@ direnv exec . ls -la .turnkey/rustdeps  # Will recreate
 When you modify Nix files that affect the devenv (e.g., fixups, cell builders), use `nix develop --impure` first to rebuild, then `direnv exec .` for subsequent commands:
 
 ```bash
-# After modifying nix/lib/deps-cell/fixups/rust/tree-sitter.nix
+# After modifying nix/fixups/rust/tree-sitter.nix
 rm -rf .turnkey/rustdeps
 nix develop --impure -c bash -c 'ls -la .turnkey/rustdeps'
 

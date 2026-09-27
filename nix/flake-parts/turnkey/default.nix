@@ -318,23 +318,19 @@ in
       # The platforms the cells are built for (buck2.platforms)
       platforms = import ../../buck2/platforms.nix { inherit lib; };
 
-      # The fixup sets (buck2.fixups), with turnkey's fixup registries
-      # still merged in until they are a published set
+      # The fixup sets the repository imports and its own fixups
+      # (buck2.fixups): no others apply. The old registry options still
+      # feed in until they are retired.
       fixupsLib = import ../../lib/fixups { inherit lib; };
       evaluatedFixups = fixupsLib.evalFixups {
         inherit pkgs;
         modules = [
           cfg.buck2.fixups
-          (import ../../lib/fixups/legacy.nix { inherit lib; } (
-            let
-              builtin = import ../../lib/deps-cell/fixups/rust { inherit pkgs lib; };
-            in
-            {
-              buildScriptFixups = builtin.buildScriptFixups // cfg.buck2.rust.buildScriptFixups;
-              rustcFlags = builtin.rustcFlags // cfg.buck2.rust.rustcFlagsRegistry;
-              inherit (builtin) nativeLibraries;
-            }
-          ))
+          (import ../../lib/fixups/legacy.nix { inherit lib; } {
+            inherit (cfg.buck2.rust) buildScriptFixups;
+            rustcFlags = cfg.buck2.rust.rustcFlagsRegistry;
+            nativeLibraries = { };
+          })
         ];
       };
       # Fixups written in buck2.fixups itself are this repository's own:

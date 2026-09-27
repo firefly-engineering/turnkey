@@ -8,11 +8,15 @@
 # 1. Generates prefix header files for symbol namespacing
 # 2. Compiles C sources with proper flags
 # 3. Assembles pregenerated .S files
-# 4. Archives into libring_core_0_17_<patch>__.a
+# 4. Archives into libring_core_<major>_<minor>_<patch>__.a
+#
+# It is written for ring 0.17: its source lists are 0.17's, so other
+# versions are left unaccounted for. The platform is the one the cell is
+# built on (ctx.platform); the library exists only for it.
 #
 # Reference: https://github.com/briansmith/ring/blob/main/build.rs
 
-{ lib }:
+{ lib, ... }:
 
 let
   symbols = import ./ring-symbols.nix { inherit lib; };
@@ -40,56 +44,52 @@ let
   # Helper to generate shell array from a Nix list
   mkSourcesArray = srcs: lib.concatMapStringsSep "\n" (src: "        ${src}") srcs;
 
-  # Detect target platform from Nix system
-  # Returns { cSources, asmSources } for the current platform
+  # ring's sources for a platform: its CPU's C and assembly, in the object
+  # format of its OS (ELF on Linux, Mach-O on macOS)
   platformSources =
-    system:
-    let
-      isAarch64 = lib.hasPrefix "aarch64" system;
-      isDarwin = lib.hasSuffix "darwin" system;
-      isLinux = lib.hasSuffix "linux" system;
-    in
-    if isAarch64 && isDarwin then
+    platform:
+    if platform.cpu == "arm64" then
       {
         cSources = symbols.cSourcesCommon ++ symbols.cSourcesAarch64;
-        asmSources = symbols.asmSourcesAarch64Apple;
-      }
-    else if isAarch64 && isLinux then
-      {
-        # aarch64-linux uses linux64 format assembly
-        cSources = symbols.cSourcesCommon ++ symbols.cSourcesAarch64;
-        asmSources = map (
-          s: builtins.replaceStrings [ "-ios64.S" ] [ "-linux64.S" ] s
-        ) symbols.asmSourcesAarch64Apple;
+        asmSources =
+          if platform.os == "macos" then
+            symbols.asmSourcesAarch64Apple
+          else
+            map (builtins.replaceStrings [ "-ios64.S" ] [ "-linux64.S" ]) symbols.asmSourcesAarch64Apple;
       }
     else
       {
-        # Default: x86_64-linux
         cSources = symbols.cSourcesCommon ++ symbols.cSourcesX86_64;
-        asmSources = symbols.asmSourcesX86_64Linux;
+        asmSources =
+          if platform.os == "macos" then
+            map (builtins.replaceStrings [ "-elf.S" ] [ "-macosx.S" ]) symbols.asmSourcesX86_64Linux
+          else
+            symbols.asmSourcesX86_64Linux;
       };
 
-  # Build the fixup for the current system
+  # ring's symbol prefix, from its version
+  prefixOf = v: "ring_core_${v.major}_${v.minor}_${v.patch}__";
+
+  # The build script for the platform the cell is built on
   mkRingFixup =
+    ctx:
     let
-      system = builtins.currentSystem;
-      platSrcs = platformSources system;
+      platSrcs = platformSources ctx.platform;
       cSourcesArray = mkSourcesArray platSrcs.cSources;
       asmSourcesArray = mkSourcesArray platSrcs.asmSources;
+      system = ctx.platform.system;
     in
-    { patchVersion, vendorPath, ... }:
     ''
           # Fixup: ring native crypto library compilation
           # Ring's build.rs compiles C and assembly files into libring_core_*.a
           # We replicate this in Nix for Buck2 to link against
           echo "Building ring native crypto library (${system})..."
-          RING_SRC="$out/${vendorPath}"
-          RING_OUT="$out/${vendorPath}/out_dir"
-          mkdir -p "$RING_OUT"
+          RING_SRC="$CRATE_SRC"
+          RING_OUT="$OUT_DIR"
 
           # Symbol prefix to avoid conflicts (matches ring's build.rs)
           # Note: The prefix ends with double underscore, matching what ring's Rust code expects
-          RING_PREFIX="ring_core_0_17_${patchVersion}__"
+          RING_PREFIX="${prefixOf ctx.versionParts}"
 
           # Generate prefix header for symbol namespacing
           # Ring expects this at ring_core_generated/prefix_symbols.h
@@ -172,28 +172,19 @@ let
 
 in
 {
-  # ==========================================================================
-  # Build Script Fixups
-  # ==========================================================================
-
-  # The fixup is a function that takes system as an argument.
-  # The deps-cell adapter passes system to fixup functions that accept it.
-  buildScriptFixups = {
-    ring = mkRingFixup;
-  };
-
-  # ==========================================================================
-  # Native Libraries
-  # ==========================================================================
-
-  nativeLibraries = {
-    # ring's native crypto library
-    ring =
-      { patchVersion, ... }:
-      {
-        lib_name = "ring_core_0_17_${patchVersion}__";
-        static_lib_path = "out_dir/libring_core_0_17_${patchVersion}__.a";
-        link_search_path = "out_dir";
+  rust.ring.versions = [
+    {
+      when = {
+        atLeast = "0.17";
+        below = "0.18";
       };
-  };
+      buildScript.generate = mkRingFixup;
+      nativeLibraries = [
+        {
+          name = ctx: prefixOf ctx.versionParts;
+          staticLib = ctx: "out_dir/lib${prefixOf ctx.versionParts}.a";
+        }
+      ];
+    }
+  ];
 }

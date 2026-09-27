@@ -11,7 +11,8 @@
 
 let
   # Import language-specific fixups
-  rustFixups = import ./rust { inherit pkgs lib; };
+  # Rust's are turnkey's fixup set now (nix/fixups)
+  rustFixups = { };
   goFixups = import ./go { inherit pkgs lib; };
   pythonFixups = import ./python { inherit pkgs lib; };
 in

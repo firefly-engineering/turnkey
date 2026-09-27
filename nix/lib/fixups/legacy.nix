@@ -1,8 +1,6 @@
 # The Rust fixup registries of before fixup sets, as one turnkeyFixups
-# module: buck2.rust.buildScriptFixups and buck2.rust.rustcFlagsRegistry,
-# merged over nix/lib/deps-cell/fixups/rust as they always were. Kept only
-# until turnkey's fixups are ported to a published set and the old options
-# are retired.
+# module: what buck2.rust.buildScriptFixups and buck2.rust.rustcFlagsRegistry
+# hold. Kept only until those options are retired.
 #
 # Old keys are a crate's name or "name@version"; an exact version becomes a
 # versions entry whose bounds hold for that version only.
