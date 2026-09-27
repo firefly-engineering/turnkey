@@ -30,6 +30,14 @@ _Avoid_: preserve (which is only the `turnkey:preserve` section)
 The tool that reads one language's lock file and writes the deps file (`rust-deps.toml`, `go-deps.toml`, ...) that language's deps cell is built from. `tk sync` runs it from the language's sync rule. Its own code is the lock file parsing and the record it writes; the flags (`--output`, prefetching on unless `--no-prefetch`, `--no-cache`), the prefetching of Nix hashes and the file's header are the same for every generator, and live in deps-gen-kit.
 _Avoid_: deps-gen tool, lockfile converter
 
+**Project root**:
+The nearest directory, from where `tk` or `tw` runs, holding a `.buckconfig` or a `.turnkey/sync.toml`; a turnkey shell writes both there. Outside one, `tk` runs from the working directory and `tw` runs the tool untouched.
+_Avoid_: repo root, workspace root
+
+**Wrapped tool**:
+A language's native tool (`go`, `cargo`, `uv`, named by the language record) that the shell runs through `tw`. When one of its mutating subcommands changes the content of a file its wrapper rule watches, `tw` runs the rule's post-commands and syncs the rule's deps rule; it always exits as the tool did. Change is judged by content, where `tk sync` judges staleness by mtime.
+_Avoid_: shim, tool wrapper (which is the shell script, not the tool)
+
 ### Testing
 
 **Test result caching**:
