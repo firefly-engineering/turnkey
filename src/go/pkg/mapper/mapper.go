@@ -10,6 +10,7 @@ import (
 
 	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 )
 
 // DependencyType classifies a dependency.
@@ -38,6 +39,15 @@ type MappedDep struct {
 type Config struct {
 	// ProjectRoot is the root directory of the project.
 	ProjectRoot string
+
+	// Languages are the languages to resolve deps for, in order, each with
+	// the cell and deps file of its external deps (sync.toml's
+	// [[languages]]).
+	Languages []syncconfig.Language
+
+	// Conditions are the build configurations sync evaluates; Go's
+	// allowed build tags come from them.
+	Conditions syncconfig.ConditionsConfig
 }
 
 // Mapper resolves packages' deps to Buck2 targets through the registered
@@ -47,12 +57,16 @@ type Mapper struct {
 	languages []Language
 }
 
-// New creates a Mapper with every registered language, each configured from
-// the project root.
+// New creates a Mapper with the plug-in of each of the configured
+// languages. A language without a plug-in is an error.
 func New(cfg Config) (*Mapper, error) {
 	m := &Mapper{config: cfg}
-	for _, newLanguage := range registry {
-		m.languages = append(m.languages, newLanguage(cfg.ProjectRoot))
+	for _, lang := range cfg.Languages {
+		newLanguage, ok := registry[lang.Name]
+		if !ok {
+			return nil, fmt.Errorf("no rules sync plug-in for language %q", lang.Name)
+		}
+		m.languages = append(m.languages, newLanguage(cfg, lang))
 	}
 	return m, nil
 }

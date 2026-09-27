@@ -54,13 +54,9 @@ type goLanguage struct {
 	allowedTags []string
 }
 
-func newGoLanguage(projectRoot string) Language {
-	cfg, _ := detectGoConfig(projectRoot)
-	l := &goLanguage{projectRoot: projectRoot, cfg: cfg}
-	if syncCfg, err := syncconfig.LoadDefaultFrom(projectRoot); err == nil {
-		l.allowedTags = syncCfg.Conditions.GoTags
-	}
-	return l
+func newGoLanguage(mcfg Config, lang syncconfig.Language) Language {
+	cfg, _ := detectGoConfig(mcfg.ProjectRoot, lang)
+	return &goLanguage{projectRoot: mcfg.ProjectRoot, cfg: cfg, allowedTags: mcfg.Conditions.GoTags}
 }
 
 // Dimensions: the platform, and each allowed build tag the package's build
@@ -236,10 +232,11 @@ func classifyGoImport(imp, modulePath string) extraction.ImportKind {
 	return extraction.ImportKindExternal
 }
 
-// detectGoConfig auto-detects Go configuration from the project.
-func detectGoConfig(projectRoot string) (*GoConfig, error) {
+// detectGoConfig auto-detects Go configuration from the project, with the
+// language's cell and deps file.
+func detectGoConfig(projectRoot string, lang syncconfig.Language) (*GoConfig, error) {
 	cfg := &GoConfig{
-		ExternalCell: "godeps",
+		ExternalCell: lang.Cell,
 		ExternalDeps: make(map[string]bool),
 	}
 
@@ -250,7 +247,7 @@ func detectGoConfig(projectRoot string) (*GoConfig, error) {
 	}
 
 	// Load go-deps.toml
-	depsPath := filepath.Join(projectRoot, "go-deps.toml")
+	depsPath := filepath.Join(projectRoot, lang.DepsFile)
 	if deps, err := loadGoDeps(depsPath); err == nil {
 		cfg.DepsFile = depsPath
 		cfg.ExternalDeps = deps

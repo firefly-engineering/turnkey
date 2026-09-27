@@ -39,7 +39,7 @@ integrity = "sha512-z"
 }
 
 func TestMapTypeScriptImports(t *testing.T) {
-	m, err := New(Config{ProjectRoot: jsDepsFixture(t)})
+	m, err := New(testConfig(jsDepsFixture(t)))
 	if err != nil {
 		t.Fatal(err)
 	}

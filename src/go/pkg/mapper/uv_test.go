@@ -57,7 +57,7 @@ func TestLoadUVWorkspaceModules(t *testing.T) {
 
 func TestMapPythonWorkspaceImports(t *testing.T) {
 	root := uvWorkspaceFixture(t)
-	m, err := New(Config{ProjectRoot: root})
+	m, err := New(testConfig(root))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -11,7 +11,6 @@ import (
 	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/mapper"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
-	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 )
 
 // turnkey's default platforms
@@ -70,7 +69,7 @@ func syncFake(t *testing.T, lang *fakeLanguage, platforms []conditions.Platform,
 	s, err := newSyncer(Config{
 		ProjectRoot: root,
 		Force:       true,
-		Conditions:  &syncconfig.ConditionsConfig{Platforms: platforms},
+		Sync:        testSync(platforms),
 	}, mapper.NewWith(mapper.Config{ProjectRoot: root}, lang))
 	if err != nil {
 		t.Fatal(err)
@@ -248,7 +247,7 @@ inotify = "0.11"
 	s, err := NewSyncer(Config{
 		ProjectRoot: root,
 		Force:       true,
-		Conditions:  &syncconfig.ConditionsConfig{Platforms: defaultPlatforms},
+		Sync:        testSync(defaultPlatforms),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -328,7 +327,7 @@ rust_library(
 	s, err := NewSyncer(Config{
 		ProjectRoot: root,
 		Force:       true,
-		Conditions:  &syncconfig.ConditionsConfig{Platforms: defaultPlatforms},
+		Sync:        testSync(defaultPlatforms),
 	})
 	if err != nil {
 		t.Fatal(err)

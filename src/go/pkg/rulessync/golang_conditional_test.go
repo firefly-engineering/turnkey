@@ -19,7 +19,12 @@ func goConditionalFixture(t *testing.T) string {
 
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
-		".turnkey/sync.toml": `[conditions]
+		".turnkey/sync.toml": `[[languages]]
+name = "go"
+cell = "godeps"
+deps_file = "go-deps.toml"
+
+[conditions]
 settings = "toolchains//conditions"
 go_tags = ["integration"]
 

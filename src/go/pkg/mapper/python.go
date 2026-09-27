@@ -8,6 +8,7 @@ import (
 
 	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -54,8 +55,9 @@ type pythonLanguage struct {
 	version *string
 }
 
-func newPythonLanguage(projectRoot string) Language {
-	cfg, _ := detectPythonConfig(projectRoot)
+func newPythonLanguage(mcfg Config, lang syncconfig.Language) Language {
+	projectRoot := mcfg.ProjectRoot
+	cfg, _ := detectPythonConfig(projectRoot, lang)
 	l := &pythonLanguage{projectRoot: projectRoot, cfg: cfg, extracted: make(map[string]PackageMapping)}
 	if cfg != nil {
 		l.members, _ = loadPyMembers(projectRoot)
@@ -112,10 +114,11 @@ func (l *pythonLanguage) ResolveDeps(pkgDir string, req Request) (PackageMapping
 	return l.applyMarkers(mapping, member, req), nil
 }
 
-// detectPythonConfig auto-detects Python configuration from the project.
-func detectPythonConfig(projectRoot string) (*PythonConfig, error) {
+// detectPythonConfig auto-detects Python configuration from the project,
+// with the language's cell and deps file.
+func detectPythonConfig(projectRoot string, lang syncconfig.Language) (*PythonConfig, error) {
 	cfg := &PythonConfig{
-		ExternalCell: "pydeps",
+		ExternalCell: lang.Cell,
 		ExternalDeps: make(map[string]bool),
 	}
 
@@ -131,7 +134,7 @@ func detectPythonConfig(projectRoot string) (*PythonConfig, error) {
 	}
 
 	// Load python-deps.toml
-	depsPath := filepath.Join(projectRoot, "python-deps.toml")
+	depsPath := filepath.Join(projectRoot, lang.DepsFile)
 	if deps, err := loadDepsKeys(depsPath); err == nil {
 		cfg.DepsFile = depsPath
 		cfg.ExternalDeps = deps

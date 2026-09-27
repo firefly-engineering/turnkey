@@ -10,7 +10,27 @@ import (
 	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/mapper"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 )
+
+// testLanguages are a project's languages as sync.toml lists them, each
+// with its default cell and deps file.
+var testLanguages = []syncconfig.Language{
+	{Name: "go", Cell: "godeps", DepsFile: "go-deps.toml"},
+	{Name: "rust", Cell: "rustdeps", DepsFile: "rust-deps.toml"},
+	{Name: "python", Cell: "pydeps", DepsFile: "python-deps.toml"},
+	{Name: "javascript", Cell: "jsdeps", DepsFile: "js-deps.toml"},
+	{Name: "solidity", Cell: "soldeps", DepsFile: "solidity-deps.toml"},
+}
+
+// testSync is the sync configuration of a project with testLanguages,
+// built for platforms.
+func testSync(platforms []conditions.Platform) *syncconfig.Config {
+	return &syncconfig.Config{
+		Languages:  testLanguages,
+		Conditions: syncconfig.ConditionsConfig{Platforms: platforms},
+	}
+}
 
 // writeFiles writes files (relative path -> content) under root.
 func writeFiles(t *testing.T, root string, files map[string]string) {
@@ -23,6 +43,14 @@ func writeFiles(t *testing.T, root string, files map[string]string) {
 		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// Without a sync.toml listing the languages, there is nothing to sync
+// with: that is an error, not a sync that passes every check.
+func TestNewSyncerWithoutLanguages(t *testing.T) {
+	if _, err := NewSyncer(Config{ProjectRoot: t.TempDir()}); err == nil {
+		t.Fatal("NewSyncer without a sync.toml succeeded")
 	}
 }
 
@@ -64,7 +92,7 @@ go_binary(
 `,
 	})
 
-	s, err := NewSyncer(Config{ProjectRoot: root, Force: true})
+	s, err := NewSyncer(Config{ProjectRoot: root, Force: true, Sync: testSync(nil)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +172,7 @@ go_test(
 `,
 	})
 
-	s, err := NewSyncer(Config{ProjectRoot: root, Force: true, DryRun: true})
+	s, err := NewSyncer(Config{ProjectRoot: root, Force: true, DryRun: true, Sync: testSync(nil)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,7 +482,7 @@ rust_test(
 `,
 	})
 
-	s, err := NewSyncer(Config{ProjectRoot: root, Force: true, DryRun: true})
+	s, err := NewSyncer(Config{ProjectRoot: root, Force: true, DryRun: true, Sync: testSync(nil)})
 	if err != nil {
 		t.Fatal(err)
 	}

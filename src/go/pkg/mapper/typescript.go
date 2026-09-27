@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -44,9 +45,9 @@ type typescriptLanguage struct {
 	cfg         *TypeScriptConfig
 }
 
-func newTypeScriptLanguage(projectRoot string) Language {
-	cfg, _ := detectTypescriptConfig(projectRoot)
-	return &typescriptLanguage{projectRoot: projectRoot, cfg: cfg}
+func newTypeScriptLanguage(mcfg Config, lang syncconfig.Language) Language {
+	cfg, _ := detectTypescriptConfig(mcfg.ProjectRoot, lang)
+	return &typescriptLanguage{projectRoot: mcfg.ProjectRoot, cfg: cfg}
 }
 
 func (l *typescriptLanguage) Name() string { return "typescript" }
@@ -124,10 +125,11 @@ func typesPackage(pkg string) string {
 	return "@types/" + pkg
 }
 
-// detectTypescriptConfig auto-detects TypeScript configuration from the project.
-func detectTypescriptConfig(projectRoot string) (*TypeScriptConfig, error) {
+// detectTypescriptConfig auto-detects TypeScript configuration from the
+// project, with the language's cell and deps file.
+func detectTypescriptConfig(projectRoot string, lang syncconfig.Language) (*TypeScriptConfig, error) {
 	cfg := &TypeScriptConfig{
-		ExternalCell: "jsdeps",
+		ExternalCell: lang.Cell,
 		ExternalDeps: make(map[string]bool),
 	}
 
@@ -142,7 +144,7 @@ func detectTypescriptConfig(projectRoot string) (*TypeScriptConfig, error) {
 	cfg.ProjectRoot = projectRoot
 
 	// Load js-deps.toml
-	depsPath := filepath.Join(projectRoot, "js-deps.toml")
+	depsPath := filepath.Join(projectRoot, lang.DepsFile)
 	if deps, err := loadJSDeps(depsPath); err == nil {
 		cfg.DepsFile = depsPath
 		cfg.ExternalDeps = deps

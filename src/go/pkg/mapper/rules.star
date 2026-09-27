@@ -27,6 +27,7 @@ go_test(
         "//src/go/pkg/extraction:extraction",
         "//src/go/pkg/godeps:godeps",
         "//src/go/pkg/starlark:starlark",
+        "//src/go/pkg/syncconfig:syncconfig",
     ],
     visibility = ["PUBLIC"],
 )

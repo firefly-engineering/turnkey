@@ -33,9 +33,10 @@ type Config struct {
 	// When false, uses mtime-based staleness detection to skip files.
 	Force bool
 
-	// Conditions are the build configurations sync evaluates. When nil,
-	// they are read from the project's .turnkey/sync.toml.
-	Conditions *syncconfig.ConditionsConfig
+	// Sync is the project's sync configuration: the languages sync
+	// resolves deps for and the build configurations it evaluates. When
+	// nil, it is read from the project's .turnkey/sync.toml.
+	Sync *syncconfig.Config
 }
 
 // Syncer orchestrates rules.star synchronization.
@@ -48,10 +49,22 @@ type Syncer struct {
 	space conditions.Space
 }
 
-// NewSyncer creates a new Syncer.
+// NewSyncer creates a new Syncer, with the plug-ins of the configured
+// languages.
 func NewSyncer(cfg Config) (*Syncer, error) {
+	if err := cfg.loadSync(); err != nil {
+		return nil, err
+	}
+	// Every sync.toml turnkey writes lists its languages: one without them
+	// is missing or predates them, and the turnkey shell regenerates it.
+	// Syncing no language would pass every check.
+	if len(cfg.Sync.Languages) == 0 {
+		return nil, fmt.Errorf("%s lists no [[languages]]: re-enter the turnkey shell to regenerate it", syncconfig.DefaultConfigPath)
+	}
 	m, err := mapper.New(mapper.Config{
 		ProjectRoot: cfg.ProjectRoot,
+		Languages:   cfg.Sync.Languages,
+		Conditions:  cfg.Sync.Conditions,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating mapper: %w", err)
@@ -62,20 +75,31 @@ func NewSyncer(cfg Config) (*Syncer, error) {
 
 // newSyncer creates a Syncer with the given mapper.
 func newSyncer(cfg Config, m *mapper.Mapper) (*Syncer, error) {
-	cond := cfg.Conditions
-	if cond == nil {
-		syncCfg, err := syncconfig.LoadDefaultFrom(cfg.ProjectRoot)
-		if err != nil {
-			return nil, fmt.Errorf("reading sync config: %w", err)
-		}
-		cond = &syncCfg.Conditions
+	if err := cfg.loadSync(); err != nil {
+		return nil, err
 	}
 
 	return &Syncer{
 		config: cfg,
 		mapper: m,
-		space:  cond.Space(),
+		space:  cfg.Sync.Conditions.Space(),
 	}, nil
+}
+
+// loadSync reads the project's sync configuration, unless it was given.
+func (cfg *Config) loadSync() error {
+	if cfg.Sync != nil {
+		return nil
+	}
+	syncCfg, err := syncconfig.LoadDefaultFrom(cfg.ProjectRoot)
+	if err != nil {
+		return fmt.Errorf("reading sync config: %w", err)
+	}
+	if err := syncCfg.Validate(); err != nil {
+		return fmt.Errorf("invalid sync config: %w", err)
+	}
+	cfg.Sync = syncCfg
+	return nil
 }
 
 // SyncResult contains the result of syncing a single rules.star file.

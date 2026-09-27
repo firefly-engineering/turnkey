@@ -383,6 +383,7 @@ func runRulesAutoSync() int {
 		ProjectRoot: root,
 		DryRun:      cfg.Rules.Strict || strictRules, // Dry-run in strict mode
 		Verbose:     verbose,
+		Sync:        cfg,
 	})
 	if err != nil {
 		if verbose {

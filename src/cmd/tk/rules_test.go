@@ -12,10 +12,11 @@ func rulesProject(t *testing.T, rulesStar string) {
 	t.Helper()
 	root := t.TempDir()
 	files := map[string]string{
-		".buckconfig":    "",
-		"Cargo.toml":     "[workspace]\nmembers = [\"lib\"]\n",
-		"lib/Cargo.toml": "[package]\nname = \"lib\"\n",
-		"lib/rules.star": rulesStar,
+		".buckconfig":        "",
+		".turnkey/sync.toml": "[[languages]]\nname = \"rust\"\ncell = \"rustdeps\"\ndeps_file = \"rust-deps.toml\"\n",
+		"Cargo.toml":         "[workspace]\nmembers = [\"lib\"]\n",
+		"lib/Cargo.toml":     "[package]\nname = \"lib\"\n",
+		"lib/rules.star":     rulesStar,
 	}
 	for rel, content := range files {
 		path := filepath.Join(root, rel)

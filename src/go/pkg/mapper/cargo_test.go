@@ -8,6 +8,7 @@ import (
 
 	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 )
 
 // writeTree writes files (relative path -> content) under root.
@@ -92,9 +93,36 @@ func targets(deps []MappedDep) []string {
 	return out
 }
 
+// A crate's external deps are in its language's cell, as listed in its
+// language's deps file, wherever sync.toml says they are.
+func TestMapRustCrateFromLanguage(t *testing.T) {
+	root := cargoWorkspaceFixture(t)
+	if err := os.MkdirAll(filepath.Join(root, "third-party"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(root, "rust-deps.toml"), filepath.Join(root, "third-party/rust-deps.toml")); err != nil {
+		t.Fatal(err)
+	}
+	m, err := New(Config{
+		ProjectRoot: root,
+		Languages:   []syncconfig.Language{{Name: "rust", Cell: "crates", DepsFile: "third-party/rust-deps.toml"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mapping, err := m.Language("rust").ResolveDeps(filepath.Join(root, "crates/lib"), Request{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := targets(mapping.Deps), []string{"crates//vendor/anyhow:anyhow"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Deps = %v, want %v", got, want)
+	}
+}
+
 func TestMapRustCrate(t *testing.T) {
 	root := cargoWorkspaceFixture(t)
-	m, err := New(Config{ProjectRoot: root})
+	m, err := New(testConfig(root))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +177,7 @@ name = "other"
 my-lib = "0.1"
 `,
 	})
-	m, err := New(Config{ProjectRoot: root})
+	m, err := New(testConfig(root))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +202,7 @@ name = "bad"
 nope.workspace = true
 `,
 	})
-	m, err := New(Config{ProjectRoot: root})
+	m, err := New(testConfig(root))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +242,7 @@ core-foundation = "0.10"
 tempfile = "3"
 `,
 	})
-	m, err := New(Config{ProjectRoot: root})
+	m, err := New(testConfig(root))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,7 +343,7 @@ rust_library(
 `,
 		"crates/app/Cargo.toml": "[package]\nname = \"app\"\n\n[dependencies]\n" + appDeps,
 	})
-	m, err := New(Config{ProjectRoot: root})
+	m, err := New(testConfig(root))
 	if err != nil {
 		t.Fatal(err)
 	}

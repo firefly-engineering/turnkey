@@ -5,8 +5,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-
-	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 )
 
 // A uv workspace member's platform marker is a select() on the OS, a marker
@@ -63,7 +61,7 @@ python_library(
 	s, err := NewSyncer(Config{
 		ProjectRoot: root,
 		Force:       true,
-		Conditions:  &syncconfig.ConditionsConfig{Platforms: defaultPlatforms},
+		Sync:        testSync(defaultPlatforms),
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -185,7 +185,7 @@ func TestGoDepsFromGodepsGen(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := New(Config{ProjectRoot: dir})
+	m, err := New(testConfig(dir))
 	if err != nil {
 		t.Fatal(err)
 	}

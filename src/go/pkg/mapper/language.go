@@ -9,6 +9,7 @@ import (
 	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 )
 
 // TargetKind is what a Buck2 rule builds, as far as sync is concerned.
@@ -90,14 +91,16 @@ func (unconditional) Dimensions(string) ([]string, error) { return nil, nil }
 
 func (unconditional) VariantAttributes(TargetKind) []string { return nil }
 
-// registry holds the language plug-ins, in the order sync tries them. Each
-// is created for a project root and loads its own configuration from it.
-var registry = []func(projectRoot string) Language{
-	newGoLanguage,
-	newRustLanguage,
-	newPythonLanguage,
-	newTypeScriptLanguage,
-	newSolidityLanguage,
+// registry holds the language plug-ins, by the name of the language record
+// each serves (nix/buck2/languages.nix). Each is created for the mapper's
+// configuration and its language's cell and deps file, and loads the rest
+// of its configuration from the project.
+var registry = map[string]func(cfg Config, lang syncconfig.Language) Language{
+	"go":         newGoLanguage,
+	"rust":       newRustLanguage,
+	"python":     newPythonLanguage,
+	"javascript": newTypeScriptLanguage,
+	"solidity":   newSolidityLanguage,
 }
 
 // importLanguage is a language whose deps come from the imports its sources

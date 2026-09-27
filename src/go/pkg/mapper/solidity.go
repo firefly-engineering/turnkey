@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -42,9 +43,9 @@ type solidityLanguage struct {
 	cfg         *SolidityConfig
 }
 
-func newSolidityLanguage(projectRoot string) Language {
-	cfg, _ := detectSolidityConfig(projectRoot)
-	return &solidityLanguage{projectRoot: projectRoot, cfg: cfg}
+func newSolidityLanguage(mcfg Config, lang syncconfig.Language) Language {
+	cfg, _ := detectSolidityConfig(mcfg.ProjectRoot, lang)
+	return &solidityLanguage{projectRoot: mcfg.ProjectRoot, cfg: cfg}
 }
 
 func (l *solidityLanguage) Name() string { return "solidity" }
@@ -62,10 +63,11 @@ func (l *solidityLanguage) ResolveDeps(pkgDir string, _ Request) (PackageMapping
 	return resolveWithDepsExtract(l, l.projectRoot, pkgDir)
 }
 
-// detectSolidityConfig auto-detects Solidity configuration from the project.
-func detectSolidityConfig(projectRoot string) (*SolidityConfig, error) {
+// detectSolidityConfig auto-detects Solidity configuration from the
+// project, with the language's cell and deps file.
+func detectSolidityConfig(projectRoot string, lang syncconfig.Language) (*SolidityConfig, error) {
 	cfg := &SolidityConfig{
-		ExternalCell: "soldeps",
+		ExternalCell: lang.Cell,
 		ExternalDeps: make(map[string]bool),
 	}
 
@@ -83,7 +85,7 @@ func detectSolidityConfig(projectRoot string) (*SolidityConfig, error) {
 	cfg.ProjectRoot = projectRoot
 
 	// Load solidity-deps.toml
-	depsPath := filepath.Join(projectRoot, "solidity-deps.toml")
+	depsPath := filepath.Join(projectRoot, lang.DepsFile)
 	if deps, err := loadSolidityDeps(depsPath); err == nil {
 		cfg.DepsFile = depsPath
 		cfg.ExternalDeps = deps

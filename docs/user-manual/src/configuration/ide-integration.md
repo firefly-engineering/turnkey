@@ -145,7 +145,9 @@ turnkey.toolchains.buck2.rules = {
 
 Sync finds each language's internal targets from its own manifest
 (`go.mod`, `Cargo.toml`, the uv workspace) and uses turnkey's deps cells
-(`godeps`, `rustdeps`, `pydeps`, `jsdeps`, `soldeps`). The platforms it
+(`godeps`, `rustdeps`, `pydeps`, `jsdeps`, `soldeps`), through the deps
+file each is built from (the language's `depsFile`). Both reach sync
+through the `[[languages]]` of `.turnkey/sync.toml`. The platforms it
 resolves deps for come from `buck2.platforms` (see
 [Platform-Conditional Deps](#platform-conditional-deps)).
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -50,9 +51,9 @@ type rustLanguage struct {
 	rules map[string]*starlark.File
 }
 
-func newRustLanguage(projectRoot string) Language {
-	cfg, _ := detectRustConfig(projectRoot)
-	return &rustLanguage{projectRoot: projectRoot, cfg: cfg}
+func newRustLanguage(mcfg Config, lang syncconfig.Language) Language {
+	cfg, _ := detectRustConfig(mcfg.ProjectRoot, lang)
+	return &rustLanguage{projectRoot: mcfg.ProjectRoot, cfg: cfg}
 }
 
 func (l *rustLanguage) Name() string { return "rust" }
@@ -85,10 +86,11 @@ func (l *rustLanguage) ResolveDeps(crateDir string, req Request) (PackageMapping
 	return mapping, nil
 }
 
-// detectRustConfig auto-detects Rust configuration from the project.
-func detectRustConfig(projectRoot string) (*RustConfig, error) {
+// detectRustConfig auto-detects Rust configuration from the project, with
+// the language's cell and deps file.
+func detectRustConfig(projectRoot string, lang syncconfig.Language) (*RustConfig, error) {
 	cfg := &RustConfig{
-		ExternalCell:      "rustdeps",
+		ExternalCell:      lang.Cell,
 		ExternalDeps:      make(map[string]bool),
 		WorkspacePackages: make(map[string]string),
 	}
@@ -108,7 +110,7 @@ func detectRustConfig(projectRoot string) (*RustConfig, error) {
 	}
 
 	// Load rust-deps.toml
-	depsPath := filepath.Join(projectRoot, "rust-deps.toml")
+	depsPath := filepath.Join(projectRoot, lang.DepsFile)
 	if deps, err := loadRustDeps(depsPath); err == nil {
 		cfg.DepsFile = depsPath
 		cfg.ExternalDeps = deps
