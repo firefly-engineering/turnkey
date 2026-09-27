@@ -292,7 +292,10 @@ in
             if !langCfg.enable then
               null
             else if langCfg.depsFile != null && builtins.pathExists langCfg.depsFile then
-              language.mkCell { inherit langCfg userPatchesDir; }
+              language.mkCell {
+                inherit (language) cellName;
+                inherit langCfg userPatchesDir;
+              }
             else
               langCfg.cell
           )

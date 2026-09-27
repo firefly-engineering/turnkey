@@ -85,6 +85,7 @@ rec {
 
   # Build a complete Python dependency cell
   mkPythonDepsCell = {
+    cellName,           # The cell's name (nix/buck2/languages.nix)
     depsFile,           # Path to python-deps.toml
 
     # Optional
@@ -110,8 +111,7 @@ rec {
     ) deps;
   in
   genericMkDepsCell {
-    cellName = "pydeps";
-    inherit depPackages userPatchesDir;
+    inherit cellName depPackages userPatchesDir;
     # Python uses simple name-only paths, no versioning or symlinks
     keyToPath = name: name;
     createSymlinks = false;

@@ -71,6 +71,7 @@ rec {
 
   # Build a complete Rust dependency cell
   mkRustDepsCell = {
+    cellName,                   # The cell's name (nix/buck2/languages.nix)
     depsFile,                   # Path to rust-deps.toml
     featuresFile ? null,        # Path to rust-features.toml (optional)
     buildScriptFixups ? {},     # Additional build script fixups
@@ -194,8 +195,7 @@ rec {
     '';
   in
   genericMkDepsCell {
-    cellName = "rustdeps";
-    inherit depPackages keyToPath parseKeyForSymlink mergeCommands userPatchesDir;
+    inherit cellName depPackages keyToPath parseKeyForSymlink mergeCommands userPatchesDir;
     createSymlinks = true;
     cellBuildInputs = cellBuildInputs ++
       (if computeUnifiedFeatures != null then [ computeUnifiedFeatures ] else []) ++

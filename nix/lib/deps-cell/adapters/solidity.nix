@@ -56,7 +56,7 @@ rec {
       subpath =
         if remapping == null then ""
         else if layout == null then
-          throw "soldeps cell: remapping `${remapping}` for ${pkg.name} does not point into ${lib.concatStringsSep " or " layouts}"
+          throw "Solidity deps cell: remapping `${remapping}` for ${pkg.name} does not point into ${lib.concatStringsSep " or " layouts}"
         else lib.removePrefix layout target;
     in {
       inherit prefix;
@@ -156,11 +156,11 @@ rec {
 
   # Build a complete Solidity dependency cell
   mkSolDepsCell = {
+    cellName,           # The cell's name (nix/buck2/languages.nix)
     depsFile,           # Path to solidity-deps.toml
 
     # Optional
     userFixups ? {},    # Additional fixups
-    cellName ? "soldeps",
   }:
   let
     depsToml = builtins.fromTOML (builtins.readFile depsFile);

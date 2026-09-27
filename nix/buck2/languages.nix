@@ -12,8 +12,9 @@
 #   cellName     the Buck2 cell and the .turnkey/<cellName> symlink
 #   description  shown by the shell in verbose mode
 #   generator    the package providing the deps file's generator
-#   mkCell       { langCfg, userPatchesDir } -> the cell, built from
-#                langCfg.depsFile (which must exist)
+#   mkCell       { cellName, langCfg, userPatchesDir } -> the cell named
+#                cellName (the record's), built from langCfg.depsFile
+#                (which must exist)
 #   syncRules    langCfg -> the [[deps]] rules of .turnkey/sync.toml, in
 #                the order tk sync must run them
 #   wrapper      optional: the native tool tw wraps (`tool`), and
@@ -44,8 +45,13 @@ in
     description = "Go deps";
     generator = import ../packages/godeps-gen.nix { inherit pkgs lib; };
     mkCell =
-      { langCfg, userPatchesDir }:
+      {
+        cellName,
+        langCfg,
+        userPatchesDir,
+      }:
       depsCell.mkGoDepsCell {
+        inherit cellName;
         inherit (langCfg) depsFile;
         inherit userPatchesDir;
         buckgen = import ../packages/buckgen.nix { inherit pkgs lib; };
@@ -92,11 +98,16 @@ in
     description = "Rust deps";
     generator = import ../packages/rustdeps-gen.nix { inherit pkgs lib; };
     mkCell =
-      { langCfg, userPatchesDir }:
+      {
+        cellName,
+        langCfg,
+        userPatchesDir,
+      }:
       let
         rustFixups = import ../lib/deps-cell/fixups/rust { inherit pkgs lib; };
       in
       depsCell.mkRustDepsCell {
+        inherit cellName;
         inherit (langCfg) depsFile;
         inherit userPatchesDir;
         featuresFile =
@@ -148,8 +159,13 @@ in
     description = "Python deps";
     generator = import ../packages/pydeps-gen.nix { inherit pkgs lib; };
     mkCell =
-      { langCfg, userPatchesDir }:
+      {
+        cellName,
+        langCfg,
+        userPatchesDir,
+      }:
       depsCell.mkPythonDepsCell {
+        inherit cellName;
         inherit (langCfg) depsFile;
         inherit userPatchesDir;
       };
@@ -234,8 +250,13 @@ in
     description = "JavaScript deps";
     generator = import ../packages/jsdeps-gen.nix { inherit pkgs lib; };
     mkCell =
-      { langCfg, userPatchesDir }:
+      {
+        cellName,
+        langCfg,
+        userPatchesDir,
+      }:
       depsCell.mkJsDepsCell {
+        inherit cellName;
         inherit (langCfg) depsFile;
         inherit userPatchesDir;
       };
@@ -262,8 +283,13 @@ in
     # The Solidity adapter builds its cell without the generic builder, so
     # it takes no user patches.
     mkCell =
-      { langCfg, userPatchesDir }:
+      {
+        cellName,
+        langCfg,
+        userPatchesDir,
+      }:
       (import ../lib/deps-cell/adapters/solidity.nix { inherit pkgs lib; }).mkSolDepsCell {
+        inherit cellName;
         inherit (langCfg) depsFile;
       };
     syncRules =

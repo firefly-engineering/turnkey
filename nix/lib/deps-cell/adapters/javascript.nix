@@ -99,6 +99,7 @@ rec {
 
   # Build a complete JavaScript dependency cell
   mkJsDepsCell = {
+    cellName,           # The cell's name (nix/buck2/languages.nix)
     depsFile,           # Path to js-deps.toml
 
     # Optional
@@ -140,8 +141,7 @@ rec {
     '';
   in
   genericMkDepsCell {
-    cellName = "jsdeps";
-    inherit depPackages rootBuckContent userPatchesDir;
+    inherit cellName depPackages rootBuckContent userPatchesDir;
     # JavaScript uses simple name-only paths, no versioning or symlinks
     keyToPath = name: name;
     createSymlinks = false;
