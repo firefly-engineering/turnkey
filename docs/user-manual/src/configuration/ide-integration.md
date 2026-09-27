@@ -212,6 +212,10 @@ Dependencies between `preserve-start` and `preserve-end` markers are never modif
   the root `pyproject.toml`'s `[tool.uv.workspace]` and their source layout,
   so a downstream namespace such as `acme.*` works the same way. Any other
   import maps to `pydeps`.
+- **TypeScript**: the npm packages imported by the sources, written to the
+  target's `npm_deps` as the jsdeps cell's `jsdeps//:<package>` aliases, plus
+  each one's `@types/...` package when `js-deps.toml` has it. The target's
+  `deps` (other TypeScript targets) are not synced.
 - **Other languages**: the imports found in the sources, mapped to targets.
 
 Sync never removes a dep it can't account for:

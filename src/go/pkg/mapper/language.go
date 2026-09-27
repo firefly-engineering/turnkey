@@ -34,6 +34,10 @@ type Language interface {
 	// and, if so, which kind of target it builds.
 	RuleKind(rule string) (kind TargetKind, ok bool)
 
+	// DepsAttribute is the attribute of its targets that the resolved
+	// deps go in, e.g. "deps".
+	DepsAttribute() string
+
 	// SourcePatterns are the file name patterns (filepath.Match) whose
 	// changes make the language's targets stale.
 	SourcePatterns() []string

@@ -57,6 +57,8 @@ func (l *rustLanguage) RuleKind(rule string) (TargetKind, bool) {
 	return kind, ok
 }
 
+func (l *rustLanguage) DepsAttribute() string { return "deps" }
+
 func (l *rustLanguage) SourcePatterns() []string { return []string{"*.rs", "Cargo.toml"} }
 
 func (l *rustLanguage) ResolveDeps(crateDir string) (PackageMapping, error) {

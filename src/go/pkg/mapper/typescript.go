@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
+	"github.com/pelletier/go-toml/v2"
 )
 
 // TypeScriptConfig holds TypeScript/JavaScript-specific configuration.
@@ -20,7 +21,7 @@ type TypeScriptConfig struct {
 	// DepsFile is the path to js-deps.toml.
 	DepsFile string
 
-	// ExternalDeps maps package names to their entries from js-deps.toml.
+	// ExternalDeps holds the names of the npm packages in js-deps.toml.
 	ExternalDeps map[string]bool
 }
 
@@ -53,12 +54,72 @@ func (l *typescriptLanguage) RuleKind(rule string) (TargetKind, bool) {
 	return kind, ok
 }
 
+// DepsAttribute is npm_deps: the TypeScript rules take the jsdeps cell's
+// packages there, and other TypeScript targets in deps, which sync doesn't
+// resolve (it skips relative imports).
+func (l *typescriptLanguage) DepsAttribute() string { return "npm_deps" }
+
 func (l *typescriptLanguage) SourcePatterns() []string {
 	return []string{"*.ts", "*.tsx", "*.js", "*.jsx", "*.mjs", "*.cjs"}
 }
 
+// ResolveDeps maps the package's imports, and adds for each npm package
+// its DefinitelyTyped package (@types/...) when js-deps.toml has one: code
+// never imports those, but TypeScript needs them to type-check the import.
 func (l *typescriptLanguage) ResolveDeps(pkgDir string) (PackageMapping, error) {
-	return resolveWithDepsExtract(l, l.projectRoot, pkgDir)
+	mapping, err := resolveWithDepsExtract(l, l.projectRoot, pkgDir)
+	if err != nil {
+		return mapping, err
+	}
+	mapping.Deps = l.withTypes(mapping.Deps)
+	mapping.TestDeps = l.withTypes(mapping.TestDeps)
+	return mapping, nil
+}
+
+// withTypes returns deps plus the @types package of each external one that
+// js-deps.toml has, deduplicated and sorted.
+func (l *typescriptLanguage) withTypes(deps []MappedDep) []MappedDep {
+	if l.cfg == nil {
+		return deps
+	}
+	seen := make(map[string]bool, len(deps))
+	for _, dep := range deps {
+		seen[dep.Target] = true
+	}
+	result := deps
+	for _, dep := range deps {
+		if dep.Type != DependencyExternal {
+			continue
+		}
+		types := typesPackage(npmPackageName(dep.ImportPath))
+		if !l.cfg.ExternalDeps[types] {
+			continue
+		}
+		typesDep := MappedDep{
+			Target:     l.label(types),
+			Type:       DependencyExternal,
+			ImportPath: types,
+		}
+		if !seen[typesDep.Target] {
+			seen[typesDep.Target] = true
+			result = append(result, typesDep)
+		}
+	}
+	sortDeps(result)
+	return result
+}
+
+// typesPackage returns the DefinitelyTyped package for an npm package:
+// "lodash" -> "@types/lodash", "@org/pkg" -> "@types/org__pkg". A package
+// under @types is its own types.
+func typesPackage(pkg string) string {
+	if strings.HasPrefix(pkg, "@types/") {
+		return pkg
+	}
+	if scoped, ok := strings.CutPrefix(pkg, "@"); ok {
+		return "@types/" + strings.Replace(scoped, "/", "__", 1)
+	}
+	return "@types/" + pkg
 }
 
 // detectTypescriptConfig auto-detects TypeScript configuration from the project.
@@ -80,12 +141,36 @@ func detectTypescriptConfig(projectRoot string) (*TypeScriptConfig, error) {
 
 	// Load js-deps.toml
 	depsPath := filepath.Join(projectRoot, "js-deps.toml")
-	if deps, err := loadDepsKeys(depsPath); err == nil {
+	if deps, err := loadJSDeps(depsPath); err == nil {
 		cfg.DepsFile = depsPath
 		cfg.ExternalDeps = deps
 	}
 
 	return cfg, nil
+}
+
+// loadJSDeps loads the npm package names from js-deps.toml, which
+// jsdeps-gen writes as a [[package]] array.
+func loadJSDeps(path string) (map[string]bool, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var depsFile struct {
+		Package []struct {
+			Name string `toml:"name"`
+		} `toml:"package"`
+	}
+	if err := toml.Unmarshal(content, &depsFile); err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]bool)
+	for _, pkg := range depsFile.Package {
+		result[pkg.Name] = true
+	}
+	return result, nil
 }
 
 // mapImport maps a single TypeScript import to a Buck2 dependency.
@@ -116,15 +201,20 @@ func (l *typescriptLanguage) mapExternal(modulePath string) MappedDep {
 		return unmappedDep(modulePath)
 	}
 
-	// Use the package name for the target
-	// e.g., "react" -> "jsdeps//vendor/react:react"
-	// e.g., "@types/node" -> "jsdeps//vendor/@types/node:node"
-	targetName := filepath.Base(pkgName)
 	return MappedDep{
-		Target:     fmt.Sprintf("%s//vendor/%s:%s", l.cfg.ExternalCell, pkgName, targetName),
+		Target:     l.label(pkgName),
 		Type:       DependencyExternal,
 		ImportPath: modulePath,
 	}
+}
+
+// label returns the jsdeps cell's target for an npm package: the alias at
+// the cell root, named with "@" dropped and "/" replaced by "_" (as
+// nix/lib/deps-cell/adapters/javascript.nix names it).
+// e.g., "lodash" -> "jsdeps//:lodash", "@types/node" -> "jsdeps//:types_node"
+func (l *typescriptLanguage) label(pkg string) string {
+	name := strings.ReplaceAll(strings.ReplaceAll(pkg, "@", ""), "/", "_")
+	return fmt.Sprintf("%s//:%s", l.cfg.ExternalCell, name)
 }
 
 // npmPackageName returns the package an import path names, handling

@@ -7,10 +7,16 @@ import (
 // SetDeps sets the deps attribute of the target.
 // If the deps attribute has markers, it only updates the auto-managed section.
 func (t *Target) SetDeps(deps []string) {
-	attr := t.GetAttribute("deps")
+	t.SetLabels("deps", deps)
+}
+
+// SetLabels sets a label-list attribute (deps, npm_deps, ...) of the target.
+// If the attribute has markers, it only updates the auto-managed section.
+func (t *Target) SetLabels(name string, deps []string) {
+	attr := t.GetAttribute(name)
 	if attr == nil {
-		// No existing deps, create as simple list
-		t.setStringList("deps", deps)
+		// No existing attribute, create as simple list
+		t.setStringList(name, deps)
 		return
 	}
 
@@ -31,13 +37,13 @@ func (t *Target) SetDeps(deps []string) {
 			attr.Value = newDepsVal
 			attr.modified = true
 			t.modified = true
-			t.modifiedAttrs["deps"] = true
+			t.modifiedAttrs[name] = true
 			return
 		}
 	}
 
 	// No markers or not a DepsValue, use simple list
-	t.setStringList("deps", deps)
+	t.setStringList(name, deps)
 }
 
 // AddDep adds a dependency to the target.

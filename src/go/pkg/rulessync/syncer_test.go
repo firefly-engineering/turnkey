@@ -193,7 +193,7 @@ func TestApplyDepsKeepsDepsWhenUnmapped(t *testing.T) {
 	target := parseTarget(t, libWithX)
 	var result SyncResult
 
-	changed := result.applyDeps(target, []string{"//pkg/y:y"}, []string{"example.com/unknown"}, nil)
+	changed := result.applyDeps(target, "deps", []string{"//pkg/y:y"}, []string{"example.com/unknown"}, nil)
 	if !changed {
 		t.Error("target not changed, want //pkg/y:y added")
 	}
@@ -216,7 +216,7 @@ func TestApplyDepsReportsKeptWithoutChange(t *testing.T) {
 	target := parseTarget(t, libWithX)
 	var result SyncResult
 
-	if result.applyDeps(target, nil, []string{"example.com/unknown"}, nil) {
+	if result.applyDeps(target, "deps", nil, []string{"example.com/unknown"}, nil) {
 		t.Error("target changed, want deps untouched")
 	}
 	if got, want := target.GetDeps(), []string{"//pkg/x:x"}; !reflect.DeepEqual(got, want) {
@@ -233,7 +233,7 @@ func TestApplyDepsRemovesWhenAllMapped(t *testing.T) {
 	target := parseTarget(t, libWithX)
 	var result SyncResult
 
-	if !result.applyDeps(target, []string{"//pkg/y:y"}, nil, nil) {
+	if !result.applyDeps(target, "deps", []string{"//pkg/y:y"}, nil, nil) {
 		t.Error("target not changed")
 	}
 	if got, want := target.GetDeps(), []string{"//pkg/y:y"}; !reflect.DeepEqual(got, want) {
@@ -259,11 +259,11 @@ func TestHasSyncableDeps(t *testing.T) {
 		{`["//a:a"] if X else []`, false},
 	} {
 		target := parseTarget(t, "rust_library(\n    name = \"lib\",\n    deps = "+tc.deps+",\n)\n")
-		if got := hasSyncableDeps(target); got != tc.want {
+		if got := hasSyncableDeps(target, "deps"); got != tc.want {
 			t.Errorf("hasSyncableDeps(deps = %s) = %v, want %v", tc.deps, got, tc.want)
 		}
 	}
-	if !hasSyncableDeps(parseTarget(t, "rust_library(name = \"lib\")\n")) {
+	if !hasSyncableDeps(parseTarget(t, "rust_library(name = \"lib\")\n"), "deps") {
 		t.Error("target without deps is not syncable, want syncable")
 	}
 }
@@ -284,7 +284,7 @@ func TestApplyDepsIgnoresOrder(t *testing.T) {
 		"rustdeps//vendor/tree-sitter-starlark:tree-sitter-starlark",
 		"rustdeps//vendor/tree-sitter:tree-sitter",
 	}
-	if result.applyDeps(target, mapped, nil, nil) || len(result.Changes) != 0 {
+	if result.applyDeps(target, "deps", mapped, nil, nil) || len(result.Changes) != 0 {
 		t.Errorf("reordering alone changed the target: %+v", result.Changes)
 	}
 }
@@ -297,7 +297,7 @@ func TestApplyDepsKeepsVersionedLabel(t *testing.T) {
 )
 `)
 	var result SyncResult
-	if result.applyDeps(target, []string{"rustdeps//vendor/tokio:tokio"}, nil, nil) {
+	if result.applyDeps(target, "deps", []string{"rustdeps//vendor/tokio:tokio"}, nil, nil) {
 		t.Errorf("versioned label replaced: %+v", result.Changes)
 	}
 }
@@ -314,7 +314,7 @@ func TestApplyDepsLeavesUnsyncedDeps(t *testing.T) {
 )
 `)
 	var result SyncResult
-	if result.applyDeps(target, []string{"rustdeps//vendor/log:log"}, nil, []string{"//src/rust/composition:composition"}) {
+	if result.applyDeps(target, "deps", []string{"rustdeps//vendor/log:log"}, nil, []string{"//src/rust/composition:composition"}) {
 		t.Errorf("target changed: %+v", result.Changes)
 	}
 	if len(result.Changes) != 0 {
@@ -323,7 +323,7 @@ func TestApplyDepsLeavesUnsyncedDeps(t *testing.T) {
 
 	target = parseTarget(t, "rust_binary(\n    name = \"bin\",\n    deps = [],\n)\n")
 	result = SyncResult{}
-	result.applyDeps(target, nil, nil, []string{"//src/rust/composition:composition"})
+	result.applyDeps(target, "deps", nil, nil, []string{"//src/rust/composition:composition"})
 	if got := target.GetDeps(); len(got) != 0 {
 		t.Errorf("deps = %v, want unsynced dep not added", got)
 	}
@@ -360,7 +360,7 @@ func TestApplyDepsHonoursPreserveSection(t *testing.T) {
 `
 	target := parseTarget(t, src)
 	var result SyncResult
-	if !result.applyDeps(target, []string{"//b:b"}, nil, nil) {
+	if !result.applyDeps(target, "deps", []string{"//b:b"}, nil, nil) {
 		t.Fatal("target not changed")
 	}
 	if got, want := target.GetAutoDeps(), []string{"//b:b"}; !reflect.DeepEqual(got, want) {
@@ -377,7 +377,28 @@ func TestApplyDepsHonoursPreserveSection(t *testing.T) {
 	// Mapped deps that match: nothing to do.
 	target = parseTarget(t, src)
 	result = SyncResult{}
-	if result.applyDeps(target, []string{"//a:a"}, nil, nil) || len(result.Changes) != 0 {
+	if result.applyDeps(target, "deps", []string{"//a:a"}, nil, nil) || len(result.Changes) != 0 {
 		t.Errorf("unchanged target reported changes: %+v", result.Changes)
+	}
+}
+
+// A language whose deps go in another attribute (TypeScript's npm_deps)
+// syncs that attribute and leaves deps alone.
+func TestApplyDepsToOtherAttribute(t *testing.T) {
+	target := parseTarget(t, `typescript_binary(
+    name = "app",
+    deps = ["//lib:lib"],
+    npm_deps = ["jsdeps//:left-pad"],
+)
+`)
+	var result SyncResult
+	if !result.applyDeps(target, "npm_deps", []string{"jsdeps//:lodash"}, nil, nil) {
+		t.Fatal("target not changed")
+	}
+	if got, want := target.GetLabels("npm_deps"), []string{"jsdeps//:lodash"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("npm_deps = %v, want %v", got, want)
+	}
+	if got, want := target.GetDeps(), []string{"//lib:lib"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("deps = %v, want %v", got, want)
 	}
 }

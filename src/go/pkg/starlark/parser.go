@@ -135,12 +135,11 @@ func parseAttribute(name string, expr *syntax.BinaryExpr, source []byte) (*Attri
 		span: spanFromNode(expr, source),
 	}
 
-	// Special handling for deps attribute to support markers
-	if name == "deps" {
-		if list, ok := expr.Y.(*syntax.ListExpr); ok {
-			attr.Value = parseDepsValue(list, source)
-			return attr, nil
-		}
+	// A list may carry turnkey markers (deps, npm_deps, ...); one without
+	// markers parses as a plain list
+	if list, ok := expr.Y.(*syntax.ListExpr); ok {
+		attr.Value = parseDepsValue(list, source)
+		return attr, nil
 	}
 
 	attr.Value = parseValue(expr.Y, source)

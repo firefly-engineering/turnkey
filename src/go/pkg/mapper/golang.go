@@ -54,6 +54,8 @@ func (l *goLanguage) RuleKind(rule string) (TargetKind, bool) {
 	return kind, ok
 }
 
+func (l *goLanguage) DepsAttribute() string { return "deps" }
+
 func (l *goLanguage) SourcePatterns() []string { return []string{"*.go"} }
 
 func (l *goLanguage) ResolveDeps(pkgDir string) (PackageMapping, error) {

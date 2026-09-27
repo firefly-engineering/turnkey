@@ -232,21 +232,22 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 	// Apply changes to targets
 	modified := false
 
+	attr := lang.DepsAttribute()
 	for _, target := range f.Targets {
 		kind, ok := lang.RuleKind(target.Rule)
 		if !ok || kind == mapper.NotSynced {
 			continue
 		}
-		if !hasSyncableDeps(target) {
+		if !hasSyncableDeps(target, attr) {
 			result.Errors = append(result.Errors,
-				fmt.Sprintf("%s: deps is not a list of labels, not synced", target.Name))
+				fmt.Sprintf("%s: %s is not a list of labels, not synced", target.Name, attr))
 			continue
 		}
 
 		switch kind {
 		case mapper.Library, mapper.Binary:
 			// Both depend on exactly what their sources need
-			if result.applyDeps(target, mapper.DepsToTargets(pkgMapping.Deps), libUnmapped, unsynced) {
+			if result.applyDeps(target, attr, mapper.DepsToTargets(pkgMapping.Deps), libUnmapped, unsynced) {
 				modified = true
 			}
 
@@ -279,7 +280,7 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 				}
 			}
 
-			if result.applyDeps(target, newDeps, testUnmapped, unsynced) {
+			if result.applyDeps(target, attr, newDeps, testUnmapped, unsynced) {
 				modified = true
 			}
 		}
@@ -423,16 +424,17 @@ func matchesAny(name string, patterns []string) bool {
 	return false
 }
 
-// hasSyncableDeps reports whether sync can rewrite a target's deps: they
+// hasSyncableDeps reports whether sync can rewrite a target's deps, held in
+// attr: they
 // are absent or a list of string labels. A computed value (a variable, a
 // concatenation, a conditional) is left alone, since sync would replace the
 // expression with a flat list of its own.
-func hasSyncableDeps(target *starlark.Target) bool {
-	attr := target.GetAttribute("deps")
-	if attr == nil {
+func hasSyncableDeps(target *starlark.Target, attr string) bool {
+	a := target.GetAttribute(attr)
+	if a == nil {
 		return true
 	}
-	switch attr.Value.(type) {
+	switch a.Value.(type) {
 	case starlark.StringListValue, starlark.DepsValue:
 		return true
 	}
@@ -523,15 +525,16 @@ func withoutDeps(deps, drop []string) []string {
 	return result
 }
 
-// applyDeps sets a target's deps to the mapped ones, preserving manual deps,
+// applyDeps sets a target's deps, held in its attr attribute (deps,
+// npm_deps, ...), to the mapped ones, preserving manual deps,
 // and records the change. If unmapped is non-empty the mapped deps are
 // incomplete, so no existing dep is removed: those that would have been are
 // recorded as kept instead. An existing dep in the Buck2 package of an
 // unsynced dep is never removed either. It reports whether the target's
 // deps changed.
-func (r *SyncResult) applyDeps(target *starlark.Target, mapped, unmapped, unsynced []string) bool {
-	oldDeps := target.GetDeps()
-	preserved := target.GetPreservedDeps()
+func (r *SyncResult) applyDeps(target *starlark.Target, attr string, mapped, unmapped, unsynced []string) bool {
+	oldDeps := target.GetLabels(attr)
+	preserved := target.GetPreservedLabels(attr)
 	newDeps := mergeWithPreserved(oldDeps, preferVersioned(oldDeps, mapped), preserved)
 
 	unsyncedPkgs := make(map[string]bool, len(unsynced))
@@ -554,7 +557,7 @@ func (r *SyncResult) applyDeps(target *starlark.Target, mapped, unmapped, unsync
 	changed := !stringSlicesEqual(oldDeps, newDeps)
 	if changed {
 		// With markers, SetDeps writes only the auto-managed section.
-		target.SetDeps(withoutDeps(newDeps, preserved))
+		target.SetLabels(attr, withoutDeps(newDeps, preserved))
 	}
 	if changed || len(kept) > 0 {
 		added, removed := diffDeps(oldDeps, newDeps)

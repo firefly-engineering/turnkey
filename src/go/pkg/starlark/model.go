@@ -254,7 +254,14 @@ func (t *Target) GetAttribute(name string) *Attribute {
 // GetDeps returns the deps attribute as a list of strings, or nil if not present.
 // For DepsValue with markers, it returns all deps (auto + preserved).
 func (t *Target) GetDeps() []string {
-	attr := t.GetAttribute("deps")
+	return t.GetLabels("deps")
+}
+
+// GetLabels returns a label-list attribute (deps, npm_deps, ...) as a list
+// of strings, or nil if not present or not a list of strings. With markers,
+// it returns all labels (auto + preserved).
+func (t *Target) GetLabels(name string) []string {
+	attr := t.GetAttribute(name)
 	if attr == nil {
 		return nil
 	}
@@ -288,7 +295,13 @@ func (t *Target) GetAutoDeps() []string {
 
 // GetPreservedDeps returns only the preserved deps (for DepsValue with markers).
 func (t *Target) GetPreservedDeps() []string {
-	attr := t.GetAttribute("deps")
+	return t.GetPreservedLabels("deps")
+}
+
+// GetPreservedLabels returns only the preserved labels of a label-list
+// attribute with markers.
+func (t *Target) GetPreservedLabels(name string) []string {
+	attr := t.GetAttribute(name)
 	if attr == nil {
 		return nil
 	}

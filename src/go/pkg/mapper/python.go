@@ -56,6 +56,8 @@ func (l *pythonLanguage) RuleKind(rule string) (TargetKind, bool) {
 	return kind, ok
 }
 
+func (l *pythonLanguage) DepsAttribute() string { return "deps" }
+
 func (l *pythonLanguage) SourcePatterns() []string { return []string{"*.py"} }
 
 func (l *pythonLanguage) ResolveDeps(pkgDir string) (PackageMapping, error) {
@@ -91,7 +93,7 @@ func detectPythonConfig(projectRoot string) (*PythonConfig, error) {
 }
 
 // loadDepsKeys loads the keys of a deps file's [deps] table: the package
-// names of python-deps.toml and js-deps.toml.
+// names of python-deps.toml.
 func loadDepsKeys(path string) (map[string]bool, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {

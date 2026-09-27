@@ -52,6 +52,8 @@ func (l *solidityLanguage) RuleKind(rule string) (TargetKind, bool) {
 	return kind, ok
 }
 
+func (l *solidityLanguage) DepsAttribute() string { return "deps" }
+
 func (l *solidityLanguage) SourcePatterns() []string { return []string{"*.sol"} }
 
 func (l *solidityLanguage) ResolveDeps(pkgDir string) (PackageMapping, error) {
