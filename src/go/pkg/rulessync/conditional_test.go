@@ -40,8 +40,8 @@ func (l *fakeLanguage) Rule(rule string) (mapper.Rule, bool) {
 
 func (l *fakeLanguage) SourcePatterns() []string { return []string{"*.fake"} }
 
-func (l *fakeLanguage) Dimensions(string) ([]string, error) {
-	return []string{conditions.OS}, nil
+func (l *fakeLanguage) Dimensions(string) (mapper.Dimensions, error) {
+	return mapper.Dimensions{Platform: []string{conditions.OS}}, nil
 }
 
 func (l *fakeLanguage) ResolveDeps(_ string, req mapper.Request) (mapper.PackageMapping, error) {

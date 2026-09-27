@@ -28,8 +28,8 @@ func (l *fakeLanguage) Rule(rule string) (Rule, bool) {
 
 func (l *fakeLanguage) SourcePatterns() []string { return []string{"*.fake"} }
 
-func (l *fakeLanguage) Dimensions(string) ([]string, error) {
-	return []string{conditions.OS}, nil
+func (l *fakeLanguage) Dimensions(string) (Dimensions, error) {
+	return Dimensions{Platform: []string{conditions.OS}}, nil
 }
 
 func (l *fakeLanguage) ResolveDeps(_ string, req Request) (PackageMapping, error) {

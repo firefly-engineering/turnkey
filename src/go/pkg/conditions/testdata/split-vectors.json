@@ -1,5 +1,5 @@
 {
-  "description": "Label lists that differ between configurations, and the [<common>] + select({<key>: [<labels>]}) src/go/pkg/conditions splits them into. Each configuration's labels are those of every entry of labels whose when it includes, in order. Read by src/go/pkg/conditions, turnkey.cfg (src/python/cfg) and nix/buck2/platforms.nix alike, so the three can't drift apart; the last two only have os and cpu, so they skip cases with dimensions.",
+  "description": "Label lists that differ between configurations, and the [<common>] + select({<key>: [<labels>]}) src/go/pkg/conditions splits them into. Each configuration's labels are those of every entry of labels whose when it includes, in order. Read by src/go/pkg/conditions, turnkey.cfg (src/python/cfg) and nix/buck2/platforms.nix alike, so the three can't drift apart; the last two only have os and cpu, so they skip cases with dimensions: the on/off dimensions (Go build tags') a language adds, each with its name, the constraint whose [set] and [unset] values back it, and the token naming set in a combined key.",
   "cases": [
     {
       "name": "the same labels everywhere are common",
@@ -815,7 +815,11 @@
       ],
       "settings": "toolchains//conditions",
       "dimensions": [
-        "go_tag:integration"
+        {
+          "name": "go_tag:integration",
+          "constraint": "prelude//go/tags/constraints:integration",
+          "token": "integration"
+        }
       ],
       "labels": [
         {
@@ -863,7 +867,11 @@
       ],
       "settings": "toolchains//conditions",
       "dimensions": [
-        "go_tag:integration"
+        {
+          "name": "go_tag:integration",
+          "constraint": "prelude//go/tags/constraints:integration",
+          "token": "integration"
+        }
       ],
       "labels": [
         {
@@ -920,7 +928,11 @@
       ],
       "settings": "toolchains//conditions",
       "dimensions": [
-        "go_tag:integration"
+        {
+          "name": "go_tag:integration",
+          "constraint": "prelude//go/tags/constraints:integration",
+          "token": "integration"
+        }
       ],
       "labels": [
         {
@@ -994,7 +1006,11 @@
       ],
       "settings": "toolchains//conditions",
       "dimensions": [
-        "go_tag:integration"
+        {
+          "name": "go_tag:integration",
+          "constraint": "prelude//go/tags/constraints:integration",
+          "token": "integration"
+        }
       ],
       "labels": [
         {
@@ -1030,8 +1046,16 @@
       ],
       "settings": "toolchains//conditions",
       "dimensions": [
-        "go_tag:b",
-        "go_tag:a"
+        {
+          "name": "go_tag:b",
+          "constraint": "prelude//go/tags/constraints:b",
+          "token": "b"
+        },
+        {
+          "name": "go_tag:a",
+          "constraint": "prelude//go/tags/constraints:a",
+          "token": "a"
+        }
       ],
       "labels": [
         {

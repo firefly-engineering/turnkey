@@ -167,15 +167,19 @@ func TestSpaceWithoutPlatforms(t *testing.T) {
 	}
 }
 
-// A Go build tag is an on/off dimension: deps that differ only by it are
-// keyed on its constraint values, and with the OS on a combined setting.
-func TestSplitOnGoTags(t *testing.T) {
-	space := NewSpace(platforms, "").WithDimensions([]string{GoTag("integration"), OS})
+// A Go build tag's on/off dimension, as the Go plug-in adds it
+var integration = OnOff{Name: "go_tag:integration", Constraint: "prelude//go/tags/constraints:integration", Token: "integration"}
+
+// An on/off dimension: deps that differ only by it are keyed on its
+// constraint values, and with the OS on a combined setting. Adding it
+// twice, or the OS, adds nothing.
+func TestSplitOnOnOffDimension(t *testing.T) {
+	space := NewSpace(platforms, "").WithDimensions([]OnOff{integration, integration, {Name: OS}})
 	if got := len(space.Configurations); got != 8 {
 		t.Fatalf("configurations = %d, want 8", got)
 	}
 	tagged := func(c Configuration) []string {
-		if c[GoTag("integration")] == Set {
+		if c[integration.Name] == Set {
 			return []string{"//it:it"}
 		}
 		return nil
@@ -189,7 +193,7 @@ func TestSplitOnGoTags(t *testing.T) {
 	}
 
 	linuxTagged := func(c Configuration) []string {
-		if c[OS] == "linux" && c[GoTag("integration")] == Set {
+		if c[OS] == "linux" && c[integration.Name] == Set {
 			return []string{"//it:it"}
 		}
 		return nil

@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 	"github.com/pelletier/go-toml/v2"
@@ -68,8 +67,8 @@ func newPythonLanguage(mcfg Config, lang syncconfig.Language) Language {
 
 // Dimensions: a dependency's platform marker (sys_platform, ...) makes the
 // deps depend on the platform.
-func (l *pythonLanguage) Dimensions(string) ([]string, error) {
-	return []string{conditions.OS, conditions.CPU}, nil
+func (l *pythonLanguage) Dimensions(string) (Dimensions, error) {
+	return platform, nil
 }
 
 func (l *pythonLanguage) Name() string { return "python" }

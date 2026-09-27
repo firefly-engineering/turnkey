@@ -10,6 +10,7 @@ go_library(
         "//src/go/pkg/conditional:conditional",
         "//src/go/pkg/conditions:conditions",
         "//src/go/pkg/extraction:extraction",
+        "//src/go/pkg/goparse:goparse",
         "//src/go/pkg/pep508:pep508",
         "//src/go/pkg/starlark:starlark",
         "//src/go/pkg/syncconfig:syncconfig",

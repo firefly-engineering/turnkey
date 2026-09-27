@@ -88,8 +88,8 @@ func (l *rustLanguage) SourcePatterns() []string { return []string{"*.rs", "Carg
 
 // Dimensions: a crate's target-specific tables, and its dependencies'
 // member targets' variants, depend on the platform.
-func (l *rustLanguage) Dimensions(string) ([]string, error) {
-	return []string{conditions.OS, conditions.CPU}, nil
+func (l *rustLanguage) Dimensions(string) (Dimensions, error) {
+	return platform, nil
 }
 
 func (l *rustLanguage) ResolveDeps(crateDir string, req Request) (PackageMapping, error) {

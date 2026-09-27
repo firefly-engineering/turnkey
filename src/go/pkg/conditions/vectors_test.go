@@ -18,7 +18,7 @@ type splitVector struct {
 	Name       string     `json:"name"`
 	Platforms  []Platform `json:"platforms"`
 	Settings   string     `json:"settings"`
-	Dimensions []string   `json:"dimensions"`
+	Dimensions []OnOff    `json:"dimensions"`
 	Labels     []struct {
 		When   Configuration `json:"when"`
 		Labels []string      `json:"labels"`

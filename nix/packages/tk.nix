@@ -42,6 +42,7 @@ pkgs.buildGoModule {
       # rulessync and its dependencies
       (root + "/src/go/pkg/rulessync")
       (root + "/src/go/pkg/mapper")
+      (root + "/src/go/pkg/goparse")
       (root + "/src/go/pkg/extraction")
       (root + "/src/go/pkg/starlark")
       (root + "/src/go/pkg/cellfresh")

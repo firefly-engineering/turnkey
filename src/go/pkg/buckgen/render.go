@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/firefly-engineering/turnkey/src/go/pkg/conditional"
@@ -78,11 +77,11 @@ func RenderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) (bool, erro
 // for: every platform, crossed with each allowed build tag its files'
 // constraints use.
 func packageSpace(pkg *goparse.GoPackage, cfg *Config) conditions.Space {
-	var dims []string
+	var dims []conditions.OnOff
 	for _, f := range pkg.Files {
 		for _, tag := range f.ConstraintTags() {
 			if slices.Contains(cfg.Conditions.GoTags, tag) {
-				dims = append(dims, conditions.GoTag(tag))
+				dims = append(dims, goparse.TagDimension(tag))
 			}
 		}
 	}
@@ -98,12 +97,7 @@ func buildContext(config conditions.Configuration, cfg *Config) goparse.BuildCon
 		CgoEnabled: true,
 		GoVersion:  cfg.GoVersion,
 	}
-	for dim, value := range config {
-		if tag, ok := strings.CutPrefix(dim, conditions.GoTagPrefix); ok && value == conditions.Set {
-			ctx.Tags = append(ctx.Tags, tag)
-		}
-	}
-	sort.Strings(ctx.Tags)
+	ctx.Tags = goparse.ConfigTags(config)
 	return ctx
 }
 

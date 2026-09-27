@@ -40,9 +40,9 @@ func OpenPackage(lang Language, projectRoot, dir string, space conditions.Space)
 	return &Package{
 		lang:       lang,
 		dir:        dir,
-		dims:       dims,
+		dims:       dims.names(),
 		selfTarget: computeSelfTarget(dir, projectRoot),
-		space:      space.WithDimensions(dims),
+		space:      space.WithDimensions(dims.OnOff),
 		cache:      make(map[string]PackageMapping),
 		reported:   make(map[string]bool),
 	}, nil

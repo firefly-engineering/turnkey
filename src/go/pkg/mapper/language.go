@@ -43,12 +43,10 @@ type Language interface {
 	// changes make the language's targets stale.
 	SourcePatterns() []string
 
-	// Dimensions names the configuration dimensions (conditions.OS,
-	// conditions.CPU, conditions.GoTag(<tag>)) the deps of the package in
-	// pkgDir depend on, or none.
-	// Sync resolves the package once per combination of their values, and
-	// writes deps that differ as a select().
-	Dimensions(pkgDir string) ([]string, error)
+	// Dimensions are the configuration dimensions the deps of the package
+	// in pkgDir depend on. Sync resolves the package once per combination
+	// of their values, and writes deps that differ as a select().
+	Dimensions(pkgDir string) (Dimensions, error)
 
 	// ResolveDeps returns the deps of the package in pkgDir, for one
 	// configuration and variant: Deps for its library and binary targets,
@@ -56,6 +54,30 @@ type Language interface {
 	// couldn't be mapped or isn't synced.
 	ResolveDeps(pkgDir string, req Request) (PackageMapping, error)
 }
+
+// Dimensions are the configuration dimensions a package's deps depend on.
+type Dimensions struct {
+	// Platform names the platform's dimensions they depend on
+	// (conditions.OS, conditions.CPU), or none.
+	Platform []string
+
+	// OnOff are the on/off dimensions they depend on too, e.g. Go build
+	// tags: sync crosses the platforms with them.
+	OnOff []conditions.OnOff
+}
+
+// names returns the names of the dimensions.
+func (d Dimensions) names() []string {
+	names := append([]string(nil), d.Platform...)
+	for _, o := range d.OnOff {
+		names = append(names, o.Name)
+	}
+	return names
+}
+
+// platform are the dimensions of a package whose deps depend on the
+// platform alone.
+var platform = Dimensions{Platform: []string{conditions.OS, conditions.CPU}}
 
 // Rule is what sync knows of one of a language's Buck2 rule kinds.
 type Rule struct {
@@ -97,7 +119,7 @@ type Request struct {
 // configuration.
 type unconditional struct{}
 
-func (unconditional) Dimensions(string) ([]string, error) { return nil, nil }
+func (unconditional) Dimensions(string) (Dimensions, error) { return Dimensions{}, nil }
 
 // registry holds the language plug-ins, by the name of the language record
 // each serves (nix/buck2/languages.nix). Each is created for the mapper's

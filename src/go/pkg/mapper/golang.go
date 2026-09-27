@@ -7,11 +7,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/goparse"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 	"github.com/pelletier/go-toml/v2"
@@ -62,15 +62,15 @@ func newGoLanguage(mcfg Config, lang syncconfig.Language) Language {
 
 // Dimensions: the platform, and each allowed build tag the package's build
 // constraints use.
-func (l *goLanguage) Dimensions(pkgDir string) ([]string, error) {
-	dims := []string{conditions.OS, conditions.CPU}
+func (l *goLanguage) Dimensions(pkgDir string) (Dimensions, error) {
+	dims := Dimensions{Platform: platform.Platform}
 	tags, err := constraintTags(pkgDir)
 	if err != nil {
-		return nil, err
+		return Dimensions{}, err
 	}
 	for _, tag := range tags {
 		if slices.Contains(l.allowedTags, tag) {
-			dims = append(dims, conditions.GoTag(tag))
+			dims.OnOff = append(dims.OnOff, goparse.TagDimension(tag))
 		}
 	}
 	return dims, nil
@@ -113,14 +113,7 @@ func buildTags(req Request) []string {
 		tags, _ := starlark.Labels(req.Variant["build_tags"])
 		return tags
 	}
-	var tags []string
-	for dim, value := range req.Config {
-		if tag, ok := strings.CutPrefix(dim, conditions.GoTagPrefix); ok && value == conditions.Set {
-			tags = append(tags, tag)
-		}
-	}
-	sort.Strings(tags)
-	return tags
+	return goparse.ConfigTags(req.Config)
 }
 
 // extract lists the imports of the Go packages under pkgDir with go list,

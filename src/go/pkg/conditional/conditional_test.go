@@ -90,10 +90,11 @@ func TestLabelsValueRoundTrip(t *testing.T) {
 // What SetLabels writes reads back as every configuration's labels, over
 // a space with a Go build tag too.
 func TestSetLabelsRoundTrip(t *testing.T) {
-	space := conditions.NewSpace(platforms, "").WithDimensions([]string{conditions.GoTag("integration")})
+	integration := conditions.OnOff{Name: "go_tag:integration", Constraint: "prelude//go/tags/constraints:integration", Token: "integration"}
+	space := conditions.NewSpace(platforms, "").WithDimensions([]conditions.OnOff{integration})
 	cases := map[string]func(conditions.Configuration) []string{
 		"by tag and os": func(c conditions.Configuration) []string {
-			if c[conditions.OS] == "linux" && c[conditions.GoTag("integration")] == conditions.Set {
+			if c[conditions.OS] == "linux" && c[integration.Name] == conditions.Set {
 				return []string{"//it:it"}
 			}
 			return nil

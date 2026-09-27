@@ -253,7 +253,7 @@ tempfile = "3"
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"os", "cpu"}; !reflect.DeepEqual(dims, want) {
+	if want := (Dimensions{Platform: []string{"os", "cpu"}}); !reflect.DeepEqual(dims, want) {
 		t.Errorf("dimensions = %v, want %v", dims, want)
 	}
 

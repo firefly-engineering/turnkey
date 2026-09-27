@@ -7,9 +7,9 @@
 //
 //   - os: the platform's operating system (config//os:linux, ...)
 //   - cpu: the platform's CPU (config//cpu:x86_64, ...)
-//   - one on/off dimension per Go build tag that matters, named
-//     GoTag(<tag>), backed by prelude//go/tags/constraints:<tag>[set] and
-//     [unset]
+//   - on/off dimensions a language adds for a package (OnOff), e.g. one
+//     per Go build tag that matters, each backed by a constraint's [set]
+//     and [unset] values
 //
 // The platforms turnkey builds for (the buck2.platforms Nix option, passed
 // through .turnkey/sync.toml) fix which os and cpu values go together. Sync
@@ -34,17 +34,11 @@ const (
 	CPU = "cpu"
 )
 
-// GoTagPrefix starts the name of a Go build tag's dimension.
-const GoTagPrefix = "go_tag:"
-
 // The values of an on/off dimension.
 const (
 	Set   = "set"
 	Unset = "unset"
 )
-
-// GoTag returns the name of a Go build tag's dimension.
-func GoTag(tag string) string { return GoTagPrefix + tag }
 
 // DefaultSettingsPackage is the Buck2 package holding turnkey's combined
 // config_settings (one per platform, named "<os>-<cpu>"), when sync.toml
@@ -172,39 +166,52 @@ func NewSpace(platforms []Platform, settings string) Space {
 	return space
 }
 
-// WithDimensions returns the space with the on/off dimensions named in
-// dims (GoTag's) added, sorted by name, each crossing every configuration
-// with both its values. Names already in the space, and others, are
-// ignored.
-func (s Space) WithDimensions(dims []string) Space {
-	var tags []string
-	for _, name := range dims {
-		tag, ok := strings.CutPrefix(name, GoTagPrefix)
-		if ok && !slices.Contains(tags, tag) {
-			if _, have := s.dimension(name); !have {
-				tags = append(tags, tag)
-			}
+// OnOff is an on/off dimension a language adds to the space a package's
+// deps are resolved in, e.g. a Go build tag's. Its values are Set and
+// Unset.
+type OnOff struct {
+	// Name identifies the dimension, e.g. "go_tag:integration".
+	Name string `json:"name"`
+
+	// Constraint is the Buck2 constraint whose [set] and [unset] values
+	// back the dimension's, e.g. "prelude//go/tags/constraints:integration".
+	Constraint string `json:"constraint"`
+
+	// Token names Set in a combined config_setting's name, e.g.
+	// "integration"; Unset is "no_<token>".
+	Token string `json:"token"`
+}
+
+// WithDimensions returns the space with the on/off dimensions dims added,
+// sorted by name, each crossing every configuration with both its values.
+// Names already in the space are ignored.
+func (s Space) WithDimensions(dims []OnOff) Space {
+	var added []OnOff
+	for _, d := range dims {
+		_, have := s.dimension(d.Name)
+		if !have && !slices.ContainsFunc(added, func(a OnOff) bool { return a.Name == d.Name }) {
+			added = append(added, d)
 		}
 	}
-	if len(tags) == 0 {
+	if len(added) == 0 {
 		return s
 	}
-	sort.Strings(tags)
+	sort.Slice(added, func(i, j int) bool { return added[i].Name < added[j].Name })
 
 	extended := Space{settings: s.settings, Dimensions: append([]Dimension(nil), s.Dimensions...)}
 	configs := s.Configurations
-	for _, tag := range tags {
+	for _, d := range added {
 		extended.Dimensions = append(extended.Dimensions, Dimension{
-			Name:   GoTag(tag),
+			Name:   d.Name,
 			Values: []string{Set, Unset},
 			key: func(v string) string {
-				return fmt.Sprintf("prelude//go/tags/constraints:%s[%s]", tag, v)
+				return fmt.Sprintf("%s[%s]", d.Constraint, v)
 			},
 			token: func(v string) string {
 				if v == Set {
-					return tag
+					return d.Token
 				}
-				return "no_" + tag
+				return "no_" + d.Token
 			},
 		})
 		var crossed []Configuration
@@ -214,7 +221,7 @@ func (s Space) WithDimensions(dims []string) Space {
 				for k, val := range config {
 					c[k] = val
 				}
-				c[GoTag(tag)] = v
+				c[d.Name] = v
 				crossed = append(crossed, c)
 			}
 		}
