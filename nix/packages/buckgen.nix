@@ -21,6 +21,7 @@ pkgs.buildGoModule {
       (root + "/src/cmd/buckgen")
       (root + "/src/go/pkg/buckgen")
       (root + "/src/go/pkg/goparse")
+      (root + "/src/go/pkg/conditional")
       (root + "/src/go/pkg/conditions")
       (root + "/src/go/pkg/starlark")
     ];

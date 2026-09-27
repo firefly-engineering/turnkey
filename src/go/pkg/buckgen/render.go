@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/conditional"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/goparse"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
@@ -63,10 +64,10 @@ func RenderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) (bool, erro
 	fmt.Fprintf(w, "    header_namespace = \"\",\n")
 	fmt.Fprintf(w, "    visibility = [\"PUBLIC\"],\n")
 
-	split := space.Split(func(config conditions.Configuration) []string { return deps[config.String()] })
+	value := conditional.LabelsValue(space, func(config conditions.Configuration) []string { return deps[config.String()] })
 	// Only output deps attribute if there are actual dependencies
-	if len(split.Common) > 0 || split.IsConditional() {
-		fmt.Fprintf(w, "    %s = %s,\n", cfg.Buck.DepsAttr, starlark.RenderIndented(depsValue(split), "    "))
+	if value != nil {
+		fmt.Fprintf(w, "    %s = %s,\n", cfg.Buck.DepsAttr, starlark.RenderIndented(value, "    "))
 	}
 	fmt.Fprintln(w, ")")
 
@@ -111,22 +112,6 @@ var (
 	goOS   = map[string]string{"linux": "linux", "macos": "darwin"}
 	goArch = map[string]string{"x86_64": "amd64", "arm64": "arm64"}
 )
-
-// depsValue returns a split as the deps attribute's value.
-func depsValue(split conditions.Split) starlark.AttributeValue {
-	common := starlark.StringListValue{Values: split.Common}
-	if !split.IsConditional() {
-		return common
-	}
-	sel := starlark.SelectValue{}
-	if len(split.Common) > 0 {
-		sel.Common = common
-	}
-	for _, b := range split.Branches {
-		sel.Branches = append(sel.Branches, starlark.SelectBranch{Key: b.Key, Value: starlark.StringListValue{Values: b.Labels}})
-	}
-	return sel
-}
 
 // RenderCell generates rules.star files for all packages in a vendor directory
 func RenderCell(vendorDir string, cfg *Config) ([]string, error) {

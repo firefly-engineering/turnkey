@@ -9,6 +9,7 @@ go_library(
         "render.go",
     ],
     deps = [
+        "//src/go/pkg/conditional:conditional",
         "//src/go/pkg/conditions:conditions",
         "//src/go/pkg/goparse:goparse",
         "//src/go/pkg/starlark:starlark",

@@ -5,6 +5,7 @@ go_library(
     package_name = "github.com/firefly-engineering/turnkey/src/go/pkg/pydepscell",
     srcs = glob(["*.go"], exclude = ["*_test.go"]),
     deps = [
+        "//src/go/pkg/conditional:conditional",
         "//src/go/pkg/conditions:conditions",
         "//src/go/pkg/pep508:pep508",
         "//src/go/pkg/starlark:starlark",

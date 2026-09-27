@@ -20,6 +20,7 @@ pkgs.buildGoModule {
       (root + "/go.sum")
       (root + "/src/cmd/pydeps-cell")
       (root + "/src/go/pkg/pydepscell")
+      (root + "/src/go/pkg/conditional")
       (root + "/src/go/pkg/conditions")
       (root + "/src/go/pkg/pep508")
       (root + "/src/go/pkg/starlark")

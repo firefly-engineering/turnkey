@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/conditional"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/pep508"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
@@ -99,7 +100,7 @@ func Render(w io.Writer, name string, deps *DepsFile, cfg Config) error {
 	}
 
 	var failed error
-	split := space.Split(func(config conditions.Configuration) []string {
+	value := conditional.LabelsValue(space, func(config conditions.Configuration) []string {
 		env, ok := pep508.PlatformEnv(config[conditions.OS], config[conditions.CPU], cfg.PythonVersion)
 		if !ok && len(cfg.Platforms) > 0 {
 			failed = fmt.Errorf("no marker environment for %s", config)
@@ -134,8 +135,8 @@ func Render(w io.Writer, name string, deps *DepsFile, cfg Config) error {
 	fmt.Fprintf(w, "    name = %q,\n", name)
 	fmt.Fprintln(w, `    srcs = glob(["**/*.py"]),`)
 	fmt.Fprintln(w, `    base_module = "",`)
-	if len(split.Common) > 0 || split.IsConditional() {
-		fmt.Fprintf(w, "    deps = %s,\n", starlark.RenderIndented(depsValue(split), "    "))
+	if value != nil {
+		fmt.Fprintf(w, "    deps = %s,\n", starlark.RenderIndented(value, "    "))
 	}
 	fmt.Fprintln(w, `    visibility = ["PUBLIC"],`)
 	fmt.Fprintln(w, ")")
@@ -150,22 +151,6 @@ func withExtra(env pep508.Env, extra string) pep508.Env {
 	}
 	with["extra"] = extra
 	return with
-}
-
-// depsValue returns a split as the deps attribute's value.
-func depsValue(split conditions.Split) starlark.AttributeValue {
-	common := starlark.StringListValue{Values: split.Common}
-	if !split.IsConditional() {
-		return common
-	}
-	sel := starlark.SelectValue{}
-	if len(split.Common) > 0 {
-		sel.Common = common
-	}
-	for _, b := range split.Branches {
-		sel.Branches = append(sel.Branches, starlark.SelectBranch{Key: b.Key, Value: starlark.StringListValue{Values: b.Labels}})
-	}
-	return sel
 }
 
 // RenderCell writes the rules.star of every package in the cell's vendor
