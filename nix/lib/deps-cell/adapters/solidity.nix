@@ -33,6 +33,36 @@ rec {
   # Public API
   # ==========================================================================
 
+  # The cell's remapping for one solidity-deps.toml package, as
+  # { prefix, target } with target relative to the cell root.
+  #
+  # soldeps-gen writes remappings for a Foundry/npm checkout, where the
+  # package sits at lib/<name>/ (git) or node_modules/<name>/ (npm), and the
+  # target may go deeper: forge-std's sources are in src/. The cell vendors
+  # every package at vendor/<name>/, so the target moves there and keeps
+  # whatever follows the package directory. A package without a remapping
+  # maps its own name to its root.
+  cellRemapping = pkg:
+    let
+      remapping = pkg.remapping or null;
+      prefix =
+        if remapping == null then "${pkg.name}/"
+        else builtins.head (lib.splitString "=" remapping);
+      # Everything after the first "=": the target in soldeps-gen's layout
+      target = lib.removePrefix "${prefix}=" remapping;
+      # Where soldeps-gen puts git and npm packages (src/cmd/soldeps-gen/src/main.rs)
+      layouts = [ "lib/${pkg.name}/" "node_modules/${pkg.name}/" ];
+      layout = lib.findFirst (root: lib.hasPrefix root target) null layouts;
+      subpath =
+        if remapping == null then ""
+        else if layout == null then
+          throw "soldeps cell: remapping `${remapping}` for ${pkg.name} does not point into ${lib.concatStringsSep " or " layouts}"
+        else lib.removePrefix layout target;
+    in {
+      inherit prefix;
+      target = "vendor/${pkg.name}/${subpath}";
+    };
+
   # Build a single Solidity dependency package
   mkSolDepPackage = {
     name,               # Package name (e.g., "forge-std" or "@openzeppelin/contracts")
@@ -163,15 +193,7 @@ rec {
       name = sanitizeName pkg.name;  # Buck target name
       value = {
         package = pkg.name;
-        prefix =
-          # Use the remapping prefix from solidity-deps.toml, or derive from package name
-          if pkg.remapping or null != null then
-            let parts = lib.splitString "=" pkg.remapping;
-            in builtins.head parts
-          else if lib.hasPrefix "@" pkg.name then
-            "${pkg.name}/"
-          else
-            "${pkg.name}/";
+        inherit (cellRemapping pkg) prefix;
         # Path relative to the cell root where the package lives
         path = "vendor/${pkg.name}";
       };
@@ -212,17 +234,8 @@ rec {
 
     # Generate remappings.txt in solc format for convenience
     remappingsTxt = lib.concatMapStringsSep "\n" (pkg:
-      let
-        prefix =
-          if pkg.remapping or null != null then
-            let parts = lib.splitString "=" pkg.remapping;
-            in builtins.head parts
-          else if lib.hasPrefix "@" pkg.name then
-            "${pkg.name}/"
-          else
-            "${pkg.name}/";
-      in
-      "${prefix}=vendor/${pkg.name}/"
+      let r = cellRemapping pkg;
+      in "${r.prefix}=${r.target}"
     ) packages;
   in
   pkgs.runCommand "${cellName}-cell" {

@@ -524,6 +524,49 @@
               "language records: ${lib.concatStringsSep "; " allProblems}";
             pkgs.runCommand "language-records-check" { } "touch $out";
 
+          # The soldeps cell's remappings.txt keeps the subdirectory of each
+          # remapping soldeps-gen emits, moved from its lib/ or node_modules/
+          # layout to the cell's vendor/ one: forge-std's sources live in
+          # src/, so `forge-std/` must point there. Checked at evaluation.
+          checks.solidity-remappings =
+            let
+              solidity = import ./nix/lib/deps-cell/adapters/solidity.nix { inherit pkgs lib; };
+              remapping =
+                pkg:
+                let
+                  r = solidity.cellRemapping pkg;
+                in
+                "${r.prefix}=${r.target}";
+              expected = {
+                # A git dependency, Foundry layout
+                "forge-std/=vendor/forge-std/src/" = {
+                  name = "forge-std";
+                  remapping = "forge-std/=lib/forge-std/src/";
+                };
+                # An npm dependency, scoped name
+                "@openzeppelin/contracts/=vendor/@openzeppelin/contracts/" = {
+                  name = "@openzeppelin/contracts";
+                  remapping = "@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/";
+                };
+                # No remapping: the package root, under its own name
+                "solady/=vendor/solady/" = {
+                  name = "solady";
+                };
+              };
+              wrong = lib.filterAttrs (want: pkg: remapping pkg != want) expected;
+              outside = solidity.cellRemapping {
+                name = "forge-std";
+                remapping = "forge-std/=elsewhere/forge-std/src/";
+              };
+            in
+            assert lib.assertMsg (wrong == { })
+              "solidity remappings: ${
+                lib.concatStringsSep "; " (lib.mapAttrsToList (want: pkg: "${remapping pkg}, want ${want}") wrong)
+              }";
+            assert lib.assertMsg (!(builtins.tryEval outside.target).success)
+              "solidity remappings: a target outside lib/<name>/ or node_modules/<name>/ is accepted";
+            pkgs.runCommand "solidity-remappings-check" { } "touch $out";
+
           # Configure turnkey to use our local toolchain files. tellerLib
           # and tellerRegistry default to self.lib.defaultTellerLib /
           # self.lib.defaultTellerRegistry system via the flake-parts
