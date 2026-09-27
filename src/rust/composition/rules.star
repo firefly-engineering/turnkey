@@ -4,29 +4,28 @@ load("@prelude//:rules.bzl", "rust_library", "rust_test")
 # Detect platform for conditional FUSE backend selection
 _IS_MACOS = host_info().os.is_macos
 
-# Common deps shared by all targets
-_COMMON_DEPS = [
-    "//src/rust/nix-eval:nix-eval",
-    "rustdeps//vendor/dirs:dirs",
-    "rustdeps//vendor/log:log",
-    "rustdeps//vendor/serde:serde",
-    "rustdeps//vendor/serde_json:serde_json",
-    "rustdeps//vendor/thiserror:thiserror",
-    "rustdeps//vendor/toml:toml",
-]
-
 # Base library without optional features
 rust_library(
     name = "composition",
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
-    deps = _COMMON_DEPS,
+    deps = [
+        "//src/rust/nix-eval:nix-eval",
+        "rustdeps//vendor/dirs:dirs",
+        "rustdeps//vendor/log:log",
+        "rustdeps//vendor/serde:serde",
+        "rustdeps//vendor/serde_json:serde_json",
+        "rustdeps//vendor/thiserror:thiserror",
+        "rustdeps//vendor/toml:toml",
+    ],
     visibility = ["PUBLIC"],
 )
 
 # Full-featured library with FUSE and watcher support
 # - Linux: uses fuser crate (feature="fuse")
 # - macOS: uses direct libfuse3 FFI (feature="fuse-t")
+# Sync doesn't resolve the optional deps its Cargo features enable (#109)
+# turnkey:no-sync
 rust_library(
     name = "composition-full",
     crate = "composition",  # Keep the original crate name for imports
@@ -40,7 +39,14 @@ rust_library(
         "-L/usr/local/lib",
         "-lfuse3",
     ] if _IS_MACOS else [],
-    deps = _COMMON_DEPS + [
+    deps = [
+        "//src/rust/nix-eval:nix-eval",
+        "rustdeps//vendor/dirs:dirs",
+        "rustdeps//vendor/log:log",
+        "rustdeps//vendor/serde:serde",
+        "rustdeps//vendor/serde_json:serde_json",
+        "rustdeps//vendor/thiserror:thiserror",
+        "rustdeps//vendor/toml:toml",
         "rustdeps//vendor/libc:libc",
         # Use versioned target to match notify-debouncer-mini's dependency
         "rustdeps//vendor/notify@8.2.0:notify",
@@ -55,7 +61,14 @@ rust_test(
     name = "composition-test",
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
-    deps = _COMMON_DEPS + [
+    deps = [
+        "//src/rust/nix-eval:nix-eval",
+        "rustdeps//vendor/dirs:dirs",
+        "rustdeps//vendor/log:log",
+        "rustdeps//vendor/serde:serde",
+        "rustdeps//vendor/serde_json:serde_json",
+        "rustdeps//vendor/thiserror:thiserror",
+        "rustdeps//vendor/toml:toml",
         "rustdeps//vendor/tempfile:tempfile",
     ],
 )
