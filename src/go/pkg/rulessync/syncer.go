@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/conditional"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/mapper"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
@@ -765,7 +766,7 @@ type resolved struct {
 // preserving manual deps, and records the change. old gives the deps the
 // target has in each configuration. Deps every configuration has are
 // written as a plain list; the others as a select() (see
-// conditions.Space.Split). It reports whether the target's deps changed.
+// conditional.SetLabels). It reports whether the target's deps changed.
 func (r *SyncResult) applyConditional(target *starlark.Target, attr string, space conditions.Space,
 	old func(conditions.Configuration) []string, want func(conditions.Configuration) (resolved, error)) (bool, error) {
 	preserved := target.GetPreservedLabels(attr)
@@ -793,15 +794,10 @@ func (r *SyncResult) applyConditional(target *starlark.Target, attr string, spac
 	}
 
 	if changed {
-		// With markers, SetSelect writes only the auto-managed section.
-		split := space.Split(func(config conditions.Configuration) []string {
+		// With markers, SetLabels writes only the auto-managed section.
+		conditional.SetLabels(target, attr, space, func(config conditions.Configuration) []string {
 			return withoutDeps(newDeps[config.String()], preserved)
 		})
-		var branches []starlark.SelectBranch
-		for _, b := range split.Branches {
-			branches = append(branches, starlark.SelectBranch{Key: b.Key, Value: starlark.StringListValue{Values: b.Labels}})
-		}
-		target.SetSelect(attr, split.Common, branches)
 	}
 	if changed || len(kept) > 0 {
 		change := TargetChange{Target: target.Name, Added: added, Removed: removed}
@@ -847,12 +843,7 @@ func (r *SyncResult) applyOwned(target *starlark.Target, attr string, space cond
 		return false, nil
 	}
 
-	split := space.Split(func(config conditions.Configuration) []string { return values[config.String()] })
-	var branches []starlark.SelectBranch
-	for _, b := range split.Branches {
-		branches = append(branches, starlark.SelectBranch{Key: b.Key, Value: starlark.StringListValue{Values: b.Labels}})
-	}
-	target.SetSelect(attr, split.Common, branches)
+	conditional.SetLabels(target, attr, space, func(config conditions.Configuration) []string { return values[config.String()] })
 	r.Changes = append(r.Changes, TargetChange{Target: target.Name, Attribute: attr, Added: added, Removed: removed})
 	return true, nil
 }

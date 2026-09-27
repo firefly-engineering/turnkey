@@ -32,6 +32,7 @@ pkgs.buildGoModule {
       (root + "/src/go/pkg/buck2args")
       (root + "/src/go/pkg/localconfig")
       (root + "/src/go/pkg/syncconfig")
+      (root + "/src/go/pkg/conditional")
       (root + "/src/go/pkg/conditions")
       (root + "/src/go/pkg/cargocfg")
       (root + "/src/go/pkg/cargofeatures")

@@ -5,6 +5,7 @@ go_library(
     package_name = "github.com/firefly-engineering/turnkey/src/go/pkg/rulessync",
     srcs = glob(["*.go"], exclude = ["*_test.go"]),
     deps = [
+        "//src/go/pkg/conditional:conditional",
         "//src/go/pkg/conditions:conditions",
         "//src/go/pkg/mapper:mapper",
         "//src/go/pkg/starlark:starlark",
