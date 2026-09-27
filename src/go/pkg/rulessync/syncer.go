@@ -248,20 +248,23 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 		result.Errors = append(result.Errors, err.Error())
 		return result, nil
 	}
+	// Every platform, crossed with the package's on/off dimensions (Go
+	// build tags)
+	space := s.space.WithDimensions(dims)
 	res := &resolver{
 		lang:       lang,
 		pkgDir:     pkgDir,
 		dims:       dims,
 		selfTarget: computeSelfTarget(pkgDir, s.config.ProjectRoot),
-		space:      s.space,
+		space:      space,
 		cache:      make(map[string]mapper.PackageMapping),
 		reported:   make(map[string]bool),
 	}
 
 	// Resolve the package in every configuration up front, so that what
 	// can't be mapped is reported even if no target is synced.
-	for _, config := range s.space.Configurations {
-		if _, err := res.resolve(config, nil); err != nil {
+	for _, config := range space.Configurations {
+		if _, err := res.resolve(config, mapper.Library, nil); err != nil {
 			result.Errors = append(result.Errors, err.Error())
 			return result, nil
 		}
@@ -280,12 +283,12 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 			result.OptedOut = append(result.OptedOut, target.Name)
 			continue
 		}
-		old, ok := readLabels(target, attr, s.space)
+		old, ok := readLabels(target, attr, space)
 		if !ok {
 			result.Unreadable = append(result.Unreadable, UnreadableTarget{Target: target.Name, Attribute: attr})
 			continue
 		}
-		variant, badAttr, ok := mapper.ReadVariant(target, lang.VariantAttributes(kind), s.space)
+		variant, badAttr, ok := mapper.ReadVariant(target, lang.VariantAttributes(kind), space)
 		if !ok {
 			result.Unreadable = append(result.Unreadable, UnreadableTarget{Target: target.Name, Attribute: badAttr})
 			continue
@@ -296,7 +299,7 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 		hasTargetUnderTest := target.GetStringAttr("target_under_test") != ""
 
 		want := func(config conditions.Configuration) (resolved, error) {
-			m, err := res.resolve(config, variant(config))
+			m, err := res.resolve(config, kind, variant(config))
 			if err != nil {
 				return resolved{}, err
 			}
@@ -327,7 +330,7 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 			return w, nil
 		}
 
-		changed, err := result.applyConditional(target, attr, s.space, old, want)
+		changed, err := result.applyConditional(target, attr, space, old, want)
 		if err != nil {
 			result.Errors = append(result.Errors, err.Error())
 			return result, nil
@@ -337,19 +340,19 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 		}
 
 		// The other attributes the language owns, e.g. Rust's features
-		owned, err := res.ownedAttributes(variant)
+		owned, err := res.ownedAttributes(kind, variant)
 		if err != nil {
 			result.Errors = append(result.Errors, err.Error())
 			return result, nil
 		}
 		for _, name := range owned {
-			oldValue, ok := readLabels(target, name, s.space)
+			oldValue, ok := readLabels(target, name, space)
 			if !ok {
 				result.Unreadable = append(result.Unreadable, UnreadableTarget{Target: target.Name, Attribute: name})
 				continue
 			}
-			changed, err := result.applyOwned(target, name, s.space, oldValue, func(config conditions.Configuration) ([]string, error) {
-				m, err := res.resolve(config, variant(config))
+			changed, err := result.applyOwned(target, name, space, oldValue, func(config conditions.Configuration) ([]string, error) {
+				m, err := res.resolve(config, kind, variant(config))
 				return m.Attrs[name], err
 			})
 			if err != nil {
@@ -553,12 +556,13 @@ type resolver struct {
 	reported map[string]bool
 }
 
-// resolve returns the package's deps in config, for a target's variant.
+// resolve returns the package's deps in config, for a target of kind and
+// its variant.
 // Deps on the package's own target are dropped (e.g. when syncing
 // src/python/cargo, //src/python/cargo:cargo).
-func (r *resolver) resolve(config conditions.Configuration, variant map[string]starlark.AttributeValue) (mapper.PackageMapping, error) {
-	req := mapper.Request{Config: config.Project(r.dims), Variant: variant, Space: r.space}
-	key := req.Config.String() + "|" + variantKey(variant)
+func (r *resolver) resolve(config conditions.Configuration, kind mapper.TargetKind, variant map[string]starlark.AttributeValue) (mapper.PackageMapping, error) {
+	req := mapper.Request{Config: config.Project(r.dims), Kind: kind, Variant: variant, Space: r.space}
+	key := fmt.Sprintf("%s|%d|%s", req.Config, kind, variantKey(variant))
 	if m, ok := r.cache[key]; ok {
 		return m, nil
 	}
@@ -584,10 +588,10 @@ func (r *resolver) resolve(config conditions.Configuration, variant map[string]s
 
 // ownedAttributes returns the attributes other than the deps that the
 // language sets for a target with variant, in any configuration.
-func (r *resolver) ownedAttributes(variant func(conditions.Configuration) map[string]starlark.AttributeValue) ([]string, error) {
+func (r *resolver) ownedAttributes(kind mapper.TargetKind, variant func(conditions.Configuration) map[string]starlark.AttributeValue) ([]string, error) {
 	var names []string
 	for _, config := range r.space.Configurations {
-		m, err := r.resolve(config, variant(config))
+		m, err := r.resolve(config, kind, variant(config))
 		if err != nil {
 			return nil, err
 		}

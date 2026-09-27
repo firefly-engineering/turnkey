@@ -253,6 +253,7 @@ rust_library(
   `config//os:<os>` when they differ only by OS (or `config//cpu:<cpu>` by
   CPU alone), otherwise one of the toolchains cell's `config_setting`s
   combining both, `toolchains//conditions:<os>-<cpu>`, one per platform.
+  Go build tags are dimensions too (see Go below), combined the same way.
 - Every platform gets a branch, empty if it needs nothing more, and there is
   no `DEFAULT`: building for a platform that isn't listed fails instead of
   silently missing deps.
@@ -285,6 +286,18 @@ expression.
   crates. Build dependencies are not synced: sync reports them and leaves
   any existing dep on them alone. See [Rust Features](#rust-features) for
   features, optional dependencies and dependencies on a member's variant.
+- **Go**: the imports `go list` reports, on every platform: it runs once
+  per platform with `GOOS`, `GOARCH` and `CGO_ENABLED=1` set, so a
+  `_linux.go` file's imports become a `config//os:linux` branch whichever
+  machine runs sync. A binary or a test is built with its `build_tags`,
+  taken literally (none is a plain `go build`). A library gets its tags
+  from the configuration, through the prelude's transition: each tag in
+  `buck2.go.allowedBuildTags` that its build constraints use is an on/off
+  dimension, and imports that depend on one become a `select()` on
+  `prelude//go/tags/constraints:<tag>[set]`/`[unset]`, or on a toolchains
+  cell setting combining it with the platform
+  (`toolchains//conditions:linux-<tag>`, `...-no_<tag>`). Test targets get
+  `_test.go` imports, external test packages' (`XTestImports`) included.
 - **Python**: the imports found in the sources. An import of a package that a
   uv workspace member provides (`turnkey.cfg`, `from turnkey import cfg`)
   maps to that member's target. The packages come from the members listed in

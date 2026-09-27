@@ -45,7 +45,8 @@ type Language interface {
 	SourcePatterns() []string
 
 	// Dimensions names the configuration dimensions (conditions.OS,
-	// conditions.CPU) the deps of the package in pkgDir depend on, or none.
+	// conditions.CPU, conditions.GoTag(<tag>)) the deps of the package in
+	// pkgDir depend on, or none.
 	// Sync resolves the package once per combination of their values, and
 	// writes deps that differ as a select().
 	Dimensions(pkgDir string) ([]string, error)
@@ -68,6 +69,9 @@ type Request struct {
 	// Config gives a value to each of the language's dimensions for the
 	// package; it is empty when the deps don't depend on the configuration.
 	Config conditions.Configuration
+
+	// Kind is the kind of target the deps are for.
+	Kind TargetKind
 
 	// Variant holds the target's variant attributes (VariantAttributes)
 	// that it sets, as they are in the configuration being resolved.

@@ -6,9 +6,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 
+	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/extraction"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/starlark"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/mod/modfile"
 )
@@ -36,17 +41,51 @@ var goRules = map[string]TargetKind{
 	"go_test":             Test,
 }
 
-// goLanguage resolves a Go package's deps from the imports go list reports.
+// goLanguage resolves a Go package's deps from the imports go list reports,
+// on each platform: for a library, with each combination of the allowed
+// build tags its build constraints use; for a binary or a test, with its
+// build_tags.
 type goLanguage struct {
-	unconditional
-
 	projectRoot string
 	cfg         *GoConfig
+
+	// allowedTags are the build tags a library's deps may vary with
+	// (sync.toml's [conditions] go_tags)
+	allowedTags []string
 }
 
 func newGoLanguage(projectRoot string) Language {
 	cfg, _ := detectGoConfig(projectRoot)
-	return &goLanguage{projectRoot: projectRoot, cfg: cfg}
+	l := &goLanguage{projectRoot: projectRoot, cfg: cfg}
+	if syncCfg, err := syncconfig.LoadDefaultFrom(projectRoot); err == nil {
+		l.allowedTags = syncCfg.Conditions.GoTags
+	}
+	return l
+}
+
+// Dimensions: the platform, and each allowed build tag the package's build
+// constraints use.
+func (l *goLanguage) Dimensions(pkgDir string) ([]string, error) {
+	dims := []string{conditions.OS, conditions.CPU}
+	tags, err := constraintTags(pkgDir)
+	if err != nil {
+		return nil, err
+	}
+	for _, tag := range tags {
+		if slices.Contains(l.allowedTags, tag) {
+			dims = append(dims, conditions.GoTag(tag))
+		}
+	}
+	return dims, nil
+}
+
+// VariantAttributes: a binary or a test is built with its build_tags,
+// literally; a library gets its tags from the configuration.
+func (l *goLanguage) VariantAttributes(kind TargetKind) []string {
+	if kind == Binary || kind == Test {
+		return []string{"build_tags"}
+	}
+	return nil
 }
 
 func (l *goLanguage) Name() string { return "go" }
@@ -60,20 +99,58 @@ func (l *goLanguage) DepsAttribute() string { return "deps" }
 
 func (l *goLanguage) SourcePatterns() []string { return []string{"*.go"} }
 
-func (l *goLanguage) ResolveDeps(pkgDir string, _ Request) (PackageMapping, error) {
-	result, err := l.extract(pkgDir)
+func (l *goLanguage) ResolveDeps(pkgDir string, req Request) (PackageMapping, error) {
+	result, err := l.extract(pkgDir, goEnv(req.Config), buildTags(req))
 	if err != nil {
 		return PackageMapping{}, fmt.Errorf("extractor failed: %w", err)
 	}
 	return resolveImports(l, result), nil
 }
 
-// extract lists the imports of the Go packages under pkgDir with go list.
-func (l *goLanguage) extract(pkgDir string) (*extraction.Result, error) {
+// goEnv returns the environment go list needs to see a configuration's
+// platform, whatever the host: GOOS, GOARCH and cgo. A configuration
+// without a platform gets the host's.
+func goEnv(config conditions.Configuration) []string {
+	goos := map[string]string{"linux": "linux", "macos": "darwin"}[config[conditions.OS]]
+	goarch := map[string]string{"x86_64": "amd64", "arm64": "arm64"}[config[conditions.CPU]]
+	if goos == "" || goarch == "" {
+		return nil
+	}
+	return []string{"GOOS=" + goos, "GOARCH=" + goarch, "CGO_ENABLED=1"}
+}
+
+// buildTags returns the build tags a request is resolved with: a binary's
+// or test's build_tags, literally, or the tags a library's configuration
+// sets.
+func buildTags(req Request) []string {
+	if req.Kind == Binary || req.Kind == Test {
+		tags, _ := starlark.Labels(req.Variant["build_tags"])
+		return tags
+	}
+	var tags []string
+	for dim, value := range req.Config {
+		if tag, ok := strings.CutPrefix(dim, conditions.GoTagPrefix); ok && value == conditions.Set {
+			tags = append(tags, tag)
+		}
+	}
+	sort.Strings(tags)
+	return tags
+}
+
+// extract lists the imports of the Go packages under pkgDir with go list,
+// in the environment env (added to the process's) and with tags.
+func (l *goLanguage) extract(pkgDir string, env, tags []string) (*extraction.Result, error) {
 	result := extraction.NewResult("go")
 
-	cmd := exec.Command("go", "list", "-json", "./...")
+	args := []string{"list", "-e", "-json"}
+	if len(tags) > 0 {
+		args = append(args, "-tags", strings.Join(tags, ","))
+	}
+	cmd := exec.Command("go", append(args, "./...")...)
 	cmd.Dir = pkgDir
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 
 	output, err := cmd.Output()
 	if err != nil {
@@ -93,12 +170,13 @@ func (l *goLanguage) extract(pkgDir string) (*extraction.Result, error) {
 	dec := json.NewDecoder(strings.NewReader(string(output)))
 	for dec.More() {
 		var pkg struct {
-			Dir         string
-			ImportPath  string
-			GoFiles     []string
-			TestGoFiles []string
-			Imports     []string
-			TestImports []string
+			Dir          string
+			ImportPath   string
+			GoFiles      []string
+			TestGoFiles  []string
+			Imports      []string
+			TestImports  []string
+			XTestImports []string
 		}
 		if err := dec.Decode(&pkg); err != nil {
 			continue
@@ -120,7 +198,7 @@ func (l *goLanguage) extract(pkgDir string) (*extraction.Result, error) {
 		}
 
 		var testImports []extraction.Import
-		for _, imp := range pkg.TestImports {
+		for _, imp := range append(pkg.TestImports, pkg.XTestImports...) {
 			testImports = append(testImports, extraction.Import{
 				Path: imp,
 				Kind: classifyGoImport(imp, modulePath),

@@ -10,6 +10,7 @@ go_library(
         "//src/go/pkg/conditions:conditions",
         "//src/go/pkg/extraction:extraction",
         "//src/go/pkg/starlark:starlark",
+        "//src/go/pkg/syncconfig:syncconfig",
         "godeps//vendor/github.com/pelletier/go-toml/v2:v2",
         "godeps//vendor/golang.org/x/mod/modfile:modfile",
     ],
