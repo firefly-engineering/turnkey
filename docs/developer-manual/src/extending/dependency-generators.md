@@ -379,12 +379,20 @@ pkgs.runCommand "newlang-deps-cell" {} ''
 
 ### 3. Add the Language's Record
 
-Add a record to `nix/buck2/languages.nix`: the cell name, the generator
-package, `mkCell` (which calls the adapter) and `syncRules`. Everything
-else follows from the record: the flake-parts module builds the cell, and
-the devenv module adds the cell to `.buckconfig`, symlinks it under
-`.turnkey/`, puts the generator on the shell's PATH and writes the sync
-rules into `.turnkey/sync.toml`.
+Add a record to `nix/buck2/languages.nix`: the cell name, `depsFile`
+(the deps file's default name), the generator package, `mkCell` (which
+calls the adapter) and `syncRules`. Everything else follows from the
+record: the flake-parts module builds the cell, and the devenv module adds
+the cell to `.buckconfig`, symlinks it under `.turnkey/`, puts the
+generator on the shell's PATH and writes the sync rules into
+`.turnkey/sync.toml`, with the cell and deps file in its `[[languages]]`.
+
+Rules sync reads `[[languages]]` and creates, for each language, the
+plug-in registered under the record's name in
+`src/go/pkg/mapper/language.go`: a language without one is an error, so
+add the plug-in with the record, and update the checked-in
+`src/go/pkg/rulessync/testdata/sync.toml` (`checks.sync-config-contract`
+prints the file to copy).
 
 ### 4. Add Configuration Options
 
