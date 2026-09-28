@@ -1,11 +1,15 @@
 # Rust Language Adapter for Dependency Cells
 #
 # Provides:
-#   - mkRustDepPackage: Build a single Rust crate package
-#   - mkRustDepsCell: Build a complete Rust dependency cell
+#   - mkRustDepPackage: Build a single Rust crate package: its source with
+#     its fixup applied, and, given its package slice, its own rules.star
+#   - mkRustDepsCell: Build a complete Rust dependency cell, and (passthru)
+#     its cell index (ADR 0004)
 #
-# Rust dependencies are fetched from crates.io.
-# Feature unification and BUCK generation happen during merge phase.
+# Rust dependencies are fetched from crates.io. The merged cell still unifies
+# features and generates every rules.star in its merge phase; each package's
+# own rules.star, generated from its slice alone, is what the cell index
+# points at.
 
 {
   pkgs,
@@ -16,7 +20,13 @@
 let
   fetchers = import ../fetchers.nix { inherit pkgs lib; };
   platforms = import ../../../buck2/platforms.nix { inherit lib; };
-  inherit (genericBuilder) genericMkDepsCell;
+  inherit (genericBuilder) genericMkDepsCell unversionedKeys mkCellIndex;
+
+  # The platform the cell is built on: what fixups build natively exists
+  # only for it
+  hostPlatform = builtins.removeAttrs (platforms.fromSystem pkgs.stdenv.hostPlatform.system) [
+    "system"
+  ];
 in
 rec {
   # Build inputs for per-dependency builds
@@ -42,30 +52,116 @@ rec {
       # Optional: the crate's fixup's commands (nix/lib/fixups): its
       # patches, then what stands in for its build.rs
       fixupCommands ? "",
+
+      # Optional, together: generate the crate's rules.star from its package
+      # slice (its rust-deps.toml entry's features and dependencies), with
+      # rust-rules-gen. It reads nothing of any other crate: its fixup's gen
+      # part, the platforms (platforms.nix's conditions) and the platform
+      # building it (host, { os; cpu; }). The `targets` output lists the
+      # rules.star's target names, one per line.
+      slice ? null,
+      fixupGen ? { },
+      conditions ? null,
+      host ? null,
+      rustRulesGen ? null,
+
+      # Optional, with a slice: what fails the crate if it has a build
+      # script no fixup accounts for (nix/lib/fixups's resolve)
+      unaccounted ? null,
     }:
     let
       fetchSpec = fetchers.mkCratesIOSpec {
         crateName = name;
         inherit version sha256;
       };
+      generates = slice != null;
     in
+    assert lib.assertMsg (
+      !generates || (rustRulesGen != null && conditions != null && host != null)
+    ) "mkRustDepPackage: a slice needs rustRulesGen, conditions and host";
     pkgs.runCommand "dep-rust-${name}-${version}"
-      {
-        nativeBuildInputs = buildInputs;
-        src = fetchers.fetch fetchSpec;
-        passthru = {
-          inherit name version;
-        };
-      }
-      ''
-        mkdir -p $out
-        cp -r $src/* $out/
-        chmod -R u+w $out
+      (
+        {
+          nativeBuildInputs = buildInputs ++ lib.optional generates rustRulesGen;
+          src = fetchers.fetch fetchSpec;
+          passthru = {
+            inherit name version;
+          };
+        }
+        // lib.optionalAttrs generates {
+          outputs = [
+            "out"
+            "targets"
+          ];
+          slice = builtins.toJSON slice;
+          fixup = builtins.toJSON fixupGen;
+          passAsFile = [
+            "slice"
+            "fixup"
+          ];
+        }
+      )
+      (
+        ''
+          mkdir -p $out
+          cp -r $src/* $out/
+          chmod -R u+w $out
 
-        # Apply the crate's fixup
-        cd $out
-        ${fixupCommands}
-      '';
+          # Apply the crate's fixup
+          cd $out
+          ${fixupCommands}
+        ''
+        + lib.optionalString generates ''
+
+          # The crate's rules.star, from its slice alone. Buck2 never runs
+          # build.rs: it fails if the crate has one no fixup accounts for.
+          rust-rules-gen \
+            --crate-dir $out \
+            --slice "$slicePath" \
+            --fixup "$fixupPath" \
+            --platforms ${lib.escapeShellArg (builtins.toJSON conditions)} \
+            --host ${lib.escapeShellArg (builtins.toJSON host)} \
+            --targets-out $targets \
+            ${lib.optionalString (unaccounted != null) "--unaccounted ${lib.escapeShellArg unaccounted}"} \
+            > $out/rules.star
+        ''
+      );
+
+  # Each locked crate's package, keyed "name@version": deps is
+  # rust-deps.toml's deps table, resolvedFixups nix/lib/fixups's resolve for
+  # its crates. With rustRulesGen, each package also generates its
+  # rules.star from its own slice, for the platforms in conditions.
+  mkRustCrates =
+    {
+      deps,
+      resolvedFixups ? {
+        fixups = { };
+        unaccounted = { };
+      },
+      conditions ? null,
+      rustRulesGen ? null,
+    }:
+    lib.mapAttrs (
+      key: dep:
+      mkRustDepPackage (
+        {
+          name = dep.name or (lib.head (lib.splitString "@" key));
+          inherit (dep) version;
+          sha256 = dep.hash;
+          fixupCommands = resolvedFixups.fixups.${key}.commands or "";
+        }
+        // lib.optionalAttrs (rustRulesGen != null) {
+          slice = {
+            features = dep.features or [ ];
+            dependencies = dep.dependencies or [ ];
+          };
+          fixupGen = resolvedFixups.fixups.${key}.gen or { };
+          unaccounted = resolvedFixups.unaccounted.${key} or null;
+          inherit conditions rustRulesGen;
+          host = hostPlatform;
+        }
+      )
+    ) deps;
 
   # Build a complete Rust dependency cell
   mkRustDepsCell =
@@ -96,6 +192,9 @@ rec {
       # Tools (must be provided by caller)
       computeUnifiedFeatures ? null, # Tool for feature unification
       genRustBuck ? null, # Tool for BUCK generation
+      # Generates each crate's own rules.star from its slice, for the cell
+      # index (passthru.index), when given
+      rustRulesGen ? null,
     }:
     let
       depsToml = builtins.fromTOML (builtins.readFile depsFile);
@@ -117,16 +216,14 @@ rec {
       );
 
       # Build individual dep packages
-      depPackages = lib.listToAttrs (
-        map (
-          crate:
-          lib.nameValuePair crate.key (mkRustDepPackage {
-            inherit (crate) name version;
-            sha256 = deps.${crate.key}.hash;
-            fixupCommands = fixups.${crate.key}.commands or "";
-          })
-        ) locked
-      );
+      depPackages = mkRustCrates {
+        inherit
+          deps
+          resolvedFixups
+          conditions
+          rustRulesGen
+          ;
+      };
 
       # What gen-rust-buck reads of each crate's fixup
       fixupsFile = pkgs.writeText "${cellName}-fixups.json" (
@@ -135,9 +232,7 @@ rec {
 
       # The platform the cell is built on: what fixups build natively
       # exists only for it
-      hostJSON = builtins.toJSON (
-        builtins.removeAttrs (platforms.fromSystem pkgs.stdenv.hostPlatform.system) [ "system" ]
-      );
+      hostJSON = builtins.toJSON hostPlatform;
 
       # Features file argument for compute-unified-features
       featuresFileArg = if featuresFile != null then "${featuresFile}" else "";
@@ -223,6 +318,18 @@ rec {
         cellBuildInputs
         ++ (if computeUnifiedFeatures != null then [ computeUnifiedFeatures ] else [ ])
         ++ (if genRustBuck != null then [ genRustBuck ] else [ ]);
+      # The cell index: each package's own derivation, with the rules.star
+      # generated from its slice, and the unversioned alias packages, as the
+      # merged cell's unversioned symlinks choose them
+      passthru = lib.optionalAttrs (rustRulesGen != null) {
+        index = mkCellIndex {
+          inherit cellName depsFile;
+          packages = lib.mapAttrs' (key: lib.nameValuePair "vendor/${keyToPath key}") depPackages;
+          aliases = lib.mapAttrs' (name: key: lib.nameValuePair "vendor/${name}" "vendor/${keyToPath key}") (
+            unversionedKeys parseKeyForSymlink (lib.attrNames depPackages)
+          );
+        };
+      };
     };
 
 }

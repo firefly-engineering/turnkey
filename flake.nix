@@ -216,6 +216,7 @@
             inherit pkgs lib;
           };
           packages.gen-rust-buck = import ./nix/packages/gen-rust-buck.nix { inherit pkgs lib; };
+          packages.rust-rules-gen = import ./nix/packages/rust-rules-gen.nix { inherit pkgs lib; };
           packages.pytest-uv-shim = import ./nix/packages/pytest-uv-shim.nix { inherit pkgs lib; };
           packages.check-rust-edition-rs = import ./nix/packages/check-rust-edition-rs.nix {
             inherit pkgs lib;
@@ -654,6 +655,89 @@
           # its deps files by content; a file the flake can't see is left out.
           # A changed or missing file loads the .envrc once more, with
           # nix-direnv's cached shell backdated; an unchanged one doesn't.
+          # A Rust crate's package, rules.star included, is built from its
+          # own data alone (ADR 0004): changing one crate's slice or hash in
+          # rust-deps.toml changes that crate's derivation and no other's.
+          # Checked at evaluation, on two crates, prost-derive depending on
+          # anyhow.
+          checks.rust-crate-isolation =
+            let
+              depsCell = import ./nix/lib/deps-cell { inherit pkgs lib; };
+              platforms = import ./nix/buck2/platforms.nix { inherit lib; };
+              anyhow = extra: {
+                "anyhow@1.0.100" = {
+                  name = "anyhow";
+                  version = "1.0.100";
+                  hash = lib.fakeHash;
+                  features = [ { name = "std"; } ];
+                }
+                // extra;
+              };
+              prostDerive = {
+                "prost-derive@0.14.1" = {
+                  name = "prost-derive";
+                  version = "0.14.1";
+                  hash = lib.fakeHash;
+                  dependencies = [ { package = "anyhow@1.0.100"; } ];
+                };
+              };
+              drvsOf =
+                deps:
+                lib.mapAttrs (_: drv: drv.drvPath) (
+                  depsCell.adapters.rust.mkRustCrates {
+                    inherit deps;
+                    conditions = platforms.conditions [
+                      "x86_64-linux"
+                      "aarch64-darwin"
+                    ];
+                    rustRulesGen = config.packages.rust-rules-gen;
+                  }
+                );
+              base = drvsOf (anyhow { } // prostDerive);
+              # anyhow's slice and hash, each changed alone, and a crate
+              # added: only the crate changed (if any) gets a new derivation
+              itoa = {
+                "itoa@1.0.15" = {
+                  name = "itoa";
+                  version = "1.0.15";
+                  hash = lib.fakeHash;
+                };
+              };
+              changes = {
+                slice = {
+                  deps = anyhow {
+                    features = [
+                      { name = "std"; }
+                      {
+                        name = "backtrace";
+                        platforms = [ "linux-x86_64" ];
+                      }
+                    ];
+                  };
+                  changed = "anyhow@1.0.100";
+                };
+                hash = {
+                  deps = anyhow { hash = builtins.replaceStrings [ "A" ] [ "B" ] lib.fakeHash; };
+                  changed = "anyhow@1.0.100";
+                };
+                added = {
+                  deps = anyhow { } // itoa;
+                  changed = null;
+                };
+              };
+              leaks = lib.filter (
+                change:
+                let
+                  inherit (changes.${change}) deps changed;
+                  drvs = drvsOf (deps // prostDerive);
+                in
+                lib.any (key: (drvs.${key} != base.${key}) != (key == changed)) (lib.attrNames base)
+              ) (lib.attrNames changes);
+            in
+            assert lib.assertMsg (leaks == [ ])
+              "rust crate isolation: ${lib.concatStringsSep ", " leaks} changed a derivation it shouldn't, or left the changed crate's alone";
+            pkgs.runCommand "rust-crate-isolation-check" { } "touch $out";
+
           checks.deps-freshness =
             let
               depsFreshness = import ./nix/devenv/turnkey/deps-freshness.nix { inherit lib pkgs; };
