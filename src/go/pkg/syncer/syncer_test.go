@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 )
@@ -107,4 +108,51 @@ func TestAMissingSourceDoesNotKeepARuleStale(t *testing.T) {
 		t.Fatalf("Check after sync: stale %v, %v; want fresh", stale, err)
 	}
 	_ = root
+}
+
+// A rule whose target lists more sources: the target is stale when one of
+// them is newer, and when it lists none (written before the rule named the
+// key).
+func TestTargetListedSourcesMakeARuleStale(t *testing.T) {
+	s, root := newSyncer(t, "rust")
+	s.Config.Deps[0].TargetSources = "manifests"
+	s.Config.Deps[0].Generator = []string{"echo", `manifests = ["member/Cargo.toml"]`}
+	member := filepath.Join(root, "member", "Cargo.toml")
+	if err := os.MkdirAll(filepath.Dir(member), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(member, []byte("[package]"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	past := time.Now().Add(-time.Hour)
+	for _, file := range []string{member, filepath.Join(root, "rust.src")} {
+		if err := os.Chtimes(file, past, past); err != nil {
+			t.Fatal(err)
+		}
+	}
+	target := filepath.Join(root, "rust.out")
+
+	// Written before the rule named the key: stale
+	if err := os.WriteFile(target, []byte("schema_version = 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, stale, err := s.Check(); err != nil || !stale {
+		t.Fatalf("Check with no manifests listed: stale %v, %v; want stale", stale, err)
+	}
+
+	if _, err := s.SyncDeps(); err != nil {
+		t.Fatal(err)
+	}
+	if _, stale, err := s.Check(); err != nil || stale {
+		t.Fatalf("Check after sync: stale %v, %v; want fresh", stale, err)
+	}
+
+	// A features-only edit to the member
+	future := time.Now().Add(time.Hour)
+	if err := os.Chtimes(member, future, future); err != nil {
+		t.Fatal(err)
+	}
+	if _, stale, err := s.Check(); err != nil || !stale {
+		t.Fatalf("Check after the member changed: stale %v, %v; want stale", stale, err)
+	}
 }

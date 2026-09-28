@@ -13,7 +13,9 @@ rust_binary(
         "rustdeps//vendor/clap:clap",
         "rustdeps//vendor/glob:glob",
         "rustdeps//vendor/serde:serde",
+        "rustdeps//vendor/serde_json:serde_json",
         "rustdeps//vendor/toml:toml",
+        "rustdeps//vendor/toml_edit:toml_edit",
     ],
     visibility = ["PUBLIC"],
 )
@@ -30,7 +32,9 @@ rust_test(
         "rustdeps//vendor/clap:clap",
         "rustdeps//vendor/glob:glob",
         "rustdeps//vendor/serde:serde",
+        "rustdeps//vendor/serde_json:serde_json",
         "rustdeps//vendor/toml:toml",
+        "rustdeps//vendor/toml_edit:toml_edit",
         "rustdeps//vendor/tempfile:tempfile",
     ],
 )

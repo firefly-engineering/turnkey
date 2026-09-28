@@ -72,10 +72,19 @@ Reads: `go.mod`, `go.sum`
 Located at `cmd/rustdeps-gen/`.
 
 ```bash
-rustdeps-gen --cargo-lock Cargo.lock -o rust-deps.toml
+rustdeps-gen --cargo-lock Cargo.lock \
+  --platform linux-x86_64=x86_64-unknown-linux-gnu \
+  --platform macos-arm64=aarch64-apple-darwin \
+  -o rust-deps.toml
 ```
 
-Reads: `Cargo.lock`
+Reads: `Cargo.lock` and the workspace's manifests. Runs `cargo tree` once per
+`--platform` (`<os>-<cpu>=<rust target triple>`) and `cargo metadata`, both
+`--locked`, to record each crate's package slice: its features and normal
+dependencies as Cargo's feature resolver resolves them, each with the
+platforms it applies on ([ADR 0006](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0006-package-slices-follow-cargos-feature-resolver.md)).
+It lists the workspace members' `Cargo.toml` files under `manifests`, which
+the Rust sync rule's `target_sources` makes sources of the file.
 
 ### pydeps-gen (Python)
 

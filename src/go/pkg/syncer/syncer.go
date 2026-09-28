@@ -15,6 +15,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/pelletier/go-toml/v2"
+
 	"github.com/firefly-engineering/turnkey/src/go/pkg/staleness"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 )
@@ -200,24 +202,71 @@ const (
 )
 
 // freshness compares a rule's target with the sources that exist; a missing
-// source (a go.sum in a module without dependencies) doesn't count.
+// source (a go.sum in a module without dependencies) doesn't count. The
+// sources include those the target lists under the rule's TargetSources,
+// and a target that lists none is stale.
 func (s *Syncer) freshness(rule syncconfig.DepsRule) (freshness, error) {
 	sources := make([]string, len(rule.Sources))
 	for i, source := range rule.Sources {
 		sources[i] = filepath.Join(s.Root, source)
 	}
-	result, err := staleness.Check(sources, filepath.Join(s.Root, rule.Target))
+	target := filepath.Join(s.Root, rule.Target)
+	listed := true
+	if rule.TargetSources != "" {
+		extra, found, err := targetSources(target, rule.TargetSources)
+		if err != nil {
+			return fresh, err
+		}
+		listed = found
+		for _, source := range extra {
+			sources = append(sources, filepath.Join(s.Root, source))
+		}
+	}
+	result, err := staleness.Check(sources, target)
 	if err != nil {
 		return fresh, err
 	}
 	switch {
 	case result.NewestSource == nil:
 		return noSources, nil
-	case result.Stale:
+	case result.Stale || !listed:
 		return stale, nil
 	default:
 		return fresh, nil
 	}
+}
+
+// targetSources reads the sources a target lists under key: a top-level
+// array of paths. found is false when the target doesn't exist or doesn't
+// have the key, as a target written before its rule named the key.
+func targetSources(target, key string) (sources []string, found bool, err error) {
+	content, err := os.ReadFile(target)
+	if os.IsNotExist(err) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	var doc map[string]any
+	if err := toml.Unmarshal(content, &doc); err != nil {
+		return nil, false, fmt.Errorf("reading %s's %s: %w", target, key, err)
+	}
+	value, found := doc[key]
+	if !found {
+		return nil, false, nil
+	}
+	list, ok := value.([]any)
+	if !ok {
+		return nil, false, fmt.Errorf("%s: %s is not an array", target, key)
+	}
+	for _, item := range list {
+		source, ok := item.(string)
+		if !ok {
+			return nil, false, fmt.Errorf("%s: %s holds %v, not a path", target, key, item)
+		}
+		sources = append(sources, source)
+	}
+	return sources, true, nil
 }
 
 // regenerate runs the generator command for a rule.

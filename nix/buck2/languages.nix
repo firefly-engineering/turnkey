@@ -25,8 +25,9 @@
 #                conditions), each locked dependency with its fixup:
 #                resolveFixups is nix/lib/fixups's resolve for the
 #                language, applied
-#   syncRules    langCfg -> the [[deps]] rules of .turnkey/sync.toml, in
-#                the order tk sync must run them
+#   syncRules    { langCfg, conditions } -> the [[deps]] rules of
+#                .turnkey/sync.toml, in the order tk sync must run them,
+#                for the platforms in conditions (as mkCell's)
 #   wrapper      optional: the native tool tw wraps (`tool`), and
 #                langCfg -> its [[wrappers]] rule, which names the sync
 #                rule to run when the tool changes the language's files,
@@ -37,6 +38,7 @@
 
 let
   depsCell = import ../lib/deps-cell { inherit pkgs lib; };
+  platforms = import ./platforms.nix { inherit lib; };
 
   # A language's deps file as sync.toml names it: relative to the project
   # root, where tk sync runs. depsFile is a relative file name, or a path in
@@ -97,7 +99,7 @@ map (language: language // { cellLink = cellLink language.cellName; }) [
       };
     # go-deps.toml has a default name, so an enabled Go always has a rule
     syncRules =
-      langCfg:
+      { langCfg, ... }:
       lib.optional langCfg.enable {
         name = "go";
         sources = [
@@ -157,20 +159,28 @@ map (language: language // { cellLink = cellLink language.cellName; }) [
         genRustBuck = import ../packages/gen-rust-buck.nix { inherit pkgs lib; };
         computeUnifiedFeatures = import ../packages/compute-unified-features.nix { inherit pkgs lib; };
       };
+    # rustdeps-gen resolves each crate's package slice with cargo, once per
+    # platform, and lists every workspace member's Cargo.toml in the deps
+    # file's `manifests`: target_sources makes them sources too
     syncRules =
-      langCfg:
+      { langCfg, conditions }:
       lib.optional (hasCell langCfg) {
         name = "rust";
         sources = [
           langCfg.cargoTomlFile
           langCfg.cargoLockFile
         ];
+        target_sources = "manifests";
         target = depsFile langCfg;
         generator = [
           "rustdeps-gen"
           "--cargo-lock"
           langCfg.cargoLockFile
-        ];
+        ]
+        ++ builtins.concatMap (platform: [
+          "--platform"
+          "${platforms.name platform}=${platforms.rustTarget platform}"
+        ]) conditions.platforms;
       };
     wrapper = {
       tool = "cargo";
@@ -212,7 +222,7 @@ map (language: language // { cellLink = cellLink language.cellName; }) [
     # With a uv lock, pylock.toml is exported from it first, so a `uv add`
     # reaches python-deps.toml in one tk sync.
     syncRules =
-      langCfg:
+      { langCfg, ... }:
       lib.optional (hasCell langCfg && langCfg.uvLockFile != null) {
         name = "pylock";
         sources = [
@@ -310,7 +320,7 @@ map (language: language // { cellLink = cellLink language.cellName; }) [
         inherit userPatchesDir resolveFixups;
       };
     syncRules =
-      langCfg:
+      { langCfg, ... }:
       lib.optional (hasCell langCfg) {
         name = "javascript";
         sources = [ langCfg.lockFile ];
@@ -350,7 +360,7 @@ map (language: language // { cellLink = cellLink language.cellName; }) [
     # it: a rule has one target, so each file gets its own rule, run in
     # order as python's pylock and python rules are
     syncRules =
-      langCfg:
+      { langCfg, ... }:
       let
         # Where the cell vendors packages (nix/lib/deps-cell): remapping
         # overrides in foundry.toml must point inside it, and the root

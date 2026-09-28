@@ -61,6 +61,7 @@ sha2 = "0.10"
 tar = { version = "0.4", default-features = false }
 tempfile = "3.10"
 toml = "0.8"
+toml_edit = "0.25"
 ureq = { version = "2", features = ["json"] }
 walkdir = "2.5"
 
