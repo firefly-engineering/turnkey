@@ -76,6 +76,12 @@ The ticket asks three things:
     across every vendored crate in the closure. With per-crate store-path
     symlinks it re-ran only `anyhow`'s reverse-dependency closure: 54 actions
     (17 s).
+  - **Prototyped end to end (§9):** per-crate derivations, each with its own
+    `rules.star`, plus an in-project directory of write-once symlinks. Nix,
+    sync, buck2 and test work all follow the size of the change. A version
+    bump costs 0–2 derivations, 8 filesystem entries, 87–95 actions
+    (15–16 s) and only the affected tests. **Symlinks must never be retargeted**:
+    buck2 keeps stale contents read through a retargeted directory symlink.
 
 ## 1. How the cell is built today
 
@@ -621,3 +627,146 @@ per-crate derivation bump looks like to buck2.
 - Not examined here: how this layout composes with `turnkey-composed`
   (FUSE) and with remote execution, where the action digest carries the
   symlink target.
+
+## 9. Prototype: per-crate derivations end to end
+
+Measured on 2026-09-28 for
+[Prototype per-crate rustdeps derivations end to end: is a bump's cost proportional to the change?](https://github.com/firefly-engineering/turnkey/issues/153),
+following the proposal in
+[this comment on #95](https://github.com/firefly-engineering/turnkey/issues/95#issuecomment-5866053229).
+The machine, build set and local-only execution are the same as in §8. The
+14 Rust test targets outside `check-test-caching` were run with
+`tk --no-sync test`, because test result caching applies only under `tk`.
+
+### 9.1 What was built
+
+The scripts are in [`rustdeps-per-crate-prototype/`](rustdeps-per-crate-prototype/):
+
+- **[`exp.nix`](rustdeps-per-crate-prototype/exp.nix)** builds one
+  `rustcrate-<name>-<version>` derivation per crate: the crate's existing
+  `dep-rust-*` output (from `rustdeps-cell.passthru.depPackages`) plus its own
+  `rules.star`. It also writes an index mapping each crate to its store path,
+  plus the version aliases.
+- **The shortcut for the global step:**
+  [`extract.py`](rustdeps-per-crate-prototype/extract.py) takes each crate's
+  `rules.star` from the real cell built for the same lockfile. That real cell
+  stands in for computing features and resolved dependencies in `rustdeps-gen`,
+  and its build is not counted below.
+  - Check: all 317 per-crate outputs are **byte-identical** to the cell's
+    `vendor/<crate>` (`diff -r`).
+- **[`sync2.py`](rustdeps-per-crate-prototype/sync2.py)** keeps a real
+  `.turnkey/rustdeps/` in the project, laid out as §9.3 describes.
+
+### 9.2 ⚠️ buck2 does not notice a retargeted directory symlink
+
+The first sync simply pointed `vendor/<crate>@<version>` symlinks at the new
+store paths. It **retargeted** `prost-derive@0.14.4` and the `anyhow` alias,
+and **removed** `anyhow@1.0.100`. The next build failed:
+
+```
+File not found: `rustdeps//vendor/anyhow@1.0.100/src/macros.rs`.
+     Included in `vendor/anyhow@1.0.100/rules.star` but does not exist
+```
+
+- On disk, `prost-derive@0.14.4/rules.star` names `anyhow@1.0.101`. In
+  buck2's loaded package (`uquery … --output-attribute deps`), it still named
+  `anyhow@1.0.100`. The failure repeated on a second build.
+- `buck2 debug file-status` reports **no mismatch** for the symlink, the
+  directory listing, or the `rules.star` behind the symlink. buck2's
+  file-system layer is up to date. The contents it read **through** the old
+  symlink target are not, and neither is the package it loaded from the removed
+  directory.
+  - *(inferred)* The file watcher reports only the symlink's own path.
+    Nothing invalidates what buck2 read beneath it.
+- The A → B swap in §8.3 could not have caught this, because both targets had
+  identical content.
+- *(not examined)* Today's single cell symlink was retargeted in §8.1 and built
+  the new `anyhow` correctly. That may be a special case for the cell root, or
+  a daemon restart during the shell reload. Either way, it doesn't carry over
+  to symlinks inside the cell.
+- **Restarting the daemon is not a workaround.** After `buck2 kill`, the build
+  re-ran **all 1184 actions** (75 s): there is no local action cache.
+
+### 9.3 The layout that works: symlinks are write-once
+
+`sync2.py` never retargets a symlink:
+
+- `vendor/_store/<store-hash>-rustcrate-<name>-<version>` is a symlink to its
+  store path. The name *is* the content's identity, so the link is only ever
+  created or deleted. Even a stale cached read behind it is correct.
+- `vendor/<name>@<version>/rules.star` is a **real file in the project**:
+  one `alias()` per target in the crate, pointing at `//vendor/_store/<…>`.
+  The unversioned `vendor/<name>/rules.star` aliases the versioned package
+  the same way. Every change buck2 must see is a change to a real file, which
+  the file watcher handles.
+- The generated labels (`rustdeps//vendor/anyhow@1.0.100:anyhow`) are unchanged.
+  Target names are read from each `rules.star` with Python's `ast` parser.
+- Moving to this layout costs one full build (1131 actions, 72 s).
+
+### 9.4 Measurements
+
+Every rebuild ran against a warm build and, from case B on, warm test
+results.
+
+| Case | Derivations built | Index build | Sync: fs entries touched | buck2 actions (rustc) | buck2 time | Tests re-run / cache hits |
+|---|---|---|---|---|---|---|
+| Cold: all per-crate derivations | 317 | 67.5 s | 598 | – | – | – |
+| A: `anyhow` 1.0.101 → 1.0.100 | 0 (in store) | 0.6 s | 8 of 598 | 95 (53) | 15.1 s | – † |
+| No-op sync and build | 0 | – | 0 | 0 | 0.0 s | – |
+| B: `serde_json` + `float_roundtrip` (features only) | 1 | 1.5 s | 3 | 63 (37) | 6.6 s | 9 / 5 |
+| C: `anyhow` 1.0.100 → 1.0.101 | 0 (in store) | 0.9 s | 8 | 87 (53) | 16.0 s | 10 / 4 |
+| First bump (symlink layout, §9.2) | 2 | 1.3 s | 4 | – (stale) | – | – |
+| Today's cell (§8.1), for comparison | cell + 1 | ~57 s cell | whole cell | 1184 (588) | 84 s | – |
+
+† Case A was the first test run on the new layout, so it had no recorded
+results to reuse.
+
+- **✅ Each measurement scales with the change, not with the lockfile.**
+  - *Nix:* only the crates whose source, fixups or `rules.star` changed get
+    rebuilt. On a version bump that is the crate and each direct dependent
+    naming it (`prost-derive`). On a feature change it is the crate alone.
+    Only `serde_json`'s `rules.star` changed.
+  - *Sync:* entries touched = store links for changed crates + their alias
+    files + the removed version, all in < 0.2 s.
+  - *buck2:* the compiled targets are the changed crate's reverse-dependency
+    closure.
+    - For `anyhow`: 10 vendored crates + `anyhow`, and the root crates above
+      them. That is 53 `rustc` actions, as in §8.3.
+    - For `serde_json`: `serde_json`, `serde-saphyr`, `ureq` and 23 root
+      targets. `cquery rdeps` gives the same 23 root targets.
+    - The remaining actions are cheap `deps` (symlink directory) and
+      `failure_filter` actions of the same targets.
+  - *Tests:* exactly the tests in the closure re-ran. `serde_json`'s closure
+    holds 9 tests and 9 re-ran; `anyhow`'s holds 10 and 10 re-ran. The rest
+    were cache hits.
+- **Cold start is ~10 s slower** than today's cell: 67.5 s against ~57 s.
+  This is aarch64-darwin, `sandbox = false`, `max-jobs = 18`.
+  - The prototype writes precomputed `rules.star` text, so it leaves out the
+    generator's run time inside each derivation. That was ~20–28 s of process
+    launches when run serially (§2.1), spread here across 18 jobs.
+  - *(inferred)* A sandboxed Linux builder adds per-derivation setup cost
+    on top.
+- **Tests were cheap with every layout.** A test's result key follows its
+  inputs' content, so layout changes that leave binaries identical still
+  hit. `tk test` hit 14/14 right after the first move to per-crate symlinks.
+
+### 9.5 Not covered
+
+- **Computing each crate's slice in `rustdeps-gen`** (unified features and
+  dependencies resolved to `name@version`) is what the shortcut stood in for.
+  It is #95's execution work, and must keep the correctness bar of #57 and #38.
+- **Generating `rules.star` inside each crate's derivation**: its run time,
+  and whether the generator needs anything global. Its inputs today include
+  the full `available_crates` list (§3.2), which would move every crate on
+  every bump.
+- **Fetching a crate version never seen before:** `anyhow` 1.0.101 was
+  already fetched. That is one fixed-output derivation per new crate.
+- **FUSE (`turnkey-composed`) and remote execution** (#151). The write-once
+  layout changes that question: the symlinks are now under
+  `vendor/_store/`, and packages are real files.
+- **User patches** (`.turnkey/patches/rustdeps/`) are applied to the merged
+  cell today. With per-crate derivations they would have to be applied to
+  the patched crate's own derivation.
+- **Garbage collection:** `_store` links are not GC roots. The prototype kept
+  its index as a root. The real sync step needs one root per index it has
+  materialized.
