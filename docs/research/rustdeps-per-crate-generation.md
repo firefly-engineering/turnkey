@@ -72,6 +72,10 @@ The ticket asks three things:
     one store path. So *(inferred)* any lockfile change probably makes buck2
     rebuild **every** vendored crate. That is the likely dominant cost of a
     one-crate change, and it is unmeasured.
+  - **Since measured (§8):** it does. The bump re-ran 1184 actions (84 s)
+    across every vendored crate in the closure. With per-crate store-path
+    symlinks it re-ran only `anyhow`'s reverse-dependency closure: 54 actions
+    (17 s).
 
 ## 1. How the cell is built today
 
@@ -490,12 +494,9 @@ roughly evaluation (~7 s) plus one fetch plus a few seconds of merge.
 
 ## 7. Not verified
 
-- **How many buck2 actions a one-crate change re-runs** (§3.3). The claim is
-  inferred from buck2's `ExternalSymlink` keying, as documented in
-  [remote-execution-and-caching.md](remote-execution-and-caching.md), not
-  measured.
-- **Whether buck2 reads BUCK files and sources through per-crate absolute
-  symlinks nested inside a cell.**
+- ~~How many buck2 actions a one-crate change re-runs~~: measured in §8.1.
+- ~~Whether buck2 reads BUCK files and sources through per-crate absolute
+  symlinks nested inside a cell~~: it does, see §8.3.
 - **The exact split of the ~49 s in-Nix bucket** between the BUCK loop and
   output registration. The ~21 s registration figure comes from a separate
   copy-only probe of the same tree. `auto-optimise-store` is suspected but
@@ -506,3 +507,117 @@ roughly evaluation (~7 s) plus one fetch plus a few seconds of merge.
   *(inferred)*.
 - **Fetch time for a new crate** is not included. The hash-discovery run
   fetched `anyhow` before the timed build.
+
+## 8. Measured: what buck2 re-runs on a one-crate bump
+
+Measured on 2026-09-28 for
+[How many buck2 actions does a one-crate `Cargo.lock` bump re-run?](https://github.com/firefly-engineering/turnkey/issues/94).
+It settles the first two items of §7. Same machine as §2, buck2
+`2026-09-14-6507dd15`, local execution only: the summary shows 0 remote and
+0 cached actions in every run. The build set is the 39 `rust_library`,
+`rust_binary` and `rust_test` targets under `root//...`. Their closure holds
+251 `rustdeps` targets. No FUSE mount was used; `.turnkey/rustdeps` was the
+plain symlink cell.
+
+### 8.1 Today's cell: the whole closure recompiles
+
+| Build | Cell | Actions run | Cache hits | buck2 time |
+|---|---|---|---|---|
+| Warm rebuild, no change | `paa14whd…` | 0 | – | 0.0 s |
+| `anyhow` 1.0.100 → 1.0.101 | `rfg5cfcz…` | **1184** | 0 | **84.4 s** |
+| Revert to 1.0.100 | `paa14whd…` (again) | **1184** | 0 | **84.7 s** |
+
+- **✅ Confirmed: the §3.3 inference holds.** The 1184 actions are 588
+  `rustc` and 588 `deps` (transitive dependency symlinks) actions, plus 8
+  `failure_filter`. They cover **237 distinct vendored packages**, which is
+  every vendored crate in the closure, and 50 root compiles. Only `anyhow`,
+  `prost-derive` and their dependents actually changed.
+- **Reverting is no cheaper.** Going back to the previous cell store path
+  re-ran all 1184 actions again. Without an action cache, buck2 keeps only the
+  last output per path, so a lockfile round trip (for example, switching
+  branches) pays the full recompile twice.
+- The bump's end-to-end wall time was **6 min 58 s**, of which buck2 was 84 s.
+  Most of the rest is the dev shell rebuilding Nix packages, not the cell:
+  - Evaluating the flake's packages before and after a `Cargo.lock`-only
+    bump shows that **12 of 30** packages get a new derivation:
+    `check-rust-edition-rs`, `check-source-coverage-rs`, `deps-extract`,
+    `godeps-gen`, `jsdeps-gen`, `nix-prefetch-cached`, `pydeps-gen`,
+    `rustdeps-gen`, `soldeps-gen`, `toolchain-profile`, `turnkey-composed`
+    and `turnkey-test-runner`. They are the shell's own Rust tools, built from
+    the root `Cargo.lock`.
+  - *(inferred)* Rebuilding those tools is the bulk of the ~5 min. The
+    revert, whose derivations were all still in the store, took 94 s end to
+    end.
+
+### 8.2 ⚠️ The cell does not follow `rust-deps.toml` until the shell is forced to reload
+
+This was found while taking the measurement. It is a bug in its own right,
+separate from this map's destination.
+
+- `cargo update` (through `tw`) and `tk build` both regenerated
+  `rust-deps.toml`. The next two `direnv exec . tk build` runs **still used
+  the old cell** (`paa14whd…`) and succeeded against stale dependencies. The
+  cell moved only after `touch flake.nix`.
+- **Cause:** nix-direnv decides whether its cached shell is fresh inside
+  `use flake`, comparing only the files watched **at that moment** against
+  its profile (`_nix_direnv_watches`, then `[[ $file -nt $profile_rc ]]` in
+  nix-direnv's `use_flake`). `use_turnkey` registers `rust-deps.toml` and the
+  other deps files with `watch_file` **after** `use flake` has returned
+  (`nix/devenv/turnkey/direnv-lib.nix`, `_turnkey_watch_files`). So those
+  files make direnv re-run `.envrc`, but never make nix-direnv re-evaluate.
+- The other deps cells (`godeps`, `pydeps`, `jsdeps`, `soldeps`) are wired the
+  same way *(inferred)*.
+
+### 8.3 Per-crate symlinks: buck2 accepts them, and keys each crate separately
+
+The scratch layout replaced the `.turnkey/rustdeps` symlink with a real
+directory:
+
+- `.buckconfig` is an absolute symlink to the cell's own `.buckconfig`.
+- `vendor/<crate>@<version>` is an absolute symlink to
+  `<cell>/vendor/<crate>@<version>`.
+- The unversioned aliases stay relative symlinks (`anyhow -> anyhow@1.0.100`).
+- `vendor/anyhow@1.0.100` points at a **separate** store path `A`, a copy of
+  the crate made with `nix store add-path`.
+
+Then `vendor/anyhow@1.0.100` was repointed at a second copy `B`. `B` has
+byte-identical content but a different store path, which is what a real
+per-crate derivation bump looks like to buck2.
+
+| Build | Actions run | buck2 wall |
+|---|---|---|
+| First build on the per-crate layout | 583 (538 vendored `rustc`, 45 root) | 73 s |
+| `anyhow` → store path `B` | **54** (22 vendored `rustc`, 32 root) | **17 s** |
+
+- **✅ buck2 loads `rules.star` and sources through per-crate absolute
+  symlinks inside a cell.** No error, and no configuration change beyond the
+  hidden `.buckconfig`. That file must be linked too: without it buck2 looks
+  for `BUCK` rather than `rules.star` and fails with `missing BUCK file`.
+- **✅ Each crate is keyed by its own symlink target.** The swap re-ran
+  exactly `anyhow`'s reverse-dependency closure: 11 vendored targets
+  (`anyhow`, the `prost*`, `protox*` and `tonic-prost*` family) and 26 root
+  targets. Nothing outside that closure re-ran.
+- **Identical content does not help.** `A` and `B` hold the same bytes, and
+  the swap still re-ran the closure. buck2 keys an external symlink by its
+  target path, not the content behind it, so an unchanged crate must keep
+  **the same store path**, not merely the same content.
+- The first build on the new layout re-ran every compile once, because every
+  crate's key changed from "inside the cell" to "its own symlink". That is a
+  one-off migration cost.
+
+### 8.4 What this means for the decision
+
+- The dominant cost of a one-crate bump is **buck2 recompiling the whole
+  closure (84 s here)**, not generating the cell (~57 s, §2). On a real
+  monorepo, compile cost grows with the code and generation cost does not.
+- The fix §3.3 predicted works: a `.turnkey/rustdeps` **directory** of
+  per-crate store-path symlinks cuts the bump to the changed crate's
+  reverse-dependency closure (54 actions, 17 s here).
+- **Constraint for the design:** each crate's store path must be a function
+  of that crate's inputs alone (source, fixups, its feature slice and its
+  resolved deps). If the path depends on anything global, every crate moves
+  on every bump and the gain is lost. That includes the cell hash and the
+  full `available_crates` list (§3.2).
+- Not examined here: how this layout composes with `turnkey-composed`
+  (FUSE) and with remote execution, where the action digest carries the
+  symlink target.
