@@ -68,6 +68,10 @@ _Avoid_: crate symlink, vendor link
 A package in a deps cell whose targets forward to the same-named targets of a store link's package. Version names (`anyhow@1.0.100`) and unversioned names (`anyhow`) are alias packages.
 _Avoid_: alias symlink, version symlink
 
+**Package slice**:
+What one package's build file needs from the global resolution of its lock file: its features, and its dependencies resolved to exact versions with the platforms each applies on. A package's store path depends on its own slice and on nothing global.
+_Avoid_: crate slice, feature slice, unified features (which is only the features part)
+
 **Cell materialization**:
 Bringing a deps cell in line with its cell index: adding missing store links, rewriting alias packages whose target changed, and removing what the index no longer names. What does it is the materializer.
 _Avoid_: sync (which is `tk sync` running the deps generators), link update, retarget
