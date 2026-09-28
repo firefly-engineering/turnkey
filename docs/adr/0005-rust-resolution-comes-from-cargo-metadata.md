@@ -1,8 +1,10 @@
 ---
-status: accepted
+status: accepted, superseded in part by ADR-0006
 ---
 
 # Rust dependency resolution comes from `cargo metadata`
+
+> **Superseded in part by [ADR 0006](0006-package-slices-follow-cargos-feature-resolver.md):** features and edges come from `cargo tree`, following Cargo's feature resolver. `cargo metadata`'s graph is the lock file's resolution, and weak dependency features make it larger than what `cargo build` compiles. Features are recorded per platform. Resolving at `tk sync` time with cargo, and retiring turnkey's resolver, stand.
 
 The features each vendored crate is built with, and the exact version each of its dependencies resolves to, come from **`cargo metadata`**, run by `tk sync`. They do not come from turnkey's own resolver. `rustdeps-gen` runs `cargo metadata --format-version 1 --locked --filter-platform <triple>` once per configured platform and merges the results. It records each crate's **package slice** in `rust-deps.toml`: its features as one flat list, and its normal dependencies as `name@version` with their rename and the platforms each applies on.
 
