@@ -117,7 +117,7 @@ Buck2 never runs a crate's `build.rs`. What a build script would produce comes f
 
 | Build Script Output | Example Crate | Fixup field |
 |---------------------|---------------|-------------|
-| `cargo:rustc-cfg=...` | serde_json, rustix | `rustcFlags` (per OS or CPU: `os.<name>`, `cpu.<name>`) |
+| `cargo:rustc-cfg=...` | serde_json, rustix | `rustcFlags` (per OS, CPU, or OS and CPU pair: `os.<name>`, `cpu.<name>`, `platform."<os>-<cpu>"`) |
 | Generated `.rs` files | serde, thiserror | `buildScript.generate` |
 | Compiled native code | ring, tree-sitter | `buildScript.generate` plus `nativeLibraries` |
 | Nothing the build needs | proc-macro2, libc | `buildScript.skip = true` |
@@ -208,10 +208,14 @@ rust.my_crate = {
     }
   ];
 
-  # Declarative per-OS and per-CPU additions, as select()s in the rules.
-  # No build script here: a crate has one, branching on ctx.platform.
+  # Overlays: declarative additions per OS, per CPU, or per OS and CPU
+  # pair, as select()s in the rules. A platform gets list fields from its
+  # OS's overlay, then its CPU's, then its pair's. Two overlays giving one
+  # platform an env variable different values fail evaluation. No build
+  # script here: a crate has one, branching on ctx.platform.
   os.linux.rustcFlags = [ "--cfg" "linux_like" ];
   cpu.arm64.env.MY_ARCH = "arm64";
+  platform."macos-arm64".rustcFlags = [ "--cfg" "apple_silicon" ];
 
   # Fields for the locked versions whose bounds hold; every match applies
   versions = [

@@ -173,6 +173,44 @@ class TestFixupRustcFlags(unittest.TestCase):
     def test_no_fixup_means_no_flags(self):
         self.assertTrue(get_fixup_rustc_flags(CrateFixup(), PLATFORMS).is_empty())
 
+    def test_per_platform_flags_are_keyed_on_the_os_and_cpu(self):
+        fixup = CrateFixup.from_dict(
+            {"rustcFlags": {"common": [], "os": {}, "cpu": {}, "platform": {"linux-arm64": ["--cfg", "p"]}}}
+        )
+        flags = get_fixup_rustc_flags(fixup, PLATFORMS)
+        self.assertEqual(
+            flags.by_platform,
+            {
+                "toolchains//conditions:linux-arm64": ["--cfg", "p"],
+                "toolchains//conditions:linux-x86_64": [],
+                "toolchains//conditions:macos-arm64": [],
+                "toolchains//conditions:macos-x86_64": [],
+            },
+        )
+
+    def test_platform_flags_come_after_the_os_and_cpu_flags(self):
+        fixup = CrateFixup.from_dict(
+            {
+                "rustcFlags": {
+                    "common": [],
+                    "os": {"linux": ["--cfg", "o"]},
+                    "cpu": {"arm64": ["--cfg", "c"]},
+                    "platform": {"linux-arm64": ["--cfg", "p"]},
+                }
+            }
+        )
+        flags = get_fixup_rustc_flags(fixup, PLATFORMS)
+        self.assertEqual(
+            flags.by_platform["toolchains//conditions:linux-arm64"],
+            ["--cfg", "o", "--cfg", "c", "--cfg", "p"],
+        )
+
+    def test_a_fixup_without_platform_overlays_still_reads(self):
+        # What a resolved fixup held before the platform overlay existed
+        fixup = CrateFixup.from_dict({"rustcFlags": {"common": [], "os": {"linux": ["--cfg", "o"]}, "cpu": {}}})
+        flags = get_fixup_rustc_flags(fixup, PLATFORMS)
+        self.assertEqual(flags.by_platform, {"config//os:linux": ["--cfg", "o"], "config//os:macos": []})
+
 
 class TestFixupEnv(unittest.TestCase):
     def test_env_differing_by_os_is_a_select(self):
@@ -186,6 +224,22 @@ class TestFixupEnv(unittest.TestCase):
             env_by_platform=by_platform,
         )
         self.assertIn('    env = {\n        "A": "1",\n    } |\n    select({', content)
+
+    def test_env_for_one_platform_uses_the_combined_key(self):
+        fixup = CrateFixup.from_dict(
+            {"env": {"common": {}, "os": {"linux": {"A": "1"}}, "cpu": {}, "platform": {"linux-arm64": {"B": "2"}}}}
+        )
+        common, by_platform = get_fixup_env(fixup, PLATFORMS)
+        self.assertEqual(common, {})
+        self.assertEqual(
+            by_platform,
+            {
+                "toolchains//conditions:linux-arm64": {"A": "1", "B": "2"},
+                "toolchains//conditions:linux-x86_64": {"A": "1"},
+                "toolchains//conditions:macos-arm64": {},
+                "toolchains//conditions:macos-x86_64": {},
+            },
+        )
 
 
 class TestNativeLibraries(unittest.TestCase):

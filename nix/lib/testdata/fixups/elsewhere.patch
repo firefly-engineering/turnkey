@@ -1,0 +1,5 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1 +1 @@
+-patched twice
++patched on a platform the cell is not built on

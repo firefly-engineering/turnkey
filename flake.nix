@@ -800,7 +800,8 @@
           # published by other flakes merge with a repository's own
           # fixups, per field; conflicts fail; enable = false drops a
           # fixup; only the repository's own unused fixups warn; version
-          # entries and OS/CPU overlays resolve per locked dependency.
+          # entries and the OS, CPU and OS and CPU pair overlays resolve
+          # per locked dependency.
           # Fixtures in nix/lib/testdata/fixups. Checked at evaluation.
           checks.fixup-sets =
             let
@@ -863,6 +864,75 @@
               after =
                 first: second: text:
                 lib.hasInfix second (lib.last (lib.splitString first text));
+
+              # The OS and CPU pair overlay (platform."<os>-<cpu>"), with
+              # the OS and CPU overlays and a version entry around it
+              serdeLocked = builtins.filter (d: d.name == "serde") locked;
+              paired = resolveWith [
+                {
+                  rust.serde = {
+                    os.linux = {
+                      rustcFlags = [
+                        "--cfg"
+                        "o"
+                      ];
+                      patches = [ (testdata + "/first.patch") ];
+                    };
+                    cpu.x86_64 = {
+                      rustcFlags = [
+                        "--cfg"
+                        "c"
+                      ];
+                      patches = [ (testdata + "/third.patch") ];
+                    };
+                    platform."linux-x86_64" = {
+                      rustcFlags = [
+                        "--cfg"
+                        "p"
+                      ];
+                      patches = [ (testdata + "/second.patch") ];
+                      nativeLibraries = [
+                        {
+                          name = "on_host";
+                          staticLib = "out_dir/libon_host.a";
+                        }
+                      ];
+                    };
+                    platform."macos-arm64" = {
+                      patches = [ (testdata + "/elsewhere.patch") ];
+                      nativeLibraries = [
+                        {
+                          name = "elsewhere";
+                          staticLib = "out_dir/libelsewhere.a";
+                        }
+                      ];
+                    };
+                    versions = [
+                      {
+                        when.atLeast = "1.0";
+                        platform."linux-x86_64".rustcFlags = [
+                          "--cfg"
+                          "v"
+                        ];
+                      }
+                    ];
+                  };
+                }
+                # Another set adding to the same pair
+                {
+                  rust.serde.platform."linux-x86_64".rustcFlags = [
+                    "--cfg"
+                    "s"
+                  ];
+                }
+              ] "rust" serdeLocked;
+              pairedSerde = paired.fixups."serde@1.0.219";
+              pairFlags = pairedSerde.gen.rustcFlags.platform."linux-x86_64";
+              envErrors =
+                overlays:
+                (resolveWith [
+                  { rust.serde = overlays; }
+                ] "rust" serdeLocked).errors;
 
               go = resolveWith [ acme ] "go" [
                 {
@@ -957,6 +1027,60 @@
                     ring17.gen.env.cpu.x86_64 == {
                       RING_X86 = "1";
                     };
+                "an OS and CPU pair's overlay is kept per pair, after sets and version entries add to it" =
+                  lib.sort (a: b: a < b) (builtins.filter (f: f != "--cfg") pairFlags) == [
+                    "p"
+                    "s"
+                    "v"
+                  ]
+                  && lib.last pairFlags == "v"
+                  &&
+                    pairedSerde.gen.rustcFlags.os.linux == [
+                      "--cfg"
+                      "o"
+                    ]
+                  && paired.errors == [ ];
+                "the host's overlays patch in OS, CPU, pair order, and other pairs' don't apply" =
+                  after "first.patch" "third.patch" pairedSerde.commands
+                  && after "third.patch" "second.patch" pairedSerde.commands
+                  && !(lib.hasInfix "elsewhere.patch" pairedSerde.commands);
+                "the host's pair overlay links its native libraries, and other pairs' don't" =
+                  map (l: l.lib_name) pairedSerde.gen.nativeLibraries == [ "on_host" ];
+                "a pair outside the supported platforms is a type error" = fails (
+                  (resolveWith [
+                    { rust.serde.platform."windows-x86_64".rustcFlags = [ ]; }
+                  ] "rust" serdeLocked).fixups
+                );
+                "a build script in a pair overlay is a type error" = fails (
+                  (resolveWith [
+                    { rust.serde.platform."linux-x86_64".buildScript.skip = true; }
+                  ] "rust" serdeLocked).fixups
+                );
+                "overlays giving one platform different env values are an error" =
+                  lib.any
+                    (
+                      e:
+                      lib.hasInfix "serde" e
+                      && lib.hasInfix "env.FOO" e
+                      && lib.hasInfix "os.linux" e
+                      && lib.hasInfix "platform.linux-arm64" e
+                    )
+                    (envErrors {
+                      os.linux.env.FOO = "a";
+                      platform."linux-arm64".env.FOO = "b";
+                    })
+                  && lib.any (e: lib.hasInfix "os.linux" e && lib.hasInfix "cpu.arm64" e) (envErrors {
+                    os.linux.env.FOO = "a";
+                    cpu.arm64.env.FOO = "b";
+                  });
+                "overlays giving one platform the same env value agree" =
+                  envErrors {
+                    os.linux.env.FOO = "a";
+                    cpu.x86_64.env.FOO = "a";
+                    platform."linux-arm64".env.FOO = "a";
+                    # A different value, but on no platform os.linux is
+                    platform."macos-arm64".env.FOO = "b";
+                  } == [ ];
                 "the build script sees the platform the cell is built on" =
                   lib.hasInfix "ring for linux-x86_64" ring17.commands;
                 "native library names are computed per version" =

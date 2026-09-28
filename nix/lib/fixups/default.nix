@@ -72,10 +72,9 @@ let
         "nativeLibraries"
       ];
       listPart = lib.genAttrs (builtins.filter (f: a ? ${f}) lists) (f: a.${f} ++ b.${f});
-      envClash = builtins.filter (k: a.env ? ${k} && a.env.${k} != b.env.${k}) (builtins.attrNames b.env);
-      envErrors = map (
-        k: "${what}: env.${k} is set to both \"${a.env.${k}}\" and \"${b.env.${k}}\""
-      ) envClash;
+      envErrors = map (k: "${what}: env.${k} is set to both \"${a.env.${k}}\" and \"${b.env.${k}}\"") (
+        envClashes a.env b.env
+      );
       bs =
         if !(a ? buildScript) then
           {
@@ -99,7 +98,7 @@ let
             ) "${what}: two version entries both give buildScript.generate";
           };
       overlayPart =
-        dim:
+        { dim, ... }:
         if a ? ${dim} then
           let
             merged = lib.mapAttrs (key: o: mergeFields "${what} (${dim}.${key})" o b.${dim}.${key}) (
@@ -115,8 +114,7 @@ let
             value = { };
             errors = [ ];
           };
-      os = overlayPart "os";
-      cpu = overlayPart "cpu";
+      overlayParts = map overlayPart overlayDims;
     in
     {
       value =
@@ -126,10 +124,72 @@ let
           env = a.env // b.env;
         }
         // bs.value
-        // os.value
-        // cpu.value;
-      errors = envErrors ++ bs.errors ++ os.errors ++ cpu.errors;
+        // lib.mergeAttrsList (map (o: o.value) overlayParts);
+      errors = envErrors ++ bs.errors ++ lib.concatMap (o: o.errors) overlayParts;
     };
+
+  # The env entries two definitions give different values
+  envClashes = a: b: builtins.filter (k: a ? ${k} && a.${k} != b.${k}) (builtins.attrNames b);
+
+  # A Rust fixup's overlays, most general first: the order a target
+  # platform ({ os; cpu; }) gets their list fields in. keyOn is the key of
+  # the overlay that applies on it.
+  overlayDims = [
+    {
+      dim = "os";
+      keyOn = target: target.os;
+    }
+    {
+      dim = "cpu";
+      keyOn = target: target.cpu;
+    }
+    {
+      dim = "platform";
+      keyOn = target: "${target.os}-${target.cpu}";
+    }
+  ];
+
+  # The overlays that apply on a target platform, most general first, each
+  # { name; fields; } (fields null when a fixup has no such overlay)
+  overlaysOn =
+    eff: target:
+    map (
+      { dim, keyOn }:
+      {
+        name = "${dim}.${keyOn target}";
+        fields = eff.${dim}.${keyOn target} or null;
+      }
+    ) overlayDims;
+
+  # Two overlays that apply on one target platform disagreeing on an env
+  # entry, for every OS and CPU pair the overlays have keys for: no
+  # overlay wins over another, as no fixup set wins over another
+  overlayEnvErrors =
+    what: eff:
+    let
+      targets = lib.cartesianProduct {
+        os = builtins.attrNames (overlaysOf eff.os);
+        cpu = builtins.attrNames (overlaysOf eff.cpu);
+      };
+      clashesOn =
+        target:
+        let
+          applying = builtins.filter (o: o.fields != null) (overlaysOn eff target);
+        in
+        lib.concatLists (
+          lib.imap0 (
+            i: a:
+            lib.concatMap (
+              b:
+              map (
+                k:
+                "${what}: env.${k} is set to both \"${a.fields.env.${k}}\" (${a.name}) and \"${b.fields.env.${k}}\" (${b.name})"
+              ) (envClashes a.fields.env b.fields.env)
+            ) (lib.drop (i + 1) applying)
+          ) applying
+        );
+    in
+    lib.unique (lib.concatMap clashesOn targets);
 
   # The context a fixup's functions receive
   contextOf =
@@ -289,12 +349,20 @@ rec {
           ) "${what}: buildScript has both generate and skip; it needs exactly one";
 
           # What applies on the platform the cell is built on
-          hostOverlays = lib.optionals isRust [
-            (eff.os.${platform.os} or null)
-            (eff.cpu.${platform.cpu} or null)
-          ];
+          hostOverlays = lib.optionals isRust (overlaysOn eff platform);
+          # A field as the cell generator reads it: what every platform
+          # gets (common), and what each overlay adds, per key
+          layered =
+            field:
+            {
+              common = eff.${field};
+            }
+            // lib.genAttrs (map (d: d.dim) overlayDims) (
+              dim: lib.mapAttrs (_: o: o.${field}) (overlaysOf eff.${dim})
+            );
           onHost =
-            field: eff.${field} ++ lib.concatMap (o: if o == null then [ ] else o.${field}) hostOverlays;
+            field:
+            eff.${field} ++ lib.concatMap (o: if o.fields == null then [ ] else o.fields.${field}) hostOverlays;
           patches = if isRust then onHost "patches" else eff.patches;
           nativeLibraries = map (l: {
             lib_name = callWith ctx l.name;
@@ -320,20 +388,12 @@ rec {
             accounted = bs != null && (bs.generate != null || bs.skip);
             gen = lib.optionalAttrs isRust {
               outDir = script != null;
-              rustcFlags = {
-                common = eff.rustcFlags;
-                os = lib.mapAttrs (_: o: o.rustcFlags) (overlaysOf eff.os);
-                cpu = lib.mapAttrs (_: o: o.rustcFlags) (overlaysOf eff.cpu);
-              };
-              env = {
-                common = eff.env;
-                os = lib.mapAttrs (_: o: o.env) (overlaysOf eff.os);
-                cpu = lib.mapAttrs (_: o: o.env) (overlaysOf eff.cpu);
-              };
+              rustcFlags = layered "rustcFlags";
+              env = layered "env";
               inherit nativeLibraries;
             };
           };
-          errors = folded.errors ++ bsErrors ++ envErrors;
+          errors = folded.errors ++ bsErrors ++ envErrors ++ lib.optionals isRust (overlayEnvErrors what eff);
         };
 
       applicable = builtins.filter (d: records ? ${d.name} && records.${d.name}.enable) deps;

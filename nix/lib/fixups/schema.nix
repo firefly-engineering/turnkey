@@ -5,7 +5,7 @@
 # ecosystem names it, in place of its build step or to correct its source.
 # Every language's fixup has the shared base (enable, patches, env,
 # versions); Rust adds its build script, rustc flags, native libraries and
-# per-OS/per-CPU overlays. Merging is the module system's: lists
+# overlays per OS, per CPU and per OS and CPU pair. Merging is the module system's: lists
 # concatenate, and two sets that disagree on a value fail evaluation,
 # naming both files.
 { lib }:
@@ -74,6 +74,17 @@ let
     };
   };
 
+  # Each overlay's keys: an OS, a CPU, or an OS and CPU pair "<os>-<cpu>",
+  # named as the toolchains cell's combined config_settings are
+  overlayKeys =
+    let
+      inherit ((import ../../buck2/platforms.nix { inherit lib; }).names) os cpu;
+    in
+    {
+      inherit os cpu;
+      platform = lib.concatMap (o: map (c: "${o}-${c}") cpu) os;
+    };
+
   overlays =
     keys: what:
     mkOption {
@@ -117,14 +128,9 @@ let
       default = null;
       description = "What stands in for the crate's build.rs: exactly one of generate or skip.";
     };
-    os = overlays [
-      "linux"
-      "macos"
-    ] "OS";
-    cpu = overlays [
-      "x86_64"
-      "arm64"
-    ] "CPU";
+    os = overlays overlayKeys.os "OS";
+    cpu = overlays overlayKeys.cpu "CPU";
+    platform = overlays overlayKeys.platform "OS and CPU pair";
   };
 
   # A language's fixups, keyed by dependency name, each with the fields,

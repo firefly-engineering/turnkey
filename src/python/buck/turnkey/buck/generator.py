@@ -217,36 +217,47 @@ class CrateFixup:
 
     Written by nix/lib/fixups/resolve.nix, one per "name@version":
     rustc flags and env are layered as the flags every platform gets
-    (common) and those a platform's OS or CPU adds; native libraries exist
-    only for the platform the cell was built on.
+    (common) and those a platform's OS, CPU, or OS and CPU pair
+    ("<os>-<cpu>") adds; native libraries exist only for the platform the
+    cell was built on.
     """
 
     out_dir: bool = False
-    rustc_flags: dict = field(default_factory=lambda: {"common": [], "os": {}, "cpu": {}})
-    env: dict = field(default_factory=lambda: {"common": {}, "os": {}, "cpu": {}})
+    rustc_flags: dict = field(default_factory=lambda: {"common": [], "os": {}, "cpu": {}, "platform": {}})
+    env: dict = field(default_factory=lambda: {"common": {}, "os": {}, "cpu": {}, "platform": {}})
     native_libraries: list[dict] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, d: dict) -> "CrateFixup":
         return cls(
             out_dir=d.get("outDir", False),
-            rustc_flags=d.get("rustcFlags", {"common": [], "os": {}, "cpu": {}}),
-            env=d.get("env", {"common": {}, "os": {}, "cpu": {}}),
+            rustc_flags=d.get("rustcFlags", {"common": [], "os": {}, "cpu": {}, "platform": {}}),
+            env=d.get("env", {"common": {}, "os": {}, "cpu": {}, "platform": {}}),
             native_libraries=d.get("nativeLibraries", []),
         )
+
+
+def _overlays_on(layers: dict, p) -> list:
+    """What a fixup's overlays give platform p, most general first: its OS's, its CPU's, then its OS and CPU pair's."""
+    return [
+        layers.get("os", {}).get(p.os),
+        layers.get("cpu", {}).get(p.cpu),
+        layers.get("platform", {}).get(f"{p.os}-{p.cpu}"),
+    ]
 
 
 def get_fixup_rustc_flags(fixup: CrateFixup, platforms: Platforms) -> PlatformRustcFlags:
     """The rustc flags a crate's fixup gives it, as common flags and select() branches.
 
     Flags come in pairs (--cfg foo), so each platform's list is kept whole
-    and in order: its OS's flags, then its CPU's.
+    and in order: its OS's flags, then its CPU's, then its OS and CPU
+    pair's.
     """
     flags = fixup.rustc_flags
     common = list(flags.get("common", []))
 
     def on(p):
-        return tuple(flags.get("os", {}).get(p.os, [])) + tuple(flags.get("cpu", {}).get(p.cpu, []))
+        return tuple(flag for layer in _overlays_on(flags, p) for flag in layer or [])
 
     per = platforms.branches(on)
     if per is None:
@@ -255,12 +266,15 @@ def get_fixup_rustc_flags(fixup: CrateFixup, platforms: Platforms) -> PlatformRu
 
 
 def get_fixup_env(fixup: CrateFixup, platforms: Platforms) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
-    """The env a crate's fixup gives it: common entries, and select() branches when platforms differ."""
+    """The env a crate's fixup gives it: common entries, and select() branches when platforms differ.
+
+    Overlays never disagree on a key: resolving the fixup fails first.
+    """
     env = fixup.env
     common = dict(env.get("common", {}))
 
     def on(p):
-        return {**env.get("os", {}).get(p.os, {}), **env.get("cpu", {}).get(p.cpu, {})}
+        return {k: v for layer in _overlays_on(env, p) for k, v in (layer or {}).items()}
 
     per = platforms.branches(on)
     if per is None:

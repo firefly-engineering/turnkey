@@ -44,6 +44,12 @@ in
 {
   inherit fromSystem settingsPackage;
 
+  # Every OS and CPU turnkey names, in Buck2's names
+  names = {
+    os = lib.attrValues oses;
+    cpu = lib.attrValues cpus;
+  };
+
   # What the cell generators get: the platforms, in Buck2's names, and the
   # package of the combined config_settings. As JSON, it is what
   # turnkey.cfg.Platforms.from_json reads.
