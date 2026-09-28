@@ -1,7 +1,8 @@
 # Generate turnkey-direnv-lib.sh for use in .envrc
 #
 # This module creates a shell script containing the `use_turnkey` function
-# that handles dependency regeneration (tk sync), symlink syncing, and
+# that handles dependency regeneration (tk sync), re-evaluating the flake
+# when a deps file changed (deps-freshness.nix), symlink syncing, and
 # watch_file declarations for the shell's deps rules.
 
 {
@@ -17,13 +18,15 @@ let
   # Teller lib for registry resolution (injected via flake-parts module)
   turnkeyLib = cfg.tellerLib;
 
+  languages = import ../../buck2/languages.nix { inherit pkgs lib; };
+
   # The deps rules tk sync runs, as buck2.nix writes them into
   # .turnkey/sync.toml (nix/buck2/sync-config.nix); a shell without Buck2
   # has none
   syncRules =
     lib.optionals buck2Cfg.enable
       (import ../../buck2/sync-config.nix { inherit pkgs lib; } {
-        languages = import ../../buck2/languages.nix { inherit pkgs lib; };
+        inherit languages;
         buck2 = buck2Cfg;
       }).rules;
   ruleNames = map (rule: rule.name) syncRules;
@@ -55,6 +58,16 @@ let
       fi
     }
   '';
+
+  # The deps files the shell's cells were built from, and the routine that
+  # re-evaluates the flake when one changed
+  depsFreshness = import ./deps-freshness.nix { inherit lib pkgs; };
+  refreshFunction = depsFreshness.refresh (
+    depsFreshness.entries {
+      inherit languages;
+      buck2 = buck2Cfg;
+    }
+  );
 
   # Symlink sync: the same links, maintained the same way, as enterShell
   # (managed-links.nix)
@@ -133,6 +146,13 @@ let
         fi
       fi
 
+      # A deps file that changed since the flake was evaluated (just now, or
+      # by tk sync or tw before this load) means stale cells: evaluate the
+      # flake again, through the .envrc, which runs use_turnkey again
+      if _turnkey_refresh_cells; then
+        return 0
+      fi
+
       # Sync symlinks
       if [[ "$skip_sync" != "1" ]]; then
         _turnkey_sync_symlinks
@@ -149,6 +169,7 @@ let
   scriptContent = lib.concatStringsSep "\n\n" [
     helperFunctions
     regenFunction
+    refreshFunction
     symlinkSyncFunction
     watchFileDeclarations
     useTurnkeyFunction
