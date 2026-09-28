@@ -38,6 +38,10 @@ _Avoid_: override, crate override, build-script shim
 A collection of fixups a repository brings as one unit, possibly spanning several languages: turnkey's built-ins, an organization's shared registry, a third party's, or the repository's own.
 _Avoid_: fixup registry (for one set), overrides
 
+**Overlay**:
+The fields a fixup adds only on some platforms: those of one OS, one CPU, or one OS and CPU pair. An overlay is always declarative, never a build script.
+_Avoid_: per-platform fixup, platform override
+
 **Project root**:
 The nearest directory, from where `tk` or `tw` runs, holding a `.buckconfig` or a `.turnkey/sync.toml`; a turnkey shell writes both there. Outside one, `tk` runs from the working directory and `tw` runs the tool untouched.
 _Avoid_: repo root, workspace root
