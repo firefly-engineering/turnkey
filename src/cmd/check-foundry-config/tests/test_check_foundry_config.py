@@ -24,7 +24,7 @@ optimizer_runs = 200
 runs = 256
 
 [dependencies]
-forge-std = "https://github.com/foundry-rs/forge-std@v1.8.0"
+forge-std = { version = "1.8.0", git = "https://github.com/foundry-rs/forge-std", tag = "v1.8.0" }
 """
 
 

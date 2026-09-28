@@ -268,6 +268,11 @@ name = "fastrand"
 version = "2.3.0"
 hash = "sha256-gCuKgtYEq3hpQeNeVHw+cCFFFng2vpiyzI4jvVKGUg8="
 
+[deps."filetime@0.2.29"]
+name = "filetime"
+version = "0.2.29"
+hash = "sha256-fK3B693Odl1mvgVp+p4T6BcOpcI8/yLAojAIOezdLPc="
+
 [deps."find-msvc-tools@0.1.9"]
 name = "find-msvc-tools"
 version = "0.1.9"
@@ -948,6 +953,11 @@ name = "serde_spanned"
 version = "0.6.9"
 hash = "sha256-J53IKhALVIg/srWTbZpmSWJynmF1wD6maRCPcXqb87Y="
 
+[deps."sha1@0.10.7"]
+name = "sha1"
+version = "0.10.7"
+hash = "sha256-8yBy4w+m8WjkogdxJllhxIaQ1EZx+tHeizokBfMqXx4="
+
 [deps."sha2@0.10.9"]
 name = "sha2"
 version = "0.10.9"
@@ -1022,6 +1032,11 @@ hash = "sha256-VjNgzutbhlwFWRALMc7g32Pxf0EHaNQCM8l0crCtcu4="
 name = "synstructure"
 version = "0.13.2"
 hash = "sha256-dSVw2Zg/5T9X6eA+YN0ErRCeDayDBz9OkZXl5C6QGjs="
+
+[deps."tar@0.4.46"]
+name = "tar"
+version = "0.4.46"
+hash = "sha256-6tJGJLE04B/ZAM/dUVGOVqljVj020kx1SCkhcwFz7+s="
 
 [deps."tempfile@3.24.0"]
 name = "tempfile"
@@ -1608,6 +1623,10 @@ name = "env_logger"
 version = "0.11"
 
 [[requested]]
+name = "flate2"
+version = "1.1"
+
+[[requested]]
 name = "fuser"
 version = "0.17"
 features = ["libfuse"]
@@ -1671,8 +1690,17 @@ name = "serde_json"
 version = "1.0"
 
 [[requested]]
+name = "sha1"
+version = "0.10"
+
+[[requested]]
 name = "sha2"
 version = "0.10"
+
+[[requested]]
+name = "tar"
+version = "0.4"
+default-features = false
 
 [[requested]]
 name = "tempfile"

@@ -1,8 +1,16 @@
 //! soldeps-gen: Generate solidity-deps.toml from foundry.toml and package.json
 //!
-//! This tool parses Foundry's foundry.toml for git dependencies and optionally
-//! package.json/pnpm-lock.yaml for npm Solidity packages (like @openzeppelin/contracts).
-//! It generates a unified TOML file for use with turnkey's Solidity deps cell (nix/buck2/languages.nix).
+//! This tool reads the git dependencies the root foundry.toml declares in
+//! Soldeer's table form and, optionally, the npm packages of
+//! package.json/pnpm-lock.yaml whose tarballs hold Solidity (like
+//! @openzeppelin/contracts). It generates a unified TOML file for use with
+//! turnkey's Solidity deps cell (nix/buck2/languages.nix), and, with the
+//! `remappings` subcommand, the root remappings.txt from that file.
+//!
+//! Only direct dependencies count: a dependency's own dependencies,
+//! submodules and remappings are not followed.
+
+mod npm;
 
 /// Package version from VERSION.txt (works with both Cargo and Buck2)
 const VERSION: &str = {
@@ -26,17 +34,52 @@ const VERSION: &str = {
 use anyhow::{Context, Result};
 use clap::Parser;
 use deps_gen_kit::{OutputArgs, PrefetchArgs, Prefetcher};
+use npm::{RegistryInspector, TarballInspector};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
 /// Generate solidity-deps.toml from foundry.toml and package.json
 #[derive(Parser, Debug)]
 #[command(name = "soldeps-gen")]
 #[command(about = "Generate solidity-deps.toml from foundry.toml and package.json")]
-struct Args {
+#[command(args_conflicts_with_subcommands = true)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Action>,
+
+    #[command(flatten)]
+    generate: GenerateArgs,
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum Action {
+    /// Print the root remappings.txt, which native forge and the Buck2
+    /// Solidity rules read, from solidity-deps.toml: each package's recorded
+    /// remapping, with its target under the vendor directory
+    Remappings {
+        /// The solidity-deps.toml to read
+        #[arg(long, default_value = "solidity-deps.toml")]
+        deps: PathBuf,
+
+        /// The foundry.toml the remappings.txt sits next to, relative to the
+        /// project root: forge resolves remapping targets from its directory
+        #[arg(long, default_value = "foundry.toml")]
+        foundry: PathBuf,
+
+        /// The directory the soldeps cell vendors packages into, one
+        /// `<name>/` per package, relative to the project root; the sync rule
+        /// passes the cell link's (nix/buck2/languages.nix)
+        #[arg(long)]
+        vendor_dir: String,
+    },
+}
+
+/// Generating solidity-deps.toml, what soldeps-gen does without a subcommand
+#[derive(clap::Args, Debug)]
+struct GenerateArgs {
     /// Path to foundry.toml file
     #[arg(long, default_value = "foundry.toml")]
     foundry: PathBuf,
@@ -51,15 +94,18 @@ struct Args {
 
     /// The previously generated solidity-deps.toml, which this run replaces
     /// (optional). A git package whose pin is unchanged keeps the remapping
-    /// target recorded there, without looking it up again; that is the only
-    /// way to get one without prefetching
+    /// target recorded there, without looking it up again, and an npm
+    /// package keeps its verdict on holding Solidity while its integrity (or,
+    /// without one, its version) is unchanged; that is the only way to get
+    /// either without prefetching
     #[arg(long)]
     previous: Option<PathBuf>,
 
     /// The directory the soldeps cell vendors packages into, one `<name>/`
     /// per package, relative to the project root. Remapping overrides in
-    /// foundry.toml must point inside it; the sync rule passes the cell
-    /// link's (nix/buck2/languages.nix)
+    /// foundry.toml must point inside it, as seen from foundry.toml's
+    /// directory; the sync rule passes the cell link's
+    /// (nix/buck2/languages.nix)
     #[arg(long)]
     vendor_dir: Option<String>,
 
@@ -68,7 +114,8 @@ struct Args {
 
     /// Prefetching pins every dependency for Nix: it resolves git refs to
     /// commits, and fetches the Nix hashes of GitHub archives and of npm
-    /// tarballs the pnpm lock has no integrity for
+    /// tarballs the pnpm lock has no integrity for. It also downloads the
+    /// tarballs of npm packages with no recorded verdict on holding Solidity
     #[command(flatten)]
     prefetch: PrefetchArgs,
 }
@@ -83,11 +130,141 @@ enum Source {
     Npm,
 }
 
+/// How a git dependency is pinned, as the root foundry.toml declares it
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Pin {
+    /// A full commit hash
+    Rev(String),
+    Tag(String),
+    Branch(String),
+}
+
+impl Pin {
+    /// The ref to resolve to a commit, or None for a commit
+    fn git_ref(&self) -> Option<String> {
+        match self {
+            Pin::Rev(_) => None,
+            Pin::Tag(tag) => Some(format!("refs/tags/{}", tag)),
+            Pin::Branch(branch) => Some(format!("refs/heads/{}", branch)),
+        }
+    }
+}
+
+impl std::fmt::Display for Pin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Pin::Rev(rev) => write!(f, "rev {}", rev),
+            Pin::Tag(tag) => write!(f, "tag {}", tag),
+            Pin::Branch(branch) => write!(f, "branch {}", branch),
+        }
+    }
+}
+
 /// A package in solidity-deps.toml: what this run writes, and what it reads
 /// back from the previous one (--previous)
-#[derive(Debug, Serialize, Deserialize)]
+///
+/// It is (de)serialized as a PackageRecord, which spells the pin out as
+/// the `tag`, `branch` and `rev` keys.
+#[derive(Debug, Clone)]
 struct OutputPackage {
     name: String,
+    /// The package version: npm's resolved version, or a git dependency's
+    /// declared `version`, which fixup sets match on
+    version: String,
+    source: Source,
+    url: Option<String>,
+    integrity: Option<String>,
+    repo: Option<String>,
+    /// A git package's declared pin
+    pin: Option<Pin>,
+    /// The commit a git package is pinned to: its declared rev, or what its
+    /// tag or branch resolved to when prefetching
+    rev: Option<String>,
+    /// Nix SRI hash of the unpacked `url` archive (git packages only)
+    hash: Option<String>,
+    /// The package's remapping, in a Foundry checkout's layout: its target
+    /// sits under lib/<name>/ (git) or node_modules/<name>/ (npm), which the
+    /// soldeps cell moves to vendor/<name>/
+    remapping: Option<String>,
+    /// Set when `remapping` comes from the root foundry.toml's `remappings`
+    /// rather than from the package itself, so a later run without the
+    /// override does not reuse it
+    remapping_overridden: bool,
+}
+
+impl Serialize for OutputPackage {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        PackageRecord::from(self.clone()).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for OutputPackage {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        PackageRecord::deserialize(deserializer)?
+            .try_into()
+            .map_err(serde::de::Error::custom)
+    }
+}
+
+impl From<OutputPackage> for PackageRecord {
+    fn from(pkg: OutputPackage) -> Self {
+        let (tag, branch) = match pkg.pin {
+            Some(Pin::Tag(tag)) => (Some(tag), None),
+            Some(Pin::Branch(branch)) => (None, Some(branch)),
+            Some(Pin::Rev(_)) | None => (None, None),
+        };
+        PackageRecord {
+            name: pkg.name,
+            version: pkg.version,
+            source: pkg.source,
+            url: pkg.url,
+            integrity: pkg.integrity,
+            repo: pkg.repo,
+            tag,
+            branch,
+            rev: pkg.rev,
+            hash: pkg.hash,
+            remapping: pkg.remapping,
+            remapping_overridden: pkg.remapping_overridden,
+        }
+    }
+}
+
+impl TryFrom<PackageRecord> for OutputPackage {
+    type Error = String;
+
+    fn try_from(record: PackageRecord) -> Result<Self, String> {
+        let pin = match (record.tag, record.branch) {
+            (Some(tag), None) => Some(Pin::Tag(tag)),
+            (None, Some(branch)) => Some(Pin::Branch(branch)),
+            (None, None) if record.source == Source::Git => record.rev.clone().map(Pin::Rev),
+            (None, None) => None,
+            (Some(_), Some(_)) => {
+                return Err(format!("{} has both a tag and a branch", record.name));
+            }
+        };
+        Ok(OutputPackage {
+            name: record.name,
+            version: record.version,
+            source: record.source,
+            url: record.url,
+            integrity: record.integrity,
+            repo: record.repo,
+            pin,
+            rev: record.rev,
+            hash: record.hash,
+            remapping: record.remapping,
+            remapping_overridden: record.remapping_overridden,
+        })
+    }
+}
+
+/// A package as solidity-deps.toml spells it (OutputPackage)
+#[derive(Debug, Serialize, Deserialize)]
+struct PackageRecord {
+    name: String,
+    /// The package version: npm's resolved version, or a git dependency's
+    /// declared `version`, which fixup sets match on
     version: String,
     source: Source,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -97,27 +274,37 @@ struct OutputPackage {
     #[serde(skip_serializing_if = "Option::is_none")]
     repo: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    tag: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    branch: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     rev: Option<String>,
-    /// Nix SRI hash of the unpacked `url` archive (git packages only)
     #[serde(skip_serializing_if = "Option::is_none")]
     hash: Option<String>,
-    /// The package's remapping, in a Foundry checkout's layout: its target
-    /// sits under lib/<name>/ (git) or node_modules/<name>/ (npm), which the
-    /// soldeps cell moves to vendor/<name>/
     #[serde(skip_serializing_if = "Option::is_none")]
     remapping: Option<String>,
-    /// Set when `remapping` comes from the root foundry.toml's `remappings`
-    /// rather than from the package itself, so a later run without the
-    /// override does not reuse it
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     remapping_overridden: bool,
+}
+
+/// An npm dependency whose tarball holds no Solidity, recorded in
+/// solidity-deps.toml so a later sync does not download it again while its
+/// integrity (without one, its version) is unchanged
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct NotSolidity {
+    name: String,
+    version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    integrity: Option<String>,
 }
 
 /// Foundry configuration structure
 #[derive(Debug, Deserialize)]
 struct FoundryConfig {
+    /// Each value should be a git dependency in Soldeer's table form
+    /// (parse_dependency); anything else is rejected there, with a message
     #[serde(default)]
-    dependencies: BTreeMap<String, String>,
+    dependencies: BTreeMap<String, toml::Value>,
     #[serde(default)]
     profile: BTreeMap<String, FoundryProfile>,
 }
@@ -143,11 +330,37 @@ const DEFAULT_PROFILE: &str = "default";
 /// string that has not changed since forge's first release.
 const FORGE_DEFAULT_SRC: &str = "src";
 
-/// The previous solidity-deps.toml, as far as reusing remappings needs it
+/// A git dependency in Soldeer's table form, as the root foundry.toml
+/// declares it: `name = { version, git, rev | tag | branch }`
+///
+/// Unknown keys are rejected: forge silently drops them, so a misspelt pin
+/// would otherwise go unnoticed. parse_dependency names them before serde's
+/// `deny_unknown_fields`, the backstop, would.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GitDependency {
+    version: String,
+    git: String,
+    rev: Option<String>,
+    tag: Option<String>,
+    branch: Option<String>,
+}
+
+/// The keys of a GitDependency table
+const DEPENDENCY_KEYS: [&str; 5] = ["version", "git", "rev", "tag", "branch"];
+
+/// Soldeer's table form, for error messages
+const TABLE_FORM: &str = "{ version = \"<version>\", git = \"<url>\", tag = \"<tag>\" } \
+                          (or rev = \"<commit>\", or branch = \"<branch>\", instead of tag)";
+
+/// A solidity-deps.toml, as reading it back needs it: the previous one
+/// (--previous), or the one the root remappings.txt is generated from
 #[derive(Debug, Default, Deserialize)]
-struct PreviousToml {
+struct RecordedDeps {
     #[serde(default)]
     package: Vec<OutputPackage>,
+    #[serde(default)]
+    not_solidity: Vec<NotSolidity>,
 }
 
 /// package.json structure (simplified)
@@ -185,6 +398,9 @@ struct OutputToml {
     meta: OutputMeta,
     #[serde(rename = "package")]
     packages: Vec<OutputPackage>,
+    /// The direct npm dependencies whose tarballs hold no Solidity
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    not_solidity: Vec<NotSolidity>,
 }
 
 #[derive(Debug, Serialize)]
@@ -192,39 +408,108 @@ struct OutputMeta {
     generator: String,
 }
 
-/// Parse Foundry git dependency format
-/// Examples:
-///   "solady": "https://github.com/vectorized/solady"
-///   "forge-std": "https://github.com/foundry-rs/forge-std@v1.8.0"
-///   "openzeppelin": "openzeppelin/openzeppelin-contracts@v5.0.0"
-fn parse_foundry_dep(name: &str, spec: &str) -> OutputPackage {
-    let (repo, rev) = if spec.contains('@') {
-        let parts: Vec<&str> = spec.splitn(2, '@').collect();
-        (parts[0].to_string(), Some(parts[1].to_string()))
-    } else {
-        (spec.to_string(), None)
+/// Parse a root foundry.toml `[dependencies]` entry: a git dependency in
+/// Soldeer's table form, with exactly one of `rev`, `tag` and `branch`
+///
+/// A string is rejected, whether a Soldeer registry version or turnkey's
+/// old `"<url>@<ref>"`: turnkey reads no registry.
+fn parse_dependency(name: &str, value: &toml::Value) -> Result<OutputPackage> {
+    let use_table_form = || {
+        format!(
+            "declare it in Soldeer's table form: {} = {}",
+            name, TABLE_FORM
+        )
+    };
+    if let toml::Value::String(spec) = value {
+        anyhow::bail!(
+            "dependency `{}` = \"{}\" is a string, which soldeps-gen does not read \
+             (neither a Soldeer registry version nor a `<url>@<ref>`); {}",
+            name,
+            spec,
+            use_table_form()
+        );
+    }
+    if let toml::Value::Table(table) = value {
+        if table.contains_key("url") {
+            anyhow::bail!(
+                "dependency `{}`: URL dependencies are not supported (Soldeer's `url = ...` \
+                 form); {}",
+                name,
+                use_table_form()
+            );
+        }
+        if let Some(key) = table
+            .keys()
+            .find(|key| !DEPENDENCY_KEYS.contains(&key.as_str()))
+        {
+            anyhow::bail!(
+                "dependency `{}`: unknown key `{}`; a dependency table takes {}",
+                name,
+                key,
+                "version, git, and one of rev, tag and branch"
+            );
+        }
+    }
+    let dep: GitDependency = value
+        .clone()
+        .try_into()
+        .with_context(|| format!("dependency `{}`: {}", name, use_table_form()))?;
+    let pin = match (dep.rev, dep.tag, dep.branch) {
+        (Some(rev), None, None) => Pin::Rev(rev),
+        (None, Some(tag), None) => Pin::Tag(tag),
+        (None, None, Some(branch)) => Pin::Branch(branch),
+        _ => anyhow::bail!(
+            "dependency `{}` needs exactly one of rev, tag and branch; {}",
+            name,
+            use_table_form()
+        ),
+    };
+    // A short hash could only be resolved in a clone: ls-remote lists refs,
+    // not abbreviated commits
+    if let Pin::Rev(rev) = &pin
+        && !is_commit_hash(rev)
+    {
+        anyhow::bail!(
+            "dependency `{}`: rev `{}` is not a full 40-hex commit hash; pin a ref name \
+             with tag or branch",
+            name,
+            rev
+        );
+    }
+    let rev = match &pin {
+        Pin::Rev(rev) => Some(rev.clone()),
+        Pin::Tag(_) | Pin::Branch(_) => None,
     };
 
-    // Normalize GitHub shorthand
-    let full_repo = if !repo.starts_with("http") && repo.contains('/') {
-        format!("https://github.com/{}", repo)
-    } else {
-        repo
-    };
-
-    OutputPackage {
+    Ok(OutputPackage {
         name: name.to_string(),
-        version: rev.clone().unwrap_or_else(|| "main".to_string()),
+        version: dep.version,
         source: Source::Git,
         url: None,
         integrity: None,
-        repo: Some(full_repo),
+        repo: Some(dep.git),
+        pin: Some(pin),
         rev,
         hash: None,
         // Derived from the dependency's own foundry.toml once it is pinned
         // (assign_remapping)
         remapping: None,
         remapping_overridden: false,
+    })
+}
+
+/// The ref a git package's tag or branch names, for resolving it, or None
+/// for a package pinned by commit
+fn declared_ref(pkg: &OutputPackage) -> Option<String> {
+    pkg.pin.as_ref().and_then(Pin::git_ref)
+}
+
+/// A git package's repository and declared pin, for messages
+fn pin_label(pkg: &OutputPackage) -> String {
+    let repo = pkg.repo.as_deref().unwrap_or_default();
+    match &pkg.pin {
+        Some(pin) => format!("{} {}", repo, pin),
+        None => repo.to_string(),
     }
 }
 
@@ -237,6 +522,7 @@ fn npm_package(name: &str, version: &str, integrity: Option<String>) -> OutputPa
         url: Some(npm_tarball_url(name, version)),
         integrity,
         repo: None,
+        pin: None,
         rev: None,
         hash: None,
         remapping: None,
@@ -247,29 +533,89 @@ fn npm_package(name: &str, version: &str, integrity: Option<String>) -> OutputPa
     pkg
 }
 
-/// Check if a package is a Solidity-related npm package
-fn is_solidity_package(name: &str) -> bool {
-    // Common Solidity npm packages
-    let solidity_prefixes = [
-        "@openzeppelin/contracts",
-        "@openzeppelin/contracts-upgradeable",
-        "@chainlink/contracts",
-        "@uniswap/",
-        "solmate",
-        "forge-std",
-        "ds-test",
-    ];
-
-    solidity_prefixes
+/// What solidity-deps.toml records of whether an npm package holds
+/// Solidity: yes if it is a recorded package, no if it is recorded as not
+/// Solidity, None without a record
+///
+/// Records are matched by integrity or, for a package the lock gives none,
+/// by name and version: a recorded Solidity package then carries the hash
+/// prefetching found, which the lock still lacks.
+fn recorded_verdict(pkg: &OutputPackage, recorded: &RecordedDeps) -> Option<bool> {
+    let same = |name: &str, version: &str, integrity: Option<&str>| match &pkg.integrity {
+        Some(key) => integrity == Some(key.as_str()),
+        None => name == pkg.name && version == pkg.version,
+    };
+    if recorded
+        .package
         .iter()
-        .any(|p| name.starts_with(p) || name == *p)
+        .any(|p| p.source == Source::Npm && same(&p.name, &p.version, p.integrity.as_deref()))
+    {
+        Some(true)
+    } else if recorded
+        .not_solidity
+        .iter()
+        .any(|p| same(&p.name, &p.version, p.integrity.as_deref()))
+    {
+        Some(false)
+    } else {
+        None
+    }
+}
+
+/// Split direct npm dependencies into the Solidity packages and the others
+///
+/// A package holds Solidity iff its tarball contains a `.sol` file. A
+/// recorded verdict (recorded_verdict) is always reused, and nothing is
+/// downloaded for it. Otherwise `inspector` downloads the tarball, checks
+/// it against the lock's integrity and looks inside; if that fails, the
+/// run fails with its error. Without an inspector (--no-prefetch) an
+/// unrecorded package fails the run too: it is never guessed either way.
+fn select_solidity(
+    candidates: Vec<OutputPackage>,
+    recorded: &RecordedDeps,
+    mut inspector: Option<&mut dyn TarballInspector>,
+) -> Result<(Vec<OutputPackage>, Vec<NotSolidity>)> {
+    let mut solidity = Vec::new();
+    let mut not_solidity = Vec::new();
+    for pkg in candidates {
+        let verdict = match (recorded_verdict(&pkg, recorded), inspector.as_deref_mut()) {
+            (Some(verdict), _) => verdict,
+            (None, Some(inspector)) => {
+                let url = pkg.url.clone().unwrap_or_default();
+                eprintln!("  looking for Solidity in {}...", url);
+                inspector
+                    .has_solidity(&url, pkg.integrity.as_deref())
+                    .with_context(|| {
+                        format!(
+                            "{}@{}: cannot tell whether it holds Solidity",
+                            pkg.name, pkg.version
+                        )
+                    })?
+            }
+            (None, None) => anyhow::bail!(
+                "{}@{}: whether it holds Solidity is not recorded; run a prefetching \
+                 sync (`tk sync`, without --no-prefetch) to look",
+                pkg.name,
+                pkg.version
+            ),
+        };
+        if verdict {
+            solidity.push(pkg);
+        } else {
+            not_solidity.push(NotSolidity {
+                name: pkg.name,
+                version: pkg.version,
+                integrity: pkg.integrity,
+            });
+        }
+    }
+    Ok((solidity, not_solidity))
 }
 
 /// Generate NPM tarball URL for a package
 fn npm_tarball_url(name: &str, version: &str) -> String {
     // Remove semver prefix (^, ~, etc.)
-    let clean_version =
-        version.trim_start_matches(|c| c == '^' || c == '~' || c == '=' || c == 'v');
+    let clean_version = version.trim_start_matches(['^', '~', '=', 'v']);
 
     if name.starts_with('@') {
         let encoded_name = name.replace('/', "%2f");
@@ -287,8 +633,8 @@ fn npm_tarball_url(name: &str, version: &str) -> String {
     }
 }
 
-/// Read the solidity-deps.toml a run replaces
-fn read_previous(path: &PathBuf) -> Result<PreviousToml> {
+/// Read a solidity-deps.toml
+fn read_recorded(path: &PathBuf) -> Result<RecordedDeps> {
     let content =
         fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
     toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))
@@ -307,10 +653,8 @@ fn parse_pnpm_lock(path: &PathBuf) -> Result<BTreeMap<String, String>> {
 
     // pnpm-lock v9 structure: packages: { "@pkg/name@version": { resolution: { integrity: "sha..." } } }
     for (key, pkg) in &lockfile.packages {
-        if let Some(resolution) = &pkg.resolution {
-            if let Some(integrity) = &resolution.integrity {
-                integrity_map.insert(key.clone(), integrity.clone());
-            }
+        if let Some(integrity) = pkg.resolution.as_ref().and_then(|r| r.integrity.as_ref()) {
+            integrity_map.insert(key.clone(), integrity.clone());
         }
     }
 
@@ -320,7 +664,8 @@ fn parse_pnpm_lock(path: &PathBuf) -> Result<BTreeMap<String, String>> {
 /// The git lookup prefetching needs, next to the hashes deps-gen-kit's
 /// Prefetcher gets
 trait RefResolver {
-    /// Resolve a git ref (tag, branch or HEAD) of a repository to a commit
+    /// Resolve a git ref of a repository (`refs/tags/<tag>`,
+    /// `refs/heads/<branch>`) to a commit
     fn resolve_ref(&self, repo: &str, git_ref: &str) -> Result<String>;
 }
 
@@ -552,14 +897,15 @@ fn remapping_to(pkg: &OutputPackage, subpath: &str) -> String {
 }
 
 /// Whether `previous` records `pkg` at the same pin: the same repository
-/// and declared ref and, once prefetching resolved the ref, the same commit
+/// and declared pin, and the same commit where `pkg` has one (a declared
+/// rev, or what prefetching resolved its tag or branch to)
 fn same_pin(pkg: &OutputPackage, previous: &OutputPackage) -> bool {
     previous.source == pkg.source
         && previous.repo == pkg.repo
-        && previous.version == pkg.version
+        && previous.pin == pkg.pin
         && match pkg.rev.as_deref() {
-            Some(rev) if is_commit_hash(rev) => previous.rev.as_deref() == Some(rev),
-            _ => true,
+            Some(rev) => previous.rev.as_deref() == Some(rev),
+            None => true,
         }
 }
 
@@ -567,8 +913,8 @@ fn same_pin(pkg: &OutputPackage, previous: &OutputPackage) -> bool {
 /// `remappings`: package name -> the target's path inside the package
 ///
 /// Each entry is an ordinary forge remapping, `<name>/=<vendor>/<name>/...`
-/// with `<vendor>` the directory the soldeps cell vendors packages into
-/// (--vendor-dir). Its prefix must name a declared package: the rules
+/// with `<vendor>` the directory the soldeps cell vendors packages into, as
+/// seen from foundry.toml's directory (vendor_prefix). Its prefix must name a declared package: the rules
 /// mapper maps an import's first path segment to the package, so there are
 /// no aliases. Its target must stay inside that package.
 fn parse_overrides(
@@ -580,12 +926,9 @@ fn parse_overrides(
     for entry in remappings {
         let invalid =
             |why: String| anyhow::anyhow!("remapping `{}` in foundry.toml: {}", entry, why);
-        let vendor_dir = vendor_dir
-            .and_then(relative_dir)
-            .filter(|dir| !dir.is_empty())
-            .ok_or_else(|| {
-                invalid("overrides need --vendor-dir, the soldeps cell's vendor directory".into())
-            })?;
+        let vendor_dir = vendor_dir.ok_or_else(|| {
+            invalid("overrides need --vendor-dir, the soldeps cell's vendor directory".into())
+        })?;
         let (prefix, target) = entry
             .split_once('=')
             .ok_or_else(|| invalid("not a `<prefix>=<target>` remapping".to_string()))?;
@@ -600,7 +943,7 @@ fn parse_overrides(
                 ))
             })?;
         let subpath = target
-            .strip_prefix(vendor_dir.as_str())
+            .strip_prefix(vendor_dir)
             .and_then(|rest| rest.strip_prefix(pkg.name.as_str()))
             .and_then(|rest| rest.strip_prefix('/'))
             .and_then(relative_dir)
@@ -662,7 +1005,7 @@ fn assign_remapping(
     }
 
     let repo = pkg.repo.clone().unwrap_or_default();
-    let pin = format!("{}@{}", repo, pkg.version);
+    let pin = pin_label(pkg);
     let reader = match prefetch {
         Prefetch::Skipped => anyhow::bail!(
             "{}: no remapping target is recorded for {}; run a prefetching sync \
@@ -735,17 +1078,17 @@ fn prefetch_package(
             let Some(repo) = pkg.repo.clone() else {
                 return Ok(());
             };
-            let git_ref = pkg.rev.clone().unwrap_or_else(|| "HEAD".to_string());
-
-            let commit = if is_commit_hash(&git_ref) {
-                git_ref
-            } else {
-                eprintln!("  resolving {}@{}...", repo, git_ref);
-                let commit = refs
-                    .resolve_ref(&repo, &git_ref)
-                    .with_context(|| format!("failed to resolve {}", git_ref))?;
-                eprintln!("  {} -> {}", git_ref, &commit[..12.min(commit.len())]);
-                commit
+            let commit = match (pkg.rev.clone(), declared_ref(pkg)) {
+                (Some(rev), _) => rev,
+                (None, Some(git_ref)) => {
+                    eprintln!("  resolving {} {}...", repo, git_ref);
+                    let commit = refs
+                        .resolve_ref(&repo, &git_ref)
+                        .with_context(|| format!("failed to resolve {}", git_ref))?;
+                    eprintln!("  {} -> {}", git_ref, &commit[..12.min(commit.len())]);
+                    commit
+                }
+                (None, None) => anyhow::bail!("{} has no rev, tag or branch", pkg.name),
             };
             pkg.rev = Some(commit.clone());
 
@@ -776,12 +1119,114 @@ fn prefetch_package(
     Ok(())
 }
 
-fn main() -> Result<()> {
-    let args = Args::parse();
+/// The subpath of a package its recorded remapping targets, relative to
+/// the package's root: empty for the root, ending in `/` otherwise
+fn remapping_subpath(pkg: &OutputPackage) -> Result<String> {
+    let remapping = pkg
+        .remapping
+        .as_deref()
+        .ok_or_else(|| anyhow::anyhow!("{} has no recorded remapping", pkg.name))?;
+    remapping
+        .strip_prefix(&format!("{}/=", pkg.name))
+        .and_then(|target| target.strip_prefix(&layout_root(pkg)))
+        .map(str::to_string)
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "{}'s remapping `{}` is not `{}/={}...`",
+                pkg.name,
+                remapping,
+                pkg.name,
+                layout_root(pkg)
+            )
+        })
+}
 
+/// `vendor_dir`, relative to the project root, as seen from the directory
+/// of `foundry_toml` (also relative to the project root), where forge
+/// resolves remapping targets: the same path for a foundry.toml at the
+/// root, one `../` more per directory it is nested in. It ends in `/`.
+fn vendor_prefix(foundry_toml: &Path, vendor_dir: &str) -> Result<String> {
+    let vendor_dir = relative_dir(vendor_dir)
+        .filter(|dir| !dir.is_empty())
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "--vendor-dir `{}` is not a directory inside the project",
+                vendor_dir
+            )
+        })?;
+    let mut up = String::new();
+    for component in foundry_toml.parent().into_iter().flat_map(Path::components) {
+        match component {
+            Component::CurDir => {}
+            Component::Normal(_) => up.push_str("../"),
+            _ => anyhow::bail!(
+                "{} is not a path inside the project",
+                foundry_toml.display()
+            ),
+        }
+    }
+    Ok(up + &vendor_dir)
+}
+
+/// The root remappings.txt: one line per package, its recorded remapping
+/// with the target moved under `vendor_prefix` (vendor_prefix()), in
+/// package name order
+///
+/// There is no header: forge reads every line of remappings.txt as a
+/// remapping.
+fn root_remappings(recorded: &RecordedDeps, vendor_prefix: &str) -> Result<String> {
+    let mut packages: Vec<&OutputPackage> = recorded.package.iter().collect();
+    packages.sort_by(|a, b| a.name.cmp(&b.name));
+    let mut out = String::new();
+    for pkg in packages {
+        let subpath = remapping_subpath(pkg)?;
+        out.push_str(&format!(
+            "{}/={}{}/{}\n",
+            pkg.name, vendor_prefix, pkg.name, subpath
+        ));
+    }
+    Ok(out)
+}
+
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+    match cli.command {
+        Some(Action::Remappings {
+            deps,
+            foundry,
+            vendor_dir,
+        }) => {
+            let recorded = read_recorded(&deps)?;
+            let remappings = vendor_prefix(&foundry, &vendor_dir)
+                .and_then(|prefix| root_remappings(&recorded, &prefix))
+                .with_context(|| format!("Invalid {}", deps.display()))?;
+            print!("{}", remappings);
+            Ok(())
+        }
+        None => generate(cli.generate),
+    }
+}
+
+/// Generate solidity-deps.toml
+fn generate(args: GenerateArgs) -> Result<()> {
     let mut output_packages: Vec<OutputPackage> = Vec::new();
     // The root foundry.toml's remappings: per-package overrides
     let mut override_remappings: Vec<String> = Vec::new();
+
+    let previous = match &args.previous {
+        Some(path) if path.exists() => read_recorded(path)?,
+        _ => RecordedDeps::default(),
+    };
+    let mut prefetcher = args.prefetch.prefetcher();
+    // npm tarballs are downloaded to look inside them when prefetching is
+    // on; --no-prefetch keeps a sync off the network
+    let mut inspector = (!args.prefetch.no_prefetch).then(RegistryInspector::new);
+    // The vendor directory as foundry.toml's remappings name it
+    let vendor = args
+        .vendor_dir
+        .as_deref()
+        .map(|dir| vendor_prefix(&args.foundry, dir))
+        .transpose()?;
 
     // Parse pnpm-lock.yaml for integrity hashes if provided
     let integrity_map = if let Some(pnpm_lock_path) = &args.pnpm_lock {
@@ -813,7 +1258,10 @@ fn main() -> Result<()> {
         );
 
         for (name, spec) in &foundry_config.dependencies {
-            output_packages.push(parse_foundry_dep(name, spec));
+            output_packages.push(
+                parse_dependency(name, spec)
+                    .with_context(|| format!("Invalid {}", args.foundry.display()))?,
+            );
         }
 
         if let Some(profile) = foundry_config.profile.get(DEFAULT_PROFILE) {
@@ -826,6 +1274,9 @@ fn main() -> Result<()> {
         );
     }
 
+    // The direct npm dependencies whose tarballs hold no Solidity
+    let mut not_solidity = Vec::new();
+
     // Parse package.json if provided
     if let Some(package_json_path) = &args.package_json {
         if package_json_path.exists() {
@@ -835,21 +1286,13 @@ fn main() -> Result<()> {
             let package_json: PackageJson = serde_json::from_str(&package_json_content)
                 .with_context(|| format!("Failed to parse {}", package_json_path.display()))?;
 
-            let all_deps: Vec<(&String, &String)> = package_json
+            let mut candidates = Vec::new();
+            for (name, version) in package_json
                 .dependencies
                 .iter()
                 .chain(package_json.dev_dependencies.iter())
-                .filter(|(name, _)| is_solidity_package(name))
-                .collect();
-
-            eprintln!(
-                "Found {} Solidity-related npm packages in package.json",
-                all_deps.len()
-            );
-
-            for (name, version) in all_deps {
-                let clean_version =
-                    version.trim_start_matches(|c| c == '^' || c == '~' || c == '=');
+            {
+                let clean_version = version.trim_start_matches(['^', '~', '=']);
 
                 // Look up integrity hash from pnpm-lock.yaml
                 // The lock file uses resolved versions, not specifier versions
@@ -873,17 +1316,26 @@ fn main() -> Result<()> {
                     }
                 };
 
-                if integrity.is_some() {
-                    eprintln!(
-                        "  {} -> found integrity hash (resolved to {})",
-                        name, resolved_version
-                    );
-                } else {
+                if integrity.is_none() {
                     eprintln!("  {} -> no integrity hash found in lock file", name);
                 }
 
-                output_packages.push(npm_package(name, &resolved_version, integrity));
+                candidates.push(npm_package(name, &resolved_version, integrity));
             }
+
+            let (solidity, others) = select_solidity(
+                candidates,
+                &previous,
+                inspector
+                    .as_mut()
+                    .map(|inspector| inspector as &mut dyn TarballInspector),
+            )?;
+            eprintln!(
+                "Found {} Solidity npm packages in package.json",
+                solidity.len()
+            );
+            output_packages.extend(solidity);
+            not_solidity = others;
         } else {
             eprintln!(
                 "Note: {} not found, skipping npm deps",
@@ -892,25 +1344,18 @@ fn main() -> Result<()> {
         }
     }
 
-    // Before any network work, so an invalid override fails fast
-    let overrides = parse_overrides(
-        &override_remappings,
-        &output_packages,
-        args.vendor_dir.as_deref(),
-    )
-    .with_context(|| format!("Invalid remappings in {}", args.foundry.display()))?;
-    let previous = match &args.previous {
-        Some(path) if path.exists() => read_previous(path)?,
-        _ => PreviousToml::default(),
-    };
+    // Before any network work on git packages, so an invalid override fails
+    // fast
+    let overrides = parse_overrides(&override_remappings, &output_packages, vendor.as_deref())
+        .with_context(|| format!("Invalid remappings in {}", args.foundry.display()))?;
 
     // Each package's prefetch failure, None where prefetching succeeded
     let mut failures: Vec<Option<anyhow::Error>> = Vec::new();
     let mut reader = None;
-    if let Some(mut prefetcher) = args.prefetch.prefetcher() {
+    if let Some(prefetcher) = &mut prefetcher {
         eprintln!("Prefetching...");
         for pkg in &mut output_packages {
-            let result = prefetch_package(pkg, &GitRefResolver, &mut prefetcher);
+            let result = prefetch_package(pkg, &GitRefResolver, prefetcher);
             if let Err(e) = &result {
                 eprintln!("  warning: {}: {:#}", pkg.name, e);
             }
@@ -931,6 +1376,7 @@ fn main() -> Result<()> {
 
     // Sort packages by name for deterministic output
     output_packages.sort_by(|a, b| a.name.cmp(&b.name));
+    not_solidity.sort_by(|a, b| a.name.cmp(&b.name));
 
     eprintln!("Total: {} packages", output_packages.len());
 
@@ -940,6 +1386,7 @@ fn main() -> Result<()> {
             generator: format!("soldeps-gen {}", VERSION),
         },
         packages: output_packages,
+        not_solidity,
     };
 
     args.output
@@ -950,49 +1397,468 @@ fn main() -> Result<()> {
 mod tests {
     use super::*;
 
+    use npm::MemoryInspector;
+
+    /// Parse `spec`, a TOML value, as the `[dependencies]` entry `name`
+    fn dep(name: &str, spec: &str) -> Result<OutputPackage> {
+        let doc: toml::Table = format!("\"{name}\" = {spec}").parse().unwrap();
+        parse_dependency(name, &doc[name])
+    }
+
+    const FORGE_STD: &str = "https://github.com/foundry-rs/forge-std";
+
+    /// A git dependency of `repo` at `pin`, a TOML key-value pair such as
+    /// `tag = "v1"`
+    fn git_dep(name: &str, repo: &str, pin: &str) -> OutputPackage {
+        dep(
+            name,
+            &format!("{{ version = \"1.0.0\", git = \"{repo}\", {pin} }}"),
+        )
+        .unwrap()
+    }
+
+    /// forge-std as the root foundry.toml declares it
+    fn forge_std() -> OutputPackage {
+        dep(
+            "forge-std",
+            &format!("{{ version = \"1.8.0\", git = \"{FORGE_STD}\", tag = \"v1.8.0\" }}"),
+        )
+        .unwrap()
+    }
+
+    // -- Dependency tables ---------------------------------------------------
+
     #[test]
-    fn test_parse_foundry_dep_simple() {
-        let pkg = parse_foundry_dep("solady", "https://github.com/vectorized/solady");
-        assert_eq!(pkg.name, "solady");
+    fn test_parse_dependency_table_with_tag() {
+        let pkg = forge_std();
+        assert_eq!(pkg.name, "forge-std");
         assert_eq!(pkg.source, Source::Git);
-        assert_eq!(
-            pkg.repo,
-            Some("https://github.com/vectorized/solady".to_string())
-        );
+        // The declared version, which fixup sets match on
+        assert_eq!(pkg.version, "1.8.0");
+        assert_eq!(pkg.repo.as_deref(), Some(FORGE_STD));
+        assert_eq!(pkg.pin, Some(Pin::Tag("v1.8.0".into())));
         assert_eq!(pkg.rev, None);
     }
 
     #[test]
-    fn test_parse_foundry_dep_with_version() {
-        let pkg = parse_foundry_dep(
-            "forge-std",
-            "https://github.com/foundry-rs/forge-std@v1.8.0",
-        );
-        assert_eq!(pkg.name, "forge-std");
+    fn test_parse_dependency_table_with_rev_or_branch() {
+        let pkg = dep(
+            "solady",
+            &format!(
+                "{{ version = \"0.1.0\", git = \"https://github.com/vectorized/solady.git\", rev = \"{COMMIT}\" }}"
+            ),
+        )
+        .unwrap();
+        assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
+        assert_eq!(pkg.pin, Some(Pin::Rev(COMMIT.into())));
         assert_eq!(
-            pkg.repo,
-            Some("https://github.com/foundry-rs/forge-std".to_string())
+            pkg.repo.as_deref(),
+            Some("https://github.com/vectorized/solady.git")
         );
-        assert_eq!(pkg.rev, Some("v1.8.0".to_string()));
+
+        let pkg = dep(
+            "solady",
+            "{ version = \"0.1.0\", git = \"https://github.com/vectorized/solady\", branch = \"main\" }",
+        )
+        .unwrap();
+        assert_eq!(pkg.pin, Some(Pin::Branch("main".into())));
+        assert_eq!(pkg.rev, None);
     }
 
     #[test]
-    fn test_parse_foundry_dep_shorthand() {
-        let pkg = parse_foundry_dep("openzeppelin", "openzeppelin/openzeppelin-contracts@v5.0.0");
-        assert_eq!(
-            pkg.repo,
-            Some("https://github.com/openzeppelin/openzeppelin-contracts".to_string())
-        );
-        assert_eq!(pkg.rev, Some("v5.0.0".to_string()));
+    fn test_parse_dependency_rejects_strings_naming_the_table_form() {
+        for spec in [
+            // Soldeer's registry form
+            "\"1.9.7\"",
+            // turnkey's old form
+            "\"https://github.com/foundry-rs/forge-std@v1.8.0\"",
+        ] {
+            let message = format!("{:#}", dep("forge-std", spec).unwrap_err());
+            assert!(message.contains("table form"), "{spec}: {message}");
+            assert!(
+                message.contains("forge-std = { version = "),
+                "{spec}: {message}"
+            );
+        }
     }
 
     #[test]
-    fn test_is_solidity_package() {
-        assert!(is_solidity_package("@openzeppelin/contracts"));
-        assert!(is_solidity_package("@openzeppelin/contracts-upgradeable"));
-        assert!(is_solidity_package("@chainlink/contracts"));
-        assert!(!is_solidity_package("lodash"));
-        assert!(!is_solidity_package("typescript"));
+    fn test_parse_dependency_needs_exactly_one_pin() {
+        let none = format!("{{ version = \"1.8.0\", git = \"{FORGE_STD}\" }}");
+        let two = format!(
+            "{{ version = \"1.8.0\", git = \"{FORGE_STD}\", tag = \"v1.8.0\", branch = \"main\" }}"
+        );
+        for spec in [none, two] {
+            let message = format!("{:#}", dep("forge-std", &spec).unwrap_err());
+            assert!(message.contains("exactly one"), "{spec}: {message}");
+        }
+    }
+
+    #[test]
+    fn test_parse_dependency_needs_version_and_git() {
+        for spec in [
+            format!("{{ git = \"{FORGE_STD}\", tag = \"v1.8.0\" }}"),
+            "{ version = \"1.8.0\", tag = \"v1.8.0\" }".to_string(),
+            // Nor is anything but a table
+            "18".to_string(),
+        ] {
+            let message = format!("{:#}", dep("forge-std", &spec).unwrap_err());
+            assert!(message.contains("table form"), "{spec}: {message}");
+        }
+    }
+
+    #[test]
+    fn test_parse_dependency_rejects_unknown_keys() {
+        // A misspelt pin, which forge would silently drop
+        let spec = format!(
+            "{{ version = \"1.8.0\", git = \"{FORGE_STD}\", tag = \"v1.8.0\", tags = \"x\" }}"
+        );
+        let message = format!("{:#}", dep("forge-std", &spec).unwrap_err());
+        assert!(message.contains("unknown key `tags`"), "{message}");
+        assert!(message.contains("version, git"), "{message}");
+    }
+
+    #[test]
+    fn test_parse_dependency_says_url_dependencies_are_not_supported() {
+        let spec = "{ version = \"1.8.0\", url = \"https://example.com/forge-std.zip\" }";
+        let message = format!("{:#}", dep("forge-std", spec).unwrap_err());
+        assert!(
+            message.contains("URL dependencies are not supported"),
+            "{message}"
+        );
+    }
+
+    #[test]
+    fn test_parse_dependency_rev_must_be_a_commit() {
+        let spec = format!("{{ version = \"1.8.0\", git = \"{FORGE_STD}\", rev = \"v1.8.0\" }}");
+        let message = format!("{:#}", dep("forge-std", &spec).unwrap_err());
+        assert!(message.contains("commit"), "{message}");
+    }
+
+    // -- npm packages --------------------------------------------------------
+
+    const OZ: &str = "@openzeppelin/contracts";
+
+    fn oz(integrity: Option<&str>) -> OutputPackage {
+        npm_package(OZ, "5.4.0", integrity.map(str::to_string))
+    }
+
+    fn lodash(integrity: Option<&str>) -> OutputPackage {
+        npm_package("lodash", "4.17.21", integrity.map(str::to_string))
+    }
+
+    fn inspector() -> MemoryInspector {
+        MemoryInspector::default()
+            .with(&npm_tarball_url(OZ, "5.4.0"), true)
+            .with(&npm_tarball_url("lodash", "4.17.21"), false)
+    }
+
+    fn names(packages: &[OutputPackage]) -> Vec<&str> {
+        packages.iter().map(|p| p.name.as_str()).collect()
+    }
+
+    #[test]
+    fn test_select_solidity_looks_inside_unrecorded_tarballs() {
+        let mut inspector = inspector();
+        let (solidity, not_solidity) = select_solidity(
+            vec![oz(Some("sha512-oz")), lodash(Some("sha512-lodash"))],
+            &RecordedDeps::default(),
+            Some(&mut inspector),
+        )
+        .unwrap();
+
+        assert_eq!(names(&solidity), [OZ]);
+        assert_eq!(
+            not_solidity,
+            [NotSolidity {
+                name: "lodash".into(),
+                version: "4.17.21".into(),
+                integrity: Some("sha512-lodash".into()),
+            }]
+        );
+        assert_eq!(inspector.calls.len(), 2);
+    }
+
+    #[test]
+    fn test_select_solidity_reuses_verdicts_recorded_for_the_integrity() {
+        let recorded = RecordedDeps {
+            package: vec![oz(Some("sha512-oz"))],
+            not_solidity: vec![NotSolidity {
+                name: "lodash".into(),
+                version: "4.17.21".into(),
+                integrity: Some("sha512-lodash".into()),
+            }],
+        };
+        let mut inspector = MemoryInspector::default();
+        let (solidity, not_solidity) = select_solidity(
+            vec![oz(Some("sha512-oz")), lodash(Some("sha512-lodash"))],
+            &recorded,
+            Some(&mut inspector),
+        )
+        .unwrap();
+
+        assert_eq!(names(&solidity), [OZ]);
+        assert_eq!(not_solidity, recorded.not_solidity);
+        assert!(inspector.calls.is_empty());
+
+        // Without prefetching too
+        let (solidity, not_solidity) = select_solidity(
+            vec![oz(Some("sha512-oz")), lodash(Some("sha512-lodash"))],
+            &recorded,
+            None,
+        )
+        .unwrap();
+        assert_eq!(names(&solidity), [OZ]);
+        assert_eq!(not_solidity.len(), 1);
+    }
+
+    #[test]
+    fn test_select_solidity_looks_again_when_the_integrity_changed() {
+        let recorded = RecordedDeps {
+            package: vec![oz(Some("sha512-oz-old"))],
+            not_solidity: vec![NotSolidity {
+                name: "lodash".into(),
+                version: "4.17.20".into(),
+                integrity: Some("sha512-lodash-old".into()),
+            }],
+        };
+        let mut inspector = inspector();
+        select_solidity(
+            vec![oz(Some("sha512-oz")), lodash(Some("sha512-lodash"))],
+            &recorded,
+            Some(&mut inspector),
+        )
+        .unwrap();
+        assert_eq!(inspector.calls.len(), 2);
+    }
+
+    #[test]
+    fn test_select_solidity_without_prefetch_fails_for_unrecorded_packages() {
+        let err = select_solidity(
+            vec![lodash(Some("sha512-lodash"))],
+            &RecordedDeps::default(),
+            None,
+        )
+        .unwrap_err();
+        let message = format!("{err:#}");
+        assert!(message.contains("lodash@4.17.21"), "{message}");
+        assert!(message.contains("prefetching sync"), "{message}");
+    }
+
+    #[test]
+    fn test_select_solidity_without_integrity_reuses_verdicts_by_name_and_version() {
+        // A Solidity package the lock gave no integrity is recorded with the
+        // hash prefetching found, which the lock still lacks next time
+        let mut recorded_oz = oz(None);
+        recorded_oz.integrity = Some("sha256-prefetched".into());
+        let recorded = RecordedDeps {
+            package: vec![recorded_oz],
+            not_solidity: vec![NotSolidity {
+                name: "lodash".into(),
+                version: "4.17.21".into(),
+                integrity: None,
+            }],
+        };
+
+        // Reused without looking, with or without prefetching
+        let (solidity, not_solidity) =
+            select_solidity(vec![oz(None), lodash(None)], &recorded, None).unwrap();
+        assert_eq!(names(&solidity), [OZ]);
+        assert_eq!(not_solidity, recorded.not_solidity);
+
+        // Another version is another package
+        let mut inspector =
+            MemoryInspector::default().with(&npm_tarball_url("lodash", "4.17.22"), false);
+        select_solidity(
+            vec![npm_package("lodash", "4.17.22", None)],
+            &recorded,
+            Some(&mut inspector),
+        )
+        .unwrap();
+        assert_eq!(inspector.calls.len(), 1);
+    }
+
+    #[test]
+    fn test_select_solidity_hands_the_integrity_to_the_inspector() {
+        let mut inspector = inspector();
+        select_solidity(
+            vec![oz(Some("sha512-oz")), lodash(None)],
+            &RecordedDeps::default(),
+            Some(&mut inspector),
+        )
+        .unwrap();
+        assert_eq!(inspector.integrities, [Some("sha512-oz".to_string()), None]);
+    }
+
+    #[test]
+    fn test_select_solidity_reports_a_failed_download() {
+        let mut inspector = MemoryInspector::default();
+        let err = select_solidity(
+            vec![oz(Some("sha512-oz"))],
+            &RecordedDeps::default(),
+            Some(&mut inspector),
+        )
+        .unwrap_err();
+        assert!(format!("{err:#}").contains("cannot fetch"), "{err:#}");
+    }
+
+    // -- Root remappings.txt -------------------------------------------------
+
+    #[test]
+    fn test_root_remappings_move_recorded_targets_under_the_vendor_dir() {
+        let mut forge_std = forge_std();
+        forge_std.remapping = Some("forge-std/=lib/forge-std/src/".into());
+        let recorded = RecordedDeps {
+            // Out of order, as a hand-edited file could be
+            package: vec![forge_std, oz(Some("sha512-oz"))],
+            not_solidity: vec![],
+        };
+        let expected = "\
+@openzeppelin/contracts/=.turnkey/soldeps/vendor/@openzeppelin/contracts/
+forge-std/=.turnkey/soldeps/vendor/forge-std/src/
+";
+        assert_eq!(
+            root_remappings(&recorded, ".turnkey/soldeps/vendor/").unwrap(),
+            expected
+        );
+    }
+
+    #[test]
+    fn test_root_remappings_next_to_a_nested_foundry_toml() {
+        // forge resolves targets from foundry.toml's directory
+        let prefix = vendor_prefix(
+            Path::new("contracts/foundry.toml"),
+            ".turnkey/soldeps/vendor/",
+        )
+        .unwrap();
+        let recorded = RecordedDeps {
+            package: vec![oz(Some("sha512-oz"))],
+            not_solidity: vec![],
+        };
+        assert_eq!(
+            root_remappings(&recorded, &prefix).unwrap(),
+            format!("{OZ}/=../.turnkey/soldeps/vendor/{OZ}/\n")
+        );
+    }
+
+    #[test]
+    fn test_vendor_prefix_is_relative_to_foundry_tomls_directory() {
+        for (foundry, vendor_dir, prefix) in [
+            (
+                "foundry.toml",
+                ".turnkey/soldeps/vendor/",
+                ".turnkey/soldeps/vendor/",
+            ),
+            (
+                "foundry.toml",
+                ".turnkey/soldeps/vendor",
+                ".turnkey/soldeps/vendor/",
+            ),
+            (
+                "./foundry.toml",
+                "./.turnkey/soldeps/vendor",
+                ".turnkey/soldeps/vendor/",
+            ),
+            (
+                "contracts/foundry.toml",
+                ".turnkey/soldeps/vendor/",
+                "../.turnkey/soldeps/vendor/",
+            ),
+            ("a/./b/foundry.toml", "v/", "../../v/"),
+        ] {
+            assert_eq!(
+                vendor_prefix(Path::new(foundry), vendor_dir).unwrap(),
+                prefix,
+                "{foundry} {vendor_dir}"
+            );
+        }
+        for (foundry, vendor_dir) in [
+            ("foundry.toml", ""),
+            ("foundry.toml", "../outside/"),
+            ("../foundry.toml", "v/"),
+            ("/abs/foundry.toml", "v/"),
+        ] {
+            assert!(
+                vendor_prefix(Path::new(foundry), vendor_dir).is_err(),
+                "{foundry} {vendor_dir}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_root_remappings_keep_overridden_targets() {
+        let mut pkg = oz(Some("sha512-oz"));
+        pkg.remapping = Some(format!("{OZ}/=node_modules/{OZ}/token/"));
+        pkg.remapping_overridden = true;
+        let recorded = RecordedDeps {
+            package: vec![pkg],
+            not_solidity: vec![],
+        };
+        assert_eq!(
+            root_remappings(&recorded, "cells/sol/vendor/").unwrap(),
+            format!("{OZ}/=cells/sol/vendor/{OZ}/token/\n")
+        );
+    }
+
+    #[test]
+    fn test_root_remappings_reject_a_missing_or_foreign_remapping() {
+        let mut missing = forge_std();
+        missing.remapping = None;
+        let mut foreign = forge_std();
+        foreign.remapping = Some("forge-std/=elsewhere/forge-std/".into());
+        for pkg in [missing, foreign] {
+            let recorded = RecordedDeps {
+                package: vec![pkg],
+                not_solidity: vec![],
+            };
+            assert!(root_remappings(&recorded, ".turnkey/soldeps/vendor/").is_err());
+        }
+    }
+
+    // -- Command line --------------------------------------------------------
+
+    #[test]
+    fn test_cli_generates_without_a_subcommand() {
+        let cli = Cli::try_parse_from([
+            "soldeps-gen",
+            "--foundry",
+            "foundry.toml",
+            "--vendor-dir",
+            ".turnkey/soldeps/vendor/",
+        ])
+        .unwrap();
+        assert!(cli.command.is_none());
+        assert_eq!(
+            cli.generate.vendor_dir.as_deref(),
+            Some(".turnkey/soldeps/vendor/")
+        );
+    }
+
+    #[test]
+    fn test_cli_remappings_subcommand() {
+        let cli = Cli::try_parse_from([
+            "soldeps-gen",
+            "remappings",
+            "--deps",
+            "solidity-deps.toml",
+            "--foundry",
+            "contracts/foundry.toml",
+            "--vendor-dir",
+            ".turnkey/soldeps/vendor/",
+        ])
+        .unwrap();
+        match cli.command {
+            Some(Action::Remappings {
+                deps,
+                foundry,
+                vendor_dir,
+            }) => {
+                assert_eq!(deps, PathBuf::from("solidity-deps.toml"));
+                assert_eq!(foundry, PathBuf::from("contracts/foundry.toml"));
+                assert_eq!(vendor_dir, ".turnkey/soldeps/vendor/");
+            }
+            None => panic!("no subcommand"),
+        }
     }
 
     use deps_gen_kit::MemoryPrefetcher;
@@ -1021,33 +1887,29 @@ mod tests {
     #[test]
     fn test_prefetch_github_dep_pins_commit_and_archive_hash() {
         let mut refs = FakeRefs::default();
-        refs.commits.insert(
-            (
-                "https://github.com/foundry-rs/forge-std".into(),
-                "v1.8.0".into(),
-            ),
-            COMMIT.into(),
-        );
+        refs.commits
+            .insert((FORGE_STD.into(), "refs/tags/v1.8.0".into()), COMMIT.into());
         let archive = format!("https://github.com/foundry-rs/forge-std/archive/{COMMIT}.tar.gz");
         let mut hashes = MemoryPrefetcher::default().with(&archive, true, "sha256-forge");
 
-        let mut pkg = parse_foundry_dep(
-            "forge-std",
-            "https://github.com/foundry-rs/forge-std@v1.8.0",
-        );
+        let mut pkg = forge_std();
         prefetch_package(&mut pkg, &refs, &mut hashes).unwrap();
 
-        assert_eq!(pkg.version, "v1.8.0");
+        assert_eq!(pkg.version, "1.8.0");
+        assert_eq!(pkg.pin, Some(Pin::Tag("v1.8.0".into())));
         assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
         assert_eq!(pkg.url.as_deref(), Some(archive.as_str()));
         assert_eq!(pkg.hash.as_deref(), Some("sha256-forge"));
     }
 
     #[test]
-    fn test_prefetch_git_dep_without_rev_resolves_head() {
+    fn test_prefetch_git_dep_on_a_branch_resolves_the_branch() {
         let mut refs = FakeRefs::default();
         refs.commits.insert(
-            ("https://github.com/vectorized/solady".into(), "HEAD".into()),
+            (
+                "https://github.com/vectorized/solady".into(),
+                "refs/heads/main".into(),
+            ),
             COMMIT.into(),
         );
         let mut hashes = MemoryPrefetcher::default().with(
@@ -1056,7 +1918,11 @@ mod tests {
             "sha256-solady",
         );
 
-        let mut pkg = parse_foundry_dep("solady", "https://github.com/vectorized/solady");
+        let mut pkg = git_dep(
+            "solady",
+            "https://github.com/vectorized/solady",
+            "branch = \"main\"",
+        );
         prefetch_package(&mut pkg, &refs, &mut hashes).unwrap();
 
         assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
@@ -1072,10 +1938,7 @@ mod tests {
             "sha256-forge",
         );
 
-        let mut pkg = parse_foundry_dep(
-            "forge-std",
-            &format!("https://github.com/foundry-rs/forge-std@{COMMIT}"),
-        );
+        let mut pkg = git_dep("forge-std", FORGE_STD, &format!("rev = \"{COMMIT}\""));
         prefetch_package(&mut pkg, &refs, &mut hashes).unwrap();
 
         assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
@@ -1086,12 +1949,12 @@ mod tests {
     fn test_prefetch_non_github_dep_pins_commit_without_hash() {
         let mut refs = FakeRefs::default();
         refs.commits.insert(
-            ("https://gitlab.com/acme/lib".into(), "v1".into()),
+            ("https://gitlab.com/acme/lib".into(), "refs/tags/v1".into()),
             COMMIT.into(),
         );
         let mut hashes = MemoryPrefetcher::default();
 
-        let mut pkg = parse_foundry_dep("lib", "https://gitlab.com/acme/lib@v1");
+        let mut pkg = git_dep("lib", "https://gitlab.com/acme/lib", "tag = \"v1\"");
         prefetch_package(&mut pkg, &refs, &mut hashes).unwrap();
 
         assert_eq!(pkg.rev.as_deref(), Some(COMMIT));
@@ -1105,11 +1968,12 @@ mod tests {
         let refs = FakeRefs::default();
         let mut hashes = MemoryPrefetcher::default();
 
-        let mut pkg = parse_foundry_dep("forge-std", "https://github.com/foundry-rs/forge-std@v9");
+        let mut pkg = git_dep("forge-std", FORGE_STD, "tag = \"v9\"");
         let err = prefetch_package(&mut pkg, &refs, &mut hashes).unwrap_err();
         assert!(format!("{err:#}").contains("v9"), "{err:#}");
 
-        assert_eq!(pkg.rev.as_deref(), Some("v9"));
+        assert_eq!(pkg.pin, Some(Pin::Tag("v9".into())));
+        assert_eq!(pkg.rev, None);
         assert_eq!(pkg.hash, None);
     }
 
@@ -1265,7 +2129,11 @@ mod tests {
 
     fn declared() -> Vec<OutputPackage> {
         vec![
-            parse_foundry_dep("solady", "https://github.com/vectorized/solady@v0.1.0"),
+            git_dep(
+                "solady",
+                "https://github.com/vectorized/solady",
+                "tag = \"v0.1.0\"",
+            ),
             npm_package("@openzeppelin/contracts", "5.4.0", None),
         ]
     }
@@ -1274,7 +2142,7 @@ mod tests {
         entries.iter().map(|e| e.to_string()).collect()
     }
 
-    const VENDOR: Option<&str> = Some(".turnkey/soldeps/vendor");
+    const VENDOR: Option<&str> = Some(".turnkey/soldeps/vendor/");
 
     #[test]
     fn test_parse_overrides_maps_package_to_path_inside_it() {
@@ -1329,6 +2197,17 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_overrides_next_to_a_nested_foundry_toml() {
+        let overrides = parse_overrides(
+            &remappings(&["solady/=../.turnkey/soldeps/vendor/solady/src/"]),
+            &declared(),
+            Some("../.turnkey/soldeps/vendor/"),
+        )
+        .unwrap();
+        assert_eq!(overrides["solady"], "src/");
+    }
+
+    #[test]
     fn test_parse_overrides_needs_the_vendor_dir() {
         let entry = remappings(&["solady/=.turnkey/soldeps/vendor/solady/src/"]);
         assert!(parse_overrides(&entry, &declared(), None).is_err());
@@ -1347,7 +2226,7 @@ mod tests {
     /// solady@v0.1.0 as prefetching leaves it: pinned to COMMIT, with the
     /// archive of that commit fetched
     fn pinned_solady() -> OutputPackage {
-        let mut pkg = parse_foundry_dep("solady", &format!("{SOLADY}@v0.1.0"));
+        let mut pkg = git_dep("solady", SOLADY, "tag = \"v0.1.0\"");
         pkg.rev = Some(COMMIT.to_string());
         pkg.hash = Some("sha256-solady".to_string());
         pkg
@@ -1355,7 +2234,7 @@ mod tests {
 
     /// solady as the previous solidity-deps.toml recorded it
     fn recorded_solady(rev: &str, remapping: &str) -> OutputPackage {
-        let mut pkg = parse_foundry_dep("solady", &format!("{SOLADY}@v0.1.0"));
+        let mut pkg = git_dep("solady", SOLADY, "tag = \"v0.1.0\"");
         pkg.rev = Some(rev.into());
         pkg.remapping = Some(remapping.into());
         pkg
@@ -1414,7 +2293,7 @@ mod tests {
     #[test]
     fn test_assign_remapping_non_github_dep_points_at_overrides() {
         let mut reader = MemorySourceReader::default();
-        let mut pkg = parse_foundry_dep("lib", "https://gitlab.com/acme/lib@v1");
+        let mut pkg = git_dep("lib", "https://gitlab.com/acme/lib", "tag = \"v1\"");
         pkg.rev = Some(COMMIT.to_string());
 
         let err = assign_remapping(&mut pkg, &no_overrides(), None, Prefetch::Done(&mut reader))
@@ -1498,7 +2377,7 @@ mod tests {
     fn test_assign_remapping_without_prefetch_reuses_recorded_target() {
         // Without prefetching, the declared tag is not resolved to a commit
         let recorded = recorded_solady(COMMIT, "solady/=lib/solady/contracts/");
-        let mut pkg = parse_foundry_dep("solady", &format!("{SOLADY}@v0.1.0"));
+        let mut pkg = git_dep("solady", SOLADY, "tag = \"v0.1.0\"");
         assign_remapping(
             &mut pkg,
             &no_overrides(),
@@ -1515,10 +2394,10 @@ mod tests {
     #[test]
     fn test_assign_remapping_without_prefetch_fails_when_pin_changed() {
         let mut recorded = recorded_solady(COMMIT, "solady/=lib/solady/contracts/");
-        recorded.version = "v0.0.9".into();
+        recorded.pin = Some(Pin::Tag("v0.0.9".into()));
 
         for recorded in [None, Some(&recorded)] {
-            let mut pkg = parse_foundry_dep("solady", &format!("{SOLADY}@v0.1.0"));
+            let mut pkg = git_dep("solady", SOLADY, "tag = \"v0.1.0\"");
             let err = assign_remapping(&mut pkg, &no_overrides(), recorded, Prefetch::Skipped)
                 .unwrap_err();
             assert!(format!("{err:#}").contains("prefetching sync"), "{err:#}");
@@ -1530,7 +2409,7 @@ mod tests {
     fn test_assign_remapping_reports_the_prefetch_failure_when_pin_changed() {
         // Prefetching ran, but the ref did not resolve
         let failure = anyhow::anyhow!("failed to resolve v0.1.0: ls-remote exploded");
-        let mut pkg = parse_foundry_dep("solady", &format!("{SOLADY}@v0.1.0"));
+        let mut pkg = git_dep("solady", SOLADY, "tag = \"v0.1.0\"");
 
         let err = assign_remapping(&mut pkg, &no_overrides(), None, Prefetch::Failed(&failure))
             .unwrap_err();
@@ -1544,7 +2423,7 @@ mod tests {
     fn test_assign_remapping_reuses_recorded_target_when_prefetch_failed() {
         let failure = anyhow::anyhow!("offline");
         let recorded = recorded_solady(COMMIT, "solady/=lib/solady/contracts/");
-        let mut pkg = parse_foundry_dep("solady", &format!("{SOLADY}@v0.1.0"));
+        let mut pkg = git_dep("solady", SOLADY, "tag = \"v0.1.0\"");
         assign_remapping(
             &mut pkg,
             &no_overrides(),
@@ -1621,9 +2500,17 @@ mod tests {
                 generator: "soldeps-gen test".into(),
             },
             packages: vec![pkg, npm_package("@openzeppelin/contracts", "5.4.0", None)],
+            not_solidity: vec![NotSolidity {
+                name: "lodash".into(),
+                version: "4.17.21".into(),
+                integrity: Some("sha512-lodash".into()),
+            }],
         };
         let text = deps_gen_kit::render("soldeps-gen", "foundry.toml", &doc).unwrap();
-        let previous: PreviousToml = toml::from_str(&text).unwrap();
+        let previous: RecordedDeps = toml::from_str(&text).unwrap();
+
+        assert_eq!(previous.not_solidity, doc.not_solidity);
+        assert_eq!(previous.package[0].pin, Some(Pin::Tag("v0.1.0".into())));
 
         assert_eq!(previous.package.len(), 2);
         assert_eq!(previous.package[0].source, Source::Git);

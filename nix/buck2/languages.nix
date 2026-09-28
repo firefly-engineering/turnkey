@@ -65,6 +65,14 @@ let
 
   # Where a cell is linked into the project, relative to its root
   cellLink = cellName: ".turnkey/${cellName}";
+
+  # Solidity's root remappings.txt, next to foundry.toml, where forge reads it
+  remappingsFile =
+    langCfg:
+    let
+      dir = dirOf langCfg.foundryTomlFile;
+    in
+    if dir == "." then "remappings.txt" else "${dir}/remappings.txt";
 in
 map (language: language // { cellLink = cellLink language.cellName; }) [
   rec {
@@ -335,35 +343,62 @@ map (language: language // { cellLink = cellLink language.cellName; }) [
         inherit (langCfg) depsFile;
         inherit userPatchesDir resolveFixups;
       };
+    # solidity-deps.toml first, then the root remappings.txt generated from
+    # it: a rule has one target, so each file gets its own rule, run in
+    # order as python's pylock and python rules are
     syncRules =
       langCfg:
-      lib.optional (hasCell langCfg) {
-        name = "solidity";
-        # Git deps come from foundry.toml, npm Solidity packages from
-        # package.json at the versions the pnpm lock pins
-        sources = [
-          langCfg.foundryTomlFile
-          langCfg.packageJsonFile
-          langCfg.pnpmLockFile
-        ];
-        target = depsFile langCfg;
-        generator = [
-          "soldeps-gen"
+      let
+        # Where the cell vendors packages (nix/lib/deps-cell): remapping
+        # overrides in foundry.toml must point inside it, and the root
+        # remappings.txt targets it. Both are relative to foundry.toml's
+        # directory, which soldeps-gen reads from --foundry.
+        foundryAndVendorDir = [
           "--foundry"
           langCfg.foundryTomlFile
-          "--package-json"
-          langCfg.packageJsonFile
-          "--pnpm-lock"
-          langCfg.pnpmLockFile
-          # The file this run replaces: git packages whose pin is unchanged
-          # keep the remapping target recorded there
-          "--previous"
-          (depsFile langCfg)
-          # Where the cell vendors packages (nix/lib/deps-cell), which
-          # remapping overrides in foundry.toml must point inside
           "--vendor-dir"
           "${cellLink cellName}/vendor/"
         ];
-      };
+      in
+      lib.optionals (hasCell langCfg) [
+        {
+          name = "solidity";
+          # Git deps come from foundry.toml, npm Solidity packages from
+          # package.json at the versions the pnpm lock pins
+          sources = [
+            langCfg.foundryTomlFile
+            langCfg.packageJsonFile
+            langCfg.pnpmLockFile
+          ];
+          target = depsFile langCfg;
+          generator = [
+            "soldeps-gen"
+            "--package-json"
+            langCfg.packageJsonFile
+            "--pnpm-lock"
+            langCfg.pnpmLockFile
+            # The file this run replaces: git packages whose pin is unchanged
+            # keep the remapping target recorded there, npm packages their
+            # verdict on holding Solidity
+            "--previous"
+            (depsFile langCfg)
+          ]
+          ++ foundryAndVendorDir;
+        }
+        {
+          name = "solidity-remappings";
+          # Each package's recorded remapping, for native forge and the Buck2
+          # Solidity rules, with targets under the cell link's vendor/
+          sources = [ (depsFile langCfg) ];
+          target = remappingsFile langCfg;
+          generator = [
+            "soldeps-gen"
+            "remappings"
+            "--deps"
+            (depsFile langCfg)
+          ]
+          ++ foundryAndVendorDir;
+        }
+      ];
   }
 ]

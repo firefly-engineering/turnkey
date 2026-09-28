@@ -1,0 +1,2 @@
+@openzeppelin/contracts/=.turnkey/soldeps/vendor/@openzeppelin/contracts/
+forge-std/=.turnkey/soldeps/vendor/forge-std/src/
