@@ -69,8 +69,8 @@ A package in a deps cell whose targets forward to the same-named targets of a st
 _Avoid_: alias symlink, version symlink
 
 **Package slice**:
-What one package's build file needs from the global resolution of its lock file: its features, and its dependencies resolved to exact versions with the platforms each applies on. A package's store path depends on its own slice and on nothing global.
-_Avoid_: crate slice, feature slice, unified features (which is only the features part)
+What one package's build file needs from the build's resolution of its lock file, on each platform the project builds for: its features and its dependencies resolved to exact versions, each with the platforms it applies on, and the name the package's code uses for each dependency where the package name wouldn't give it. "The build's resolution" is what the language's own build tool would compile for that platform. It is not the lock file's resolution, which can be larger: Cargo's lock file keeps optional dependencies that a weak dependency feature only names. A package's store path depends on its own slice and on nothing global.
+_Avoid_: crate slice, feature slice, unified features (which is only the features part), lock file resolution
 
 **Cell materialization**:
 Bringing a deps cell in line with its cell index: adding missing store links, rewriting alias packages whose target changed, and removing what the index no longer names. What does it is the materializer.
