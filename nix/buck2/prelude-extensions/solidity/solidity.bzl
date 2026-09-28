@@ -7,6 +7,13 @@
 
 This module provides rules for compiling Solidity smart contracts.
 
+forge drives both solidity_library and solidity_test, in a forge project
+staged from the root foundry.toml and remappings.txt, the sources at their
+repository-relative paths and the soldeps bundle at the cell link's path
+(forge_project.bzl). Compiler and test settings (optimizer, fuzz runs, ...)
+live in the root foundry.toml, as they do for native forge; the compiler is
+the toolchain's solc.
+
 Example usage:
 
     load("@prelude//solidity:solidity.bzl", "solidity_library", "solidity_contract", "solidity_test")
@@ -15,12 +22,7 @@ Example usage:
     solidity_library(
         name = "token_lib",
         srcs = ["src/Token.sol"],
-        deps = ["//soldeps:openzeppelin_contracts"],
-        remappings = {
-            "@openzeppelin/": "//soldeps:openzeppelin_contracts/",
-        },
-        optimizer = True,
-        optimizer_runs = 200,
+        deps = ["soldeps//:openzeppelin_contracts"],
     )
 
     # Extract specific contract artifacts
@@ -34,8 +36,7 @@ Example usage:
     solidity_test(
         name = "token_test",
         srcs = ["test/Token.t.sol"],
-        deps = [":token_lib", "//soldeps:forge_std"],
-        fuzz_runs = 256,
+        deps = [":token_lib"],
     )
 """
 
@@ -59,23 +60,43 @@ SolidityContractInfo = _SolidityContractInfo
 system_solidity_toolchain = _system_solidity_toolchain
 solidity_contract = _solidity_contract
 
-def _with_soldeps_bundle(kwargs):
-    """Default the `soldeps` attr to the soldeps cell's bundle, if the repo has one.
+def _config(rule_name: str, key: str) -> str:
+    """A key of .buckconfig's [solidity], which turnkey generates."""
+    value = read_root_config("solidity", key, None)
+    if value == None:
+        fail(("{}: .buckconfig has no [solidity] {}. turnkey writes that section when " +
+              "turnkey.toolchains.buck2.solidity.enable is set, and the root rules.star " +
+              "must export foundry.toml, and remappings.txt with Solidity dependencies.").format(rule_name, key))
+    return value
 
-    Depending on the bundle makes every dependency source the rule can import
-    an input of its action, instead of a file read through the cell's path.
+def _with_forge_project(rule_name: str, kwargs: dict) -> dict:
+    """Default the forge project's inputs (forge_project.bzl) from .buckconfig.
+
+    turnkey's generated .buckconfig carries them in [solidity]: the root
+    foundry.toml's target always; with a soldeps cell (`soldeps_dir` set), the
+    root remappings.txt's target, the cell's bundle and its link, where the
+    bundle is staged. Declaring them makes every setting and dependency source
+    an input of the action, instead of a file read in place.
     """
-    if "soldeps" not in kwargs and read_root_config("cells", "soldeps", None) != None:
-        kwargs["soldeps"] = "soldeps//:bundle"
+    if "foundry_toml" not in kwargs:
+        kwargs["foundry_toml"] = _config(rule_name, "foundry_toml")
+    if read_root_config("solidity", "soldeps_dir", None) != None:
+        for attr, key in [
+            ("soldeps", "soldeps_bundle"),
+            ("soldeps_dir", "soldeps_dir"),
+            ("remappings_txt", "remappings_txt"),
+        ]:
+            if attr not in kwargs:
+                kwargs[attr] = _config(rule_name, key)
     return kwargs
 
 def solidity_library(**kwargs):
-    """solidity_library, with the soldeps bundle as a declared dependency."""
-    _solidity_library(**_with_soldeps_bundle(kwargs))
+    """solidity_library, with the root forge config and the soldeps bundle as inputs."""
+    _solidity_library(**_with_forge_project("solidity_library", kwargs))
 
 def solidity_test(**kwargs):
-    """solidity_test, with the soldeps bundle as a declared dependency."""
-    _solidity_test(**_with_soldeps_bundle(kwargs))
+    """solidity_test, with the root forge config and the soldeps bundle as inputs."""
+    _solidity_test(**_with_forge_project("solidity_test", kwargs))
 
 # Rule implementations for registration with prelude
 implemented_rules = {

@@ -10,8 +10,6 @@ solidity_library(
     deps = [
         "soldeps//:openzeppelin_contracts",
     ],
-    optimizer = True,
-    optimizer_runs = 200,
     visibility = ["PUBLIC"],
 )
 
@@ -28,6 +26,5 @@ solidity_test(
     name = "token_test",
     srcs = ["test/MyToken.t.sol"],
     deps = [":token_lib"],
-    fuzz_runs = 256,
     visibility = ["PUBLIC"],
 )

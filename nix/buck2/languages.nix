@@ -328,6 +328,9 @@ map (language: language // { cellLink = cellLink language.cellName; }) [
     name = "solidity";
     cellName = "soldeps";
     description = "Solidity deps";
+    # The root remappings.txt the sync writes, which the Buck2 Solidity rules
+    # stage too (nix/devenv/turnkey/buck2.nix's .buckconfig [solidity])
+    inherit remappingsFile;
     depsFile = langCfg: depsFileName langCfg "solidity-deps.toml";
     generator = import ../packages/soldeps-gen.nix { inherit pkgs lib; };
     mkCell =

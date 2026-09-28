@@ -44,25 +44,69 @@ on, a pre-commit hook rejects one (see [Native forge](#native-forge)).
 
 ## Build Rules
 
+forge drives both `solidity_library` and `solidity_test`, and reads the same
+configuration native forge reads. The root `foundry.toml` holds every compiler
+and test setting (optimizer, `optimizer_runs`, `evm_version`, `via_ir`,
+`[fuzz] runs`, ...), and the root `remappings.txt` every remapping (overrides
+go in `foundry.toml`, see [Remappings](#remappings)). The rules take neither
+settings nor remappings as attributes. So tests run against the bytecode that
+ships, and native `forge build` produces the same bytecode as Buck2.
+
+Each Solidity action runs forge in a scratch project that holds only its
+declared inputs, each at its place in the repository:
+
+- the root `foundry.toml` and `remappings.txt`;
+- the target's sources, and those of every `solidity_library` it depends on;
+- the `soldeps` cell's `bundle` (every vendor package), at the cell link's
+  path, `.turnkey/soldeps/`, where the root `remappings.txt` points.
+
+forge runs with the toolchain's `solc` (`--use`), `--offline`, and without the
+caller's `FOUNDRY_*`/`DAPP_*` variables or `~/.foundry` configuration.
+
+The `solidity_library` and `solidity_test` macros add these inputs
+themselves, from the `[solidity]` section turnkey writes into the generated
+`.buckconfig`: `foundry.toml` always, the bundle and `remappings.txt` when
+the repository has a `soldeps` cell. `foundry.toml` must be at the repository
+root (`turnkey.toolchains.buck2.solidity.foundryTomlFile`'s default); the
+shell fails to evaluate otherwise.
+
+> **Breaking change:** a repository using the Solidity rules must export both
+> files from a `rules.star` at its root:
+>
+> ```python
+> # rules.star, at the repository root
+> export_file(name = "foundry.toml", visibility = ["PUBLIC"])
+> export_file(name = "remappings.txt", visibility = ["PUBLIC"])
+> ```
+>
+> Without them, a Solidity target fails to build with an unknown
+> `root//:foundry.toml` target. The rules also no longer accept `optimizer`,
+> `optimizer_runs`, `fuzz_runs`, `solc_version` or `remappings`: set them in
+> the root `foundry.toml`.
+
+Changing a setting in `foundry.toml`, or a dependency, rebuilds and retests
+every Solidity target.
+
 ### solidity_library
 
-Compile Solidity source files:
+Compile Solidity source files with `forge build <srcs>`:
 
 ```python
 load("@prelude//solidity:solidity.bzl", "solidity_library")
 
 solidity_library(
     name = "my_token",
-    srcs = ["MyToken.sol"],
-    deps = ["//soldeps:openzeppelin_contracts"],
-    optimizer = True,
-    optimizer_runs = 200,
+    srcs = ["src/MyToken.sol"],
+    deps = ["soldeps//:openzeppelin_contracts"],
 )
 ```
 
+Its output is forge's artifacts directory (`out/`): one
+`<File>.sol/<Contract>.json` per contract compiled, imports included.
+
 ### solidity_contract
 
-Extract a specific contract from compiled sources:
+Extract a specific contract from a compiled library:
 
 ```python
 load("@prelude//solidity:solidity.bzl", "solidity_contract")
@@ -70,13 +114,18 @@ load("@prelude//solidity:solidity.bzl", "solidity_contract")
 solidity_contract(
     name = "my_token_artifact",
     contract = "MyToken",  # Contract name in source
-    deps = [":my_token"],
+    lib = ":my_token",
 )
 ```
 
-This produces:
-- `{name}.abi` - Contract ABI (JSON)
-- `{name}.bin` - Deployment bytecode
+It takes the artifact of the contract of that name defined in one of the
+library's own sources (not in an import); if two of them define it, split the
+library. It produces what solc's own outputs would be:
+
+- `{contract}.abi` - Contract ABI (JSON)
+- `{contract}.bin` - Deployment bytecode (hex)
+- `{contract}.bin-runtime` - Runtime bytecode (hex)
+- `{contract}.metadata.json` - Compiler metadata
 
 ### solidity_test
 
@@ -87,14 +136,14 @@ load("@prelude//solidity:solidity.bzl", "solidity_test")
 
 solidity_test(
     name = "my_token_test",
-    srcs = ["MyToken.t.sol"],
-    deps = [
-        "//src/contracts:my_token",
-        "//soldeps:forge-std",
-    ],
-    fuzz_runs = 256,  # Optional: fuzz test iterations
+    srcs = ["test/MyToken.t.sol"],
+    deps = [":my_token"],
 )
 ```
+
+Fuzz runs come from `foundry.toml`'s `[fuzz] runs`. The fuzz seed is fixed per
+target, unless the target opts out of test result caching (see
+[Test result caching](../workflows/test-result-caching.md)).
 
 ## External Dependencies
 
@@ -154,7 +203,7 @@ Reference a package through the `soldeps` cell:
 solidity_library(
     name = "my_token",
     srcs = ["MyToken.sol"],
-    deps = ["//soldeps:openzeppelin_contracts"],
+    deps = ["soldeps//:openzeppelin_contracts"],
 )
 ```
 
@@ -262,11 +311,9 @@ remappings of its own.
 **The compiler comes from the dev shell.** `foundry.toml` sets neither `solc`
 nor `solc_version`. When Solidity is enabled, the dev shell exports
 `FOUNDRY_SOLC`, the solc the Buck2 toolchain uses, together with
-`FOUNDRY_OFFLINE=true`. Native runs therefore share their compiler with
-`solidity_test` and never download one. Only the compiler is shared so far: the
-Buck2 rules do not take their other settings (optimizer, fuzz runs) from the
-root `foundry.toml` yet
-([#138](https://github.com/firefly-engineering/turnkey/issues/138)). The toolchain
+`FOUNDRY_OFFLINE=true`. Native runs therefore share their compiler with the
+Buck2 rules and never download one; the other settings are shared through
+`foundry.toml` itself (see [Build Rules](#build-rules)). The toolchain
 declared in `toolchain.toml` stays the one place the compiler version is set;
 a `solc_version` in `foundry.toml` could only go stale on a toolchain bump, so
 the pre-commit hook rejects `solc` and `solc_version` keys.
@@ -278,9 +325,7 @@ The compiler version comes from the toolchain declared in `toolchain.toml`
 (through `FOUNDRY_SOLC`) both use its `solc`. To change the version, change the
 toolchain.
 
-The Solidity rules still accept a per-target `solc_version` attribute. It is
-going away ([#138](https://github.com/firefly-engineering/turnkey/issues/138));
-don't use it in new targets.
+There is one compiler per repository: the rules take no per-target version.
 
 ## Building and Testing
 

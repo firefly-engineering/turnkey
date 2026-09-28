@@ -8,26 +8,20 @@
 SolidityToolchainInfo = provider(
     doc = "Information about the Solidity toolchain.",
     fields = {
-        "solc": provider_field(typing.Any, default = None),  # RunInfo for default solc
-        "solc_versions": provider_field(typing.Any, default = {}),  # dict[str, RunInfo] for multi-version support
-        "default_version": provider_field(typing.Any, default = None),  # str - default solc version
-        "forge": provider_field(typing.Any, default = None),  # RunInfo for forge (testing)
+        "solc": provider_field(typing.Any, default = None),  # RunInfo for solc, which forge compiles with (--use)
+        "forge": provider_field(typing.Any, default = None),  # RunInfo for forge (compilation and testing)
         "cast": provider_field(typing.Any, default = None),  # RunInfo for cast (interactions)
         "anvil": provider_field(typing.Any, default = None),  # RunInfo for anvil (local node)
-        "jq": provider_field(typing.Any, default = None),  # RunInfo for jq (data processing)
-        "soldeps_path": provider_field(typing.Any, default = None),  # str - path to soldeps cell for auto-remapping
+        "jq": provider_field(typing.Any, default = None),  # RunInfo for jq (artifact extraction)
     },
 )
 
 SolidityLibraryInfo = provider(
     doc = "Information about compiled Solidity sources.",
     fields = {
-        "output_dir": provider_field(typing.Any, default = None),  # Artifact - compiled artifacts directory
-        "srcs": provider_field(typing.Any, default = []),  # list[Artifact] - source .sol files
-        "remappings": provider_field(typing.Any, default = {}),  # dict[str, str] - import remappings
-        "solc_version": provider_field(typing.Any, default = None),  # str - solc version used
-        "transitive_srcs": provider_field(typing.Any, default = None),  # TransitiveSet
-        "transitive_remappings": provider_field(typing.Any, default = {}),  # dict[str, str] - all remappings from deps
+        "output_dir": provider_field(typing.Any, default = None),  # Artifact - forge's artifacts directory (out/)
+        "srcs": provider_field(typing.Any, default = {}),  # dict[str, Artifact] - source .sol files by repository-relative path
+        "transitive_srcs": provider_field(typing.Any, default = {}),  # dict[str, Artifact] - srcs plus every solidity_library dep's
     },
 )
 
@@ -42,37 +36,3 @@ SolidityContractInfo = provider(
         "source_map": provider_field(typing.Any, default = None),  # Artifact - source map for debugging
     },
 )
-
-# Transitive set for Solidity source files
-def _sol_src_artifacts(value: Artifact):
-    return value
-
-SoliditySrcsTSet = transitive_set(args_projections = {"artifacts": _sol_src_artifacts})
-
-def get_transitive_srcs(
-        actions: AnalysisActions,
-        value: Artifact | None = None,
-        deps: list[SolidityLibraryInfo] = []) -> SoliditySrcsTSet:
-    """Build a transitive set of Solidity source files."""
-    kwargs = {}
-    if value:
-        kwargs["value"] = value
-    if deps:
-        kwargs["children"] = [dep.transitive_srcs for dep in deps if dep.transitive_srcs]
-
-    return actions.tset(SoliditySrcsTSet, **kwargs)
-
-def merge_remappings(
-        base: dict[str, str],
-        deps: list[SolidityLibraryInfo] = []) -> dict[str, str]:
-    """Merge import remappings from dependencies, with base taking precedence."""
-    result = {}
-    # First add all remappings from dependencies
-    for dep in deps:
-        if dep.transitive_remappings:
-            result.update(dep.transitive_remappings)
-        if dep.remappings:
-            result.update(dep.remappings)
-    # Base remappings take precedence
-    result.update(base)
-    return result

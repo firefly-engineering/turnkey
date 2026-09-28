@@ -455,6 +455,8 @@ in
         default = "foundry.toml";
         description = ''
           Relative path to foundry.toml file (for staleness checking and regeneration).
+          The Buck2 Solidity rules need it at the repository root, the single
+          root foundry.toml layout; evaluation fails otherwise.
         '';
       };
 

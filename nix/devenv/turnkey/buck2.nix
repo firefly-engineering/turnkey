@@ -241,12 +241,36 @@ let
       if override == "" then 47301 else lib.toInt override;
   };
 
+  # What the Buck2 Solidity rules' macros stage (prelude solidity.bzl): the
+  # foundry.toml, and with a soldeps cell the root remappings.txt and the
+  # cell's bundle at its link. The rules run forge in a copy of the
+  # repository root, the single root foundry.toml layout, so foundry.toml
+  # must sit there; the root rules.star exports both files.
+  solidityBuckconfig =
+    let
+      solidity = lib.findFirst (language: language.name == "solidity") null languages;
+      soldeps = nixCells.${solidity.cellName} or null;
+      rootLabel = path: "root//:${path}";
+    in
+    if !cfg.solidity.enable then
+      null
+    else
+      assert lib.assertMsg (dirOf cfg.solidity.foundryTomlFile == ".")
+        "turnkey.toolchains.buck2.solidity.foundryTomlFile is `${cfg.solidity.foundryTomlFile}`: the Buck2 Solidity rules need the repository's one foundry.toml at the repository root";
+      {
+        foundryToml = rootLabel cfg.solidity.foundryTomlFile;
+        remappingsTxt = if soldeps == null then null else rootLabel (solidity.remappingsFile cfg.solidity);
+        soldepsBundle = if soldeps == null then null else "${soldeps.name}//:bundle";
+        soldepsDir = if soldeps == null then null else soldeps.path;
+      };
+
   # The .buckconfig (nix/buck2/buckconfig.nix)
   buckconfigContent = import ../../buck2/buckconfig.nix { inherit lib; } {
     cells = lib.attrValues nixCells;
     inherit toolchainsCellPath testRunnerProtocol;
     testCache = testCache.buckconfig;
     goAllowedBuildTags = lib.optionals cfg.go.enable cfg.go.allowedBuildTags;
+    solidity = solidityBuckconfig;
   };
 
   # Buckconfig file derivation
@@ -333,11 +357,11 @@ in
     # The test result cache, as tk reads it (src/go/pkg/testcache)
     // testCache.env
     # Native forge compiles with the solc the toolchains cell's solc target
-    # runs, and never touches the network, as solidity_test does with
-    # `forge test --use $SOLC --offline`. foundry.toml cannot say this itself
-    # (`solc = "solc"` is not looked up on PATH, and an offline `solc_version`
-    # cannot install), and the toolchain stays the one place the compiler
-    # version is declared. Offline without a compiler could not build, so
+    # runs, and never touches the network, as the Buck2 Solidity rules do
+    # with `forge build|test --use $SOLC --offline`. foundry.toml cannot say
+    # this itself (`solc = "solc"` is not looked up on PATH, and an offline
+    # `solc_version` cannot install), and the toolchain stays the one place
+    # the compiler version is declared. Offline without a compiler could not build, so
     # both variables are set or neither is.
     // lib.optionalAttrs (cfg.solidity.enable && toolchainsCellContent.solcPath != null) {
       FOUNDRY_SOLC = toolchainsCellContent.solcPath;

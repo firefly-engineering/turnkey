@@ -19,18 +19,8 @@ def _system_solidity_toolchain_impl(ctx: AnalysisContext) -> list[Provider]:
     anvil_path = ctx.attrs.anvil_path
     jq_path = ctx.attrs.jq_path
 
-    # Create RunInfo for solc
+    # The one solc: forge compiles with it (--use), whatever foundry.toml says
     solc_run_info = RunInfo(args = cmd_args(solc_path))
-
-    # Build solc_versions dict if additional versions are provided
-    solc_versions = {}
-    for version, path in ctx.attrs.solc_versions.items():
-        solc_versions[version] = RunInfo(args = cmd_args(path))
-
-    # Add the default solc to the versions dict if a default version is specified
-    default_version = ctx.attrs.default_solc_version
-    if default_version and default_version not in solc_versions:
-        solc_versions[default_version] = solc_run_info
 
     # Create RunInfo for Foundry tools
     forge_run_info = RunInfo(args = cmd_args(forge_path)) if forge_path else None
@@ -40,13 +30,10 @@ def _system_solidity_toolchain_impl(ctx: AnalysisContext) -> list[Provider]:
 
     toolchain_info = SolidityToolchainInfo(
         solc = solc_run_info,
-        solc_versions = solc_versions,
-        default_version = default_version,
         forge = forge_run_info,
         cast = cast_run_info,
         anvil = anvil_run_info,
         jq = jq_run_info,
-        soldeps_path = ctx.attrs.soldeps_path,
     )
 
     return [
@@ -58,23 +45,12 @@ system_solidity_toolchain = rule(
     impl = _system_solidity_toolchain_impl,
     attrs = {
         "solc_path": attrs.string(
-            doc = "Path to the default Solidity compiler (solc) binary",
-        ),
-        "solc_versions": attrs.dict(
-            key = attrs.string(),
-            value = attrs.string(),
-            default = {},
-            doc = "Map of solc version strings to binary paths for multi-version support",
-        ),
-        "default_solc_version": attrs.option(
-            attrs.string(),
-            default = None,
-            doc = "Default solc version to use when not specified by target",
+            doc = "Path to the Solidity compiler (solc) binary forge compiles with",
         ),
         "forge_path": attrs.option(
             attrs.string(),
             default = None,
-            doc = "Path to the Foundry forge binary (for testing)",
+            doc = "Path to the Foundry forge binary (compiles solidity_library, runs solidity_test)",
         ),
         "cast_path": attrs.option(
             attrs.string(),
@@ -89,12 +65,7 @@ system_solidity_toolchain = rule(
         "jq_path": attrs.option(
             attrs.string(),
             default = None,
-            doc = "Path to the jq binary (for data processing)",
-        ),
-        "soldeps_path": attrs.option(
-            attrs.string(),
-            default = None,
-            doc = "Path to the soldeps cell directory for automatic import remapping",
+            doc = "Path to the jq binary (extracts solidity_contract outputs)",
         ),
     },
     is_toolchain_rule = True,

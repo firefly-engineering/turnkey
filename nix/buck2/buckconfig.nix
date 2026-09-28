@@ -21,6 +21,10 @@
   testCache,
   # The Go build tags targets may use (buck2.go.allowedBuildTags)
   goAllowedBuildTags ? [ ],
+  # null, or { foundryToml, remappingsTxt, soldepsBundle, soldepsDir }: the
+  # inputs the Solidity rules' macros stage (prelude solidity.bzl), the last
+  # three null without a soldeps cell
+  solidity ? null,
 }:
 
 let
@@ -76,3 +80,17 @@ in
   [go]
       allowed_build_tags = ${lib.concatStringsSep "," goAllowedBuildTags}
 ''
++ lib.optionalString (solidity != null) (
+  let
+    keys = {
+      foundry_toml = solidity.foundryToml;
+    }
+    // lib.optionalAttrs (solidity.soldepsDir != null) {
+      remappings_txt = solidity.remappingsTxt;
+      soldeps_bundle = solidity.soldepsBundle;
+      soldeps_dir = solidity.soldepsDir;
+    };
+  in
+  "\n[solidity]\n"
+  + lib.concatStrings (lib.mapAttrsToList (key: value: "    ${key} = ${value}\n") keys)
+)

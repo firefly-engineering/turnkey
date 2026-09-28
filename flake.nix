@@ -443,6 +443,30 @@
                 ];
               };
 
+              # The Solidity rules' inputs (prelude solidity.bzl's macros read
+              # [solidity]), with and without a soldeps cell
+              solidityBuckconfig =
+                solidity:
+                import ./nix/buck2/buckconfig.nix { inherit lib; } {
+                  cells = [ ];
+                  toolchainsCellPath = ".turnkey/toolchains";
+                  testRunnerProtocol = "/nix/store/stand-in-protocol";
+                  testCache = null;
+                  inherit solidity;
+                };
+              withSoldeps = solidityBuckconfig {
+                foundryToml = "root//:foundry.toml";
+                remappingsTxt = "root//:remappings.txt";
+                soldepsBundle = "soldeps//:bundle";
+                soldepsDir = ".turnkey/soldeps";
+              };
+              withoutSoldeps = solidityBuckconfig {
+                foundryToml = "root//:foundry.toml";
+                remappingsTxt = null;
+                soldepsBundle = null;
+                soldepsDir = null;
+              };
+
               # How the shell describes the cache to tk, as tk's tests read it
               shellContract = builtins.fromJSON (
                 builtins.readFile ./src/go/pkg/testcache/testdata/shell-contract.json
@@ -551,6 +575,17 @@
             ) "toolchains cell: no config_setting combining the OS and an allowed Go build tag";
             assert lib.assertMsg (lib.hasInfix "allowed_build_tags = integration,e2e" taggedBuckconfig)
               "buckconfig: buck2.go.allowedBuildTags doesn't reach go.allowed_build_tags";
+            assert lib.assertMsg (
+              lib.hasInfix "[solidity]\n    foundry_toml = root//:foundry.toml\n" withSoldeps
+              && lib.hasInfix "    remappings_txt = root//:remappings.txt\n" withSoldeps
+              && lib.hasInfix "    soldeps_bundle = soldeps//:bundle\n" withSoldeps
+              && lib.hasInfix "    soldeps_dir = .turnkey/soldeps\n" withSoldeps
+            ) "buckconfig: [solidity] doesn't carry the Solidity rules' inputs";
+            assert lib.assertMsg (
+              lib.hasInfix "foundry_toml = root//:foundry.toml" withoutSoldeps
+              && !(lib.hasInfix "soldeps_dir" withoutSoldeps)
+              && !(lib.hasInfix "[solidity]" uncached)
+            ) "buckconfig: [solidity] names a soldeps cell there is none of, or appears without Solidity";
             assert lib.assertMsg (
               syncToml.conditions.go_tags == [ ]
             ) "sync.toml: [conditions] go_tags isn't buck2.go.allowedBuildTags";
@@ -997,55 +1032,6 @@
             in
             assert lib.assertMsg (failed == [ ]) "fixup sets: ${lib.concatStringsSep "; " failed}";
             pkgs.runCommand "fixup-sets-check" { } "touch $out";
-
-          # The soldeps cell's remappings.txt keeps the subdirectory of each
-          # remapping soldeps-gen emits, moved from its lib/ or node_modules/
-          # layout to the cell's vendor/ one: forge-std's sources live in
-          # src/, so `forge-std/` must point there. Checked at evaluation.
-          checks.solidity-remappings =
-            let
-              inherit ((import ./nix/lib/deps-cell { inherit pkgs lib; }).adapters) solidity;
-              remapping =
-                pkg:
-                let
-                  r = solidity.cellRemapping pkg;
-                in
-                "${r.prefix}=${r.target}";
-              expected = {
-                # A git dependency, Foundry layout
-                "forge-std/=vendor/forge-std/src/" = {
-                  name = "forge-std";
-                  remapping = "forge-std/=lib/forge-std/src/";
-                };
-                # A git dependency without a foundry.toml: its repository root
-                "solmate/=vendor/solmate/" = {
-                  name = "solmate";
-                  remapping = "solmate/=lib/solmate/";
-                };
-                # An npm dependency, scoped name
-                "@openzeppelin/contracts/=vendor/@openzeppelin/contracts/" = {
-                  name = "@openzeppelin/contracts";
-                  remapping = "@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/";
-                };
-                # No remapping: the package root, under its own name
-                "solady/=vendor/solady/" = {
-                  name = "solady";
-                };
-              };
-              wrong = lib.filterAttrs (want: pkg: remapping pkg != want) expected;
-              outside = solidity.cellRemapping {
-                name = "forge-std";
-                remapping = "forge-std/=elsewhere/forge-std/src/";
-              };
-            in
-            assert lib.assertMsg (wrong == { })
-              "solidity remappings: ${
-                lib.concatStringsSep "; " (lib.mapAttrsToList (want: pkg: "${remapping pkg}, want ${want}") wrong)
-              }";
-            assert lib.assertMsg (
-              !(builtins.tryEval outside.target).success
-            ) "solidity remappings: a target outside lib/<name>/ or node_modules/<name>/ is accepted";
-            pkgs.runCommand "solidity-remappings-check" { } "touch $out";
 
           # Configure turnkey to use our local toolchain files. tellerLib
           # and tellerRegistry default to self.lib.defaultTellerLib /

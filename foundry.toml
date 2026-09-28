@@ -4,9 +4,12 @@
 # src/; narrow a run with --match-path 'src/examples/<name>/**'. There is no
 # per-package foundry.toml (check-foundry-config rejects one).
 #
+# The Buck2 Solidity rules read this file too, so the settings below drive
+# solidity_library and solidity_test as well as native forge.
+#
 # The compiler is not pinned here: the dev shell exports FOUNDRY_SOLC (the
 # toolchain's solc) and FOUNDRY_OFFLINE=true, the same compiler and offline
-# policy solidity_test uses under Buck2.
+# policy the Buck2 Solidity rules use.
 
 [profile.default]
 src = "src"

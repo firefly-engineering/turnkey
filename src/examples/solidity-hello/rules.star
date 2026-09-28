@@ -7,8 +7,6 @@ load("@prelude//solidity:solidity.bzl", "solidity_contract", "solidity_library",
 solidity_library(
     name = "counter_lib",
     srcs = ["src/Counter.sol"],
-    optimizer = True,
-    optimizer_runs = 200,
     visibility = ["PUBLIC"],
 )
 
@@ -25,6 +23,5 @@ solidity_test(
     name = "counter_test",
     srcs = ["test/Counter.t.sol"],
     deps = [":counter_lib"],
-    fuzz_runs = 256,
     visibility = ["PUBLIC"],
 )

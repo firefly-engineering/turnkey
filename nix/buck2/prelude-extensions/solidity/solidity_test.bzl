@@ -6,7 +6,8 @@
 """Solidity test rule implementation using Foundry's forge."""
 
 load("@prelude//test_caching:test_caching.bzl", "test_caching_kwargs", "test_caching_opted_out")
-load(":providers.bzl", "SolidityLibraryInfo", "SolidityToolchainInfo", "merge_remappings")
+load(":forge_project.bzl", "forge_command", "forge_config_attrs", "solidity_inputs")
+load(":providers.bzl", "SolidityToolchainInfo")
 
 def _fuzz_seed(label: str) -> int:
     """A fixed fuzz seed derived from the target label (32-bit FNV-1a).
@@ -22,196 +23,30 @@ def _fuzz_seed(label: str) -> int:
 def _solidity_test_impl(ctx: AnalysisContext) -> list[Provider]:
     """Implementation of solidity_test rule.
 
-    Runs Solidity tests using Foundry's forge test command.
-    Remappings are auto-generated from the toolchain's soldeps path.
+    Runs `forge test --use $SOLC --offline` in a forge project staged from
+    the root foundry.toml and remappings.txt, the test sources, every
+    solidity_library dep's sources and the soldeps bundle
+    (forge_project.bzl). The tests compile with the root's settings and
+    remappings, the ones solidity_library and native forge use.
     """
-    toolchain = ctx.attrs._solidity_toolchain[SolidityToolchainInfo]
-
-    if not toolchain.forge:
-        fail("Solidity toolchain does not have forge configured. Required for solidity_test.")
-
-    # Collect dependency info and remappings
-    dep_infos = []
-    dep_artifacts = []
-    for dep in ctx.attrs.deps:
-        if SolidityLibraryInfo in dep:
-            dep_info = dep[SolidityLibraryInfo]
-            dep_infos.append(dep_info)
-            for src in dep_info.srcs:
-                dep_artifacts.append(src)
-            if dep_info.output_dir:
-                dep_artifacts.append(dep_info.output_dir)
-        elif DefaultInfo in dep:
-            default_info = dep[DefaultInfo]
-            if default_info.default_outputs:
-                for output in default_info.default_outputs:
-                    dep_artifacts.append(output)
-
-    # Merge remappings from deps and explicit remappings
-    all_remappings = merge_remappings(ctx.attrs.remappings, dep_infos)
-
-    # Create test script that sets up forge project structure
-    test_script = ctx.actions.declare_output("run_tests.sh")
-
-    # Build explicit remappings for embedding (non-Buck-target style only)
-    remappings_lines = []
-    for prefix, target in all_remappings.items():
-        if not target.startswith("//") and not target.startswith("@") and ":" not in target:
-            remappings_lines.append("{}={}".format(prefix, target))
-    remappings_content = "\\n".join(remappings_lines)
-
-    # Build forge test arguments
-    forge_args = []
+    forge_args = ["test"]
     if ctx.attrs.verbosity > 0:
         forge_args.append("-" + "v" * ctx.attrs.verbosity)
-    if ctx.attrs.fuzz_runs:
-        forge_args.append("--fuzz-runs")
-        forge_args.append(str(ctx.attrs.fuzz_runs))
 
     # Seed fuzzing from the label unless the target opts out of test result
     # caching, which is how a target asks for stochastic fuzzing.
     if not test_caching_opted_out(ctx.attrs.labels):
-        forge_args.append("--fuzz-seed")
-        forge_args.append(str(_fuzz_seed(str(ctx.label.raw_target()))))
+        forge_args.extend(["--fuzz-seed", str(_fuzz_seed(str(ctx.label.raw_target())))])
     if ctx.attrs.fork_url:
-        forge_args.append("--fork-url")
-        forge_args.append(ctx.attrs.fork_url)
+        forge_args.extend(["--fork-url", ctx.attrs.fork_url])
     if ctx.attrs.match_test:
-        forge_args.append("--match-test")
-        forge_args.append(ctx.attrs.match_test)
+        forge_args.extend(["--match-test", ctx.attrs.match_test])
     if ctx.attrs.match_contract:
-        forge_args.append("--match-contract")
-        forge_args.append(ctx.attrs.match_contract)
+        forge_args.extend(["--match-contract", ctx.attrs.match_contract])
     if ctx.attrs.gas_report:
         forge_args.append("--gas-report")
 
-    forge_args_str = " ".join(['"{}"'.format(a) for a in forge_args]) if forge_args else ""
-
-    script_content = """#!/usr/bin/env bash
-set -euo pipefail
-
-FORGE="$1"
-SOLC="$2"
-shift 2
-
-# Create temporary forge project structure
-WORK_DIR=$(mktemp -d)
-trap 'rm -rf "$WORK_DIR"' EXIT
-
-mkdir -p "$WORK_DIR/src"
-mkdir -p "$WORK_DIR/test"
-mkdir -p "$WORK_DIR/lib"
-
-# Parse arguments
-TEST_SRCS=()
-DEP_SRCS=()
-SOLDEPS_CELL=""
-MODE="none"
-
-for arg in "$@"; do
-    if [[ "$arg" == "--test-srcs" ]]; then
-        MODE="test"
-        continue
-    fi
-    if [[ "$arg" == "--dep-srcs" ]]; then
-        MODE="dep"
-        continue
-    fi
-    if [[ "$arg" == "--soldeps-cell" ]]; then
-        MODE="soldeps"
-        continue
-    fi
-    case "$MODE" in
-        test) TEST_SRCS+=("$arg") ;;
-        dep) DEP_SRCS+=("$arg") ;;
-        soldeps) SOLDEPS_CELL="$arg"; MODE="none" ;;
-    esac
-done
-
-# Copy test files
-for src in "${TEST_SRCS[@]}"; do
-    cp "$src" "$WORK_DIR/test/"
-done
-
-# Copy/link dependency sources
-for src in "${DEP_SRCS[@]}"; do
-    if [[ -d "$src" ]]; then
-        # It's a directory (likely from soldeps), symlink it
-        PKG_NAME=$(basename "$src")
-        ln -s "$(realpath "$src")" "$WORK_DIR/lib/$PKG_NAME"
-    elif [[ -f "$src" ]]; then
-        cp "$src" "$WORK_DIR/src/"
-    fi
-done
-
-# Build remappings.txt - auto-generate from soldeps cell if available
-REMAPPINGS_CONTENT=""
-
-# Auto-generate remappings from soldeps cell's remappings.txt
-if [[ -n "$SOLDEPS_CELL" && -f "$SOLDEPS_CELL/remappings.txt" ]]; then
-    while IFS= read -r line; do
-        if [[ -n "$line" && ! "$line" =~ ^# ]]; then
-            # Convert relative path in remapping to absolute path
-            # Format: prefix=vendor/package/ -> prefix=/abs/path/to/cell/vendor/package/
-            PREFIX="${line%%=*}"
-            RELPATH="${line#*=}"
-            ABSPATH="$(realpath "$SOLDEPS_CELL")/$RELPATH"
-            REMAPPINGS_CONTENT+="${PREFIX}=${ABSPATH}"$'\\n'
-        fi
-    done < "$SOLDEPS_CELL/remappings.txt"
-fi
-
-# Add any additional explicit remappings
-EXPLICIT_REMAPPINGS='""" + remappings_content + """'
-if [[ -n "$EXPLICIT_REMAPPINGS" ]]; then
-    REMAPPINGS_CONTENT+="$EXPLICIT_REMAPPINGS"
-fi
-
-# Write remappings.txt
-echo -e "$REMAPPINGS_CONTENT" > "$WORK_DIR/remappings.txt"
-
-# Create minimal foundry.toml
-cat > "$WORK_DIR/foundry.toml" << 'FOUNDRY'
-[profile.default]
-src = "src"
-test = "test"
-libs = ["lib"]
-out = "out"
-FOUNDRY
-
-# Run forge test
-cd "$WORK_DIR"
-# --use pins the toolchain's solc and --offline stops forge from resolving
-# or downloading any other compiler, so the compiler is part of the command.
-"$FORGE" test --use "$SOLC" --offline """ + forge_args_str + """
-"""
-
-    ctx.actions.write(
-        test_script,
-        script_content,
-        is_executable = True,
-    )
-
-    # Build test command
-    test_cmd = cmd_args(test_script)
-    test_cmd.add(toolchain.forge.args)
-    test_cmd.add(toolchain.solc.args)
-
-    # Add test sources
-    test_cmd.add("--test-srcs")
-    for src in ctx.attrs.srcs:
-        test_cmd.add(src)
-
-    # Add dependency sources
-    test_cmd.add("--dep-srcs")
-    for artifact in dep_artifacts:
-        test_cmd.add(artifact)
-
-    # Add the soldeps bundle for auto-remapping. It is a declared dependency,
-    # so the remappings and every dependency source are inputs of the test.
-    if ctx.attrs.soldeps:
-        test_cmd.add("--soldeps-cell")
-        test_cmd.add(ctx.attrs.soldeps[DefaultInfo].default_outputs[0])
+    test_cmd = forge_command(ctx, solidity_inputs(ctx), forge_args)
 
     # Create run info for test execution
     run_info = RunInfo(args = test_cmd)
@@ -224,9 +59,10 @@ cd "$WORK_DIR"
     return [
         DefaultInfo(),
         # Cacheable: forge runs the toolchain's solc offline, reads its
-        # dependencies from the declared soldeps bundle, and fuzzes with a
-        # seed fixed by the label. A fork test reads chain state over the
-        # network, so it always runs.
+        # settings from the declared foundry.toml and its dependencies from
+        # the declared soldeps bundle, and fuzzes with a seed fixed by the
+        # label. A fork test reads chain state over the network, so it
+        # always runs.
         ExternalRunnerTestInfo(**(
             test_info_kwargs if ctx.attrs.fork_url else test_caching_kwargs(test_info_kwargs)
         )),
@@ -245,22 +81,6 @@ solidity_test = rule(
             attrs.dep(),
             default = [],
             doc = "Dependencies (solidity_library targets or filegroups from soldeps)",
-        ),
-        "soldeps": attrs.option(
-            attrs.dep(),
-            default = None,
-            doc = "The soldeps cell's bundle (remappings.txt plus every vendor package). Set automatically by the solidity_test macro when the repo has a soldeps cell.",
-        ),
-        "remappings": attrs.dict(
-            key = attrs.string(),
-            value = attrs.string(),
-            default = {},
-            doc = "Additional import remappings. Usually not needed as remappings are auto-generated from the toolchain's soldeps.",
-        ),
-        "fuzz_runs": attrs.option(
-            attrs.int(),
-            default = None,
-            doc = "Number of fuzz test runs (default: forge's default of 256)",
         ),
         "fork_url": attrs.option(
             attrs.string(),
@@ -294,6 +114,6 @@ solidity_test = rule(
             default = "toolchains//:solc",
             providers = [SolidityToolchainInfo],
         ),
-    },
-    doc = "Runs Solidity tests using Foundry's forge test.",
+    } | forge_config_attrs(),
+    doc = "Runs Solidity tests using Foundry's forge test, with the root foundry.toml's settings.",
 )

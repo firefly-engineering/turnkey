@@ -10,16 +10,14 @@ load(":providers.bzl", "SolidityContractInfo", "SolidityLibraryInfo", "SolidityT
 def _solidity_contract_impl(ctx: AnalysisContext) -> list[Provider]:
     """Implementation of solidity_contract rule.
 
-    Extracts specific contract artifacts from a compiled solidity_library.
+    Extracts one contract's artifacts from a solidity_library's forge
+    artifacts directory.
     """
     toolchain = ctx.attrs._solidity_toolchain[SolidityToolchainInfo]
+    if not toolchain.jq:
+        fail("Solidity toolchain does not have jq configured. Required for solidity_contract.")
 
-    # Get the library dependency
-    lib_dep = ctx.attrs.lib
-    if SolidityLibraryInfo not in lib_dep:
-        fail("lib must be a solidity_library target")
-
-    lib_info = lib_dep[SolidityLibraryInfo]
+    lib_info = ctx.attrs.lib[SolidityLibraryInfo]
     contract_name = ctx.attrs.contract
 
     # Declare output artifacts
@@ -28,10 +26,16 @@ def _solidity_contract_impl(ctx: AnalysisContext) -> list[Provider]:
     deployed_bytecode_file = ctx.actions.declare_output("{}.bin-runtime".format(contract_name))
     metadata_file = ctx.actions.declare_output("{}.metadata.json".format(contract_name))
 
-    # Create extraction script
-    extract_script = ctx.actions.declare_output("extract.sh")
-
-    script_content = """#!/usr/bin/env bash
+    # forge writes one <File>.sol/<Contract>.json per contract it compiled,
+    # the library's imports included, so a name alone can be ambiguous. The
+    # artifact to extract is the one whose compilation target is this
+    # contract in one of the library's own sources (named relative to the
+    # repository root, where foundry.toml sits). The outputs are what
+    # solc's --abi, --bin, --bin-runtime and --metadata write: compact JSON,
+    # unprefixed hex and the raw metadata string.
+    extract_script = ctx.actions.write(
+        "extract.sh",
+        """#!/usr/bin/env bash
 set -euo pipefail
 
 JQ="$1"
@@ -41,108 +45,48 @@ ABI_OUT="$4"
 BIN_OUT="$5"
 BIN_RUNTIME_OUT="$6"
 METADATA_OUT="$7"
+shift 7
+# The rest: the library's sources, relative to the repository root
+SRCS_JSON=$(printf '%s\\n' "$@" | "$JQ" -R . | "$JQ" -s .)
 
-# Find contract files in artifacts directory
-# solc outputs files as: ContractName.abi, ContractName.bin, etc.
-# or SourceFile_ContractName.abi if multiple contracts in one file
-
-find_contract_file() {
-    local ext="$1"
-    local pattern
-
-    # First try exact match
-    if [[ -f "$ARTIFACTS_DIR/$CONTRACT_NAME.$ext" ]]; then
-        echo "$ARTIFACTS_DIR/$CONTRACT_NAME.$ext"
-        return 0
+ARTIFACT=""
+while IFS= read -r candidate; do
+    if "$JQ" -e --arg name "$CONTRACT_NAME" --argjson srcs "$SRCS_JSON" \\
+        '.metadata.settings.compilationTarget | to_entries | any(.value == $name and (.key | IN($srcs[])))' \\
+        "$candidate" > /dev/null; then
+        if [[ -n "$ARTIFACT" ]]; then
+            echo "error: more than one of the library's sources defines a contract named $CONTRACT_NAME; split the library so each solidity_library defines it once" >&2
+            exit 1
+        fi
+        ARTIFACT="$candidate"
     fi
+done < <(find "$ARTIFACTS_DIR" -name "$CONTRACT_NAME.json" -not -path "*/build-info/*")
 
-    # Try with source file prefix (SourceFile_ContractName.ext)
-    pattern=$(find "$ARTIFACTS_DIR" -name "*_$CONTRACT_NAME.$ext" -o -name "$CONTRACT_NAME.$ext" 2>/dev/null | head -1)
-    if [[ -n "$pattern" && -f "$pattern" ]]; then
-        echo "$pattern"
-        return 0
-    fi
-
-    # Check combined-json output
-    if [[ -f "$ARTIFACTS_DIR/combined.json" ]]; then
-        echo "COMBINED"
-        return 0
-    fi
-
-    echo ""
-    return 1
-}
-
-# Extract from individual files or combined.json
-ABI_FILE=$(find_contract_file "abi")
-BIN_FILE=$(find_contract_file "bin")
-BIN_RUNTIME_FILE=$(find_contract_file "bin-runtime")
-METADATA_FILE=$(find_contract_file "metadata.json")
-
-if [[ "$ABI_FILE" == "COMBINED" ]]; then
-    # Extract from combined.json
-    if [[ -n "$JQ" && -x "$JQ" ]]; then
-        # Use jq if available
-        "$JQ" -r ".contracts | to_entries[] | select(.key | endswith(\\":$CONTRACT_NAME\\")) | .value.abi" "$ARTIFACTS_DIR/combined.json" > "$ABI_OUT"
-        "$JQ" -r ".contracts | to_entries[] | select(.key | endswith(\\":$CONTRACT_NAME\\")) | .value.bin" "$ARTIFACTS_DIR/combined.json" > "$BIN_OUT"
-        "$JQ" -r ".contracts | to_entries[] | select(.key | endswith(\\":$CONTRACT_NAME\\")) | .value[\\"bin-runtime\\"]" "$ARTIFACTS_DIR/combined.json" > "$BIN_RUNTIME_OUT"
-        "$JQ" -r ".contracts | to_entries[] | select(.key | endswith(\\":$CONTRACT_NAME\\")) | .value.metadata" "$ARTIFACTS_DIR/combined.json" > "$METADATA_OUT"
-    else
-        # Fallback: use grep/sed (less reliable but works without jq)
-        echo "Warning: jq not found, using fallback extraction" >&2
-        grep -o '"abi":[^}]*' "$ARTIFACTS_DIR/combined.json" | head -1 | sed 's/"abi"://' > "$ABI_OUT"
-        grep -o '"bin":"[^"]*"' "$ARTIFACTS_DIR/combined.json" | head -1 | sed 's/"bin":"//;s/"//' > "$BIN_OUT"
-        grep -o '"bin-runtime":"[^"]*"' "$ARTIFACTS_DIR/combined.json" | head -1 | sed 's/"bin-runtime":"//;s/"//' > "$BIN_RUNTIME_OUT"
-        echo "{}" > "$METADATA_OUT"
-    fi
-else
-    # Copy from individual files
-    if [[ -n "$ABI_FILE" && -f "$ABI_FILE" ]]; then
-        cp "$ABI_FILE" "$ABI_OUT"
-    else
-        echo "[]" > "$ABI_OUT"
-        echo "Warning: ABI file not found for $CONTRACT_NAME" >&2
-    fi
-
-    if [[ -n "$BIN_FILE" && -f "$BIN_FILE" ]]; then
-        cp "$BIN_FILE" "$BIN_OUT"
-    else
-        echo "" > "$BIN_OUT"
-        echo "Warning: Bytecode file not found for $CONTRACT_NAME" >&2
-    fi
-
-    if [[ -n "$BIN_RUNTIME_FILE" && -f "$BIN_RUNTIME_FILE" ]]; then
-        cp "$BIN_RUNTIME_FILE" "$BIN_RUNTIME_OUT"
-    else
-        echo "" > "$BIN_RUNTIME_OUT"
-    fi
-
-    if [[ -n "$METADATA_FILE" && -f "$METADATA_FILE" ]]; then
-        cp "$METADATA_FILE" "$METADATA_OUT"
-    else
-        echo "{}" > "$METADATA_OUT"
-    fi
+if [[ -z "$ARTIFACT" ]]; then
+    echo "error: no contract $CONTRACT_NAME in the library's sources: $*" >&2
+    exit 1
 fi
-"""
 
-    ctx.actions.write(
-        extract_script,
-        script_content,
+"$JQ" -cj '.abi' "$ARTIFACT" > "$ABI_OUT"
+"$JQ" -j '.bytecode.object | ltrimstr("0x")' "$ARTIFACT" > "$BIN_OUT"
+"$JQ" -j '.deployedBytecode.object | ltrimstr("0x")' "$ARTIFACT" > "$BIN_RUNTIME_OUT"
+"$JQ" -ej '.rawMetadata' "$ARTIFACT" > "$METADATA_OUT"
+""",
         is_executable = True,
     )
 
-    # Build extraction command
-    extract_cmd = cmd_args(extract_script)
-    extract_cmd.add(toolchain.jq.args if toolchain.jq else "")
-    extract_cmd.add(lib_info.output_dir)
-    extract_cmd.add(contract_name)
-    extract_cmd.add(abi_file.as_output())
-    extract_cmd.add(bytecode_file.as_output())
-    extract_cmd.add(deployed_bytecode_file.as_output())
-    extract_cmd.add(metadata_file.as_output())
-
     ctx.actions.run(
-        cmd_args(extract_cmd, hidden = [lib_info.output_dir] + ([toolchain.jq] if toolchain.jq else [])),
+        cmd_args(
+            extract_script,
+            toolchain.jq.args,
+            lib_info.output_dir,
+            contract_name,
+            abi_file.as_output(),
+            bytecode_file.as_output(),
+            deployed_bytecode_file.as_output(),
+            metadata_file.as_output(),
+            lib_info.srcs.keys(),
+        ),
         category = "solidity_extract",
         identifier = ctx.label.name,
     )
