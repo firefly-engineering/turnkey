@@ -50,6 +50,28 @@ _Avoid_: repo root, workspace root
 A language's native tool (`go`, `cargo`, `uv`, named by the language record) that the shell runs through `tw`. When one of its mutating subcommands changes the content of a file its wrapper rule watches, `tw` runs the rule's post-commands and syncs the rule's deps rule; it always exits as the tool did. Change is judged by content, where `tk sync` judges staleness by mtime.
 _Avoid_: shim, tool wrapper (which is the shell script, not the tool)
 
+### Deps cells
+
+**Deps cell**:
+The buck2 cell holding one language's third-party packages (`rustdeps`, `godeps`, ...). It is a real directory in the project, kept in line with its cell index.
+_Avoid_: cell derivation, vendor cell
+
+**Cell index**:
+The Nix-built list of a deps cell's packages: each package's store path and target names, and the version aliases. A deps cell has exactly one current cell index.
+_Avoid_: manifest, cell derivation
+
+**Store link**:
+A symlink in a deps cell to one package's store path, named after that store path. It is only ever created or deleted, never retargeted.
+_Avoid_: crate symlink, vendor link
+
+**Alias package**:
+A package in a deps cell whose targets forward to the same-named targets of a store link's package. Version names (`anyhow@1.0.100`) and unversioned names (`anyhow`) are alias packages.
+_Avoid_: alias symlink, version symlink
+
+**Cell materialization**:
+Bringing a deps cell in line with its cell index: adding missing store links, rewriting alias packages whose target changed, and removing what the index no longer names. What does it is the materializer.
+_Avoid_: sync (which is `tk sync` running the deps generators), link update, retarget
+
 ### Testing
 
 **Test result caching**:
