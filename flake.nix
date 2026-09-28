@@ -648,6 +648,97 @@
             ) "split vectors: ${lib.concatStringsSep "; " namingProblems}";
             pkgs.runCommand "split-vectors-check" { } "touch $out";
 
+          # use_turnkey re-evaluates the flake when a deps file no longer
+          # matches the one its cell was built from, and only then
+          # (nix/devenv/turnkey/deps-freshness.nix). The default shell records
+          # its deps files by content; a file the flake can't see is left out.
+          # A changed or missing file loads the .envrc once more, with
+          # nix-direnv's cached shell backdated; an unchanged one doesn't.
+          checks.deps-freshness =
+            let
+              depsFreshness = import ./nix/devenv/turnkey/deps-freshness.nix { inherit lib pkgs; };
+              languages = import ./nix/buck2/languages.nix { inherit pkgs lib; };
+              shellEntries = depsFreshness.entries {
+                inherit languages;
+                buck2 = config.devenv.shells.default.turnkey.buck2;
+              };
+              stringEntries = depsFreshness.entries {
+                inherit languages;
+                buck2 =
+                  (lib.evalModules {
+                    modules = [
+                      (import ./nix/buck2/options.nix {
+                        inherit lib;
+                        version = "check";
+                      })
+                      {
+                        enable = true;
+                        rust.depsFile = "rust-deps.toml";
+                      }
+                    ];
+                  }).config;
+              };
+              # Cells built from a rust-deps.toml holding "old"
+              refresh = pkgs.writeText "deps-freshness.sh" (
+                depsFreshness.refresh [
+                  {
+                    file = "rust-deps.toml";
+                    hash = builtins.hashString "sha256" "old\n";
+                  }
+                ]
+              );
+            in
+            assert lib.assertMsg (lib.elem {
+              file = "rust-deps.toml";
+              hash = builtins.hashFile "sha256" ./rust-deps.toml;
+            } shellEntries) "deps freshness: the default shell doesn't record rust-deps.toml's content";
+            assert lib.assertMsg (
+              stringEntries == [ ]
+            ) "deps freshness: a deps file outside the flake is recorded";
+            pkgs.runCommand "deps-freshness-check" { } ''
+              mkdir layout project
+              layout=$PWD/layout
+              cd project
+              # An .envrc like a consumer's: the library, then use_turnkey's
+              # early return, then the links
+              cat > .envrc <<'EOF'
+              echo load >> loads
+              source ${refresh}
+              if _turnkey_refresh_cells; then return 0; fi
+              echo link >> loads
+              EOF
+              # direnv's functions, as far as the routine uses them
+              load() {
+                rm -f loads log
+                touch -t 202601010000 "$layout/flake-profile-x.rc"
+                bash -c '
+                  layout=$1
+                  direnv_layout_dir() { echo "$layout"; }
+                  log_status() { echo "$*" >> log; }
+                  source_env() { . "$1"; }
+                  source_env ./.envrc
+                ' _ "$layout"
+              }
+              touch -t 202001010000 reference
+              fail() { echo "deps freshness: $*" >&2; exit 1; }
+
+              printf 'old\n' > rust-deps.toml
+              load
+              [ "$(cat loads)" = "$(printf 'load\nlink')" ] || fail "unchanged file: loads were $(cat loads)"
+              [ ! -e log ] || fail "unchanged file: logged $(cat log)"
+              [ "$layout/flake-profile-x.rc" -nt reference ] || fail "unchanged file: cache backdated"
+
+              for change in "printf 'new\n' > rust-deps.toml" "rm rust-deps.toml"; do
+                eval "$change"
+                load
+                [ "$(cat loads)" = "$(printf 'load\nload\nlink')" ] || fail "$change: loads were $(cat loads)"
+                grep -q "re-evaluating the flake for rust-deps.toml" log || fail "$change: no re-evaluation logged"
+                grep -q "still don't match rust-deps.toml" log || fail "$change: second load didn't report"
+                [ reference -nt "$layout/flake-profile-x.rc" ] || fail "$change: cache not backdated"
+              done
+              touch $out
+            '';
+
           # .turnkey/sync.toml as the shell writes it for a project with every
           # language, byte for byte what rulessync's tests read
           # (src/go/pkg/rulessync/testdata/sync.toml): the seam between the
