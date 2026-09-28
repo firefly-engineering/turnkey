@@ -790,6 +790,7 @@
           # without a uv lock, at evaluation.
           checks.language-records =
             let
+              platforms = import ./nix/buck2/platforms.nix { inherit lib; };
               languages = import ./nix/buck2/languages.nix { inherit pkgs lib; };
               buck2Options =
                 python:
@@ -814,7 +815,12 @@
                 python:
                 let
                   options = buck2Options python;
-                  rulesOf = language: language.syncRules options.${language.name};
+                  rulesOf =
+                    language:
+                    language.syncRules {
+                      langCfg = options.${language.name};
+                      conditions = platforms.conditions options.platforms;
+                    };
                   rules = builtins.concatMap rulesOf languages;
                   names = map (rule: rule.name) rules;
                   indexOf = name: lib.lists.findFirstIndex (n: n == name) null names;
@@ -876,7 +882,12 @@
               # in the project
               goRecord = lib.findFirst (language: language.name == "go") null languages;
               nestedGoRule = builtins.head (
-                goRecord.syncRules ((buck2Options { }).go // { depsFile = ./.turnkey/go-deps.toml; })
+                goRecord.syncRules {
+                  langCfg = (buck2Options { }).go // {
+                    depsFile = ./.turnkey/go-deps.toml;
+                  };
+                  conditions = platforms.conditions (buck2Options { }).platforms;
+                }
               );
             in
             assert lib.assertMsg (

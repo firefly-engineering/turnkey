@@ -18,8 +18,14 @@
 let
   platforms = import ./platforms.nix { inherit lib; };
 
-  # Each language's sync rules, in language order
-  syncRules = builtins.concatMap (language: language.syncRules buck2.${language.name}) languages;
+  # Each language's sync rules, in language order, and a language's
+  syncRules = builtins.concatMap rulesOf languages;
+  rulesOf =
+    language:
+    language.syncRules {
+      langCfg = buck2.${language.name};
+      conditions = platforms.conditions buck2.platforms;
+    };
 
   # What tw does for each wrapped tool: which of its commands can change the
   # language's files, and the sync rule to run when they do. Only languages
@@ -29,15 +35,13 @@ let
     let
       rule = language.wrapper.rule buck2.${language.name};
     in
-    lib.optional
-      (language ? wrapper && language.syncRules buck2.${language.name} != [ ] && rule != null)
-      (
-        {
-          name = language.wrapper.tool;
-          command = language.wrapper.tool;
-        }
-        // rule
-      )
+    lib.optional (language ? wrapper && rulesOf language != [ ] && rule != null) (
+      {
+        name = language.wrapper.tool;
+        command = language.wrapper.tool;
+      }
+      // rule
+    )
   ) languages;
 
   # The complete sync.toml, as the value pkgs.formats.toml renders

@@ -11,6 +11,7 @@ go_library(
         # turnkey:auto-start
         "//src/go/pkg/staleness:staleness",
         "//src/go/pkg/syncconfig:syncconfig",
+        "godeps//vendor/github.com/pelletier/go-toml/v2:v2",
         # turnkey:auto-end
     ],
     visibility = ["PUBLIC"],

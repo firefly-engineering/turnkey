@@ -40,9 +40,29 @@ let
   # The Buck2 package of the combined config_settings, in the toolchains
   # cell, each named "<os>-<cpu>"
   settingsPackage = "toolchains//conditions";
+
+  # Each platform's Rust target triple, by its Buck2 names
+  rustTargets = {
+    linux = {
+      x86_64 = "x86_64-unknown-linux-gnu";
+      arm64 = "aarch64-unknown-linux-gnu";
+    };
+    macos = {
+      x86_64 = "x86_64-apple-darwin";
+      arm64 = "aarch64-apple-darwin";
+    };
+  };
 in
 {
   inherit fromSystem settingsPackage;
+
+  # A platform's name, "<os>-<cpu>" in Buck2's names (fromSystem's, or
+  # conditions'), as its combined config_setting and the deps files name it
+  name = platform: "${platform.os}-${platform.cpu}";
+
+  # The Rust target triple cargo resolves a platform's dependencies for
+  # (fromSystem's, or conditions')
+  rustTarget = platform: rustTargets.${platform.os}.${platform.cpu};
 
   # Every OS and CPU turnkey names, in Buck2's names
   names = {

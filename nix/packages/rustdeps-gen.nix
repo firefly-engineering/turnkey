@@ -36,6 +36,9 @@ pkgs.rustPlatform.buildRustPackage {
     "-p"
     "rustdeps-gen"
   ];
+  # The ignored tests run cargo on a vendored fixture workspace: Buck2's
+  # tests have no cargo, the build has
+  checkFlags = [ "--include-ignored" ];
 
   nativeBuildInputs = [ pkgs.makeWrapper ];
 

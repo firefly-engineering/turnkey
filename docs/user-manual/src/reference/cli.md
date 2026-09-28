@@ -207,8 +207,9 @@ generator = ["godeps-gen", "--go-mod", "go.mod", "--go-sum", "go.sum"]
 [[deps]]
 name = "rust"
 sources = ["Cargo.toml", "Cargo.lock"]
+target_sources = "manifests"
 target = "rust-deps.toml"
-generator = ["rustdeps-gen", "--cargo-lock", "Cargo.lock"]
+generator = ["rustdeps-gen", "--cargo-lock", "Cargo.lock", "--platform", "linux-x86_64=x86_64-unknown-linux-gnu", "--platform", "macos-arm64=aarch64-apple-darwin"]
 ```
 
 Each `[[deps]]` entry defines:
@@ -216,6 +217,10 @@ Each `[[deps]]` entry defines:
 - `sources` - Files that trigger regeneration when modified
 - `target` - The generated file
 - `generator` - Command to regenerate the target
+- `target_sources` (optional) - A top-level key of the target whose array
+  lists more sources, relative to the project root. They are files only the
+  generator can find, such as a Cargo workspace's member manifests. A
+  target without that key is stale.
 
 #### Local Target Overrides
 

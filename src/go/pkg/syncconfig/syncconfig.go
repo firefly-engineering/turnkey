@@ -135,6 +135,12 @@ type DepsRule struct {
 	// Target is the file to generate when sources change.
 	Target string `toml:"target"`
 
+	// TargetSources, when set, is a top-level key of the target (a TOML
+	// file) whose array lists more sources, relative to the project root:
+	// files only the generator can find, such as a Cargo workspace's member
+	// manifests. A target without that key is stale.
+	TargetSources string `toml:"target_sources,omitempty"`
+
 	// Generator is the command to run to regenerate the target.
 	// The command is executed from the project root.
 	Generator []string `toml:"generator"`

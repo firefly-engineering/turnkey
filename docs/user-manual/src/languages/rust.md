@@ -80,6 +80,19 @@ rustdeps cell resolves features from them the way Cargo does:
 Declare what you need in `Cargo.toml` as you would for Cargo; there is
 nothing to repeat for Buck2.
 
+`tk sync` also records each vendored crate's **package slice** in
+`rust-deps.toml`: its features and dependencies as Cargo resolves them for
+`cargo test --workspace`, on each of the project's platforms (`cargo tree`,
+one run per platform). The cell does not use the slices yet. Recording them
+means that:
+
+- `tk sync` runs `cargo` with `--locked`, so `Cargo.lock` must match
+  `Cargo.toml`. After editing a manifest by hand, run a cargo command (or
+  `tw cargo …`) that updates the lock. The first run downloads the crates
+  into `~/.cargo/registry`.
+- Every workspace member's `Cargo.toml` is a source of `rust-deps.toml`, so a
+  features-only edit in a member regenerates it.
+
 ## Feature Overrides
 
 Use `rust-features.toml` where the result must differ from Cargo's:
