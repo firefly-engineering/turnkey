@@ -30,6 +30,8 @@ tools/gobuckify/gobuckify
 # All dependencies must go through Nix-backed cells (.turnkey/godeps/, etc.)
 # See docs/dependency-management.md for details
 vendor/
+# The deps cell tests route user patches by their vendor/<package>/ directory
+!nix/lib/deps-cell/testdata/**/vendor/
 
 # Rust build artifacts
 target/

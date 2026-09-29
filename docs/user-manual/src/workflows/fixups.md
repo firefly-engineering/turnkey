@@ -108,8 +108,21 @@ build script runs.
 
 Fixup patches are separate from the patches `tk compose patch` writes to
 `.turnkey/patches/<cell>/` from the FUSE edit layer. Those are this
-repository's local, exact-version workarounds, and apply last, to the
-assembled cell.
+repository's local, exact-version workarounds.
+
+- **Rust cell:** each patch goes in its package's directory,
+  `.turnkey/patches/rustdeps/vendor/<crate>@<version>/`, and applies in that
+  crate's own derivation, after its fixup. Changing a patch rebuilds only that
+  crate and what depends on it.
+  - A directory may also be named after the crate alone
+    (`vendor/anyhow/`); it then goes to the version the cell's unversioned
+    alias points at.
+  - A patch that doesn't apply exactly, with no fuzz, fails the build and
+    names the crate.
+  - A patch file left directly under `rustdeps/`, from before this layout,
+    fails evaluation: move it into its package's directory, or regenerate it
+    with `tk compose patch`.
+- **Other cells:** patches apply last, to the assembled cell.
 
 ## When sets disagree
 

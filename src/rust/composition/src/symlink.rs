@@ -67,8 +67,15 @@ impl SymlinkBackend {
         Ok(())
     }
 
-    /// Create a symlink, removing any existing file/link at the target
+    /// Point a symlink at target. One already pointing there is left alone:
+    /// removing and re-creating it is a retarget as far as buck2's file
+    /// watcher is concerned, and costs a re-read of the whole cell (ADR 0004).
     fn create_symlink(&self, target: &PathBuf, link: &PathBuf) -> Result<()> {
+        if link.is_symlink() && fs::read_link(link).ok().as_ref() == Some(target) {
+            debug!("Symlink already current: {:?} -> {:?}", link, target);
+            return Ok(());
+        }
+
         // Remove existing symlink or file if present
         if link.exists() || link.is_symlink() {
             fs::remove_file(link).map_err(|e| Error::SymlinkRemoveFailed {
@@ -285,6 +292,29 @@ mod tests {
 
         // Check symlink was removed
         assert!(!link_path.exists());
+    }
+
+    #[test]
+    fn test_refresh_leaves_a_current_link_alone() {
+        let (_mount_dir, _source_dir, mount_point, cell_source) = setup_test_env();
+        let config = CompositionConfig::new(&mount_point, "/tmp/repo")
+            .with_cell(CellConfig::new("godeps", &cell_source));
+        let mut backend = SymlinkBackend::new(config);
+        backend.mount().unwrap();
+
+        // A marker only a re-created link would lose: the link's own inode
+        let link_path = mount_point.join("godeps");
+        let inode = |p: &PathBuf| {
+            use std::os::unix::fs::MetadataExt;
+            fs::symlink_metadata(p).unwrap().ino()
+        };
+        let before = inode(&link_path);
+        backend.refresh().unwrap();
+        assert_eq!(
+            inode(&link_path),
+            before,
+            "refresh re-created a current link"
+        );
     }
 
     #[test]

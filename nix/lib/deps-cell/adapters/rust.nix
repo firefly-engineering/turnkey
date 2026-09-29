@@ -68,6 +68,11 @@ rec {
       # Optional, with a slice: what fails the crate if it has a build
       # script no fixup accounts for (nix/lib/fixups's resolve)
       unaccounted ? null,
+
+      # The user's patches of this crate (tk compose patch), in order. They
+      # name files as a/vendor/<package>/..., and apply after the fixup; one
+      # that doesn't apply fails the crate.
+      userPatches ? [ ],
     }:
     let
       fetchSpec = fetchers.mkCratesIOSpec {
@@ -82,7 +87,8 @@ rec {
     pkgs.runCommand "dep-rust-${name}-${version}"
       (
         {
-          nativeBuildInputs = buildInputs ++ lib.optional generates rustRulesGen;
+          nativeBuildInputs =
+            buildInputs ++ lib.optional generates rustRulesGen ++ lib.optional (userPatches != [ ]) pkgs.patch;
           src = fetchers.fetch fetchSpec;
           passthru = {
             inherit name version;
@@ -111,6 +117,15 @@ rec {
           cd $out
           ${fixupCommands}
         ''
+        + lib.concatMapStrings (patchFile: ''
+
+          # The user's patch ${baseNameOf patchFile}
+          patch -d $out -p3 --forward --fuzz=0 < ${patchFile} || {
+            echo "error: user patch ${baseNameOf patchFile} does not apply to ${name}@${version}"
+            echo "  (regenerate it with 'tk compose patch', or remove it)"
+            exit 1
+          }
+        '') userPatches
         + lib.optionalString generates ''
 
           # The crate's rules.star, from its slice alone. Buck2 never runs
@@ -127,6 +142,58 @@ rec {
         ''
       );
 
+  # The user's patches of each locked crate, keyed "name@version", from
+  # <dir>/<cellName>/vendor/<package>/*.patch as tk compose patch writes them
+  # (in name order). <package> is a crate's "name@version", or its
+  # unversioned name, which resolves as the cell's unversioned alias does.
+  userPatchesOf =
+    {
+      dir,
+      cellName,
+      keys,
+      parseKey,
+    }:
+    let
+      cellDir = dir + "/${cellName}";
+      entries = if dir != null && builtins.pathExists cellDir then builtins.readDir cellDir else { };
+      flat = lib.filter (name: entries.${name} != "directory") (lib.attrNames entries);
+      vendorDir = cellDir + "/vendor";
+      packages =
+        if entries ? vendor then
+          lib.attrNames (lib.filterAttrs (_: type: type == "directory") (builtins.readDir vendorDir))
+        else
+          [ ];
+      aliases = unversionedKeys parseKey keys;
+      keyOf =
+        package:
+        if builtins.elem package keys then
+          package
+        else
+          aliases.${package}
+            or (throw "turnkey: user patches under ${cellName}/vendor/${package}/: ${cellName} locks no such package");
+      patchesIn =
+        package:
+        map (name: vendorDir + "/${package}/${name}") (
+          lib.sort (a: b: a < b) (
+            lib.attrNames (
+              lib.filterAttrs (name: type: type == "regular" && lib.hasSuffix ".patch" name) (
+                builtins.readDir (vendorDir + "/${package}")
+              )
+            )
+          )
+        );
+    in
+    if flat != [ ] then
+      throw "turnkey: user patches for ${cellName} go under ${cellName}/vendor/<package>/, one directory per package (tk compose patch writes them there); move or regenerate: ${lib.concatStringsSep ", " flat}"
+    else
+      lib.foldl' (
+        acc: package:
+        let
+          key = keyOf package;
+        in
+        acc // { ${key} = (acc.${key} or [ ]) ++ patchesIn package; }
+      ) { } packages;
+
   # Each locked crate's package, keyed "name@version": deps is
   # rust-deps.toml's deps table, resolvedFixups nix/lib/fixups's resolve for
   # its crates. With rustRulesGen, each package also generates its
@@ -140,6 +207,9 @@ rec {
       },
       conditions ? null,
       rustRulesGen ? null,
+      # The user's patches of each crate, keyed "name@version"
+      # (userPatchesOf's)
+      userPatches ? { },
     }:
     lib.mapAttrs (
       key: dep:
@@ -149,6 +219,7 @@ rec {
           inherit (dep) version;
           sha256 = dep.hash;
           fixupCommands = resolvedFixups.fixups.${key}.commands or "";
+          userPatches = userPatches.${key} or [ ];
         }
         // lib.optionalAttrs (rustRulesGen != null) {
           slice = {
@@ -223,6 +294,12 @@ rec {
           conditions
           rustRulesGen
           ;
+        userPatches = userPatchesOf {
+          dir = userPatchesDir;
+          inherit cellName;
+          keys = lib.attrNames deps;
+          parseKey = parseKeyForSymlink;
+        };
       };
 
       # What gen-rust-buck reads of each crate's fixup
@@ -311,8 +388,10 @@ rec {
         keyToPath
         parseKeyForSymlink
         mergeCommands
-        userPatchesDir
         ;
+      # Each package applies its own user patches: the merged cell copies
+      # them patched
+      userPatchesDir = null;
       createSymlinks = true;
       cellBuildInputs =
         cellBuildInputs
