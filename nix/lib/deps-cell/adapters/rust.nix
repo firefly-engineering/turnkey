@@ -3,13 +3,12 @@
 # Provides:
 #   - mkRustDepPackage: Build a single Rust crate package: its source with
 #     its fixup applied, and, given its package slice, its own rules.star
-#   - mkRustDepsCell: Build a complete Rust dependency cell, and (passthru)
-#     its cell index (ADR 0004)
+#   - mkRustCrates: Every locked crate's package
+#   - mkRustDepsCell: The Rust dependency cell's cell index (ADR 0004)
 #
-# Rust dependencies are fetched from crates.io. The merged cell still unifies
-# features and generates every rules.star in its merge phase; each package's
-# own rules.star, generated from its slice alone, is what the cell index
-# points at.
+# Rust dependencies are fetched from crates.io. Each crate's rules.star is
+# generated in its own package, from its package slice alone (ADR 0006);
+# tk materialize lays the packages out as the cell the index describes.
 
 {
   pkgs,
@@ -20,7 +19,7 @@
 let
   fetchers = import ../fetchers.nix { inherit pkgs lib; };
   platforms = import ../../../buck2/platforms.nix { inherit lib; };
-  inherit (genericBuilder) genericMkDepsCell unversionedKeys mkCellIndex;
+  inherit (genericBuilder) unversionedKeys mkCellIndex;
 
   # The platform the cell is built on: what fixups build natively exists
   # only for it
@@ -34,9 +33,6 @@ rec {
     stdenv.cc
     perl
   ];
-
-  # Build inputs for cell builds
-  cellBuildInputs = with pkgs; [ python3 ];
 
   # ==========================================================================
   # Public API
@@ -234,17 +230,20 @@ rec {
       )
     ) deps;
 
-  # Build a complete Rust dependency cell
+  # Build the Rust dependency cell (ADR 0004): each locked crate's own
+  # package (mkRustCrates), and the cell index that tk materialize keeps
+  # .turnkey/<cellName> in line with. The result is the index, with
+  # depPackages (each crate's package, keyed "name@version") and index
+  # (itself) alongside.
   mkRustDepsCell =
     {
       cellName, # The cell's name (nix/buck2/languages.nix)
       depsFile, # Path to rust-deps.toml
-      featuresFile ? null, # Path to rust-features.toml (optional)
 
       # The locked crates' fixups: [ { key; name; version; } ] ->
       # { fixups = { <key> = { commands; gen; }; }; unaccounted = { <key> =
       # message; }; } (nix/lib/fixups's resolve): a crate in unaccounted
-      # fails the cell if it has a build script
+      # fails its package if it has a build script
       resolveFixups ? (
         _: {
           fixups = { };
@@ -252,73 +251,23 @@ rec {
         }
       ),
 
-      # User patches (from FUSE edit layer)
-      userPatchesDir ? null, # Path to .turnkey/patches directory
+      # The user's patches (tk compose patch): <dir>/<cellName>/vendor/<package>/
+      userPatchesDir ? null,
 
       # The platforms to build for, and the package of their combined
       # config_settings (nix/buck2/platforms.nix's conditions): the select()s
-      # of target-specific deps are keyed on them
+      # of platform-specific features and deps are keyed on them
       conditions,
 
-      # Tools (must be provided by caller)
-      computeUnifiedFeatures ? null, # Tool for feature unification
-      genRustBuck ? null, # Tool for BUCK generation
-      # Generates each crate's own rules.star from its slice, for the cell
-      # index (passthru.index), when given
-      rustRulesGen ? null,
+      # Generates each crate's rules.star from its package slice
+      rustRulesGen,
     }:
     let
-      depsToml = builtins.fromTOML (builtins.readFile depsFile);
-      deps = depsToml.deps or { };
+      deps = (builtins.fromTOML (builtins.readFile depsFile)).deps or { };
+      keys = lib.attrNames deps;
 
-      # The locked crates, and their fixups
-      locked = lib.mapAttrsToList (key: depSpec: {
-        inherit key;
-        name = depSpec.name or (lib.head (lib.splitString "@" key));
-        inherit (depSpec) version;
-      }) deps;
-      resolvedFixups = resolveFixups locked;
-      inherit (resolvedFixups) fixups;
-
-      # The crates no fixup accounts for the build script of, and what the
-      # cell fails with if they have one
-      unaccountedFile = pkgs.writeText "${cellName}-unaccounted-build-scripts.json" (
-        builtins.toJSON resolvedFixups.unaccounted
-      );
-
-      # Build individual dep packages
-      depPackages = mkRustCrates {
-        inherit
-          deps
-          resolvedFixups
-          conditions
-          rustRulesGen
-          ;
-        userPatches = userPatchesOf {
-          dir = userPatchesDir;
-          inherit cellName;
-          keys = lib.attrNames deps;
-          parseKey = parseKeyForSymlink;
-        };
-      };
-
-      # What gen-rust-buck reads of each crate's fixup
-      fixupsFile = pkgs.writeText "${cellName}-fixups.json" (
-        builtins.toJSON (lib.mapAttrs (_: fixup: fixup.gen) fixups)
-      );
-
-      # The platform the cell is built on: what fixups build natively
-      # exists only for it
-      hostJSON = builtins.toJSON hostPlatform;
-
-      # Features file argument for compute-unified-features
-      featuresFileArg = if featuresFile != null then "${featuresFile}" else "";
-
-      # Key to path: Rust keys are already "name@version" format
-      keyToPath = key: key;
-
-      # Parse key for symlink: extract crate name (basePath) and version
-      parseKeyForSymlink =
+      # A key's crate name (basePath) and version
+      parseKey =
         key:
         let
           parts = lib.splitString "@" key;
@@ -328,87 +277,31 @@ rec {
           version = if lib.length parts > 1 then lib.elemAt parts 1 else "";
         };
 
-      # Include both versioned and unversioned crate names for gen-rust-buck
-      versionedNames = lib.attrNames deps;
-      unversionedNames = lib.unique (map (key: lib.head (lib.splitString "@" key)) versionedNames);
-      allCrateNames = versionedNames ++ unversionedNames;
-
-      conditionsJSON = builtins.toJSON conditions;
-
-      # Merge commands: every build script accounted for, feature
-      # unification, BUCK generation
-      mergeCommands = ''
-        # Every crate with a build script needs a fixup saying what stands
-        # in for it: Buck2 never runs build.rs
-        python3 ${./rust-build-scripts.py} "$out/vendor" ${unaccountedFile}
-
-        # Compute unified features (if tool provided)
-        ${
-          if computeUnifiedFeatures != null then
-            ''
-              echo "Computing unified features..."
-              UNIFIED_FEATURES=$(compute-unified-features "$out/vendor" ${featuresFileArg} --deps-file ${depsFile} --platforms '${conditionsJSON}')
-              export UNIFIED_FEATURES
-            ''
-          else
-            ''
-              UNIFIED_FEATURES="{}"
-              export UNIFIED_FEATURES
-            ''
-        }
-
-        # Generate BUCK files (if tool provided)
-        ${
-          if genRustBuck != null then
-            ''
-              echo "Generating BUCK files..."
-              for dir in "$out/vendor"/*; do
-                if [ -d "$dir" ] && [ -f "$dir/Cargo.toml" ]; then
-                  gen-rust-buck "$dir" \
-                    '${builtins.toJSON allCrateNames}' \
-                    ${fixupsFile} \
-                    "$UNIFIED_FEATURES" \
-                    '${conditionsJSON}' \
-                    '${hostJSON}' \
-                    > "$dir/rules.star" || echo "# rules.star generation failed" > "$dir/rules.star"
-                fi
-              done
-            ''
-          else
-            ''
-              echo "No gen-rust-buck tool provided, skipping BUCK generation"
-            ''
-        }
-      '';
-    in
-    genericMkDepsCell {
-      inherit
-        cellName
-        depPackages
-        keyToPath
-        parseKeyForSymlink
-        mergeCommands
-        ;
-      # Each package applies its own user patches: the merged cell copies
-      # them patched
-      userPatchesDir = null;
-      createSymlinks = true;
-      cellBuildInputs =
-        cellBuildInputs
-        ++ (if computeUnifiedFeatures != null then [ computeUnifiedFeatures ] else [ ])
-        ++ (if genRustBuck != null then [ genRustBuck ] else [ ]);
-      # The cell index: each package's own derivation, with the rules.star
-      # generated from its slice, and the unversioned alias packages, as the
-      # merged cell's unversioned symlinks choose them
-      passthru = lib.optionalAttrs (rustRulesGen != null) {
-        index = mkCellIndex {
-          inherit cellName depsFile;
-          packages = lib.mapAttrs' (key: lib.nameValuePair "vendor/${keyToPath key}") depPackages;
-          aliases = lib.mapAttrs' (name: key: lib.nameValuePair "vendor/${name}" "vendor/${keyToPath key}") (
-            unversionedKeys parseKeyForSymlink (lib.attrNames depPackages)
-          );
+      depPackages = mkRustCrates {
+        inherit deps conditions rustRulesGen;
+        resolvedFixups = resolveFixups (
+          map (key: {
+            inherit key;
+            name = deps.${key}.name or (parseKey key).basePath;
+            inherit (deps.${key}) version;
+          }) keys
+        );
+        userPatches = userPatchesOf {
+          dir = userPatchesDir;
+          inherit cellName keys parseKey;
         };
       };
-    };
+
+      # Each crate's versioned package, and each unversioned name's alias
+      # package, forwarding to its highest version
+      index = mkCellIndex {
+        inherit cellName depsFile;
+        packages = lib.mapAttrs' (key: lib.nameValuePair "vendor/${key}") depPackages;
+        aliases = lib.mapAttrs' (name: key: lib.nameValuePair "vendor/${name}" "vendor/${key}") (
+          unversionedKeys parseKey keys
+        );
+      };
+    in
+    index // { inherit depPackages index; };
 
 }

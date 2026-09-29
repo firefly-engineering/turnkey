@@ -83,7 +83,6 @@ cat > flake.nix << EOF
             rust = {
               enable = true;
               depsFile = ./rust-deps.toml;
-              featuresFile = ./rust-features.toml;
               cargoTomlFile = "rust_lib/Cargo.toml";
               cargoLockFile = "rust_lib/Cargo.lock";
             };
@@ -114,12 +113,6 @@ uv = {}
 pydeps-gen = {}
 EOF
 
-# Step 6: Create rust-features.toml
-step "Creating rust-features.toml"
-cat > rust-features.toml << 'EOF'
-[overrides]
-serde = { add = ["derive", "serde_derive"] }
-EOF
 
 # Step 7: Stage files for flake
 step "Staging files for Nix flake"
@@ -133,7 +126,8 @@ run_in_devshell_script << 'PHASE1'
 
   echo ""
   echo "Generating rust-deps.toml..."
-  rustdeps-gen --cargo-lock rust_lib/Cargo.lock -o rust-deps.toml
+  # Through the sync rule: it passes the platforms the slices are resolved for
+  tk sync rust
 
   echo ""
   echo "Generating python-deps.toml..."

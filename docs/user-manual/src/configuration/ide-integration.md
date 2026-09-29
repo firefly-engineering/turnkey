@@ -284,8 +284,7 @@ expression.
   gets is a plain dep, one no platform gets is dropped. `cfg()` supports
   `target_os`, `target_family` (`unix`), `target_arch`,
   `target_pointer_width`, `target_env`, `target_vendor`, `target_endian`
-  and `all`/`any`/`not`, as the rustdeps cell evaluates it for vendored
-  crates. Build dependencies are not synced: sync reports them and leaves
+  and `all`/`any`/`not`. Build dependencies are not synced: sync reports them and leaves
   any existing dep on them alone. See [Rust Features](#rust-features) for
   features, optional dependencies and dependencies on a member's variant.
 - **Go**: the imports `go list` reports, on every platform: it runs once

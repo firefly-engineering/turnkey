@@ -149,16 +149,8 @@ map (language: language // { cellLink = cellLink language.cellName; }) [
       depsCell.mkRustDepsCell {
         inherit cellName;
         inherit (langCfg) depsFile;
-        inherit userPatchesDir resolveFixups;
-        featuresFile =
-          if langCfg.featuresFile != null && builtins.pathExists langCfg.featuresFile then
-            langCfg.featuresFile
-          else
-            null;
-        inherit conditions;
-        genRustBuck = import ../packages/gen-rust-buck.nix { inherit pkgs lib; };
+        inherit userPatchesDir resolveFixups conditions;
         rustRulesGen = import ../packages/rust-rules-gen.nix { inherit pkgs lib; };
-        computeUnifiedFeatures = import ../packages/compute-unified-features.nix { inherit pkgs lib; };
       };
     # rustdeps-gen resolves each crate's package slice with cargo, once per
     # platform, and lists every workspace member's Cargo.toml in the deps

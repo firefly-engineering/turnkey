@@ -24,11 +24,24 @@ This means Go won't try to compile generated Buck2 cells, Cargo won't discover t
 ├── prelude/         # Symlink to Buck2 prelude derivation
 ├── toolchains/      # Symlink to generated toolchains cell
 ├── godeps/          # Symlink to Go dependencies cell
-├── rustdeps/        # Symlink to Rust dependencies cell
-└── jsdeps/          # Symlink to JavaScript dependencies cell
+├── jsdeps/          # Symlink to JavaScript dependencies cell
+├── rustdeps/        # Real directory: the write-once Rust cell (tk materialize)
+│   ├── .buckconfig
+│   ├── .deps-file-sha256   # the rust-deps.toml it was built from
+│   ├── _store/<store path name>  # one symlink per crate, never retargeted
+│   └── vendor/<crate>@<version>/rules.star, vendor/<crate>/rules.star  # aliases
+├── rustdeps.lock    # held while tk materialize runs
+├── gcroots/rustdeps # GC root for the Rust cell's current index
+├── edits/, patches/ # tk compose's edits and generated patches
+└── sync.toml        # Symlink to the rules tk sync follows
 ```
 
-The symlinks point to Nix store paths containing the generated Buck2 cells.
+Most cells are symlinks to Nix store paths containing the generated Buck2
+cells. The Rust cell is a real directory that `tk materialize`, run by the
+shell, keeps in line with the cell index Nix builds: a dependency change
+rewrites only the entries for the crates that changed
+([ADR 0004](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0004-deps-cells-are-write-once-directories.md)).
+Don't edit it; the shell rewrites it on every load.
 
 ## Buck2 Configuration
 

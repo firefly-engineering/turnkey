@@ -18,7 +18,6 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-mod requested;
 mod slices;
 
 use slices::{Dependency, Feature, Platform};
@@ -32,8 +31,8 @@ struct Args {
     #[arg(long, default_value = "Cargo.lock")]
     cargo_lock: PathBuf,
 
-    /// Path to the workspace's root Cargo.toml, whose members' dependency
-    /// specs are recorded as [[requested]] (default: next to Cargo.lock)
+    /// Path to the workspace's root Cargo.toml, which cargo resolves the
+    /// package slices from (default: next to Cargo.lock)
     #[arg(long)]
     cargo_toml: Option<PathBuf>,
 
@@ -65,9 +64,6 @@ struct RustDeps {
     manifests: BTreeSet<PathBuf>,
     /// Keyed "name@version", to hold several versions of a crate
     deps: BTreeMap<String, Crate>,
-    /// The workspace members' registry dependency specs, from their
-    /// Cargo.toml files: where feature unification starts
-    requested: Vec<requested::Request>,
 }
 
 /// A crate with its Nix hash and its package slice
@@ -93,12 +89,10 @@ fn main() -> Result<()> {
     let lockfile = Lockfile::load(&args.cargo_lock)
         .with_context(|| format!("Failed to load {}", args.cargo_lock.display()))?;
 
-    // Feature unification in the cell starts from what the workspace asks for
     let cargo_toml = args
         .cargo_toml
         .clone()
         .unwrap_or_else(|| args.cargo_lock.with_file_name("Cargo.toml"));
-    let requested = requested::workspace_requests(&cargo_toml)?;
 
     // Each crate's package slice: Cargo resolves the workspace once per
     // platform, and its lock file graph names the dependencies
@@ -148,7 +142,6 @@ fn main() -> Result<()> {
                 (key, c)
             })
             .collect(),
-        requested,
     };
     args.output.write_text(&render(&doc)?)
 }
@@ -328,7 +321,7 @@ version = "0.1.0"
     }
 
     #[test]
-    fn writes_deps_slices_and_requested() {
+    fn writes_deps_and_slices() {
         let doc = RustDeps {
             schema_version: 2,
             platforms: vec!["linux-x86_64".into(), "macos-arm64".into()],
@@ -363,12 +356,6 @@ version = "0.1.0"
                     ],
                 },
             )]),
-            requested: vec![requested::Request {
-                name: "serde".into(),
-                version: Some("1.0".into()),
-                default_features: false,
-                features: ["derive".to_string()].into(),
-            }],
         };
         let out = render(&doc).unwrap();
         let parsed: toml::Value = toml::from_str(&out).unwrap();
@@ -405,9 +392,6 @@ dependencies = [
         assert_eq!(deps[1]["package"].as_str(), Some("serde_derive@1.0.228"));
         assert_eq!(deps[1]["rename"].as_str(), Some("derive"));
         assert_eq!(deps[1]["platforms"][0].as_str(), Some("macos-arm64"));
-        let req = &parsed["requested"][0];
-        assert_eq!(req["name"].as_str(), Some("serde"));
-        assert_eq!(req["default-features"].as_bool(), Some(false));
-        assert_eq!(req["features"][0].as_str(), Some("derive"));
+        assert_eq!(parsed.get("requested"), None);
     }
 }

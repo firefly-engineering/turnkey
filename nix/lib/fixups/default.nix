@@ -260,9 +260,9 @@ rec {
   # Returns { fixups = { <key> = { commands; gen; accounted; }; };
   # unaccounted = { <key> = message; }; warnings; errors; }. commands run
   # in the dependency's derivation (patches, then the build script); gen is
-  # what gen-rust-buck reads. unaccounted holds, for every Rust crate whose
-  # build.rs no fixup accounts for, the error the cell fails with if the
-  # crate turns out to have one.
+  # what rust-rules-gen reads. unaccounted holds, for every Rust crate whose
+  # build.rs no fixup accounts for, the error the crate's package fails with
+  # if it turns out to have one.
   resolve =
     {
       evaluated,

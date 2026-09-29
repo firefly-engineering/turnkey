@@ -59,20 +59,20 @@ git add go-deps.toml
 # Re-enter shell
 ```
 
-### Rust feature conflicts
+### A vendored Rust crate's features differ from what you expect
 
-**Cause:** A vendored crate is built with features that differ from what
-Cargo would pick. Features are resolved from the `[[requested]]` entries in
-`rust-deps.toml`, so first make sure it is current (`tk sync`; editing only a
-dependency's `features` in a member `Cargo.toml` does not change `Cargo.lock`,
-so `touch Cargo.lock` before syncing).
+**Cause:** Each crate gets the features `cargo` resolves for `cargo test
+--workspace`, per platform, recorded in `rust-deps.toml` by `tk sync`. Either
+`rust-deps.toml` is out of date, or a member doesn't ask for the feature.
 
-**Solution:** If it still differs, create `rust-features.toml` with explicit
-overrides:
-```toml
-[overrides]
-problematic-crate = ["feature1", "feature2"]
-```
+**Solution:**
+1. Regenerate it: `tk sync`. A features-only edit to a member's `Cargo.toml`
+   is enough to make the Rust rule stale.
+2. Compare with cargo itself:
+   `cargo tree --target <triple> -e normal,dev -i <crate> --format '{p} {f}'`.
+3. Ask for the feature in the member's `Cargo.toml` that uses the crate.
+   There is no override file: `rust-features.toml` is retired
+   (see [Upgrading](./upgrading.md)).
 
 ## FUSE Issues
 

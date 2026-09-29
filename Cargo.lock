@@ -1867,21 +1867,11 @@ dependencies = [
  "cargo-lock",
  "clap",
  "deps-gen-kit",
- "glob",
  "serde",
  "serde_json",
  "tempfile",
  "toml",
  "toml_edit 0.25.11+spec-1.1.0",
-]
-
-[[package]]
-name = "rustfeatures-gen"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "toml",
 ]
 
 [[package]]

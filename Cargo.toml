@@ -14,7 +14,6 @@ members = [
     "src/cmd/pydeps-gen",
     "src/cmd/rustdeps-gen",
     "src/cmd/rust-rules-gen",
-    "src/cmd/rustfeatures-gen",
     "src/cmd/soldeps-gen",
     "src/cmd/test-runner-codegen",
     "src/cmd/turnkey-composed",
