@@ -396,3 +396,44 @@ func lock(path string) (func(), error) {
 		_ = f.Close()
 	}, nil
 }
+
+// CurrentIndex reads the index a cell was last materialized from: the one
+// its GC root points at
+func CurrentIndex(root, cell string) (*Index, error) {
+	link := filepath.Join(root, ".turnkey", gcrootsDir, cell)
+	path, err := os.Readlink(link)
+	if err != nil {
+		return nil, fmt.Errorf("the %s cell isn't materialized (no %s): %w", cell, link, err)
+	}
+	return ReadIndex(path)
+}
+
+// Resolve finds the package holding a path in the cell (vendor/<pkg>/...):
+// the package's own path, as the index names it (an alias package resolves
+// to the package it forwards to), its store path, and the path within it
+func (index *Index) Resolve(relPath string) (pkgPath, store, rest string, ok bool) {
+	relPath = filepath.ToSlash(filepath.Clean(relPath))
+	best := ""
+	for path := range index.Packages {
+		if strings.HasPrefix(relPath, path+"/") && len(path) > len(best) {
+			best = path
+		}
+	}
+	for path := range index.Aliases {
+		if strings.HasPrefix(relPath, path+"/") && len(path) > len(best) {
+			best = path
+		}
+	}
+	if best == "" {
+		return "", "", "", false
+	}
+	rest = strings.TrimPrefix(relPath, best+"/")
+	if target, alias := index.Aliases[best]; alias {
+		best = target
+	}
+	pkg, ok := index.Packages[best]
+	if !ok {
+		return "", "", "", false
+	}
+	return best, pkg.Store, rest, true
+}

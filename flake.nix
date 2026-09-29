@@ -738,6 +738,41 @@
               "rust crate isolation: ${lib.concatStringsSep ", " leaks} changed a derivation it shouldn't, or left the changed crate's alone";
             pkgs.runCommand "rust-crate-isolation-check" { } "touch $out";
 
+          # A user patch goes to its own package's derivation
+          # (nix/lib/deps-cell/adapters/rust.nix's userPatchesOf): routed by
+          # its directory, vendor/<package>/, where an unversioned name
+          # resolves as the cell's alias does. A flat patch file, from before
+          # packages had directories, fails evaluation with where to move it.
+          checks.rust-user-patches =
+            let
+              depsCell = import ./nix/lib/deps-cell { inherit pkgs lib; };
+              routed =
+                dir:
+                depsCell.adapters.rust.userPatchesOf {
+                  inherit dir;
+                  cellName = "rustdeps";
+                  keys = [
+                    "anyhow@1.0.99"
+                    "anyhow@1.0.100"
+                    "prost-derive@0.14.1"
+                  ];
+                  parseKey = key: {
+                    basePath = lib.head (lib.splitString "@" key);
+                    version = lib.last (lib.splitString "@" key);
+                  };
+                };
+              got = lib.mapAttrs (_: map baseNameOf) (routed ./nix/lib/deps-cell/testdata/patches);
+              flat = builtins.tryEval (routed ./nix/lib/deps-cell/testdata/flat-patches);
+            in
+            assert lib.assertMsg (
+              got == {
+                "anyhow@1.0.100" = [ "src-lib.rs.patch" ];
+                "prost-derive@0.14.1" = [ "src-lib.rs.patch" ];
+              }
+            ) "rust user patches: routed ${builtins.toJSON got}";
+            assert lib.assertMsg (!flat.success) "rust user patches: a flat patch file was accepted";
+            pkgs.runCommand "rust-user-patches-check" { } "touch $out";
+
           checks.deps-freshness =
             let
               depsFreshness = import ./nix/devenv/turnkey/deps-freshness.nix { inherit lib pkgs; };

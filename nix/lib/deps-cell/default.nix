@@ -27,7 +27,8 @@ let
     };
 
   # Each unversioned name's package: for keys grouped by parseKey's
-  # basePath, the key with the highest version (a string comparison).
+  # basePath, the key with the highest version (builtins.compareVersions:
+  # 1.0.100 is higher than 1.0.99).
   # { <basePath> = <key>; }. The cell's unversioned symlinks and the cell
   # index's unversioned alias packages both follow it.
   unversionedKeys =
@@ -38,7 +39,9 @@ let
       highest =
         group:
         let
-          highestVersion = lib.head (lib.sort (a: b: a > b) (map (key: parsed.${key}.version) group));
+          highestVersion = lib.head (
+            lib.sort (a: b: builtins.compareVersions a b > 0) (map (key: parsed.${key}.version) group)
+          );
         in
         lib.findFirst (key: parsed.${key}.version == highestVersion) (lib.head group) group;
     in

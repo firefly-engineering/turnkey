@@ -268,3 +268,26 @@ func TestStaleComparesTheDepsFileWithTheMarker(t *testing.T) {
 		t.Errorf("changed deps file: stale %v, %v", stale, err)
 	}
 }
+
+func TestResolvesPathsThroughTheCurrentIndex(t *testing.T) {
+	f := newFixture(t)
+	index := f.index("1.0.100")
+	addRoot := func(link, store string) error { return os.Symlink(store, link) }
+	if _, err := Materialize(Options{Root: f.root, IndexPath: index, AddRoot: addRoot}); err != nil {
+		t.Fatal(err)
+	}
+	current, err := CurrentIndex(f.root, "rustdeps")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := filepath.Join(f.store, "aaa-dep-rust-anyhow-1.0.100")
+	for _, path := range []string{"vendor/anyhow@1.0.100/src/lib.rs", "vendor/anyhow/src/lib.rs"} {
+		pkg, gotStore, rest, ok := current.Resolve(path)
+		if !ok || pkg != "vendor/anyhow@1.0.100" || gotStore != store || rest != "src/lib.rs" {
+			t.Errorf("Resolve(%s) = %s, %s, %s, %v", path, pkg, gotStore, rest, ok)
+		}
+	}
+	if _, _, _, ok := current.Resolve("vendor/serde/src/lib.rs"); ok {
+		t.Errorf("resolved a package the index doesn't list")
+	}
+}

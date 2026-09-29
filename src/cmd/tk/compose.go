@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/firefly-engineering/turnkey/src/go/pkg/materialize"
 )
 
 // Directories for edit overlay system
@@ -133,16 +135,13 @@ func runComposeEdit(args []string) int {
 	cell := parts[0]
 	relPath := parts[1]
 
-	// Find the cell source (symlink in .turnkey/)
-	cellLink := filepath.Join(root, ".turnkey", cell)
-	cellSource, err := os.Readlink(cellLink)
+	// The file in the Nix store, and its path in the cell as patches name
+	// it
+	sourceFile, relPath, _, err := resolveCellFile(root, cell, relPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "tk compose edit: cell %q not found: %v\n", cell, err)
+		fmt.Fprintf(os.Stderr, "tk compose edit: %v\n", err)
 		return 1
 	}
-
-	// Source file in the Nix store
-	sourceFile := filepath.Join(cellSource, relPath)
 	if _, err := os.Stat(sourceFile); os.IsNotExist(err) {
 		fmt.Fprintf(os.Stderr, "tk compose edit: file not found: %s\n", sourceFile)
 		return 1
@@ -174,6 +173,37 @@ func runComposeEdit(args []string) int {
 	fmt.Printf("Original: %s\n", sourceFile)
 	fmt.Println("\nEdit the file, then run 'tk compose patch' to generate a patch.")
 	return 0
+}
+
+// resolveCellFile finds a file of a deps cell in the Nix store, and the
+// path patches name it by. A cell that is a symlink to one store path holds
+// it under that path. A materialized cell (ADR 0004) holds it in a
+// package's own store path: the cell index resolves vendor/<pkg>/..., and
+// an alias package (vendor/anyhow) to the package it forwards to
+// (vendor/anyhow@1.0.100), which is the path patches are routed by; pkg is
+// that package's path, and empty for a symlinked cell.
+func resolveCellFile(root, cell, relPath string) (storeFile, patchPath, pkg string, err error) {
+	cellDir := filepath.Join(root, ".turnkey", cell)
+	info, err := os.Lstat(cellDir)
+	if err != nil {
+		return "", "", "", fmt.Errorf("cell %q not found: %w", cell, err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		target, err := os.Readlink(cellDir)
+		if err != nil {
+			return "", "", "", fmt.Errorf("cell %q: %w", cell, err)
+		}
+		return filepath.Join(target, relPath), relPath, "", nil
+	}
+	index, err := materialize.CurrentIndex(root, cell)
+	if err != nil {
+		return "", "", "", err
+	}
+	pkg, store, rest, ok := index.Resolve(relPath)
+	if !ok {
+		return "", "", "", fmt.Errorf("%s/%s is in no package of the %s cell", cell, relPath, cell)
+	}
+	return filepath.Join(store, rest), pkg + "/" + rest, pkg, nil
 }
 
 // runComposePatch generates patches from edited files.
@@ -213,21 +243,23 @@ func runComposePatch(args []string) int {
 			continue
 		}
 
-		// Get cell source path
-		cellLink := filepath.Join(root, ".turnkey", cell)
-		cellSource, err := os.Readlink(cellLink)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "tk compose patch: cell %q not found: %v\n", cell, err)
-			continue
-		}
+		for _, editPath := range files {
+			editedFile := filepath.Join(editsPath, cell, editPath)
+			originalFile, relPath, pkg, err := resolveCellFile(root, cell, editPath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "tk compose patch: %v\n", err)
+				continue
+			}
 
-		for _, relPath := range files {
-			originalFile := filepath.Join(cellSource, relPath)
-			editedFile := filepath.Join(editsPath, cell, relPath)
-
-			// Generate patch filename (replace / with -)
+			// Generate patch filename (replace / with -). A materialized
+			// cell's patches go in their package's directory, which routes
+			// each to the package's own derivation.
 			patchName := strings.ReplaceAll(relPath, "/", "-") + ".patch"
 			patchFile := filepath.Join(patchesPath, cell, patchName)
+			if pkg != "" {
+				patchName = strings.ReplaceAll(strings.TrimPrefix(relPath, pkg+"/"), "/", "-") + ".patch"
+				patchFile = filepath.Join(patchesPath, cell, pkg, patchName)
+			}
 
 			// Generate diff
 			diff, err := generateUnifiedDiff(originalFile, editedFile, "a/"+relPath, "b/"+relPath)
@@ -355,8 +387,12 @@ func runComposeReset(args []string) int {
 		return 0
 	}
 
-	// Reset specific file
+	// Reset specific file, named as edit named it (an alias package's path
+	// resolves to its package's)
 	relPath := parts[1]
+	if _, canonical, _, err := resolveCellFile(root, cell, relPath); err == nil {
+		relPath = canonical
+	}
 	editFile := filepath.Join(editsPath, cell, relPath)
 
 	if _, err := os.Stat(editFile); os.IsNotExist(err) {
@@ -434,16 +470,15 @@ func listPatchFiles(patchesPath string) map[string][]string {
 		cell := entry.Name()
 		cellPath := filepath.Join(patchesPath, cell)
 
+		// A materialized cell's patches are in package directories
 		var files []string
-		patchEntries, err := os.ReadDir(cellPath)
-		if err != nil {
-			continue
-		}
-		for _, pe := range patchEntries {
-			if !pe.IsDir() && strings.HasSuffix(pe.Name(), ".patch") {
-				files = append(files, pe.Name())
+		_ = filepath.WalkDir(cellPath, func(path string, d os.DirEntry, err error) error {
+			if err == nil && !d.IsDir() && strings.HasSuffix(d.Name(), ".patch") {
+				rel, _ := filepath.Rel(cellPath, path)
+				files = append(files, rel)
 			}
-		}
+			return nil
+		})
 
 		if len(files) > 0 {
 			result[cell] = files
@@ -498,13 +533,19 @@ func generateUnifiedDiff(originalPath, modifiedPath, originalLabel, modifiedLabe
 	return unifiedDiff(original, modified, originalLabel, modifiedLabel), nil
 }
 
-// readLines reads a file and returns its lines.
+// readLines reads a file and returns its lines. The newline ending the last
+// line ends it: it doesn't start another, empty line, which would become a
+// context line the file doesn't have.
 func readLines(path string) ([]string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return strings.Split(string(data), "\n"), nil
+	text := strings.TrimSuffix(string(data), "\n")
+	if text == "" {
+		return nil, nil
+	}
+	return strings.Split(text, "\n"), nil
 }
 
 // unifiedDiff generates a unified diff between two sets of lines.

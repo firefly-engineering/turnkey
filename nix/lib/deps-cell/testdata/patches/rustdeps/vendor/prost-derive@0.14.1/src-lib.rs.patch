@@ -1,0 +1,5 @@
+--- a/vendor/x/src/lib.rs
++++ b/vendor/x/src/lib.rs
+@@ -1 +1,2 @@
+ fn x() {}
++// fixture
