@@ -117,6 +117,16 @@ eval "$(tk completion zsh)"
 tk completion fish > ~/.config/fish/completions/tk.fish
 ```
 
+#### tk materialize
+
+Bring deps cells in line with their cell indexes. The shell runs it on every load (direnv's `use_turnkey` and `enterShell`), so you rarely need to.
+
+```bash
+tk materialize /nix/store/…-rustdeps-index.json
+```
+
+It adds missing store links, rewrites alias packages whose target changed, removes what the index no longer names, roots the index under `.turnkey/gcroots/`, and records the deps file's hash. It fails, and changes nothing, if a store link points anywhere but its own name. A run with nothing to do touches no file.
+
 #### tk rules
 
 Manage `rules.star` files that define Buck2 build targets from source files. This command automatically detects imports from source files and updates the `deps` list in `rules.star`.

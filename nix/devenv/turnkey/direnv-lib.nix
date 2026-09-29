@@ -70,11 +70,14 @@ let
   );
 
   # Symlink sync: the same links, maintained the same way, as enterShell
-  # (managed-links.nix)
+  # (managed-links.nix), and the materialized cells (tk materialize)
   symlinkSyncFunction = ''
     _turnkey_sync_symlinks() {
       :
       ${(import ./managed-links.nix { inherit lib; }).ensure cfg.managedLinks}
+      ${lib.optionalString (cfg.materializedCells != [ ]) ''
+        "${tk}" --quiet materialize ${lib.escapeShellArgs cfg.materializedCells}
+      ''}
     }
   '';
 

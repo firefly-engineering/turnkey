@@ -367,6 +367,19 @@ wrong.
 The hash should come from the source (e.g., GitHub tarball), not from
 transformed/vendored output.
 
+## The Rust Cell Is a Real Directory
+
+`.turnkey/rustdeps` is a directory that `tk materialize` keeps in line with the cell index the shell builds ([ADR 0004](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0004-deps-cells-are-write-once-directories.md)). The other deps cells are still symlinks to one store path.
+
+- **`_store/<store path name>`**: one symlink per crate, to that crate's own store path. It is only ever created or deleted, never pointed elsewhere.
+- **`vendor/<crate>@<version>/rules.star`** and **`vendor/<crate>/rules.star`**: `alias()` targets that forward to a store link's crate. Labels such as `rustdeps//vendor/anyhow:anyhow` are unchanged.
+
+Only what a change touches is rewritten, so a dependency bump recompiles the bumped crate's dependents and re-runs only their tests. Everything else stays cached, with no daemon restart. Don't edit the directory: the shell rewrites it on every load.
+
+- **Switching over:** the first shell load after upgrading turnkey replaces the old `.turnkey/rustdeps` symlink with the directory. `tk` restarts the buck2 daemon once, and the next build is a full one.
+- **Going back to an older turnkey:** run `rm -rf .turnkey/rustdeps`, then reload the shell.
+- **`tk: warning: the rustdeps cell was built from another rust-deps.toml`:** `rust-deps.toml` changed since the shell last loaded. Run `direnv reload`, or re-enter the shell, to rebuild the cell.
+
 ## Troubleshooting
 
 ### Dependencies Not Found
