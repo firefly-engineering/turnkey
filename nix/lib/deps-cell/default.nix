@@ -26,6 +26,66 @@ let
       inherit pkgs lib genericBuilder;
     };
 
+  # Each unversioned name's package: for keys grouped by parseKey's
+  # basePath, the key with the highest version (a string comparison).
+  # { <basePath> = <key>; }. The cell's unversioned symlinks and the cell
+  # index's unversioned alias packages both follow it.
+  unversionedKeys =
+    parseKey: keys:
+    let
+      parsed = lib.genAttrs keys parseKey;
+      byBasePath = lib.groupBy (key: parsed.${key}.basePath) keys;
+      highest =
+        group:
+        let
+          highestVersion = lib.head (lib.sort (a: b: a > b) (map (key: parsed.${key}.version) group));
+        in
+        lib.findFirst (key: parsed.${key}.version == highestVersion) (lib.head group) group;
+    in
+    lib.mapAttrs (_: highest) byBasePath;
+
+  # A deps cell's .buckconfig
+  cellBuckconfig = cellName: ''
+    [cells]
+        ${cellName} = .
+        prelude = prelude
+
+    [buildfile]
+        name = rules.star
+  '';
+
+  # A deps cell's cell index (ADR 0004): what the materializer brings the
+  # cell's directory in line with. packages maps each package's path in the
+  # cell to its derivation, whose `targets` output lists its target names;
+  # aliases maps each alias package's path to the package it forwards to.
+  # It records the deps file's content hash, which tk compares with the
+  # file on disk.
+  mkCellIndex =
+    {
+      cellName,
+      depsFile,
+      packages,
+      aliases,
+    }:
+    pkgs.runCommand "${cellName}-index.json"
+      {
+        nativeBuildInputs = [ pkgs.python3 ];
+        spec = builtins.toJSON {
+          cell = cellName;
+          deps_file_sha256 = builtins.hashFile "sha256" depsFile;
+          buckconfig = cellBuckconfig cellName;
+          packages = lib.mapAttrs (_: package: {
+            store = "${package}";
+            targets = "${package.targets}";
+          }) packages;
+          inherit aliases;
+        };
+        passAsFile = [ "spec" ];
+      }
+      ''
+        python3 ${./cell-index.py} "$specPath" > $out
+      '';
+
   # Generic cell builder - the core reusable function
   genericMkDepsCell =
     {
@@ -53,24 +113,10 @@ let
       symlinkCommands =
         if createSymlinks && parseKeyForSymlink != null then
           let
-            # Parse all keys to get basePath and version
-            parsedKeys = lib.mapAttrs (key: _: parseKeyForSymlink key) depPackages;
-
-            # Group keys by basePath
-            byBasePath = lib.groupBy (key: (parsedKeys.${key}).basePath) (lib.attrNames depPackages);
-
-            # For each basePath, find highest version and create symlink
+            # Each basePath's symlink points at its highest version
             mkSymlink =
-              basePath: keys:
+              basePath: highestKey:
               let
-                versions = map (key: (parsedKeys.${key}).version) keys;
-                # Sort versions descending (simple string sort works for semver)
-                sortedVersions = lib.sort (a: b: a > b) versions;
-                highestVersion = lib.head sortedVersions;
-                # Find the key with the highest version
-                highestKey = lib.findFirst (
-                  key: (parsedKeys.${key}).version == highestVersion
-                ) (lib.head keys) keys;
                 targetPath = keyToPath highestKey;
                 # Get parent directory path for mkdir
                 parentDir = lib.concatStringsSep "/" (lib.init (lib.splitString "/" basePath));
@@ -86,7 +132,9 @@ let
                 ln -sfn "${targetName}" "$out/vendor/${basePath}"
               '';
           in
-          lib.concatStringsSep "\n" (lib.mapAttrsToList mkSymlink byBasePath)
+          lib.concatStringsSep "\n" (
+            lib.mapAttrsToList mkSymlink (unversionedKeys parseKeyForSymlink (lib.attrNames depPackages))
+          )
         else
           "";
     in
@@ -163,19 +211,17 @@ let
         }
 
         # Generate cell .buckconfig
-        cat > $out/.buckconfig << 'BUCKCONFIG'
-        [cells]
-            ${cellName} = .
-            prelude = prelude
-
-        [buildfile]
-            name = rules.star
-        BUCKCONFIG
+        cp ${pkgs.writeText "${cellName}-buckconfig" (cellBuckconfig cellName)} $out/.buckconfig
       '';
 
   # Build generic builder for adapters
   genericBuilder = {
-    inherit genericMkDepsCell;
+    inherit
+      genericMkDepsCell
+      unversionedKeys
+      cellBuckconfig
+      mkCellIndex
+      ;
   };
 
   # Create adapters with access to generic builder
