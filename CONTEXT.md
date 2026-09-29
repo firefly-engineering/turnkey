@@ -46,6 +46,10 @@ _Avoid_: per-platform fixup, platform override
 The nearest directory, from where `tk` or `tw` runs, holding a `.buckconfig` or a `.turnkey/sync.toml`; a turnkey shell writes both there. Outside one, `tk` runs from the working directory and `tw` runs the tool untouched.
 _Avoid_: repo root, workspace root
 
+**Workspace projection**:
+A language workspace narrowed to a subset of its members: the root manifest keeps only those members and the shared declarations they inherit, and the lock keeps only the packages they reach. Turnkey builds each of its own Nix-built tools from its projection, computed when Nix evaluates, so the tool is rebuilt only when its projection changes, not on every change to the repo's workspace. Internal to turnkey's Nix lib; each language needs its own projector.
+_Avoid_: pruned workspace, pruned source (which name how it is made, not what it is)
+
 **Wrapped tool**:
 A language's native tool (`go`, `cargo`, `uv`, named by the language record) that the shell runs through `tw`. When one of its mutating subcommands changes the content of a file its wrapper rule watches, `tw` runs the rule's post-commands and syncs the rule's deps rule; it always exits as the tool did. Change is judged by content, where `tk sync` judges staleness by mtime.
 _Avoid_: shim, tool wrapper (which is the shell script, not the tool)
