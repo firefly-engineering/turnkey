@@ -88,7 +88,6 @@ cat > flake.nix << EOF
             rust = {
               enable = true;
               depsFile = ./rust-deps.toml;
-              featuresFile = ./rust-features.toml;
               cargoTomlFile = "rust_lib/Cargo.toml";
               cargoLockFile = "rust_lib/Cargo.lock";
             };
@@ -121,13 +120,6 @@ nodejs = {}
 typescript = {}
 EOF
 
-# Step 5b: Create rust-features.toml to enable serde derive
-step "Creating rust-features.toml"
-cat > rust-features.toml << 'EOF'
-# Feature overrides for Rust crates
-[overrides]
-serde = { add = ["derive", "serde_derive"] }
-EOF
 
 # Step 6: Stage files for flake
 step "Staging files for Nix flake"
@@ -152,7 +144,8 @@ run_in_devshell_script << 'PHASE1'
 
   echo ""
   echo "Generating rust-deps.toml..."
-  rustdeps-gen --cargo-lock rust_lib/Cargo.lock -o rust-deps.toml
+  # Through the sync rule: it passes the platforms the slices are resolved for
+  tk sync rust
   echo "Generated rust-deps.toml"
 
   echo ""

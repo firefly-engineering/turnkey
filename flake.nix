@@ -118,8 +118,7 @@
           "deps-extract"
           "buckgen"
           "cargo-prune-workspace"
-          "compute-unified-features"
-          "gen-rust-buck"
+          "rust-rules-gen"
           # Misc
           "nix-prefetch-cached"
           "pytest-uv-shim"
@@ -212,10 +211,6 @@
           # flake-parts module or rust-deps-cell builder rather than by
           # name, so they need to be at packages.* for the cachix
           # workflow to publish them under stable names.
-          packages.compute-unified-features = import ./nix/packages/compute-unified-features.nix {
-            inherit pkgs lib;
-          };
-          packages.gen-rust-buck = import ./nix/packages/gen-rust-buck.nix { inherit pkgs lib; };
           packages.rust-rules-gen = import ./nix/packages/rust-rules-gen.nix { inherit pkgs lib; };
           packages.pytest-uv-shim = import ./nix/packages/pytest-uv-shim.nix { inherit pkgs lib; };
           packages.check-rust-edition-rs = import ./nix/packages/check-rust-edition-rs.nix {
@@ -1424,7 +1419,6 @@
               rust = {
                 enable = true;
                 depsFile = ./rust-deps.toml; # Rust crate dependencies
-                featuresFile = ./rust-features.toml; # Manual feature overrides
               };
 
               # Python dependencies

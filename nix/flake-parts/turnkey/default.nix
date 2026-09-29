@@ -450,32 +450,38 @@ in
       devenv.shells = shellConfigs;
 
       # Expose cell derivations as packages so the composition daemon
-      # can build them directly with `nix build .#<cell>-cell`
-      packages = lib.mapAttrs' (name: drv: lib.nameValuePair "${name}-cell" drv) allCells // {
-        # Combined toolchain profile with all tools in bin/
-        # The daemon exposes this as a virtual bin/ directory at the mount root
-        toolchain-profile =
-          let
-            defaultDecl = cfg.declarationFiles.default or null;
-            # What the default shell gets: its declared toolchains, and the
-            # pinned buck2 when it has the Buck2 integration
-            toolchainPackages =
-              lib.optionals (defaultDecl != null) (
-                (import ../../lib/toolchain-declaration.nix { inherit lib; }).resolve {
-                  tellerLib = turnkeyLib;
-                  inherit registry;
-                  declarationFile = defaultDecl;
-                }
-              )
-              ++ lib.optional (cfg.buck2.enable && builtins.elem "default" cfg.buck2.shells) pinnedBuck2;
-          in
-          pkgs.buildEnv {
-            name = "turnkey-toolchain-profile";
-            paths = toolchainPackages;
-            passthru = { inherit toolchainPackages; };
-            # Ignore collisions (multiple packages may provide the same binary name)
-            ignoreCollisions = true;
-          };
-      };
+      # can build them directly with `nix build .#<cell>-cell`. A write-once
+      # cell (ADR 0004) is a cell index, which the daemon must not serve as
+      # a cell: it is exposed as <cell>-index instead.
+      packages =
+        lib.mapAttrs' (
+          name: drv: lib.nameValuePair "${name}-${if drv ? index then "index" else "cell"}" drv
+        ) allCells
+        // {
+          # Combined toolchain profile with all tools in bin/
+          # The daemon exposes this as a virtual bin/ directory at the mount root
+          toolchain-profile =
+            let
+              defaultDecl = cfg.declarationFiles.default or null;
+              # What the default shell gets: its declared toolchains, and the
+              # pinned buck2 when it has the Buck2 integration
+              toolchainPackages =
+                lib.optionals (defaultDecl != null) (
+                  (import ../../lib/toolchain-declaration.nix { inherit lib; }).resolve {
+                    tellerLib = turnkeyLib;
+                    inherit registry;
+                    declarationFile = defaultDecl;
+                  }
+                )
+                ++ lib.optional (cfg.buck2.enable && builtins.elem "default" cfg.buck2.shells) pinnedBuck2;
+            in
+            pkgs.buildEnv {
+              name = "turnkey-toolchain-profile";
+              paths = toolchainPackages;
+              passthru = { inherit toolchainPackages; };
+              # Ignore collisions (multiple packages may provide the same binary name)
+              ignoreCollisions = true;
+            };
+        };
     };
 }

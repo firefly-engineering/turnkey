@@ -20,10 +20,6 @@ requires-python = ">=3.11"
 # install all of them (editable). Non-packaged example members are pulled
 # in for dependency resolution only.
 dependencies = [
-    "turnkey-buck",
-    "turnkey-buildsystem",
-    "turnkey-cargo",
-    "turnkey-cfg",
     "turnkey-example-python-hello",
     "turnkey-example-python-hello-deps",
 ]
@@ -39,19 +35,11 @@ dev = [
 
 [tool.uv.workspace]
 members = [
-    "src/python/cargo",
-    "src/python/buck",
-    "src/python/buildsystem",
-    "src/python/cfg",
     "src/examples/python-hello",
     "src/examples/python-hello-deps",
 ]
 
 [tool.uv.sources]
-turnkey-buck = { workspace = true }
-turnkey-buildsystem = { workspace = true }
-turnkey-cargo = { workspace = true }
-turnkey-cfg = { workspace = true }
 turnkey-example-python-hello = { workspace = true }
 turnkey-example-python-hello-deps = { workspace = true }
 
@@ -61,4 +49,4 @@ turnkey-example-python-hello-deps = { workspace = true }
 package = false
 
 [tool.pytest.ini_options]
-testpaths = ["src/python"]
+testpaths = ["src/examples"]

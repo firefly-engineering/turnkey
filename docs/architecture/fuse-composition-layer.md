@@ -574,9 +574,19 @@ and as a fallback for the FUSE backend:
 2. `tk` reads the stamp file before delegating to Buck2 and kills the daemon if
    targets changed.
 
-**Trade-off:** Kills the entire daemon. DICE early cutoff still limits rebuild
-scope, but the daemon restart itself costs a few hundred milliseconds and loses
-in-memory state.
+**Trade-off:** Kills the entire daemon, and with it every in-memory result
+DICE's early cutoff would need. There is no local action cache, so after the
+kill every target in every language re-runs: measured on 2026-09-28, the 39
+root Rust targets re-ran all 1184 actions after a one-crate bump
+([#154](https://github.com/firefly-engineering/turnkey/issues/154)). Plain
+`buck2` callers get no check at all, and can build against a retargeted
+cell's stale inputs.
+
+The Rust cell no longer needs this: it is a write-once cell
+([ADR 0004](../adr/0004-deps-cells-are-write-once-directories.md)), whose
+store links are never retargeted, so a bump recompiles only the changed
+crate's dependents, with no kill, and plain `buck2` reads it correctly. The
+other deps cells are still symlinks and still rely on `cellfresh`.
 
 #### Strategy 2: Sideband journal API (recommended, EdenFS pattern)
 

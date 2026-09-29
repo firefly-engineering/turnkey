@@ -1,5 +1,5 @@
 {
-  "description": "Cargo platform specs ([target.'<spec>'.dependencies]) and the platforms (<os>-<cpu>, in Buck2's names) each one matches. Read by src/go/pkg/cargocfg and turnkey.cfg (src/python/cfg) alike, so the two can't drift apart.",
+  "description": "Cargo platform specs ([target.'<spec>'.dependencies]) and the platforms (<os>-<cpu>, in Buck2's names) each one matches. Read by src/go/pkg/cargocfg's tests.",
   "platforms": [
     {
       "os": "linux",

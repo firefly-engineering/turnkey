@@ -258,8 +258,9 @@ in
         example = lib.literalExpression "./rust-deps.toml";
         description = ''
           Path to rust-deps.toml file declaring Rust crate dependencies.
-          When set, turnkey will build the rustdeps cell automatically
-          using the gen-rust-buck.py approach.
+          When set, turnkey builds the rustdeps cell from it: one package per
+          crate, which tk materialize lays out in .turnkey/rustdeps
+          (docs/adr/0004-deps-cells-are-write-once-directories.md).
         '';
       };
 
@@ -279,25 +280,7 @@ in
         '';
       };
 
-      featuresFile = mkOption {
-        type = types.nullOr types.path;
-        default = null;
-        example = lib.literalExpression "./rust-features.toml";
-        description = ''
-          Path to rust-features.toml file for manual feature overrides.
-          This file is NOT generated - it's for resolving feature conflicts
-          or forcing specific feature sets on crates.
-
-          Format:
-            [overrides]
-            # Complete replacement
-            syn = ["derive", "parsing", "visit"]
-
-            # Additive/subtractive
-            serde = { add = ["alloc"] }
-            some-crate = { remove = ["incompatible-feature"] }
-        '';
-      };
+      featuresFile = removedOption "rust.featuresFile" "rust-features.toml is retired: each crate's features are the ones cargo resolves for your Cargo.toml files (docs/adr/0005-rust-resolution-comes-from-cargo-metadata.md). Ask for a feature in the member's Cargo.toml instead, then remove the option and the file; see docs/user-manual/src/reference/upgrading.md.";
 
       rustcFlagsRegistry = removedFixups "rustcFlagsRegistry";
       buildScriptFixups = removedFixups "buildScriptFixups";

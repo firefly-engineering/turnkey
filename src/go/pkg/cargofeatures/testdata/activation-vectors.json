@@ -1,5 +1,5 @@
 {
-  "description": "Cargo feature activation: a crate's [features], its optional and required dependency keys, the requested and removed features, and what they turn on. Read by src/go/pkg/cargofeatures and turnkey.cargo.features.activate (src/python/cargo) alike, so the two can't drift apart.",
+  "description": "Cargo feature activation: a crate's [features], its optional and required dependency keys, the requested and removed features, and what they turn on. Read by src/go/pkg/cargofeatures's tests.",
   "cases": [
     {
       "name": "default expands",

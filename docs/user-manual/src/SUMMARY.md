@@ -45,3 +45,4 @@
 
 - [CLI Commands](./reference/cli.md)
 - [Troubleshooting](./reference/troubleshooting.md)
+- [Upgrading](./reference/upgrading.md)

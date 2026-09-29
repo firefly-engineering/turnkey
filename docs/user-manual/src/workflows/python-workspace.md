@@ -29,7 +29,7 @@ Tests live in a sibling `tests/` directory inside each member, kept outside the 
 
 ## The `turnkey.*` Namespace Convention
 
-Every workspace member contributes a subpackage under the shared `turnkey` [PEP 420 implicit namespace package][pep-420]. No member defines a top-level `turnkey/__init__.py`; Python's import system resolves `turnkey.cargo`, `turnkey.cfg`, etc. by walking every `sys.path` entry that exposes a `turnkey/<name>/` directory.
+Every workspace member contributes a subpackage under the shared `turnkey` [PEP 420 implicit namespace package][pep-420]. No member defines a top-level `turnkey/__init__.py`; Python's import system resolves `turnkey.parser`, `turnkey.config`, etc. by walking every `sys.path` entry that exposes a `turnkey/<name>/` directory.
 
 [pep-420]: https://peps.python.org/pep-0420/
 
@@ -47,16 +47,16 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "turnkey-cargo"
+name = "turnkey-parser"
 version = "0.1.0"
 description = "Cargo manifest and feature-graph utilities"
 requires-python = ">=3.11"
 dependencies = [
-    "turnkey-cfg",       # cross-member dep
+    "turnkey-config",       # cross-member dep
 ]
 
 [tool.uv.sources]
-turnkey-cfg = { workspace = true }
+turnkey-config = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["turnkey"]   # everything under turnkey/<name>/ is the wheel content
@@ -71,10 +71,10 @@ packages = ["turnkey"]   # everything under turnkey/<name>/ is the wheel content
 Declare the dep under `[project] dependencies` with the bare package name, then pin its source to the workspace under `[tool.uv.sources]`:
 
 ```toml
-dependencies = ["turnkey-cfg"]
+dependencies = ["turnkey-config"]
 
 [tool.uv.sources]
-turnkey-cfg = { workspace = true }
+turnkey-config = { workspace = true }
 ```
 
 This mirrors `Cargo.toml`'s `serde.workspace = true` pattern — the consumer member doesn't pin a version, the lockfile reconciles it.
@@ -121,10 +121,8 @@ requires-python = ">=3.11"
 # Listing members as dependencies makes the default `uv sync` install all
 # of them in one shot — no `--all-packages` flag needed.
 dependencies = [
-    "turnkey-buck",
-    "turnkey-buildsystem",
-    "turnkey-cargo",
-    "turnkey-cfg",
+    "turnkey-parser",
+    "turnkey-config",
     "turnkey-example-python-hello",
     "turnkey-example-python-hello-deps",
 ]
@@ -135,19 +133,15 @@ dev = ["pytest>=7.0"]
 
 [tool.uv.workspace]
 members = [
-    "src/python/cargo",
-    "src/python/buck",
-    "src/python/buildsystem",
-    "src/python/cfg",
+    "src/python/parser",
+    "src/python/config",
     "src/examples/python-hello",
     "src/examples/python-hello-deps",
 ]
 
 [tool.uv.sources]
-turnkey-buck = { workspace = true }
-turnkey-buildsystem = { workspace = true }
-turnkey-cargo = { workspace = true }
-turnkey-cfg = { workspace = true }
+turnkey-parser = { workspace = true }
+turnkey-config = { workspace = true }
 turnkey-example-python-hello = { workspace = true }
 turnkey-example-python-hello-deps = { workspace = true }
 
@@ -163,32 +157,32 @@ Member source paths are spelled relative to the member's `rules.star`:
 load("@prelude//:rules.bzl", "python_library", "python_test")
 
 python_library(
-    name = "cargo",
+    name = "parser",
     srcs = [
-        "turnkey/cargo/__init__.py",
-        "turnkey/cargo/features.py",
-        "turnkey/cargo/toml.py",
+        "turnkey/parser/__init__.py",
+        "turnkey/parser/grammar.py",
+        "turnkey/parser/tokens.py",
     ],
     base_module = "",
-    deps = ["//src/python/cfg:cfg"],
+    deps = ["//src/python/config:config"],
     visibility = ["PUBLIC"],
 )
 
 python_test(
-    name = "test_toml",
-    srcs = ["tests/test_toml.py"],
+    name = "test_parser",
+    srcs = ["tests/test_parser.py"],
     base_module = "tests",
-    deps = [":cargo"],
+    deps = [":parser"],
 )
 ```
 
-`base_module = ""` tells Buck2 to install sources at their declared `srcs` paths, so files land at `turnkey/cargo/...` in the runtime tree — matching the import prefix the rest of the codebase uses.
+`base_module = ""` tells Buck2 to install sources at their declared `srcs` paths, so files land at `turnkey/parser/...` in the runtime tree — matching the import prefix the rest of the codebase uses.
 
 ## Adding or Updating Dependencies
 
 ```bash
 # 1. Edit the member that needs the dep
-$EDITOR src/python/cargo/pyproject.toml      # add to [project] dependencies
+$EDITOR src/python/parser/pyproject.toml      # add to [project] dependencies
 
 # 2. Refresh editable installs (optional but recommended)
 uv sync
@@ -220,7 +214,7 @@ The pylock rule exists when the flake sets `buck2.python.uvLockFile`
 | Task                            | uv track                                | Buck2 track                                       |
 | ------------------------------- | --------------------------------------- | ------------------------------------------------- |
 | Run all tests                   | `uv run pytest`                         | `tk test //src/python/...`                        |
-| Run a single member's tests     | `uv run pytest src/python/cargo`        | `tk test //src/python/cargo:test_toml`            |
+| Run a single member's tests     | `uv run pytest src/python/parser`        | `tk test //src/python/parser:test_parser`            |
 | Run an example                  | `uv run --package <pkg-name> <script>`  | `tk run //src/examples/python-hello-deps:python-hello-deps` |
 | REPL with members available     | `uv run python`                         | n/a                                               |
 | IDE language server             | Point at `.venv/bin/python`             | n/a                                               |
