@@ -10,21 +10,22 @@
 let
   root = ../..;
   cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
-  protocol = import ./test-runner-protocol.nix { inherit pkgs lib; };
-in
-pkgs.rustPlatform.buildRustPackage {
-  pname = "turnkey-test-runner";
-  version = "0.1.0";
-
-  src = cargoLib.prunedCargoSource {
+  projection = cargoLib.workspaceProjection {
     inherit root;
     members = [
       "src/cmd/turnkey-test-runner"
       "src/rust/buck2-test-executor"
     ];
   };
+  protocol = import ./test-runner-protocol.nix { inherit pkgs lib; };
+in
+pkgs.rustPlatform.buildRustPackage {
+  pname = "turnkey-test-runner";
+  version = "0.1.0";
 
-  cargoLock.lockFile = root + "/Cargo.lock";
+  inherit (projection) src;
+
+  cargoLock.lockFileContents = projection.lock;
   cargoBuildFlags = [
     "-p"
     "turnkey-test-runner"

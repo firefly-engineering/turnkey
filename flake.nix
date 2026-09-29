@@ -117,7 +117,6 @@
           "turnkey-prelude"
           "deps-extract"
           "buckgen"
-          "cargo-prune-workspace"
           "rust-rules-gen"
           # Misc
           "nix-prefetch-cached"
@@ -193,9 +192,6 @@
           packages.pydeps-gen = import ./nix/packages/pydeps-gen.nix { inherit pkgs lib; };
           packages.rustdeps-gen = import ./nix/packages/rustdeps-gen.nix { inherit pkgs lib; };
           packages.buckgen = import ./nix/packages/buckgen.nix { inherit pkgs lib; };
-          packages.cargo-prune-workspace = import ./nix/packages/cargo-prune-workspace.nix {
-            inherit pkgs lib;
-          };
           packages.tk = import ./nix/packages/tk.nix {
             inherit pkgs lib;
             inherit ((self.lib.pinnedBuck2Release system)) buck2;
@@ -767,6 +763,96 @@
             ) "rust user patches: routed ${builtins.toJSON got}";
             assert lib.assertMsg (!flat.success) "rust user patches: a flat patch file was accepted";
             pkgs.runCommand "rust-user-patches-check" { } "touch $out";
+
+          # A Nix-built Rust tool is built from its workspace projection
+          # (nix/lib/cargo.nix), so a workspace change its members don't
+          # reach leaves its source and lock alone: an unreachable package's
+          # checksum changed, a package added to the lock, a
+          # [workspace.dependencies] entry and a member added. A reachable
+          # package's checksum does change them, and projecting onto every
+          # member gives back Cargo.lock as it is. Checked at evaluation, on
+          # rust-rules-gen.
+          checks.workspace-projection =
+            let
+              cargoLib = import ./nix/lib/cargo.nix { inherit pkgs lib; };
+              root = ./.;
+              manifest = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+              lock = builtins.fromTOML (builtins.readFile ./Cargo.lock);
+              project =
+                args:
+                let
+                  projection = cargoLib.workspaceProjection (
+                    {
+                      inherit root;
+                      members = [ "src/cmd/rust-rules-gen" ];
+                    }
+                    // args
+                  );
+                in
+                {
+                  inherit (projection) lock;
+                  src = projection.src.drvPath;
+                };
+              base = project { };
+              reachedKeys = map (p: "${p.name} ${p.version}") (builtins.fromTOML base.lock).package;
+              isReached = p: lib.elem "${p.name} ${p.version}" reachedKeys;
+              # The first registry package on each side of the projection
+              unreached = lib.findFirst (p: p ? checksum && !(isReached p)) null lock.package;
+              reached = lib.findFirst (p: p ? checksum && isReached p) null lock.package;
+              withChecksum =
+                target:
+                lock
+                // {
+                  package = map (
+                    p:
+                    if p == target then p // { checksum = builtins.replaceStrings [ "0" ] [ "1" ] p.checksum; } else p
+                  ) lock.package;
+                };
+              unaffected = {
+                unreached-checksum = project { lock = withChecksum unreached; };
+                lock-package-added = project {
+                  lock = lock // {
+                    package = lock.package ++ [
+                      {
+                        name = "turnkey-projection-check";
+                        version = "0.0.0";
+                        source = "registry+https://github.com/rust-lang/crates.io-index";
+                        checksum = lib.fakeSha256;
+                      }
+                    ];
+                  };
+                };
+                workspace-dependency-added = project {
+                  manifest = lib.recursiveUpdate manifest {
+                    workspace.dependencies.turnkey-projection-check = "0.0";
+                  };
+                };
+                member-added = project {
+                  manifest = lib.recursiveUpdate manifest {
+                    workspace.members = manifest.workspace.members ++ [ "src/examples/rust-hello-projection" ];
+                  };
+                };
+              };
+              leaks = lib.attrNames (lib.filterAttrs (_: p: p != base) unaffected);
+              affected = project { lock = withChecksum reached; };
+              everyMember = cargoLib.workspaceProjection {
+                inherit root;
+                inherit (manifest.workspace) members;
+              };
+            in
+            assert lib.assertMsg (
+              unreached != null && reached != null
+            ) "workspace projection: no registry package on one side of rust-rules-gen's projection";
+            assert lib.assertMsg (
+              leaks == [ ]
+            ) "workspace projection: ${lib.concatStringsSep ", " leaks} changed rust-rules-gen's projection";
+            assert lib.assertMsg (
+              affected.lock != base.lock && affected.src != base.src
+            ) "workspace projection: a reachable package's checksum left rust-rules-gen's projection alone";
+            assert lib.assertMsg (
+              builtins.fromTOML everyMember.lock == lock
+            ) "workspace projection: projecting onto every member doesn't give back Cargo.lock";
+            pkgs.runCommand "workspace-projection-check" { } "touch $out";
 
           checks.deps-freshness =
             let

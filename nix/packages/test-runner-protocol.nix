@@ -59,14 +59,16 @@ let
     cp -r ${googleapis}/google/api ${googleapis}/google/longrunning ${googleapis}/google/rpc $out/reapi/google/
   '';
 
+  codegenProjection = cargoLib.workspaceProjection {
+    inherit root;
+    members = [ "src/cmd/test-runner-codegen" ];
+  };
+
   codegen = pkgs.rustPlatform.buildRustPackage {
     pname = "test-runner-codegen";
     version = "0.1.0";
-    src = cargoLib.prunedCargoSource {
-      inherit root;
-      members = [ "src/cmd/test-runner-codegen" ];
-    };
-    cargoLock.lockFile = root + "/Cargo.lock";
+    inherit (codegenProjection) src;
+    cargoLock.lockFileContents = codegenProjection.lock;
     cargoBuildFlags = [
       "-p"
       "test-runner-codegen"
