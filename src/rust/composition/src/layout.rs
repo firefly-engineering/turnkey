@@ -168,6 +168,9 @@ pub struct LayoutContext {
     pub cell_prefix: String,
     /// All available cells
     pub cells: Vec<CellInfo>,
+    /// The write-once deps cells, served from `<source_dir_name>/.turnkey/<cell>`
+    /// (ADR 0004)
+    pub write_once_cells: Vec<String>,
 }
 
 impl LayoutContext {
@@ -351,6 +354,16 @@ impl Buck2Layout {
             ));
         }
 
+        // Write-once cells: the repo's own directory, through the source
+        // pass-through, so its store links reach buck2 as they do outside
+        // the mount
+        for name in &ctx.write_once_cells {
+            content.push_str(&format!(
+                "    {} = {}/.turnkey/{}\n",
+                name, ctx.source_dir_name, name
+            ));
+        }
+
         content.push('\n');
 
         // Cell aliases (required by Buck2 prelude)
@@ -458,6 +471,12 @@ impl BazelLayout {
             content.push_str(&format!(
                 "local_repository(\n    name = \"{}\",\n    path = \"../{}/{}\",\n)\n\n",
                 cell.name, ctx.cell_prefix, cell.name
+            ));
+        }
+        for name in &ctx.write_once_cells {
+            content.push_str(&format!(
+                "local_repository(\n    name = \"{}\",\n    path = \".turnkey/{}\",\n)\n\n",
+                name, name
             ));
         }
 
@@ -748,7 +767,31 @@ mod tests {
                 CellInfo::new("godeps", "/nix/store/abc-godeps"),
                 CellInfo::new("rustdeps", "/nix/store/xyz-rustdeps").with_editable(true),
             ],
+            write_once_cells: Vec::new(),
         }
+    }
+
+    #[test]
+    fn test_buck2_maps_write_once_cells_into_the_source() {
+        let mut ctx = test_context();
+        ctx.cells.retain(|c| c.name != "rustdeps");
+        ctx.write_once_cells = vec!["rustdeps".to_string()];
+
+        let configs = Buck2Layout.generate_config(&ctx);
+        let buckconfig = &configs
+            .iter()
+            .find(|c| c.name == ".buckconfig")
+            .unwrap()
+            .content;
+        assert!(
+            buckconfig.contains("    rustdeps = root/.turnkey/rustdeps\n"),
+            "{buckconfig}"
+        );
+        assert!(
+            buckconfig.contains("    godeps = external/godeps\n"),
+            "{buckconfig}"
+        );
+        assert!(!buckconfig.contains("external/rustdeps"), "{buckconfig}");
     }
 
     #[test]

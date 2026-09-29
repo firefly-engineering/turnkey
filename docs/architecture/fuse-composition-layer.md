@@ -136,6 +136,16 @@ impl Layout for MyLayout {
 }
 ```
 
+#### Write-once deps cells are served from the source pass-through
+
+A write-once deps cell ([ADR 0004](../adr/0004-deps-cells-are-write-once-directories.md)) is a real directory in the repo, `.turnkey/<cell>`, which `tk materialize` keeps in line with its cell index. Today that's the Rust cell. The composition layer doesn't serve it from a store path:
+
+- **Discovery:** a `.turnkey/<cell>` that is a real directory holding the materializer's marker (`.deps-file-sha256`) counts as write-once. Its `<cell>-cell` flake export is neither built nor served.
+- **Layout:** `Buck2Layout` maps the cell into the source pass-through, `<cell> = root/.turnkey/<cell>`, rather than to `external/<cell>`. Its store links reach buck2 as absolute symlinks, as they do without the mount, so each package keeps its own key. On macOS the cell is a directory, never a symlink.
+- **Nesting:** buck2 doesn't descend into a nested cell's directory when it expands the enclosing cell's `...`. Verified with a scratch project: `root//...` lists none of the nested cell's targets. So the `root` cell holding `.turnkey/rustdeps` changes nothing about `root//...`.
+- **Excludes:** excluding `.turnkey` from the pass-through fails validation while there are write-once cells.
+- **After a dependency bump,** the alias files change in the repo, not through the mount. As for any file changed behind the mount, buck2 sees the change only after a daemon restart, until a journal-backed watcher exists (Strategy 2 below).
+
 ### 3. Fixed Mount Location
 
 The FUSE layer mounts at a **configurable fixed location**, enabling:

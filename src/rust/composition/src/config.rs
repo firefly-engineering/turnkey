@@ -66,6 +66,12 @@ pub struct CompositionConfig {
     /// Default: `.turnkey/patches`
     pub patches_dir: PathBuf,
 
+    /// The write-once deps cells (ADR 0004): real directories the
+    /// materializer keeps at `<repo>/.turnkey/<cell>`. They are not served
+    /// from a store path: the layout maps them into the source pass-through
+    /// (`root/.turnkey/<cell>`), so each package keeps its own key.
+    pub write_once_cells: Vec<String>,
+
     /// Files and directories to exclude from the source pass-through.
     ///
     /// Entries are matched against the first path component under `root/`.
@@ -110,6 +116,7 @@ impl CompositionConfig {
             enable_editing: false,
             edits_dir: PathBuf::from(".turnkey/edits"),
             patches_dir: PathBuf::from(".turnkey/patches"),
+            write_once_cells: Vec::new(),
             exclude: Vec::new(),
             output_mounts: Vec::new(),
             toolchain_profile: None,
@@ -131,6 +138,12 @@ impl CompositionConfig {
     /// Add a cell configuration
     pub fn with_cell(mut self, cell: CellConfig) -> Self {
         self.cells.push(cell);
+        self
+    }
+
+    /// Add a write-once deps cell, served from the repo's `.turnkey/<name>`
+    pub fn with_write_once_cell(mut self, name: impl Into<String>) -> Self {
+        self.write_once_cells.push(name.into());
         self
     }
 
@@ -184,6 +197,19 @@ impl CompositionConfig {
 
         if self.layout.is_empty() {
             return Err("layout cannot be empty".into());
+        }
+
+        // Write-once cells are served from root/.turnkey/<cell>
+        if !self.write_once_cells.is_empty()
+            && self
+                .exclude
+                .iter()
+                .any(|e| e.trim_end_matches('/') == ".turnkey")
+        {
+            return Err(format!(
+                "the write-once cells ({}) are served from .turnkey/, which is excluded from the source pass-through",
+                self.write_once_cells.join(", ")
+            ));
         }
 
         // Check for duplicate cell names
@@ -324,6 +350,14 @@ mod tests {
 
         assert!(config.validate().is_err());
         assert!(config.validate().unwrap_err().contains("duplicate"));
+    }
+
+    #[test]
+    fn test_validate_rejects_excluding_write_once_cells() {
+        let config = CompositionConfig::new("/firefly/turnkey", "/home/user/repo")
+            .with_write_once_cell("rustdeps")
+            .with_excludes(vec![".turnkey/".to_string()]);
+        assert!(config.validate().unwrap_err().contains("rustdeps"));
     }
 
     #[test]
