@@ -417,7 +417,11 @@ fn run_serve(config_path: &Path) -> Result<()> {
                                     mount_label, manifest_name
                                 );
                                 let nix = CliNixClient::new(&repo_root);
-                                match discover::build_all_cells(&nix, nix_eval::current_system()) {
+                                match discover::build_all_cells(
+                                    &nix,
+                                    nix_eval::current_system(),
+                                    &repo_root,
+                                ) {
                                     Ok(cells) => {
                                         info!("[{}] Rebuilt {} cells", mount_label, cells.len());
                                         if let Ok(mut b) = backend_clone.lock() {
@@ -717,7 +721,11 @@ fn run_daemon(
                         );
                         // Rebuild cells directly via nix build
                         let nix = CliNixClient::new(&repo_root);
-                        match discover::build_all_cells(&nix, nix_eval::current_system()) {
+                        match discover::build_all_cells(
+                            &nix,
+                            nix_eval::current_system(),
+                            &repo_root,
+                        ) {
                             Ok(cells) => {
                                 info!("Rebuilt {} cells, refreshing backend", cells.len());
                                 // TODO: update backend's cell paths with new store paths

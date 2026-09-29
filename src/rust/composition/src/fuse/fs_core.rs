@@ -278,6 +278,7 @@ impl FsCore {
                 .iter()
                 .map(|c| CellInfo::new(&c.name, &c.source_path).with_editable(c.editable))
                 .collect(),
+            write_once_cells: config.write_once_cells.clone(),
         };
 
         // Generate and cache config files

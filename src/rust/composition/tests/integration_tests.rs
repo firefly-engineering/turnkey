@@ -738,6 +738,7 @@ mod layout_tests {
                 source_path: PathBuf::from("/nix/store/xxx-godeps"),
                 editable: false,
             }],
+            write_once_cells: Vec::new(),
         };
 
         let configs = layout.generate_config(&ctx);
