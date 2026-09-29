@@ -45,6 +45,11 @@ pkgs.rustPlatform.buildRustPackage (
       mainProgram = "turnkey-composed";
     };
   }
+  // lib.optionalAttrs pkgs.stdenv.isLinux {
+    # fuser's libfuse feature finds libfuse (2.x) with pkg-config
+    nativeBuildInputs = [ pkgs.pkg-config ];
+    buildInputs = [ pkgs.fuse ];
+  }
   // lib.optionalAttrs isDarwin {
     # macFUSE installs libfuse3 to /usr/local/lib regardless of arch.
     # composition/build.rs sets the same path via cargo:rustc-link-search.
