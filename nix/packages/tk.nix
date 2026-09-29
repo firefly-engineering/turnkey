@@ -46,6 +46,7 @@ pkgs.buildGoModule {
       (root + "/src/go/pkg/extraction")
       (root + "/src/go/pkg/starlark")
       (root + "/src/go/pkg/cellfresh")
+      (root + "/src/go/pkg/materialize")
       (root + "/src/go/pkg/testcache")
     ];
   };

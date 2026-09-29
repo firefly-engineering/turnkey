@@ -194,7 +194,19 @@ let
     inherit (cell) path;
     target = cell.derivation;
     label = "${cell.name} cell";
-  }) (lib.attrValues nixCells);
+  }) (lib.attrValues linkedCells);
+
+  # A cell with a cell index is a real directory the materializer keeps in
+  # line with it (ADR 0004), not a managed link
+  materializedCells = lib.filterAttrs (_: cell: cell.derivation ? index) nixCells;
+  linkedCells = lib.filterAttrs (_: cell: !(cell.derivation ? index)) nixCells;
+  cellIndexes = map (cell: "${cell.derivation.index}") (lib.attrValues materializedCells);
+
+  # turnkey's tk, from the registry (it is built in), or whatever tk is on PATH
+  tk = if turnkeyCfg.registry ? tk then "${resolvedRegistry.tk}/bin/tk" else "tk";
+  materializeCommand = lib.optionalString (cellIndexes != [ ]) ''
+    "${tk}" --quiet materialize ${lib.escapeShellArgs cellIndexes}
+  '';
 
   # Generate info output for all Nix-backed cells
   nixCellsInfo = lib.concatStringsSep "\n" (
@@ -294,6 +306,13 @@ let
 in
 {
   # Outside turnkey.buck2: set under a condition that reads turnkey.buck2
+  options.turnkey.materializedCells = lib.mkOption {
+    type = lib.types.listOf lib.types.str;
+    internal = true;
+    default = [ ];
+    description = "The cell indexes of the deps cells tk materializes (ADR 0004), for direnv's use_turnkey.";
+  };
+
   options.turnkey.managedLinks = lib.mkOption {
     type = lib.types.listOf lib.types.attrs;
     internal = true;
@@ -338,6 +357,7 @@ in
     packages = [ cfg.package ] ++ runtimePackages ++ internalPackages;
 
     turnkey.managedLinks = links;
+    turnkey.materializedCells = cellIndexes;
 
     # Export paths for debugging and inspection
     env = {
@@ -384,8 +404,10 @@ in
       fi
 
       # Point .buckconfig, .turnkey/sync.toml and the cells at what this
-      # shell generated
+      # shell generated, and bring the materialized cells in line with
+      # their indexes
       ${managedLinks.ensure links}
+      ${materializeCommand}
 
       # Ensure .buckroot exists (marks project boundary for Buck2)
       if [ ! -e .buckroot ]; then

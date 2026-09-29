@@ -89,6 +89,9 @@ func main() {
 	case "completion":
 		exitCode := runCompletion(args[1:])
 		os.Exit(exitCode)
+	case "materialize":
+		exitCode := runMaterialize(args[1:])
+		os.Exit(exitCode)
 	}
 
 	// Determine if this command needs sync first, from buck2's subcommand
@@ -112,9 +115,11 @@ func main() {
 		}
 	}
 
-	// Check if cell symlinks changed (kills daemon if so)
+	// Check if cell symlinks changed (kills daemon if so), and whether a
+	// materialized cell lags its deps file
 	if needsSync && !noSync {
 		checkCellFreshness()
+		warnStaleCells()
 	}
 
 	// Delegate to buck2
@@ -734,6 +739,7 @@ tk-specific subcommands:
   rules            Manage rules.star files (check, sync)
   compose          Edit external dependencies (edit, patch, reset, status)
   completion       Generate shell completion scripts (bash, zsh, fish)
+  materialize      Bring deps cells in line with their cell indexes (the shell runs it)
 
 All other subcommands are delegated to buck2.
 
