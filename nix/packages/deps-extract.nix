@@ -17,6 +17,10 @@
 let
   root = ../..;
   cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
+  projection = cargoLib.workspaceProjection {
+    inherit root;
+    members = [ "src/rust/deps-extract" ];
+  };
 
   # Build features list based on enabled languages
   features = lib.concatStringsSep "," (
@@ -30,14 +34,9 @@ pkgs.rustPlatform.buildRustPackage {
   pname = "deps-extract";
   version = "0.1.0";
 
-  src = cargoLib.prunedCargoSource {
-    inherit root;
-    members = [ "src/rust/deps-extract" ];
-  };
+  inherit (projection) src;
 
-  cargoLock = {
-    lockFile = root + "/Cargo.lock";
-  };
+  cargoLock.lockFileContents = projection.lock;
 
   # Build with selected features only (no default features)
   cargoBuildFlags = [

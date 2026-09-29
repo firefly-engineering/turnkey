@@ -12,6 +12,14 @@
 let
   root = ../..;
   cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
+  projection = cargoLib.workspaceProjection {
+    inherit root;
+    members = [
+      "src/cmd/turnkey-composed"
+      "src/rust/composition"
+      "src/rust/nix-eval"
+    ];
+  };
   isDarwin = pkgs.stdenv.isDarwin;
 in
 pkgs.rustPlatform.buildRustPackage (
@@ -19,18 +27,9 @@ pkgs.rustPlatform.buildRustPackage (
     pname = "turnkey-composed";
     version = "0.1.0";
 
-    src = cargoLib.prunedCargoSource {
-      inherit root;
-      members = [
-        "src/cmd/turnkey-composed"
-        "src/rust/composition"
-        "src/rust/nix-eval"
-      ];
-    };
+    inherit (projection) src;
 
-    cargoLock = {
-      lockFile = root + "/Cargo.lock";
-    };
+    cargoLock.lockFileContents = projection.lock;
 
     cargoBuildFlags = [
       "-p"

@@ -10,22 +10,21 @@
 let
   root = ../..;
   cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
-in
-pkgs.rustPlatform.buildRustPackage {
-  pname = "nix-prefetch-cached";
-  version = "0.1.0";
-
-  src = cargoLib.prunedCargoSource {
+  projection = cargoLib.workspaceProjection {
     inherit root;
     members = [
       "src/cmd/nix-prefetch-cached"
       "src/rust/prefetch-cache"
     ];
   };
+in
+pkgs.rustPlatform.buildRustPackage {
+  pname = "nix-prefetch-cached";
+  version = "0.1.0";
 
-  cargoLock = {
-    lockFile = root + "/Cargo.lock";
-  };
+  inherit (projection) src;
+
+  cargoLock.lockFileContents = projection.lock;
 
   # Only build nix-prefetch-cached
   cargoBuildFlags = [

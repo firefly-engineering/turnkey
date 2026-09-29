@@ -9,22 +9,21 @@
 let
   root = ../..;
   cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
-in
-pkgs.rustPlatform.buildRustPackage {
-  pname = "check-source-coverage-rs";
-  version = "0.1.0";
-
-  src = cargoLib.prunedCargoSource {
+  projection = cargoLib.workspaceProjection {
     inherit root;
     members = [
       "src/cmd/check-source-coverage-rs"
       "src/rust/starlark-parse"
     ];
   };
+in
+pkgs.rustPlatform.buildRustPackage {
+  pname = "check-source-coverage-rs";
+  version = "0.1.0";
 
-  cargoLock = {
-    lockFile = root + "/Cargo.lock";
-  };
+  inherit (projection) src;
+
+  cargoLock.lockFileContents = projection.lock;
 
   cargoBuildFlags = [
     "-p"

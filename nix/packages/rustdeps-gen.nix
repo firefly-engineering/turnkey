@@ -9,12 +9,7 @@
 let
   root = ../..;
   cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
-in
-pkgs.rustPlatform.buildRustPackage {
-  pname = "rustdeps-gen";
-  version = "0.1.0";
-
-  src = cargoLib.prunedCargoSource {
+  projection = cargoLib.workspaceProjection {
     inherit root;
     members = [
       "src/cmd/rustdeps-gen"
@@ -22,10 +17,14 @@ pkgs.rustPlatform.buildRustPackage {
       "src/rust/prefetch-cache"
     ];
   };
+in
+pkgs.rustPlatform.buildRustPackage {
+  pname = "rustdeps-gen";
+  version = "0.1.0";
 
-  cargoLock = {
-    lockFile = root + "/Cargo.lock";
-  };
+  inherit (projection) src;
+
+  cargoLock.lockFileContents = projection.lock;
 
   # Only build rustdeps-gen, not examples
   cargoBuildFlags = [

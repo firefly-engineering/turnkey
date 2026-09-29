@@ -9,19 +9,18 @@
 let
   root = ../..;
   cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
+  projection = cargoLib.workspaceProjection {
+    inherit root;
+    members = [ "src/cmd/rust-rules-gen" ];
+  };
 in
 pkgs.rustPlatform.buildRustPackage {
   pname = "rust-rules-gen";
   version = "0.1.0";
 
-  src = cargoLib.prunedCargoSource {
-    inherit root;
-    members = [ "src/cmd/rust-rules-gen" ];
-  };
+  inherit (projection) src;
 
-  cargoLock = {
-    lockFile = root + "/Cargo.lock";
-  };
+  cargoLock.lockFileContents = projection.lock;
 
   cargoBuildFlags = [
     "-p"
