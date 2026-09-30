@@ -61,15 +61,19 @@ The buck2 cell holding one language's third-party packages (`rustdeps`, `godeps`
 _Avoid_: cell derivation, vendor cell
 
 **Cell index**:
-The Nix-built list of a deps cell's packages: each package's store path and target names, and the version aliases. A deps cell has exactly one current cell index.
+The Nix-built list of a deps cell's locked packages: each one's store path and target names, and the version aliases. A deps cell has exactly one current cell index.
 _Avoid_: manifest, cell derivation
 
+**Locked package**:
+The unit a deps generator locks at one version, and a deps cell stores behind one store link: a crate, a Go module, a Python distribution. For Rust it is also one buck2 package. A Go module holds many Go packages, each its own buck2 package.
+_Avoid_: dependency (which also names the edge), module (outside Go)
+
 **Store link**:
-A symlink in a deps cell to one package's store path, named after that store path. It is only ever created or deleted, never retargeted.
+A symlink in a deps cell to one locked package's store path, named after that store path. It is only ever created or deleted, never retargeted.
 _Avoid_: crate symlink, vendor link
 
 **Alias package**:
-A package in a deps cell whose targets forward to the same-named targets of a store link's package. Version names (`anyhow@1.0.100`) and unversioned names (`anyhow`) are alias packages.
+A package in a deps cell whose targets forward to the same-named targets of a buck2 package inside a store link: the store link's root for a crate, a subdirectory for a Go package. Version names (`anyhow@1.0.100`) and unversioned names (`anyhow`, `github.com/spf13/cobra`) are alias packages. A Go module has one version, so Go has only unversioned ones, one per Go package.
 _Avoid_: alias symlink, version symlink
 
 **Package slice**:
