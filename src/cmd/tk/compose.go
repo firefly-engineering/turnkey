@@ -83,9 +83,9 @@ func runComposeStatus(args []string) int {
 		fmt.Println("No edited files.")
 	} else {
 		fmt.Printf("Edited files (%d):\n", len(edited))
-		for cell, files := range edited {
-			fmt.Printf("\n  %s:\n", cell)
-			for _, f := range files {
+		for _, c := range edited {
+			fmt.Printf("\n  %s:\n", c.cell)
+			for _, f := range c.files {
 				fmt.Printf("    %s\n", f)
 			}
 		}
@@ -98,9 +98,9 @@ func runComposeStatus(args []string) int {
 			fmt.Println("\nNo patches generated.")
 		} else {
 			fmt.Printf("\nGenerated patches (%d):\n", len(patches))
-			for cell, files := range patches {
-				fmt.Printf("\n  %s:\n", cell)
-				for _, f := range files {
+			for _, c := range patches {
+				fmt.Printf("\n  %s:\n", c.cell)
+				for _, f := range c.files {
 					fmt.Printf("    %s\n", f)
 				}
 			}
@@ -244,13 +244,14 @@ func runComposePatch(args []string) int {
 	}
 
 	patchCount := 0
-	for cell, files := range edited {
+	for _, c := range edited {
+		cell := c.cell
 		// Skip if cell filter specified and doesn't match
 		if cellFilter != "" && cell != cellFilter {
 			continue
 		}
 
-		for _, editPath := range files {
+		for _, editPath := range c.files {
 			editedFile := filepath.Join(editsPath, cell, editPath)
 			originalFile, relPath, pkg, err := resolveCellFile(root, cell, editPath)
 			if err != nil {
@@ -419,9 +420,16 @@ func runComposeReset(args []string) int {
 	return 0
 }
 
-// listEditedFiles returns a map of cell -> list of relative paths.
-func listEditedFiles(editsPath string) map[string][]string {
-	result := make(map[string][]string)
+// cellFiles is a cell's files under .turnkey/edits or .turnkey/patches
+type cellFiles struct {
+	cell  string
+	files []string
+}
+
+// listEditedFiles returns each cell's edited files, as paths relative to
+// the cell's directory, the cells and their files in name order.
+func listEditedFiles(editsPath string) []cellFiles {
+	var result []cellFiles
 
 	if _, err := os.Stat(editsPath); os.IsNotExist(err) {
 		return result
@@ -450,16 +458,17 @@ func listEditedFiles(editsPath string) map[string][]string {
 		})
 
 		if len(files) > 0 {
-			result[cell] = files
+			result = append(result, cellFiles{cell, files})
 		}
 	}
 
 	return result
 }
 
-// listPatchFiles returns a map of cell -> list of patch filenames.
-func listPatchFiles(patchesPath string) map[string][]string {
-	result := make(map[string][]string)
+// listPatchFiles returns each cell's patches, as paths relative to the
+// cell's directory, the cells and their patches in name order.
+func listPatchFiles(patchesPath string) []cellFiles {
+	var result []cellFiles
 
 	if _, err := os.Stat(patchesPath); os.IsNotExist(err) {
 		return result
@@ -488,7 +497,7 @@ func listPatchFiles(patchesPath string) map[string][]string {
 		})
 
 		if len(files) > 0 {
-			result[cell] = files
+			result = append(result, cellFiles{cell, files})
 		}
 	}
 
@@ -496,10 +505,10 @@ func listPatchFiles(patchesPath string) map[string][]string {
 }
 
 // countFiles counts total files across all cells.
-func countFiles(m map[string][]string) int {
+func countFiles(cells []cellFiles) int {
 	count := 0
-	for _, files := range m {
-		count += len(files)
+	for _, c := range cells {
+		count += len(c.files)
 	}
 	return count
 }
