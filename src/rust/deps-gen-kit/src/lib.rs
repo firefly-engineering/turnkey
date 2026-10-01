@@ -10,10 +10,14 @@
 //! - the [`Prefetcher`] seam, with [`NixPrefetcher`] as the real adapter,
 //!   on turnkey's prefetch cache, and [`MemoryPrefetcher`] for tests;
 //! - [`OutputArgs::write`], which writes the common header and the
-//!   serde-serialized record.
+//!   serde-serialized record;
+//! - [`starlark`], the attribute values the cell generators write in
+//!   `rules.star`, as turnkey's Go tools wrote them.
 //!
 //! Generators run through `tk sync`, from the sync rules turnkey generates
 //! (nix/buck2/languages.nix), which read the deps file from stdout.
+
+pub mod starlark;
 
 use anyhow::{Context, Result, anyhow};
 use prefetch_cache::{PrefetchCache, nix_prefetch_url};

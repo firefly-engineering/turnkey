@@ -15,6 +15,7 @@ let
     members = [
       "src/cmd/pydeps-gen"
       "src/rust/deps-gen-kit"
+      "src/rust/gostd"
       "src/rust/prefetch-cache"
     ];
     # The PEP 508 cases src/go/pkg/pep508 runs too, which the crate's

@@ -10,6 +10,7 @@ rust_library(
         "rustdeps//vendor/clap:clap",
         "rustdeps//vendor/serde:serde",
         "rustdeps//vendor/toml:toml",
+        "//src/rust/gostd:gostd",
         "//src/rust/prefetch-cache:prefetch-cache",
     ],
     visibility = ["PUBLIC"],
@@ -24,6 +25,7 @@ rust_test(
         "rustdeps//vendor/clap:clap",
         "rustdeps//vendor/serde:serde",
         "rustdeps//vendor/toml:toml",
+        "//src/rust/gostd:gostd",
         "//src/rust/prefetch-cache:prefetch-cache",
     ],
 )

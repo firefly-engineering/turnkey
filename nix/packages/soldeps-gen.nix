@@ -15,6 +15,7 @@ let
     members = [
       "src/cmd/soldeps-gen"
       "src/rust/deps-gen-kit"
+      "src/rust/gostd"
       "src/rust/prefetch-cache"
     ];
   };
