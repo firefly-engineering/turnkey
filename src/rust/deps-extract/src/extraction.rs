@@ -1,12 +1,14 @@
 //! Extraction protocol types matching the Go implementation.
 //!
 //! This module defines the JSON output format that is consumed by
-//! the rules sync tooling.
+//! the rules sync tooling. Reading it back, as src/go/pkg/extraction does
+//! with encoding/json, a field the output leaves out is empty.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// The extraction result containing all packages found.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Result {
     /// Protocol version (always "1")
     pub version: String,
@@ -45,7 +47,8 @@ impl Result {
 }
 
 /// A package (directory) containing source files.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Package {
     /// Relative path from the analysis root
     pub path: String,
@@ -76,7 +79,7 @@ impl Package {
 }
 
 /// An import dependency.
-#[derive(Debug, Clone, Serialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Import {
     /// The import path/module name
     pub path: String,
@@ -86,7 +89,7 @@ pub struct Import {
 }
 
 /// Classification of an import.
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum ImportKind {
     /// Standard library import
