@@ -62,9 +62,15 @@ init_from_template() {
   cp -r "${template_dir}/." .
 
   # Update flake.nix to use local turnkey path for testing
-  # Replace github:firefly-engineering/turnkey with a path reference
+  # Replace github:firefly-engineering/turnkey with a reference to this
+  # checkout: a git+file URL when it is a git work tree, otherwise a path
+  # (a secondary jj workspace has no .git of its own)
   if [[ -f flake.nix ]]; then
-    sed -i "s|github:firefly-engineering/turnkey|git+file://${turnkey_root}|g" flake.nix
+    local turnkey_url="path:${turnkey_root}"
+    if [[ "$(git -C "${turnkey_root}" rev-parse --show-toplevel 2>/dev/null)" == "${turnkey_root}" ]]; then
+      turnkey_url="git+file://${turnkey_root}"
+    fi
+    sed -i "s|github:firefly-engineering/turnkey|${turnkey_url}|g" flake.nix
   fi
 
   echo "Initialized from template: ${template}"
