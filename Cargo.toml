@@ -34,6 +34,7 @@ members = [
     "src/rust/nix-eval",
     "src/rust/pep508",
     "src/rust/prefetch-cache",
+    "src/rust/project-sync",
     "src/rust/starlark-parse",
 ]
 
@@ -113,3 +114,4 @@ gostd = { path = "src/rust/gostd" }
 nix-eval = { path = "src/rust/nix-eval" }
 pep508 = { path = "src/rust/pep508" }
 prefetch-cache = { path = "src/rust/prefetch-cache" }
+project-sync = { path = "src/rust/project-sync" }

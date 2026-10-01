@@ -19,8 +19,12 @@
 //!   for slash-separated paths (turnkey runs on Linux and macOS only)
 //! - [`constraint`]: `go/build/constraint`, the `//go:build` and
 //!   `// +build` lines of Go files
+//! - [`filepath`]: `path/filepath` on Unix paths, for the paths tk and tw
+//!   hand to their children and stat: `Clean`, `Join`, `Split`, `Dir`,
+//!   `Base`, `IsAbs`, `Match` and `Glob`
 
 pub mod constraint;
+pub mod filepath;
 pub mod path;
 pub mod strconv;
 pub mod strings;

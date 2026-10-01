@@ -6,3 +6,6 @@ description = "Ports of the Go standard library behaviours turnkey's generated f
 
 [dependencies]
 unicode-properties.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

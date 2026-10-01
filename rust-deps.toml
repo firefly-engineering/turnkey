@@ -36,6 +36,7 @@ manifests = [
     "src/rust/nix-eval/Cargo.toml",
     "src/rust/pep508/Cargo.toml",
     "src/rust/prefetch-cache/Cargo.toml",
+    "src/rust/project-sync/Cargo.toml",
     "src/rust/starlark-parse/Cargo.toml",
 ]
 

@@ -10,10 +10,15 @@
 /// processing (`.` and empty elements dropped, `..` resolved against the
 /// element before it, no trailing slash); "." for an empty result
 pub fn clean(p: &str) -> String {
-    if p.is_empty() {
-        return ".".to_string();
+    // Only whole elements and ASCII are copied, so this is still UTF-8
+    String::from_utf8(clean_bytes(p.as_bytes())).expect("cleaning keeps UTF-8")
+}
+
+/// [`clean`] on a path's bytes, which needn't be UTF-8 (a Unix path)
+pub fn clean_bytes(b: &[u8]) -> Vec<u8> {
+    if b.is_empty() {
+        return b".".to_vec();
     }
-    let b = p.as_bytes();
     let rooted = b[0] == b'/';
     let n = b.len();
     let mut out: Vec<u8> = Vec::with_capacity(n);
@@ -59,10 +64,9 @@ pub fn clean(p: &str) -> String {
         }
     }
     if out.is_empty() {
-        return ".".to_string();
+        out.push(b'.');
     }
-    // Only whole elements and ASCII were copied, so this is still UTF-8
-    String::from_utf8(out).expect("cleaning keeps UTF-8")
+    out
 }
 
 /// `path.Join` (and `filepath.Join` on Unix): the non-empty elements
@@ -84,14 +88,23 @@ pub fn dir(p: &str) -> String {
 /// `path.Base` (and `filepath.Base` on Unix): the last element, without
 /// trailing slashes; "." for an empty path and "/" for slashes alone
 pub fn base(p: &str) -> String {
+    // A suffix after a slash, or "." or "/": still UTF-8
+    String::from_utf8(base_bytes(p.as_bytes()).to_vec()).expect("a base keeps UTF-8")
+}
+
+/// [`base`] on a path's bytes, which needn't be UTF-8 (a Unix path)
+pub fn base_bytes(p: &[u8]) -> &[u8] {
     if p.is_empty() {
-        return ".".to_string();
+        return b".";
     }
-    let p = p.trim_end_matches('/');
+    let mut p = p;
+    while let [rest @ .., b'/'] = p {
+        p = rest;
+    }
     if p.is_empty() {
-        return "/".to_string();
+        return b"/";
     }
-    p[p.rfind('/').map_or(0, |i| i + 1)..].to_string()
+    &p[p.iter().rposition(|&c| c == b'/').map_or(0, |i| i + 1)..]
 }
 
 /// `filepath.IsAbs` on Unix

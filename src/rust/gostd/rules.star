@@ -17,6 +17,7 @@ rust_test(
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
     deps = [
+        "rustdeps//vendor/tempfile:tempfile",
         "rustdeps//vendor/unicode-properties:unicode-properties",
     ],
 )
