@@ -49,8 +49,8 @@ The Rust generators take all three from `src/rust/deps-gen-kit`:
 `OutputArgs` and `PrefetchArgs` to flatten into their clap `Args`, the
 `Prefetcher` seam (`NixPrefetcher` on the `prefetch-cache` crate, and
 `MemoryPrefetcher` for tests), and `OutputArgs::write` for a serde-serialized
-record. godeps-gen takes the same flags and prefetches through the
-`nix-prefetch-cached` binary, built on the same crate.
+record. godeps-gen takes the same flags and prefetches through one
+`nix-prefetch-cached --batch` call, built on the same crate.
 
 `tk sync` runs a generator from its language's sync rule
 (`nix/buck2/languages.nix`) and reads the deps file from stdout.

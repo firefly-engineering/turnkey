@@ -1,67 +1,102 @@
 package godeps
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os/exec"
 	"strings"
 )
 
-// Prefetcher fetches Nix-compatible hashes for Go module sources.
+// Module is one module version whose source is hashed.
+type Module struct {
+	Path    string
+	Version string
+}
+
+// Prefetched is the Nix hash of one module's source, or why it has none.
+type Prefetched struct {
+	Hash string
+	Err  error
+}
+
+// Prefetcher fetches Nix-compatible hashes for Go module sources, all of a
+// module graph's at once.
 type Prefetcher interface {
-	// Supports returns true if this prefetcher can handle the given import path.
-	Supports(importPath string) bool
-
-	// Prefetch fetches the Nix hash for the given module at the specified version.
-	// Returns the SRI hash (e.g., "sha256-abc123...") or an error.
-	Prefetch(importPath, version string) (string, error)
+	// Prefetch returns one result per module, in order: an SRI hash (e.g.
+	// "sha256-abc123...") or the error for that module alone.
+	Prefetch(mods []Module) []Prefetched
 }
 
-// PrefetchFunc is an adapter to allow ordinary functions to be used as Prefetchers.
-type PrefetchFunc func(importPath, version string) (string, error)
-
-// Supports always returns true for PrefetchFunc.
-func (f PrefetchFunc) Supports(importPath string) bool {
-	return true
-}
-
-// Prefetch calls the underlying function.
-func (f PrefetchFunc) Prefetch(importPath, version string) (string, error) {
-	return f(importPath, version)
-}
-
-// GoProxyPrefetcher hashes a module's zip from proxy.golang.org, unpacked as
-// Nix fetchzip unpacks it. The godeps cell fetches every module from the
+// GoProxyPrefetcher hashes modules' zips from proxy.golang.org, unpacked as
+// Nix fetchzip unpacks them. The godeps cell fetches every module from the
 // proxy (nix/lib/deps-cell/adapters/go.nix), so its hash is the only one that
 // matches; a GitHub archive of the same version hashes differently.
+//
+// All modules go to one nix-prefetch-cached --batch process, which loads
+// turnkey's prefetch cache (src/rust/prefetch-cache) once and fetches the
+// misses in parallel.
 type GoProxyPrefetcher struct {
+	// Command is the nix-prefetch-cached to run; "nix-prefetch-cached"
+	// (looked up on PATH) when empty.
+	Command string
+	// Logger gets nix-prefetch-cached's progress and warnings.
 	Logger io.Writer
 	// NoCache fetches afresh instead of reusing a hash nix-prefetch-cached
 	// has already computed.
 	NoCache bool
 }
 
-// Supports returns true for any import path: every public module is on the
-// proxy.
-func (p *GoProxyPrefetcher) Supports(importPath string) bool {
-	return true
-}
-
-// Prefetch downloads the module zip from proxy.golang.org and computes the hash.
-// The hash is computed on the unpacked content to match Nix fetchzip behavior.
-func (p *GoProxyPrefetcher) Prefetch(importPath, version string) (string, error) {
-	// URL encode the module path for proxy.golang.org
-	// Handles / -> ! conversion and uppercase -> !lowercase per module proxy protocol
-	escapedPath := escapeModulePath(importPath)
-
-	url := fmt.Sprintf("https://proxy.golang.org/%s/@v/%s.zip", escapedPath, version)
-
-	if p.Logger != nil {
-		_, _ = fmt.Fprintf(p.Logger, "prefetching %s@%s from proxy.golang.org...\n", importPath, version)
+// Prefetch hashes every module's proxy.golang.org zip in one batch.
+func (p *GoProxyPrefetcher) Prefetch(mods []Module) []Prefetched {
+	if len(mods) == 0 {
+		return nil
+	}
+	urls := make([]string, len(mods))
+	for i, m := range mods {
+		urls[i] = proxyZipURL(m)
 	}
 
-	// Use unpack=true to match Nix fetchzip behavior (unpacks zip and strips root)
-	return runNixPrefetchCached(url, true, p.NoCache)
+	command := p.Command
+	if command == "" {
+		command = "nix-prefetch-cached"
+	}
+	// Use --unpack to match Nix fetchzip behavior (unpacks zip and strips root)
+	args := []string{"--batch", "--unpack"}
+	if p.NoCache {
+		args = append(args, "--no-cache")
+	}
+	cmd := exec.Command(command, args...)
+	cmd.Stdin = strings.NewReader(strings.Join(urls, "\n") + "\n")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if p.Logger != nil {
+		cmd.Stderr = io.MultiWriter(&stderr, p.Logger)
+	}
+	output, err := cmd.Output()
+
+	lines := strings.Split(strings.TrimSuffix(string(output), "\n"), "\n")
+	if err == nil && len(lines) != len(urls) {
+		err = fmt.Errorf("%d results for %d URLs", len(lines), len(urls))
+	}
+	results := make([]Prefetched, len(mods))
+	for i, url := range urls {
+		switch {
+		case err != nil:
+			results[i].Err = fmt.Errorf("nix-prefetch-cached %s: %v: %s", url, err, strings.TrimSpace(stderr.String()))
+		case strings.HasPrefix(lines[i], "error: "):
+			results[i].Err = fmt.Errorf("nix-prefetch-cached %s: %s", url, strings.TrimPrefix(lines[i], "error: "))
+		default:
+			results[i].Hash = lines[i]
+		}
+	}
+	return results
+}
+
+// proxyZipURL is the proxy.golang.org zip of a module version.
+func proxyZipURL(m Module) string {
+	// Handles uppercase -> !lowercase per module proxy protocol
+	return fmt.Sprintf("https://proxy.golang.org/%s/@v/%s.zip", escapeModulePath(m.Path), m.Version)
 }
 
 // escapeModulePath escapes a module path for use in proxy.golang.org URLs.
@@ -79,54 +114,35 @@ func escapeModulePath(path string) string {
 	return result.String()
 }
 
-// runNixPrefetchCached hashes url with nix-prefetch-cached, which keeps
-// turnkey's prefetch cache (src/rust/prefetch-cache) and returns an SRI hash.
-// Use unpack=true for archives that will be extracted by fetchzip.
-func runNixPrefetchCached(url string, unpack, noCache bool) (string, error) {
-	var args []string
-	if unpack {
-		args = append(args, "--unpack")
-	}
-	if noCache {
-		args = append(args, "--no-cache")
-	}
-	output, err := exec.Command("nix-prefetch-cached", append(args, url)...).Output()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return "", fmt.Errorf("nix-prefetch-cached %s: %s", url, strings.TrimSpace(string(exitErr.Stderr)))
-		}
-		return "", fmt.Errorf("nix-prefetch-cached %s: %w", url, err)
-	}
-	return strings.TrimSpace(string(output)), nil
-}
-
 // DefaultPrefetcher returns the prefetcher godeps-gen uses: the Go proxy,
 // the source the godeps cell fetches from.
 func DefaultPrefetcher(logger io.Writer, noCache bool) Prefetcher {
 	return &GoProxyPrefetcher{Logger: logger, NoCache: noCache}
 }
 
-// PrefetchAll fetches Nix hashes for all dependencies using the given prefetcher.
-// Errors are reported via the errHandler callback; processing continues on error.
+// PrefetchAll fetches Nix hashes for all dependencies using the given
+// prefetcher, in one call. Errors are reported via the errHandler callback;
+// the other dependencies still get their hashes.
 func PrefetchAll(deps []Dependency, p Prefetcher, errHandler func(dep Dependency, err error)) {
+	mods := make([]Module, len(deps))
 	for i := range deps {
 		// Use EffectiveFetchPath for the actual fetch, but keep ImportPath for storage
-		fetchPath := deps[i].EffectiveFetchPath()
+		mods[i] = Module{Path: deps[i].EffectiveFetchPath(), Version: deps[i].Version}
+	}
 
-		if !p.Supports(fetchPath) {
+	results := p.Prefetch(mods)
+	for i := range deps {
+		switch {
+		case i >= len(results):
 			if errHandler != nil {
-				errHandler(deps[i], fmt.Errorf("no prefetcher supports %s", fetchPath))
+				errHandler(deps[i], fmt.Errorf("no hash returned for %s", mods[i].Path))
 			}
-			continue
-		}
-
-		hash, err := p.Prefetch(fetchPath, deps[i].Version)
-		if err != nil {
+		case results[i].Err != nil:
 			if errHandler != nil {
-				errHandler(deps[i], err)
+				errHandler(deps[i], results[i].Err)
 			}
-			continue
+		default:
+			deps[i].NixHash = results[i].Hash
 		}
-		deps[i].NixHash = hash
 	}
 }

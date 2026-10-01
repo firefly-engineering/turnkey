@@ -20,6 +20,9 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread;
 
 /// Current cache format version
 const CACHE_VERSION: u32 = 1;
@@ -231,6 +234,68 @@ impl PrefetchCache {
         })
     }
 
+    /// The Nix SRI hashes of many URLs, one result per URL in order:
+    /// [`PrefetchCache::prefetch`] for a batch. Hits come from the cache;
+    /// the distinct misses are fetched with `fetch`, at most `jobs` at a
+    /// time, and the cache is saved once at the end. A failed URL fails its
+    /// own result only.
+    ///
+    /// `fetch` is [`nix_prefetch_url`] or a wrapper of it (to report
+    /// progress, or a stand-in in tests).
+    pub fn prefetch_all<F>(
+        &mut self,
+        urls: &[&str],
+        unpack: bool,
+        jobs: usize,
+        fetch: F,
+    ) -> Vec<Result<Prefetched>>
+    where
+        F: Fn(&str, bool) -> Result<String> + Sync,
+    {
+        let mut misses: Vec<&str> = urls
+            .iter()
+            .copied()
+            .filter(|url| !self.contains(&url_key(url, unpack)))
+            .collect();
+        misses.sort_unstable();
+        misses.dedup();
+
+        // An error isn't Clone, and a URL listed twice gets two results
+        let fetched: HashMap<&str, Result<String, String>> = misses
+            .iter()
+            .copied()
+            .zip(fetch_all(&misses, jobs, |url| {
+                fetch(url, unpack).map_err(|e| format!("{e:#}"))
+            }))
+            .collect();
+        for (url, result) in &fetched {
+            if let Ok(hash) = result {
+                self.set(url_key(url, unpack), hash.clone());
+            }
+        }
+        if let Err(e) = self.save() {
+            eprintln!("prefetch-cache: warning: failed to save cache: {}", e);
+        }
+
+        urls.iter()
+            .map(|url| match fetched.get(url) {
+                Some(Ok(hash)) => Ok(Prefetched {
+                    hash: hash.clone(),
+                    cached: false,
+                }),
+                Some(Err(e)) => Err(anyhow::anyhow!("{e}")),
+                None => Ok(Prefetched {
+                    hash: self
+                        .get(&url_key(url, unpack))
+                        .expect("not a miss, so cached")
+                        .hash
+                        .clone(),
+                    cached: true,
+                }),
+            })
+            .collect()
+    }
+
     /// The cache file at `path`, if it is there and readable
     fn read(path: &Path) -> Option<CacheFile> {
         let content = fs::read_to_string(path).ok()?;
@@ -255,6 +320,36 @@ pub fn url_key(url: &str, unpack: bool) -> String {
     } else {
         url.to_string()
     }
+}
+
+/// `f` applied to every item, on at most `jobs` threads at a time, with
+/// the results in the items' order
+pub fn fetch_all<T, R, F>(items: &[T], jobs: usize, f: F) -> Vec<R>
+where
+    T: Sync,
+    R: Send,
+    F: Fn(&T) -> R + Sync,
+{
+    let next = AtomicUsize::new(0);
+    let results: Mutex<Vec<Option<R>>> = Mutex::new(items.iter().map(|_| None).collect());
+    thread::scope(|scope| {
+        for _ in 0..jobs.clamp(1, items.len().max(1)) {
+            scope.spawn(|| {
+                loop {
+                    let i = next.fetch_add(1, Ordering::Relaxed);
+                    let Some(item) = items.get(i) else { break };
+                    let result = f(item);
+                    results.lock().unwrap()[i] = Some(result);
+                }
+            });
+        }
+    });
+    results
+        .into_inner()
+        .unwrap()
+        .into_iter()
+        .map(|r| r.expect("every item is fetched"))
+        .collect()
 }
 
 /// Run nix-prefetch-url, uncached, and return the hash in SRI form
@@ -366,6 +461,75 @@ mod tests {
         let reloaded = PrefetchCache::with_dir(dir.path()).unwrap();
         assert!(reloaded.contains("theirs"));
         assert!(reloaded.contains("ours"));
+    }
+
+    #[test]
+    fn test_prefetch_all_fetches_each_miss_once_and_keeps_order() {
+        let dir = tempdir().unwrap();
+        let mut cache = PrefetchCache::with_dir(dir.path()).unwrap();
+        cache.set(url_key("https://x/hit", true), "sha256-hit".to_string());
+
+        let calls = Mutex::new(Vec::new());
+        let results = cache.prefetch_all(
+            &[
+                "https://x/a",
+                "https://x/hit",
+                "https://x/bad",
+                "https://x/a",
+            ],
+            true,
+            4,
+            |url, unpack| {
+                assert!(unpack);
+                calls.lock().unwrap().push(url.to_string());
+                match url {
+                    "https://x/bad" => anyhow::bail!("no such zip"),
+                    _ => Ok(format!("sha256-{}", &url[10..])),
+                }
+            },
+        );
+
+        let mut calls = calls.into_inner().unwrap();
+        calls.sort();
+        assert_eq!(calls, ["https://x/a", "https://x/bad"]);
+
+        let a = Prefetched {
+            hash: "sha256-a".to_string(),
+            cached: false,
+        };
+        assert_eq!(results[0].as_ref().unwrap(), &a);
+        assert!(results[1].as_ref().unwrap().cached);
+        assert!(
+            results[2]
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains("no such zip")
+        );
+        assert_eq!(results[3].as_ref().unwrap(), &a);
+
+        // Saved once, with the hit kept and the failure not cached
+        let reloaded = PrefetchCache::with_dir(dir.path()).unwrap();
+        assert_eq!(reloaded.len(), 2);
+        assert!(reloaded.contains(&url_key("https://x/a", true)));
+        assert!(!reloaded.contains(&url_key("https://x/bad", true)));
+    }
+
+    #[test]
+    fn test_fetch_all_bounds_concurrency_and_keeps_order() {
+        let running = AtomicUsize::new(0);
+        let peak = AtomicUsize::new(0);
+        let items: Vec<usize> = (0..50).collect();
+        let results = fetch_all(&items, 3, |i| {
+            let now = running.fetch_add(1, Ordering::SeqCst) + 1;
+            peak.fetch_max(now, Ordering::SeqCst);
+            thread::sleep(std::time::Duration::from_millis(1));
+            running.fetch_sub(1, Ordering::SeqCst);
+            i * 2
+        });
+        assert_eq!(results, (0..50).map(|i| i * 2).collect::<Vec<_>>());
+        assert!(peak.load(Ordering::SeqCst) <= 3);
+        assert!(fetch_all(&[] as &[usize], 0, |i| *i).is_empty());
     }
 
     #[test]

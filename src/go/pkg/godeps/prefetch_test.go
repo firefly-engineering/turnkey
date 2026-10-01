@@ -10,60 +10,29 @@ import (
 
 // MockPrefetcher is a test double for Prefetcher
 type MockPrefetcher struct {
-	SupportedPaths []string
-	Hashes         map[string]string
-	Errors         map[string]error
-	Calls          []string
+	Hashes map[string]string
+	Errors map[string]error
+	Calls  [][]Module
 }
 
-func (m *MockPrefetcher) Supports(importPath string) bool {
-	for _, p := range m.SupportedPaths {
-		if p == importPath || p == "*" {
-			return true
+func (m *MockPrefetcher) Prefetch(mods []Module) []Prefetched {
+	m.Calls = append(m.Calls, mods)
+	results := make([]Prefetched, len(mods))
+	for i, mod := range mods {
+		key := mod.Path + " " + mod.Version
+		if err, ok := m.Errors[key]; ok {
+			results[i].Err = err
+		} else if hash, ok := m.Hashes[key]; ok {
+			results[i].Hash = hash
+		} else {
+			results[i].Err = errors.New("not found")
 		}
 	}
-	return false
+	return results
 }
 
-func (m *MockPrefetcher) Prefetch(importPath, version string) (string, error) {
-	m.Calls = append(m.Calls, importPath+"@"+version)
-	key := importPath + " " + version
-	if err, ok := m.Errors[key]; ok {
-		return "", err
-	}
-	if hash, ok := m.Hashes[key]; ok {
-		return hash, nil
-	}
-	return "", errors.New("not found")
-}
-
-func TestPrefetchFunc(t *testing.T) {
-	called := false
-	f := PrefetchFunc(func(path, version string) (string, error) {
-		called = true
-		return "sha256-test=", nil
-	})
-
-	// Should always support
-	if !f.Supports("anything") {
-		t.Error("PrefetchFunc should support any path")
-	}
-
-	hash, err := f.Prefetch("test", "v1.0.0")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !called {
-		t.Error("function was not called")
-	}
-	if hash != "sha256-test=" {
-		t.Errorf("expected sha256-test=, got %s", hash)
-	}
-}
-
-func TestPrefetchAll(t *testing.T) {
+func TestPrefetchAllMakesOneCall(t *testing.T) {
 	mock := &MockPrefetcher{
-		SupportedPaths: []string{"*"},
 		Hashes: map[string]string{
 			"github.com/foo/bar v1.0.0": "sha256-foo=",
 			"github.com/baz/qux v1.0.0": "sha256-baz=",
@@ -83,11 +52,13 @@ func TestPrefetchAll(t *testing.T) {
 	if deps[1].NixHash != "sha256-baz=" {
 		t.Errorf("expected sha256-baz=, got %s", deps[1].NixHash)
 	}
+	if len(mock.Calls) != 1 {
+		t.Errorf("expected one batch call, got %d", len(mock.Calls))
+	}
 }
 
 func TestPrefetchAll_WithErrors(t *testing.T) {
 	mock := &MockPrefetcher{
-		SupportedPaths: []string{"*"},
 		Hashes: map[string]string{
 			"github.com/good/pkg v1.0.0": "sha256-good=",
 		},
@@ -119,28 +90,6 @@ func TestPrefetchAll_WithErrors(t *testing.T) {
 	}
 }
 
-func TestGoProxyPrefetcher_Supports(t *testing.T) {
-	p := &GoProxyPrefetcher{}
-
-	// GoProxyPrefetcher is a fallback and supports everything
-	tests := []string{
-		"github.com/foo/bar",
-		"golang.org/x/mod",
-		"gopkg.in/yaml.v3",
-		"example.com/anything",
-		"bitbucket.org/user/repo",
-		"gitlab.com/user/repo",
-	}
-
-	for _, path := range tests {
-		t.Run(path, func(t *testing.T) {
-			if !p.Supports(path) {
-				t.Errorf("Supports(%s) = false, want true (fallback prefetcher)", path)
-			}
-		})
-	}
-}
-
 func TestEscapeModulePath(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -163,43 +112,81 @@ func TestEscapeModulePath(t *testing.T) {
 	}
 }
 
-func TestDefaultPrefetcherHashesTheProxyZipTheCellFetches(t *testing.T) {
-	// A stand-in nix-prefetch-cached that records its arguments
-	bin := t.TempDir()
-	calls := filepath.Join(bin, "calls")
-	script := "#!/bin/sh\necho \"$@\" >> " + calls + "\necho sha256-stand-in=\n"
-	if err := os.WriteFile(filepath.Join(bin, "nix-prefetch-cached"), []byte(script), 0o755); err != nil {
+// standIn writes a stand-in nix-prefetch-cached running script, and
+// returns its path
+func standIn(t *testing.T, script string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "nix-prefetch-cached")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n"+script), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return path
+}
 
+func TestGoProxyPrefetcherHashesTheProxyZipsTheCellFetches(t *testing.T) {
+	t.Parallel()
+	// Records its arguments and stdin, and answers one hash per URL
+	dir := t.TempDir()
+	calls := filepath.Join(dir, "calls")
+	command := standIn(t, `echo "$@" >> `+calls+`
+while read -r url; do echo "$url" >> `+calls+`; echo "sha256-${url##*/}"; done
+`)
+
+	mods := []Module{
+		{Path: "github.com/BurntSushi/toml", Version: "v1.4.0"},
+		{Path: "golang.org/x/mod", Version: "v0.20.0"},
+	}
 	for _, noCache := range []bool{false, true} {
-		hash, err := DefaultPrefetcher(nil, noCache).Prefetch("github.com/BurntSushi/toml", "v1.4.0")
-		if err != nil || hash != "sha256-stand-in=" {
-			t.Fatalf("Prefetch = %q, %v", hash, err)
+		p := &GoProxyPrefetcher{Command: command, NoCache: noCache}
+		got := p.Prefetch(mods)
+		want := []Prefetched{{Hash: "sha256-v1.4.0.zip"}, {Hash: "sha256-v0.20.0.zip"}}
+		if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
+			t.Fatalf("Prefetch = %v, want %v", got, want)
 		}
 	}
 
 	got, _ := os.ReadFile(calls)
-	// The URL nix/lib/deps-cell/fetchers.nix's goproxy fetcher builds,
-	// unpacked as fetchzip unpacks it
-	url := "https://proxy.golang.org/github.com/!burnt!sushi/toml/@v/v1.4.0.zip"
-	want := "--unpack " + url + "\n--unpack --no-cache " + url + "\n"
+	// The URLs nix/lib/deps-cell/fetchers.nix's goproxy fetcher builds,
+	// unpacked as fetchzip unpacks them, all in one call
+	urls := "https://proxy.golang.org/github.com/!burnt!sushi/toml/@v/v1.4.0.zip\n" +
+		"https://proxy.golang.org/golang.org/x/mod/@v/v0.20.0.zip\n"
+	want := "--batch --unpack\n" + urls + "--batch --unpack --no-cache\n" + urls
 	if string(got) != want {
 		t.Errorf("nix-prefetch-cached called with\n%s\nwant\n%s", got, want)
 	}
 }
 
-func TestPrefetchFailureNamesTheURL(t *testing.T) {
-	bin := t.TempDir()
-	script := "#!/bin/sh\necho 'no such module' >&2\nexit 1\n"
-	if err := os.WriteFile(filepath.Join(bin, "nix-prefetch-cached"), []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", bin)
+func TestGoProxyPrefetcherFailsOnlyTheModuleThatFailed(t *testing.T) {
+	t.Parallel()
+	command := standIn(t, `read -r a; read -r b
+echo sha256-good=
+echo "error: no such module"
+`)
 
-	_, err := DefaultPrefetcher(nil, false).Prefetch("example.com/gone", "v1.0.0")
+	got := (&GoProxyPrefetcher{Command: command}).Prefetch([]Module{
+		{Path: "example.com/good", Version: "v1.0.0"},
+		{Path: "example.com/gone", Version: "v1.0.0"},
+	})
+	if got[0].Hash != "sha256-good=" || got[0].Err != nil {
+		t.Errorf("good module = %v", got[0])
+	}
+	err := got[1].Err
 	if err == nil || !strings.Contains(err.Error(), "proxy.golang.org/example.com/gone/@v/v1.0.0.zip") || !strings.Contains(err.Error(), "no such module") {
 		t.Errorf("error %v doesn't name the URL and nix-prefetch-cached's reason", err)
+	}
+}
+
+func TestGoProxyPrefetcherFailsEveryModuleWhenTheBatchFails(t *testing.T) {
+	t.Parallel()
+	command := standIn(t, "echo 'cache dir unwritable' >&2\nexit 1\n")
+
+	got := (&GoProxyPrefetcher{Command: command}).Prefetch([]Module{
+		{Path: "example.com/a", Version: "v1.0.0"},
+		{Path: "example.com/b", Version: "v1.0.0"},
+	})
+	for i, r := range got {
+		if r.Err == nil || !strings.Contains(r.Err.Error(), "cache dir unwritable") {
+			t.Errorf("module %d: error %v doesn't carry nix-prefetch-cached's reason", i, r.Err)
+		}
 	}
 }
