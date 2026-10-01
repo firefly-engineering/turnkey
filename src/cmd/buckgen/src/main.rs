@@ -6,8 +6,8 @@
 //! resolved per platform and allowed build tag (src/rust/goparse,
 //! src/rust/conditions).
 //!
-//! It is the Rust port of src/cmd/buckgen and src/go/pkg/buckgen (#213),
-//! and writes the same bytes.
+//! It was ported from Go (#213), and writes the bytes the Go version
+//! wrote.
 //!
 //! Usage:
 //!

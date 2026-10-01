@@ -183,7 +183,7 @@ fn import_to_target(import_path: &str, cfg: &Config) -> String {
 
 #[cfg(test)]
 mod tests {
-    //! src/go/pkg/buckgen's tests
+    //! The Go version's tests (#213)
 
     use super::*;
     use crate::config::{BuckConfig, ConditionsConfig};

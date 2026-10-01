@@ -1,13 +1,8 @@
 [package]
-name = "buckgen-rs"
+name = "buckgen"
 version = "0.1.0"
 edition.workspace = true
 description = "Generate the rules.star files of a Go module in the Go deps cell"
-
-# The binary is named after the tool it ports
-[[bin]]
-name = "buckgen"
-path = "src/main.rs"
 
 [dependencies]
 conditions.workspace = true

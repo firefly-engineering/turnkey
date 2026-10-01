@@ -1,35 +1,44 @@
 # buckgen Nix package
 #
-# Builds the buckgen tool that generates rules.star files for Go dependencies.
-# This parses Go source files directly without requiring importable code
-# (no go.mod/main.go scaffolding needed).
+# Builds the tool that writes the rules.star files of a Go module in the Go
+# deps cell (src/cmd/buckgen), from the module's own source: it parses the
+# Go files directly, without the go command. Each module's derivation runs
+# it (mkGoDepPackage, nix/lib/deps-cell/adapters/go.nix). Written in Rust
+# (ported from Go, #213), built from the workspace projection like the
+# other Rust tools.
 { pkgs, lib }:
 
 let
-  fs = lib.fileset;
   root = ../..;
+  cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
+  projection = cargoLib.workspaceProjection {
+    inherit root;
+    members = [
+      "src/cmd/buckgen"
+      "src/rust/conditions"
+      "src/rust/deps-gen-kit"
+      "src/rust/goparse"
+      "src/rust/gostd"
+      "src/rust/prefetch-cache"
+    ];
+  };
 in
-pkgs.buildGoModule {
+pkgs.rustPlatform.buildRustPackage {
   pname = "buckgen";
   version = "0.1.0";
 
-  src = fs.toSource {
-    inherit root;
-    fileset = fs.unions [
-      (root + "/go.mod")
-      (root + "/go.sum")
-      (root + "/src/cmd/buckgen")
-      (root + "/src/go/pkg/buckgen")
-      (root + "/src/go/pkg/goparse")
-      (root + "/src/go/pkg/conditional")
-      (root + "/src/go/pkg/conditions")
-      (root + "/src/go/pkg/starlark")
-    ];
-  };
-  subPackages = [ "src/cmd/buckgen" ];
+  inherit (projection) src;
 
-  # Use lib.fakeHash initially to get the correct hash:
-  vendorHash = "sha256-4sLFkUmpdMTHbYaW01MELSokNtuCA1t+4dCghQYRHcI=";
+  cargoLock.lockFileContents = projection.lock;
+
+  cargoBuildFlags = [
+    "-p"
+    "buckgen"
+  ];
+  cargoTestFlags = [
+    "-p"
+    "buckgen"
+  ];
 
   meta = {
     description = "Generate rules.star files for Go dependencies in Buck2";

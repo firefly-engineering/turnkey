@@ -236,7 +236,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "buckgen-rs"
+name = "buckgen"
 version = "0.1.0"
 dependencies = [
  "conditions",
