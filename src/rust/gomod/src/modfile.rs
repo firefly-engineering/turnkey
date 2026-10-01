@@ -134,6 +134,35 @@ pub fn is_directory_path(ns: &str) -> bool {
         || (b.len() >= 2 && b[0].is_ascii_alphabetic() && b[1] == b':')
 }
 
+/// `modfile.ModulePath`: the module path go.mod text declares, `""` when it
+/// declares none. Like x/mod's, it reads lines rather than the grammar, so
+/// unrelated problems in the file don't matter: the first line that is
+/// `module` and a path, comments dropped, has it; a quoted path is
+/// unquoted, and `""` if it can't be.
+pub fn module_path(data: &str) -> String {
+    for line in data.split('\n') {
+        let line = line.find("//").map_or(line, |i| &line[..i]);
+        let Some(rest) = trim_space(line).strip_prefix("module") else {
+            continue;
+        };
+        let path = trim_space(rest);
+        if path.len() == rest.len() || path.is_empty() {
+            continue;
+        }
+        if path.starts_with('"') || path.starts_with('`') {
+            return gostd::strconv::unquote(path).unwrap_or_default();
+        }
+        return path.to_string();
+    }
+    String::new()
+}
+
+/// `s` without leading and trailing white space, as Go's `bytes.TrimSpace`
+/// trims it
+fn trim_space(s: &str) -> &str {
+    s.trim_matches(gostd::unicode::is_space)
+}
+
 /// Reads directives into a file, collecting their errors
 struct Directives<'a> {
     file: &'a str,
@@ -614,6 +643,36 @@ fn is_go_version(v: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The module path, whatever else the file holds, as x/mod's
+    /// ModulePath reads it (and the mapper's TestExtractModulePath)
+    #[test]
+    fn module_paths() {
+        for (content, want) in [
+            (
+                "module github.com/foo/bar\n\ngo 1.21\n",
+                "github.com/foo/bar",
+            ),
+            (
+                "module github.com/firefly-engineering/turnkey",
+                "github.com/firefly-engineering/turnkey",
+            ),
+            ("// comment\nmodule example.com/pkg\n", "example.com/pkg"),
+            ("go 1.21\n", ""),
+            ("module \"example.com/q\" // quoted\n", "example.com/q"),
+            ("module `example.com/raw`\n", "example.com/raw"),
+            ("module \"unterminated\n", ""),
+            (
+                "modules example.com/x\nmodule example.com/y\n",
+                "example.com/y",
+            ),
+            ("module\nmodule example.com/z\n", "example.com/z"),
+            ("  module\texample.com/t  // c\r\n", "example.com/t"),
+            ("require x v1\nmodule (\n", "("),
+        ] {
+            assert_eq!(module_path(content), want, "{content:?}");
+        }
+    }
 
     fn requires(src: &str) -> Vec<(String, String, bool)> {
         parse_mod("go.mod", src)
