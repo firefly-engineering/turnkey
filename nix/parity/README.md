@@ -72,8 +72,9 @@ why byte-identical output is out of reach (#204).
 
 A case's `stubs` names the commands to replace. The harness writes one
 recording stub per name into a directory that comes first on the `PATH`
-it sets on the launched tool; after it come only coreutils, `go` and `git`
-from nixpkgs (for what isn't stubbed, like `godeps-gen`'s `go list`).
+it sets on the launched tool; after it come only coreutils, `go`, `git`
+and `python3` from nixpkgs and turnkey's `deps-extract` (for what isn't
+stubbed, like `godeps-gen`'s `go list` or rules sync's extractor).
 
 Each call to a stub is recorded: the command, its argv, its cwd, and the
 environment variables that differ from the environment the harness gave

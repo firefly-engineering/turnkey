@@ -51,11 +51,15 @@ let
       casesDir = if hasCases then "${./cases}" else "";
       source = "${source}";
       # What the launched tool finds on PATH after the stubs: the real
-      # tools a case doesn't stub (godeps-gen's go list)
+      # tools a case doesn't stub (godeps-gen's go list; rules sync's
+      # deps-extract and python3, which its Python plug-in asks its
+      # version)
       toolsPath = lib.makeBinPath [
         pkgs.coreutils
         pkgs.go
         pkgs.git
+        packages.deps-extract
+        pkgs.python3
       ];
       sslCertFile = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
       packages = toolPackages;
