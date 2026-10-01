@@ -15,7 +15,8 @@
 //! so what is written never depends on the host it runs on.
 //!
 //! [`conditional`] turns a label list per configuration into the attribute
-//! value written in `rules.star`.
+//! value written in `rules.star`, and [`json`] decodes the platforms of a
+//! JSON configuration as the Go tools did.
 //!
 //! The Rust port of src/go/pkg/conditions and src/go/pkg/conditional
 //! (#212), with the same keys and the same splits: testdata/split-vectors.json
@@ -23,6 +24,7 @@
 //! (src/python/cfg), rust-rules-gen and nix/buck2/platforms.nix run too.
 
 pub mod conditional;
+pub mod json;
 
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap, HashSet};

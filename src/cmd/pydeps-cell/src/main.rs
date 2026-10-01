@@ -45,43 +45,8 @@ fn main() -> ExitCode {
 fn run(cell_dir: &Path, deps_path: &Path) -> anyhow::Result<()> {
     let path = cell::join(cell_dir, &["pydeps-cell.json"]);
     let data = std::fs::read(&path).map_err(|e| anyhow::anyhow!("open {}: {e}", path.display()))?;
-    let cfg: cell::Config = serde_json::from_str(&go_json_text(&data))
+    let cfg: cell::Config = serde_json::from_str(&deps_gen_kit::gojson::text(&data))
         .map_err(|e| anyhow::anyhow!("parsing pydeps-cell.json: {e}"))?;
     let deps = cell::load_deps(deps_path)?;
     cell::render_cell(cell_dir, &deps, &cfg)
-}
-
-/// JSON input as encoding/json reads it: each byte that isn't part of a
-/// valid UTF-8 sequence is U+FFFD (in a string; anywhere else it is a
-/// syntax error either way)
-fn go_json_text(mut data: &[u8]) -> String {
-    let mut out = String::with_capacity(data.len());
-    loop {
-        match std::str::from_utf8(data) {
-            Ok(rest) => {
-                out.push_str(rest);
-                return out;
-            }
-            Err(e) => {
-                let valid = e.valid_up_to();
-                out.push_str(std::str::from_utf8(&data[..valid]).expect("valid up to here"));
-                out.push('\u{fffd}');
-                data = &data[valid + 1..];
-            }
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn invalid_utf8_is_replaced_byte_by_byte() {
-        assert_eq!(
-            go_json_text(b"a\xe2\x82b\xffc"),
-            "a\u{fffd}\u{fffd}b\u{fffd}c"
-        );
-        assert_eq!(go_json_text("été".as_bytes()), "été");
-    }
 }

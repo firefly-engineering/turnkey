@@ -12,11 +12,14 @@
 //! - [`OutputArgs::write`], which writes the common header and the
 //!   serde-serialized record;
 //! - [`starlark`], the attribute values the cell generators write in
-//!   `rules.star`, as turnkey's Go tools wrote them.
+//!   `rules.star`, as turnkey's Go tools wrote them;
+//! - [`gojson`], for the cell tools that decode their JSON configuration as
+//!   their Go versions did.
 //!
 //! Generators run through `tk sync`, from the sync rules turnkey generates
 //! (nix/buck2/languages.nix), which read the deps file from stdout.
 
+pub mod gojson;
 pub mod starlark;
 
 use anyhow::{Context, Result, anyhow};
