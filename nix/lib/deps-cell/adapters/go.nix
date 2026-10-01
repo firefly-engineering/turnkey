@@ -129,6 +129,13 @@ rec {
       fetchSpec = mkFetchSpec effectiveFetchPath version sha256;
       patchCommands = if fixup != null then fixup else "";
       generates = buckgen != null;
+      # The zip's <module path>@<version>/ prefix, without the first
+      # directory fetchzip strips: "" for a one-element module path
+      zipRoot =
+        let
+          rest = lib.tail (lib.splitString "/" effectiveFetchPath);
+        in
+        lib.optionalString (rest != [ ]) "${lib.concatStringsSep "/" rest}@${version}";
       # a/vendor/<module path>/...: a/, vendor/ and the module path's segments
       strip = 2 + lib.length (lib.splitString "/" importPath);
     in
@@ -162,16 +169,17 @@ rec {
         ''
           mkdir -p $out
 
-          # Go proxy zips have the full module path as nested dirs
-          # (e.g., golang.org/x/example/hello@v.../reverse/reverse.go)
-          # fetchzip strips only the first level, so we need to find
-          # the actual content root (directory containing go.mod).
-          CONTENT_ROOT=$(find $src -name 'go.mod' -type f -printf '%h\n' | head -1)
-          if [ -n "$CONTENT_ROOT" ]; then
-            cp -r "$CONTENT_ROOT"/* $out/
-          else
-            cp -r $src/* $out/
+          # A module zip holds its files under <module path>@<version>/
+          # (e.g. golang.org/x/example/hello@v.../reverse/reverse.go), and
+          # fetchzip strips only the first directory. The module's root is
+          # where the rest of that prefix leads, whether or not it has a
+          # go.mod: one tagged before modules has none.
+          CONTENT_ROOT=$src/${lib.escapeShellArg zipRoot}
+          if [ ! -d "$CONTENT_ROOT" ]; then
+            echo "error: the module zip of ${effectiveFetchPath}@${version} has no ${zipRoot}/" >&2
+            exit 1
           fi
+          cp -r "$CONTENT_ROOT"/* $out/
           chmod -R u+w $out
 
           # Apply fixup if provided
