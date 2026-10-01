@@ -21,6 +21,8 @@
   testCache,
   # The Go build tags targets may use (buck2.go.allowedBuildTags)
   goAllowedBuildTags ? [ ],
+  # The directories buck2 doesn't see (buck2.ignore)
+  ignore ? [ ],
   # null, or { foundryToml, remappingsTxt, soldepsBundle, soldepsDir }: the
   # inputs the Solidity rules' macros stage (prelude solidity.bzl), the last
   # three null without a soldeps cell
@@ -79,6 +81,11 @@ in
 
   [go]
       allowed_build_tags = ${lib.concatStringsSep "," goAllowedBuildTags}
+''
++ lib.optionalString (ignore != [ ]) ''
+
+  [project]
+      ignore = ${lib.concatStringsSep "," ignore}
 ''
 + lib.optionalString (solidity != null) (
   let

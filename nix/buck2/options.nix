@@ -95,6 +95,18 @@ in
       '';
     };
 
+    ignore = mkOption {
+      type = types.listOf types.str;
+      default = [ ];
+      example = [ "e2e/fixtures" ];
+      description = ''
+        Directories, relative to the project root, that buck2 doesn't see:
+        written to `.buckconfig`'s `project.ignore`, so `//...` skips their
+        `rules.star` files. For trees that are projects of their own, such
+        as test fixtures whose targets only build in their own checkout.
+      '';
+    };
+
     prelude.path = mkOption {
       type = types.nullOr (types.either types.package types.path);
       default = null;

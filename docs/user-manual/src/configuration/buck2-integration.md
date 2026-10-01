@@ -106,6 +106,17 @@ off the supported path, and it turns test result caching off:
 turnkey.toolchains.buck2.prelude.path = ./my-prelude;
 ```
 
+## Directories Buck2 Doesn't See
+
+`ignore` lists directories, relative to the project root, that buck2 skips:
+they go to the generated `.buckconfig`'s `project.ignore`, so `//...` doesn't
+load their `rules.star` files. Use it for trees that are projects of their
+own, such as test fixtures whose targets only build in their own checkout:
+
+```nix
+turnkey.toolchains.buck2.ignore = [ "e2e/fixtures" ];
+```
+
 ## Dependency Cells
 
 Language-specific dependency cells are generated when configured:

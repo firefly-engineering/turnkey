@@ -289,6 +289,7 @@ let
     inherit toolchainsCellPath testRunnerProtocol;
     testCache = testCache.buckconfig;
     goAllowedBuildTags = lib.optionals cfg.go.enable cfg.go.allowedBuildTags;
+    inherit (cfg) ignore;
     solidity = solidityBuckconfig;
   };
 

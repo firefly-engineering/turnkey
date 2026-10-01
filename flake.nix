@@ -433,6 +433,10 @@
                   "integration"
                   "e2e"
                 ];
+                ignore = [
+                  "e2e/fixtures/a"
+                  "e2e/fixtures/b"
+                ];
               };
 
               # The Solidity rules' inputs (prelude solidity.bzl's macros read
@@ -567,6 +571,9 @@
             ) "toolchains cell: no config_setting combining the OS and an allowed Go build tag";
             assert lib.assertMsg (lib.hasInfix "allowed_build_tags = integration,e2e" taggedBuckconfig)
               "buckconfig: buck2.go.allowedBuildTags doesn't reach go.allowed_build_tags";
+            assert lib.assertMsg
+              (lib.hasInfix "[project]\n    ignore = e2e/fixtures/a,e2e/fixtures/b\n" taggedBuckconfig)
+              "buckconfig: buck2.ignore doesn't reach project.ignore";
             assert lib.assertMsg (
               lib.hasInfix "[solidity]\n    foundry_toml = root//:foundry.toml\n" withSoldeps
               && lib.hasInfix "    remappings_txt = root//:remappings.txt\n" withSoldeps
@@ -1597,6 +1604,11 @@
               # Keep rules.star deps in step with the sources: tk syncs them
               # before build, test and the other build-graph commands
               rules.enabled = true;
+
+              # The e2e fixtures are test data: each is a project of its own,
+              # which the e2e tests copy into a fresh turnkey project. Their
+              # deps resolve only there, against their own deps cells
+              ignore = [ "e2e/fixtures" ];
 
               # Pre-commit checks
               tk = {
