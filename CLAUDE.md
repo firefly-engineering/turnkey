@@ -219,7 +219,7 @@ This ensures:
 
 ### Go
 
-**Root file**: `go.mod` at repo root
+**Root file**: `go.mod` at repo root. This is a choice for turnkey's own repo, not a framework limit: a turnkey project can hold several Go modules as a `go.work` workspace ([ADR 0007](docs/adr/0007-go-modules-share-one-resolution-through-go-work.md)).
 
 ```
 /turnkey/
@@ -230,7 +230,7 @@ This ensures:
 ```
 
 - All Go code shares one module
-- No nested go.mod files
+- No nested go.mod files, except test fixtures (`src/testdata/godeps/*`), which are outside the Go build
 - Add deps with `go get` from repo root
 
 ### Rust

@@ -252,6 +252,11 @@ func (s *Syncer) SyncFile(rulesPath string) (*SyncResult, error) {
 		// Can't determine language, skip
 		return result, nil
 	}
+	if scoped, ok := lang.(mapper.ScopedLanguage); ok && !scoped.Manages(pkgDir) {
+		// Outside what the language builds, e.g. a Go test fixture's own
+		// module: not sync's to change
+		return result, nil
+	}
 
 	// Check staleness before running extractor (unless Force mode)
 	if !s.config.Force {

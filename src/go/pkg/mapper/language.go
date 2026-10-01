@@ -55,6 +55,16 @@ type Language interface {
 	ResolveDeps(pkgDir string, req Request) (PackageMapping, error)
 }
 
+// A ScopedLanguage is a Language that manages the rules of only some of the
+// packages they appear in, e.g. Go, those of the workspace's modules.
+type ScopedLanguage interface {
+	Language
+
+	// Manages reports whether sync manages the language's rules in the
+	// package in pkgDir; it leaves those of any other package alone.
+	Manages(pkgDir string) bool
+}
+
 // Dimensions are the configuration dimensions a package's deps depend on.
 type Dimensions struct {
 	// Platform names the platform's dimensions they depend on

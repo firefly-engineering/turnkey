@@ -13,7 +13,7 @@ import (
 func TestMapGoImports(t *testing.T) {
 	lang := &goLanguage{
 		cfg: &GoConfig{
-			ModulePath:   "github.com/firefly-engineering/turnkey",
+			Members:      []GoMember{{Path: "github.com/firefly-engineering/turnkey", Dir: "."}},
 			ExternalCell: "godeps",
 			ExternalDeps: map[string]bool{
 				"github.com/google/uuid": true,
@@ -102,7 +102,7 @@ func TestMapGoImports(t *testing.T) {
 // skipped, internal and external imports mapped.
 func TestResolveImports(t *testing.T) {
 	lang := &goLanguage{cfg: &GoConfig{
-		ModulePath:   "github.com/example/project",
+		Members:      []GoMember{{Path: "github.com/example/project", Dir: "."}},
 		ExternalCell: "godeps",
 		ExternalDeps: map[string]bool{
 			"github.com/google/uuid": true,
@@ -201,7 +201,7 @@ func TestGoDepsFromGodepsGen(t *testing.T) {
 func TestUnmappedExternalDep(t *testing.T) {
 	lang := &goLanguage{
 		cfg: &GoConfig{
-			ModulePath:   "github.com/example/project",
+			Members:      []GoMember{{Path: "github.com/example/project", Dir: "."}},
 			ExternalCell: "godeps",
 			ExternalDeps: map[string]bool{
 				// Only uuid is known
@@ -257,5 +257,143 @@ func TestExtractModulePath(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("extractModulePath(%q) = %q, want %q", tt.content, got, tt.want)
 		}
+	}
+}
+
+// An import maps to the workspace member whose module path is its longest
+// prefix on a / boundary, at its directory, with the target named after the
+// import path's last component (as the godeps cell's forwarding aliases
+// name it), and the longest module path wins between a member and a
+// third-party module.
+func TestMapGoWorkspaceImports(t *testing.T) {
+	cfg := &GoConfig{
+		Members: []GoMember{
+			{Path: "example.com/app", Dir: "."},
+			{Path: "example.com/app/tools", Dir: "tools"},
+			{Path: "example.com/lib", Dir: "libs/lib"},
+			{Path: "golang.org/x/sys", Dir: "third_party/x-sys"},
+		},
+		ExternalCell: "godeps",
+		ExternalDeps: map[string]bool{
+			"example.com/libextra":  true,
+			"example.com/lib/proto": true,
+		},
+	}
+	lang := &goLanguage{cfg: cfg}
+
+	tests := []struct {
+		imp  string
+		kind extraction.ImportKind
+		want string
+	}{
+		{"example.com/app/internal/x", extraction.ImportKindInternal, "//internal/x:x"},
+		{"example.com/app", extraction.ImportKindInternal, "//:app"},
+		{"example.com/app/tools/gen", extraction.ImportKindInternal, "//tools/gen:gen"},
+		{"example.com/lib/sub", extraction.ImportKindInternal, "//libs/lib/sub:sub"},
+		{"golang.org/x/sys", extraction.ImportKindInternal, "//third_party/x-sys:sys"},
+		{"golang.org/x/sys/cpu", extraction.ImportKindInternal, "//third_party/x-sys/cpu:cpu"},
+		// Not on a / boundary: a third-party module
+		{"example.com/libextra/y", extraction.ImportKindExternal, "godeps//vendor/example.com/libextra/y:y"},
+		// A third-party module nested in a member's module path
+		{"example.com/lib/proto/v1", extraction.ImportKindExternal, "godeps//vendor/example.com/lib/proto/v1:v1"},
+		{"fmt", extraction.ImportKindStdlib, ""},
+	}
+	for _, tt := range tests {
+		if got := classifyGoImport(tt.imp, cfg); got != tt.kind {
+			t.Errorf("classifyGoImport(%q) = %v, want %v", tt.imp, got, tt.kind)
+			continue
+		}
+		deps, unmapped := mapImports(lang, []extraction.Import{{Path: tt.imp, Kind: tt.kind}})
+		if len(unmapped) != 0 {
+			t.Errorf("%s: unmapped", tt.imp)
+		}
+		var got string
+		if targets := DepsToTargets(deps); len(targets) == 1 {
+			got = targets[0]
+		}
+		if got != tt.want {
+			t.Errorf("%s maps to %q, want %q", tt.imp, got, tt.want)
+		}
+	}
+}
+
+// An import is first-party only on a / boundary of a member's module path.
+func TestClassifyGoImportBoundary(t *testing.T) {
+	cfg := &GoConfig{Members: []GoMember{{Path: "github.com/x/fo", Dir: "."}}}
+	if got := classifyGoImport("github.com/x/foo", cfg); got != extraction.ImportKindExternal {
+		t.Errorf("github.com/x/foo in module github.com/x/fo: %v, want external", got)
+	}
+}
+
+// The members come from go-deps.toml's [members] when it records them, and
+// otherwise are the root go.mod alone.
+func TestGoMembersFromDepsFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/root\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	lang := testLanguage("go")
+
+	cfg, _ := detectGoConfig(dir, lang)
+	if want := []GoMember{{Path: "example.com/root", Dir: "."}}; !reflect.DeepEqual(cfg.Members, want) {
+		t.Errorf("without go-deps.toml: members = %v, want %v", cfg.Members, want)
+	}
+
+	depsFile, err := os.Create(filepath.Join(dir, lang.DepsFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = godeps.WriteDepsFile(depsFile, godeps.DepsFile{
+		Members: []godeps.Member{{Path: "example.com/b", Dir: "b"}, {Path: "example.com/a", Dir: "a"}},
+	}, godeps.DefaultOutputOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := depsFile.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, _ = detectGoConfig(dir, lang)
+	want := []GoMember{{Path: "example.com/a", Dir: "a"}, {Path: "example.com/b", Dir: "b"}}
+	if !reflect.DeepEqual(cfg.Members, want) {
+		t.Errorf("members = %v, want %v", cfg.Members, want)
+	}
+}
+
+// Sync manages a package's Go rules only when the nearest go.mod above it
+// is a member's.
+func TestGoManages(t *testing.T) {
+	root := t.TempDir()
+	for _, f := range []string{"go.mod", "lib/go.mod", "src/testdata/fixture/go.mod"} {
+		p := filepath.Join(root, f)
+		if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("module example.com/m\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	lang := &goLanguage{projectRoot: root, cfg: &GoConfig{Members: []GoMember{
+		{Path: "example.com/app", Dir: "."},
+		{Path: "example.com/lib", Dir: "lib"},
+	}}}
+
+	for dir, want := range map[string]bool{
+		".":                         true,
+		"cmd/app":                   true,
+		"lib":                       true,
+		"lib/sub":                   true,
+		"src/testdata/fixture":      false,
+		"src/testdata/fixture/deep": false,
+	} {
+		if got := lang.Manages(filepath.Join(root, dir)); got != want {
+			t.Errorf("Manages(%s) = %v, want %v", dir, got, want)
+		}
+	}
+
+	// Without a member at the root, a package under no member isn't managed
+	lang.cfg.Members = lang.cfg.Members[1:]
+	if lang.Manages(filepath.Join(root, "cmd/app")) {
+		t.Error("Manages(cmd/app) with no root member = true, want false")
 	}
 }

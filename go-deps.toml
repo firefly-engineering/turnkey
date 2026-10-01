@@ -8,6 +8,8 @@
 schema_version = 2
 
 sources = [
+    "go.work",
+    "go.work.sum",
     "go.mod",
     "go.sum",
 ]

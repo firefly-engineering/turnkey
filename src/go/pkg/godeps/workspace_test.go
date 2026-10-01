@@ -180,8 +180,9 @@ func TestASingleModuleIsAWorkspaceOfOne(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ws.WorkFile != "" || !reflect.DeepEqual(ws.Sources, []string{"go.mod", "go.sum"}) {
-		t.Errorf("work file %q, sources %v; want none and go.mod, go.sum", ws.WorkFile, ws.Sources)
+	// go.work is a source though absent: adding one makes go-deps.toml stale
+	if ws.WorkFile != "" || !reflect.DeepEqual(ws.Sources, []string{"go.work", "go.work.sum", "go.mod", "go.sum"}) {
+		t.Errorf("work file %q, sources %v; want none and go.work, go.work.sum, go.mod, go.sum", ws.WorkFile, ws.Sources)
 	}
 	if want := []Member{{Path: "example.com/m", Dir: ".", sumFile: "go.sum"}}; !reflect.DeepEqual(ws.Members, want) {
 		t.Errorf("members %+v, want %+v", ws.Members, want)
