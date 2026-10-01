@@ -90,8 +90,11 @@ shell's `TURNKEY_REAL_GO` can't route `tw` around the stubs.
 ## Case files
 
 One file per tool, `cases/<tool>.toml`; the file name is the tool name
-`nix run .#parity -- <tool>` takes. The example below is godeps-gen's,
-whose case file its switch (#211) deleted.
+`nix run .#parity -- <tool>` takes. Inputs too large to inline in it, which
+nothing else in the tree has, go in `cases/<tool>/` (the harness only reads
+the `.toml` files directly under `cases/`), and go away with the case file.
+The example below is godeps-gen's, whose case file its switch (#211)
+deleted.
 
 ```toml
 [tool]
