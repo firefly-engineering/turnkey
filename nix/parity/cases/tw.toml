@@ -1,0 +1,152 @@
+# tw: runs a native tool, and syncs the deps rule its wrapper rule names
+# when a mutating subcommand changed a watched file.
+#
+# Every command tw launches is a recording stub: the wrapped tool, its
+# post-commands, and the sync's generators. What is compared is the call
+# log (argv, cwd, env tw set or changed), the exit code, the files written,
+# and stdout.
+#
+# The port adds `rust = "<package>"` below; its switch deletes this file.
+
+[tool]
+go = "tw"
+
+# A project: the greenfield fixture, with the sync.toml turnkey would
+# generate for it, trimmed to one wrapper and a two-rule sync chain (the
+# second rule's source is the first one's target)
+[[cases]]
+name = "go-get-changes-go-mod"
+description = "a mutating subcommand that changes go.mod: post-command, then the go rule, then the rule stale after it"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.mod", "go.sum"]
+target = "go-deps.toml"
+generator = ["godeps-gen", "--go-mod", "go.mod", "--go-sum", "go.sum"]
+
+[[deps]]
+name = "derived"
+sources = ["go-deps.toml"]
+target = "derived.txt"
+generator = ["buck2", "bxl", "//gen:derived.bxl"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["get", "mod"]
+watch_files = ["go.mod", "go.sum"]
+deps_rule = "go"
+post_commands = ["go mod tidy"]
+"""
+args = ["go", "get", "example.com/dep@v1.0.0"]
+exit = 0
+outputs = [
+  { stream = "stdout" },
+  { path = "work/go-deps.toml" },
+  { path = "work/derived.txt" },
+]
+
+[[cases.stubs.go]]
+args_prefix = ["get"]
+stdout = "go: added example.com/dep v1.0.0\n"
+write."work/go.mod" = """
+module example.com/greenfield
+
+go 1.21
+
+require (
+	example.com/dep v1.0.0
+	github.com/google/uuid v1.6.0
+)
+"""
+
+[[cases.stubs.go]]
+args = ["mod", "tidy"]
+
+[[cases.stubs.godeps-gen]]
+stdout = "schema_version = 2\n"
+
+[[cases.stubs.buck2]]
+stdout = "derived\n"
+
+[[cases]]
+name = "go-get-unchanged"
+description = "a mutating subcommand that fails and changes nothing: no sync, its exit code passed on"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.mod", "go.sum"]
+target = "go-deps.toml"
+generator = ["godeps-gen"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["get", "mod"]
+watch_files = ["go.mod", "go.sum"]
+deps_rule = "go"
+post_commands = ["go mod tidy"]
+"""
+args = ["go", "get", "example.com/missing@v9"]
+exit = 1
+outputs = [{ stream = "stdout" }]
+
+[[cases.stubs.go]]
+exit = 1
+stderr = "go: example.com/missing@v9: not found\n"
+
+[[cases.stubs.godeps-gen]]
+
+[[cases]]
+name = "go-build-passes-through"
+description = "a subcommand that isn't mutating runs the tool and nothing else"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.mod", "go.sum"]
+target = "go-deps.toml"
+generator = ["godeps-gen"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["get", "mod"]
+watch_files = ["go.mod", "go.sum"]
+deps_rule = "go"
+"""
+args = ["go", "build", "./..."]
+exit = 0
+outputs = [{ stream = "stdout" }]
+
+[[cases.stubs.go]]
+stdout = "built\n"
+
+[[cases.stubs.godeps-gen]]
+
+[[cases]]
+name = "no-wrapper-rule"
+description = "a tool without a wrapper rule is passed through, from a subdirectory"
+inputs = { work = "e2e/fixtures/multi-language" }
+files."work/.turnkey/sync.toml" = ""
+cwd = "work/rust_lib"
+args = ["cargo", "add", "serde"]
+exit = 3
+outputs = [{ stream = "stdout" }]
+
+[[cases.stubs.cargo]]
+exit = 3
+stdout = "cargo output\n"
+
+[[cases]]
+name = "no-project"
+description = "outside a project every tool is passed through"
+inputs = { work = "src/testdata/godeps/simple" }
+args = ["--verbose", "go", "get", "example.com/dep"]
+exit = 0
+outputs = [{ stream = "stdout" }]
+
+[[cases.stubs.go]]
+write."work/go.mod" = "module example.com/simple\n"
