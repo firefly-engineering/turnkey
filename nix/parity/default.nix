@@ -22,8 +22,11 @@
 }:
 
 let
+  # Between switches there may be no case file, and so no ./cases: Git and
+  # jj don't keep an empty directory
+  hasCases = builtins.pathExists ./cases;
   caseFiles = lib.filterAttrs (name: type: type == "regular" && lib.hasSuffix ".toml" name) (
-    builtins.readDir ./cases
+    if hasCases then builtins.readDir ./cases else { }
   );
 
   toolPackages = lib.mapAttrs' (
@@ -45,7 +48,7 @@ let
 
   config = pkgs.writeText "parity-config.json" (
     builtins.toJSON {
-      casesDir = "${./cases}";
+      casesDir = if hasCases then "${./cases}" else "";
       source = "${source}";
       # What the launched tool finds on PATH after the stubs: the real
       # tools a case doesn't stub (godeps-gen's go list)

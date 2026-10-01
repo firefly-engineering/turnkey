@@ -7,33 +7,44 @@
 #   tw go get github.com/foo/bar    # runs go get, syncs if go.mod changed
 #   tw cargo add serde              # runs cargo add, syncs if Cargo.lock changed
 #   tw uv add requests              # runs uv add, syncs if pyproject.toml changed
+#
+# Written in Rust, built from the root Cargo workspace like rustdeps-gen.
 { pkgs, lib }:
 
 let
-  fs = lib.fileset;
   root = ../..;
+  cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
+  projection = cargoLib.workspaceProjection {
+    inherit root;
+    members = [
+      "src/cmd/tw"
+      "src/rust/conditions"
+      "src/rust/deps-gen-kit"
+      "src/rust/gostd"
+      "src/rust/prefetch-cache"
+      "src/rust/project-sync"
+    ];
+  };
 in
-pkgs.buildGoModule {
+pkgs.rustPlatform.buildRustPackage {
   pname = "tw";
   version = "0.1.0";
 
-  src = fs.toSource {
-    inherit root;
-    fileset = fs.unions [
-      (root + "/go.mod")
-      (root + "/go.sum")
-      (root + "/src/cmd/tw")
-      (root + "/src/go/pkg/syncconfig")
-      (root + "/src/go/pkg/conditions")
-      (root + "/src/go/pkg/syncer")
-      (root + "/src/go/pkg/staleness")
-      (root + "/src/go/pkg/snapshot")
-      (root + "/src/go/pkg/wrap")
-    ];
-  };
-  subPackages = [ "src/cmd/tw" ];
+  inherit (projection) src;
 
-  vendorHash = "sha256-JKYuooBnREx9FIvz51BCGaS+YFmfSZQHNzKMI7lfAOM=";
+  cargoLock.lockFileContents = projection.lock;
+
+  cargoBuildFlags = [
+    "-p"
+    "tw"
+  ];
+  # project-sync's tests too: they cover the sync tw runs
+  cargoTestFlags = [
+    "-p"
+    "tw"
+    "-p"
+    "project-sync"
+  ];
 
   meta = {
     description = "Turnkey wrapper for native language tools with auto-sync";

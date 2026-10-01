@@ -12,12 +12,12 @@ It is temporary. Each tool's switch deletes that tool's case file, and the
 `tk` switch deletes this directory and `apps.parity` in `flake.nix`.
 
 ```bash
-nix run .#parity -- --list                     # the tools and their cases
-nix run .#parity -- tw                         # Go package against Rust package
-nix run .#parity -- --self-check tw            # Go package against itself
-nix run .#parity -- tw --case no-project
-nix run .#parity -- tw --rust target/debug/tw  # a cargo build
-nix run .#parity -- tw --keep                  # keep the scratch dir to look at
+nix run .#parity -- --list                         # the tools and their cases
+nix run .#parity -- <tool>                         # Go package against Rust package
+nix run .#parity -- --self-check <tool>            # Go package against itself
+nix run .#parity -- <tool> --case <case>
+nix run .#parity -- <tool> --rust target/debug/<tool>  # a cargo build
+nix run .#parity -- <tool> --keep                  # keep the scratch dir to look at
 ```
 
 It exits 0 when every case is clean, 1 when a case differs, and 2 on a
@@ -164,8 +164,8 @@ outputs = [{ path = "out" }]
    same `PATH` additions), with its binary named after the tool. Expose it
    as `packages.<tool>-rs` in `flake.nix`, outside the shell.
 2. Point the case file at it: `rust = "<tool>-rs"` under `[tool]`. Add
-   the case file first if the tool has none (`cases/tw.toml` exists
-   already), and add the cases the port needs.
+   the case file first if the tool has none, and add the cases the port
+   needs.
 3. `nix run .#parity -- --self-check <tool>` must be clean (the cases are
    deterministic), then `nix run .#parity -- <tool>` must be clean before
    the switch. While porting, `--rust target/debug/<tool>` skips the Nix

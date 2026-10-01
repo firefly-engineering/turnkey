@@ -111,12 +111,12 @@ tw -v cargo add serde           # Verbose mode
 ```
 
 **Key packages:**
-- `src/go/pkg/syncconfig/` - Configuration parsing for `.turnkey/sync.toml`
-- `src/go/pkg/syncer/` - Sync execution logic
-- `src/go/pkg/snapshot/` - File hashing for change detection
+- `src/cmd/tw/` - `tw` itself (Rust): running the tool, and hashing the watched files for change detection
+- `src/rust/project-sync/` - `.turnkey/sync.toml` parsing, staleness and sync execution (Rust, for `tw`)
+- `src/go/pkg/syncconfig/`, `src/go/pkg/syncer/` - the same for `tk`, until `tk` is ported
 - `nix/packages/tw-wrappers.nix` - Shell wrappers that shadow real tools
 
-See `docs/native-tool-wrappers.md` for full documentation.
+See `docs/user-manual/src/reference/cli.md` (the `tw` section) for full documentation.
 
 ## Architecture Patterns
 
@@ -636,7 +636,7 @@ When adding functionality, ensure it works across all platforms.
 ## Related Resources
 
 - **Dependency Management**: See `docs/dependency-management.md` for core principles on how dependencies flow from language-native declarations through Nix to Buck2 cells. **Read this before working on any dependency-related code.**
-- **Native Tool Wrappers**: See `docs/native-tool-wrappers.md` for how `go`, `cargo`, `uv` are transparently wrapped with auto-sync.
+- **Native Tool Wrappers**: See the `tw` section of `docs/user-manual/src/reference/cli.md` for how `go`, `cargo`, `uv` are transparently wrapped with auto-sync.
 - **Testing in Devenv**: See `docs/testing-devenv.md` for the standard `direnv exec . <command>` pattern used for all testing.
 - **Buck2 Cell Resolution**: See `docs/buck2_cell_resolution.md` for deep dive
 - **flake-parts**: https://flake.parts/

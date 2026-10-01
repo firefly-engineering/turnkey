@@ -22,8 +22,6 @@
 //! ```
 //!
 //! A tool without a wrapper rule is passed through untouched.
-//!
-//! This is the Rust port of `src/cmd/tw` (#214).
 
 mod snapshot;
 mod wrap;
