@@ -133,7 +133,9 @@ write."work/go.mod" = "module example.com/x\n"
 
 Inputs come from the turnkey source tree the flake was evaluated from: the
 Go tests' `testdata/`, `e2e/fixtures/*`, the Go coverage fixture, or `"."`
-for turnkey's own repository.
+for turnkey's own repository. An absolute `/nix/store/...` path is read
+from the store as it is: `buckgen`'s cases read the Go module zips' sources
+(fixed-output, so their paths are the same everywhere) and GOROOT's trees.
 
 ### Tools that run inside a deps-cell derivation
 
