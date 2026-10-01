@@ -4,6 +4,7 @@ import (
 	"go/build/constraint"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -120,5 +121,41 @@ func TestBuildContextMatches(t *testing.T) {
 		if got := tt.ctx.Matches(tt.file); got != tt.matches {
 			t.Errorf("%s: Matches = %v; want %v", tt.name, got, tt.matches)
 		}
+	}
+}
+
+func TestParseFileEmbedPatterns(t *testing.T) {
+	content := "package testpkg\n" +
+		"import \"embed\"\n" +
+		"//go:embed static/*.html \"my file.txt\" `raw dir`\n" +
+		"var files embed.FS\n" +
+		"//go:embed\tversion.txt\n" +
+		"var version string\n" +
+		"// see //go:embed notadirective\n" +
+		"var s = \"//go:embed instring\"\n" +
+		"/* //go:embed inblock */\n"
+	path := filepath.Join(t.TempDir(), "embed.go")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	gf, err := ParseFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"static/*.html", "my file.txt", "raw dir", "version.txt"}
+	if !reflect.DeepEqual(gf.EmbedDirs, want) {
+		t.Errorf("EmbedDirs = %q, want %q", gf.EmbedDirs, want)
+	}
+}
+
+func TestParseFileRejectsAMalformedEmbed(t *testing.T) {
+	content := "package testpkg\n//go:embed \"unterminated\nvar b []byte\n"
+	path := filepath.Join(t.TempDir(), "embed.go")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseFile(path); err == nil {
+		t.Error("ParseFile accepted an unterminated //go:embed pattern")
 	}
 }
