@@ -11,7 +11,11 @@ go_library(
 
 go_test(
     name = "greet_test",
-    srcs = ["greet_test.go"],
+    # The internal test (package greet) and the external one (greet_test)
+    srcs = [
+        "greet_external_test.go",
+        "greet_test.go",
+    ],
     target_under_test = ":greet",
     # Compiled in through //go:embed
     embed_srcs = ["testdata/cases.txt"],

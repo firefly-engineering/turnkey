@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"example.com/lib/text"
 )
 
 // cases holds one "name=greeting" pair per line. It is compiled into the
@@ -55,8 +53,5 @@ func TestHelloMatchesGolden(t *testing.T) {
 	want := strings.TrimSpace(golden(t))
 	if got := Hello("world"); got != want {
 		t.Errorf("Hello(%q) = %q, want %q", "world", got, want)
-	}
-	if got, want := Hello("go"), "Hello, "+text.Shout("go"); got != want {
-		t.Errorf("Hello(%q) = %q, want %q", "go", got, want)
 	}
 }

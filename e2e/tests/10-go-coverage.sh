@@ -10,6 +10,7 @@
 #    dependency's own deps
 # 4. Build everything and run the binary
 # 5. Run the tests twice: the second run reuses every recorded result
+# 6. Run the external test package's test from the test binary
 #
 # Issue: https://github.com/firefly-engineering/turnkey/issues/208
 set -euo pipefail
@@ -79,6 +80,9 @@ assert_file_contains "app/cache/rules.star" '"godeps//vendor/github.com/hashicor
 # (https://github.com/firefly-engineering/turnkey/issues/201): rules sync
 # must still declare it
 assert_file_contains "app/cache/rules.star" '"godeps//vendor/github.com/hashicorp/golang-lru/v2/simplelru:simplelru"' || exit 1
+# The external test package's imports are the test's deps; its import of
+# the package under test is the target_under_test, not a dep
+assert_file_not_contains "lib/greet/rules.star" '"//lib/greet:greet"' || exit 1
 echo "rules.star deps synced from the imports"
 
 step "Committing the synced state"
@@ -104,6 +108,11 @@ run_output=$(run_in_devshell_script_capture << 'PHASE2'
   echo ""
   echo "=== second test run ==="
   tk test //...
+
+  echo ""
+  echo "=== external test package ==="
+  # The test binary runs the external package's tests too
+  "$(buck2 build //lib/greet:greet_test --show-full-simple-output)" -test.v -test.run 'TestHelloShouts$'
 PHASE2
 ) || {
   echo "$run_output" | tail -60
@@ -115,10 +124,13 @@ step "Verifying the binary's output"
 assert_output_contains 'printf "%s\n" "$run_output"' "Hello, TURNKEY!" || exit 1
 assert_output_contains 'printf "%s\n" "$run_output"' 'Name: (string) (len=7) "turnkey"' || exit 1
 
+step "Verifying the external test package ran"
+assert_output_contains 'printf "%s\n" "$run_output"' "^--- PASS: TestHelloShouts" || exit 1
+
 step "Verifying both test runs"
 # Two go_test targets, run by the first run and reused by the second
 first_run=$(echo "$run_output" | sed -n '/=== first test run ===/,/=== second test run ===/p')
-second_run=$(echo "$run_output" | sed -n '/=== second test run ===/,$p')
+second_run=$(echo "$run_output" | sed -n '/=== second test run ===/,/=== external test package ===/p')
 assert_output_contains 'printf "%s\n" "$first_run"' "Pass 2.*Fail 0\. Timeout 0\. Fatal 0\." || exit 1
 assert_output_contains 'printf "%s\n" "$first_run"' "^0 recorded (reused without running)" || exit 1
 assert_output_contains 'printf "%s\n" "$second_run"' "Pass 2.*Fail 0\. Timeout 0\. Fatal 0\." || exit 1

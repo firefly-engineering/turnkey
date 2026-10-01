@@ -17,7 +17,7 @@ whole path: `tk sync` → `godeps` cell → rules sync → `buck2 build`/`test`.
 go.work                  use ./app ./lib
 lib/                     module example.com/lib (no third-party deps)
   text/                  library
-  greet/                 library importing text; go_test with embed_srcs and resources
+  greet/                 library importing text; go_test with embed_srcs, resources and an external test package
 app/                     module example.com/app
   config/                BurntSushi/toml
   cache/                 golang-lru/v2 (lru and simplelru); go_test
@@ -42,16 +42,9 @@ The root `flake.nix`, `toolchain.toml` and `rules.star` come from
 | `go_test` with `target_under_test` | `lib/greet:greet_test`, `app/cache:cache_test` |
 | `embed_srcs` and `//go:embed` | `lib/greet/greet_test.go` embeds `testdata/cases.txt` |
 | testdata as `resources` | `lib/greet/greet_test.go` reads `testdata/golden.txt` next to the test binary |
+| An external `_test` package | `lib/greet/greet_external_test.go` (`package greet_test`) |
 | Test result caching | the test runs `tk test //...` twice; the second run must reuse every result |
 | A direct import also reachable through a dep's own deps ([#201](https://github.com/firefly-engineering/turnkey/issues/201)) | `app/cache` imports `simplelru` directly and through `lru`: rules sync must declare it |
-
-## Not covered yet: an external `_test` package
-
-The fixture has no external test package (`package greet_test`). The buck2
-prelude's `go_test` fails on one: `go/package_builder.bzl` stops with
-"External tests are not supported, remove suffix '_test' from package
-declaration". Adding it needs a prelude change that builds the `_test`
-package and has the generated test main import it.
 
 ## Why the deps are empty
 
