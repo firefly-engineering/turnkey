@@ -1,11 +1,13 @@
 package starlark
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"go.starlark.net/syntax"
 )
@@ -377,26 +379,23 @@ func spanFromNode(node syntax.Node, source []byte) Span {
 }
 
 // positionToOffset converts a syntax.Position to a byte offset.
+// Position is a 1-based line and a 1-based column counted in runes, not
+// bytes, so the column is walked rune by rune from the start of its line.
 func positionToOffset(pos syntax.Position, source []byte) int {
-	// Position is 1-indexed line and column
-	line := int(pos.Line)
-	col := int(pos.Col)
-
 	offset := 0
-	currentLine := 1
-
-	for i, b := range source {
-		if currentLine == line {
-			// Found the line, add column offset
-			return offset + col - 1
+	for line := int32(1); line < pos.Line; line++ {
+		nl := bytes.IndexByte(source[offset:], '\n')
+		if nl < 0 {
+			return len(source)
 		}
-		if b == '\n' {
-			currentLine++
-		}
-		offset = i + 1
+		offset += nl + 1
 	}
 
-	return len(source)
+	for col := int32(1); col < pos.Col && offset < len(source); col++ {
+		_, size := utf8.DecodeRune(source[offset:])
+		offset += size
+	}
+	return offset
 }
 
 // extractText extracts the original source text for a node.

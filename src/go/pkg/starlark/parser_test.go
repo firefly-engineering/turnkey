@@ -582,3 +582,21 @@ func TestParseSingleQuotedStrings(t *testing.T) {
 		t.Errorf("importpath = %#v", got)
 	}
 }
+
+func TestSetDepsAfterNonASCIIOnTheSameLine(t *testing.T) {
+	src := `go_library(name = "x", srcs = ["café"], deps = [])
+`
+	f, err := Parse("test.star", []byte(src))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	f.GetTarget("x").SetDeps([]string{"//a:b"})
+
+	out := string(f.Write())
+	if _, err := Parse("out.star", []byte(out)); err != nil {
+		t.Fatalf("rewritten file doesn't parse: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, `srcs = ["café"]`) || !strings.Contains(out, `"//a:b"`) {
+		t.Errorf("unexpected output:\n%s", out)
+	}
+}
