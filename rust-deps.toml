@@ -30,6 +30,7 @@ manifests = [
     "src/rust/deps-extract/Cargo.toml",
     "src/rust/deps-gen-kit/Cargo.toml",
     "src/rust/gomod/Cargo.toml",
+    "src/rust/goparse/Cargo.toml",
     "src/rust/gostd/Cargo.toml",
     "src/rust/nix-eval/Cargo.toml",
     "src/rust/pep508/Cargo.toml",
@@ -2684,6 +2685,14 @@ dependencies = [
     { package = "pin-project-lite@0.2.17" },
     { package = "tracing-attributes@0.1.31" },
     { package = "tracing-core@0.1.36" },
+]
+
+[deps."tree-sitter-go@0.25.0"]
+name = "tree-sitter-go"
+version = "0.25.0"
+hash = "sha256-bcIrIM7FWX/NGZO4o7A+cpkFzD3jT3CdtwLM4hB6p4M="
+dependencies = [
+    { package = "tree-sitter-language@0.1.6" },
 ]
 
 [deps."tree-sitter-language@0.1.6"]

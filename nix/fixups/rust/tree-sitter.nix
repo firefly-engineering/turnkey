@@ -107,6 +107,7 @@ in
   };
 
   # Language grammars
+  rust.tree-sitter-go = grammar { name = "tree_sitter_go"; };
   rust.tree-sitter-rust = grammar {
     name = "tree_sitter_rust";
     hasScanner = true;

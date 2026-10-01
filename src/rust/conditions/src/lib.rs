@@ -98,6 +98,11 @@ impl Configuration {
         self.0.insert(dim.to_string(), value.to_string());
     }
 
+    /// Its dimensions and their values, in dimension name order
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.0.iter().map(|(d, v)| (d.as_str(), v.as_str()))
+    }
+
     /// The number of dimensions it assigns
     pub fn len(&self) -> usize {
         self.0.len()

@@ -1,0 +1,14 @@
+[package]
+name = "goparse"
+version = "0.1.0"
+edition.workspace = true
+description = "Go source files' package clause, imports, build constraints and embeds, as go/parser and go/build read them"
+
+[dependencies]
+conditions.workspace = true
+gostd.workspace = true
+tree-sitter.workspace = true
+tree-sitter-go.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -28,6 +28,7 @@ members = [
     "src/rust/deps-extract",
     "src/rust/deps-gen-kit",
     "src/rust/gomod",
+    "src/rust/goparse",
     "src/rust/gostd",
     "src/rust/nix-eval",
     "src/rust/pep508",
@@ -93,6 +94,7 @@ tonic-prost-build = { version = "0.14", default-features = false, features = ["t
 # Tree-sitter for source code parsing
 tree-sitter = "0.25"
 tree-sitter-language = "0.1"
+tree-sitter-go = "0.25"
 tree-sitter-python = "0.23"
 tree-sitter-rust = "0.23"
 tree-sitter-typescript = "0.23"
@@ -105,6 +107,7 @@ composition = { path = "src/rust/composition", features = ["watcher"] }
 conditions = { path = "src/rust/conditions" }
 deps-gen-kit = { path = "src/rust/deps-gen-kit" }
 gomod = { path = "src/rust/gomod" }
+goparse = { path = "src/rust/goparse" }
 gostd = { path = "src/rust/gostd" }
 nix-eval = { path = "src/rust/nix-eval" }
 pep508 = { path = "src/rust/pep508" }
