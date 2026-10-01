@@ -1,4 +1,4 @@
-load("@prelude//:rules.bzl", "go_library", "go_test")
+load("@prelude//:rules.bzl", "export_file", "go_library", "go_test")
 
 go_library(
     name = "rulessync",
@@ -28,4 +28,12 @@ go_test(
         "//src/go/pkg/syncconfig:syncconfig",
     ],
     visibility = ["PUBLIC"],
+)
+
+# The sync.toml turnkey's shell writes, read by the rules-sync crate's
+# tests too
+export_file(
+    name = "sync-contract",
+    src = "testdata/sync.toml",
+    visibility = ["//src/rust/rules-sync/..."],
 )

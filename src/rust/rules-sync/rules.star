@@ -44,10 +44,11 @@ rust_test(
         "rustdeps//vendor/toml:toml",
     ],
     # The cfg() and feature activation cases src/go/pkg/cargocfg and
-    # src/go/pkg/cargofeatures run too, embedded from where testdata/ links
-    # to them
+    # src/go/pkg/cargofeatures run too, and the sync.toml turnkey writes,
+    # embedded from where testdata/ links to them
     mapped_srcs = {
         "//src/go/pkg/cargocfg:cfg-vectors": "testdata/cfg-vectors.json",
         "//src/go/pkg/cargofeatures:activation-vectors": "testdata/activation-vectors.json",
+        "//src/go/pkg/rulessync:sync-contract": "testdata/sync.toml",
     },
 )
