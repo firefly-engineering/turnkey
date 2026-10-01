@@ -104,6 +104,11 @@ func TestTransformIsolationDir(t *testing.T) {
 			input:    []string{"build", "--isolation-dir"},
 			expected: []string{"build", "--isolation-dir"},
 		},
+		{
+			name:     "the target's own args after --",
+			input:    []string{"--isolation-dir=x", "run", "//tool", "--", "--isolation-dir=y", "--isolation-dir", "z"},
+			expected: []string{"--isolation-dir=.turnkey-x", "run", "//tool", "--", "--isolation-dir=y", "--isolation-dir", "z"},
+		},
 	}
 
 	for _, tt := range tests {

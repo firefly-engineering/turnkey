@@ -668,11 +668,18 @@ func injectArgsAfterSeparator(args []string, toInject []string) []string {
 //   - --isolation-dir=foo     -> --isolation-dir=.turnkey-foo
 //   - --isolation-dir=.custom -> --isolation-dir=.custom (already dotted, pass through)
 //   - No --isolation-dir      -> unchanged (uses .turnkey from buckconfig)
+//
+// The arguments after -- are the target's or the test's, not buck2's, and
+// pass through unchanged.
 func transformIsolationDir(args []string) []string {
 	result := make([]string, 0, len(args))
 
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
+
+		if arg == "--" {
+			return append(result, args[i:]...)
+		}
 
 		// Handle --isolation-dir=value format
 		if strings.HasPrefix(arg, "--isolation-dir=") {
