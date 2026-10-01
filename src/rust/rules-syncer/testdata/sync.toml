@@ -29,10 +29,11 @@ cpu = "arm64"
 os = "macos"
 
 [[deps]]
-generator = ["godeps-gen", "--go-mod", "go.mod", "--go-sum", "go.sum"]
+generator = ["godeps-gen", "--go-work", "go.work", "--go-mod", "go.mod", "--go-sum", "go.sum"]
 name = "go"
-sources = ["go.mod", "go.sum"]
+sources = ["go.work", "go.work.sum", "go.mod", "go.sum"]
 target = "go-deps.toml"
+target_sources = "sources"
 
 [[deps]]
 generator = ["rustdeps-gen", "--cargo-lock", "Cargo.lock", "--platform", "linux-x86_64=x86_64-unknown-linux-gnu", "--platform", "linux-arm64=aarch64-unknown-linux-gnu", "--platform", "macos-x86_64=x86_64-apple-darwin", "--platform", "macos-arm64=aarch64-apple-darwin"]
@@ -104,10 +105,10 @@ strict = false
 [[wrappers]]
 command = "go"
 deps_rule = "go"
-mutating_subcommands = ["get", "mod"]
+mutating_subcommands = ["get", "mod", "work"]
 name = "go"
 post_commands = ["go mod tidy"]
-watch_files = ["go.mod", "go.sum"]
+watch_files = ["go.work", "go.work.sum", "go.mod", "go.sum"]
 
 [[wrappers]]
 command = "cargo"
