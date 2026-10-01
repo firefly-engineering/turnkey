@@ -9,6 +9,7 @@ resolver = "2"
 members = [
     "src/cmd/check-rust-edition-rs",
     "src/cmd/check-source-coverage-rs",
+    "src/cmd/godeps-gen-rs",
     "src/cmd/jsdeps-gen",
     "src/cmd/nix-prefetch-cached",
     "src/cmd/pydeps-gen",
