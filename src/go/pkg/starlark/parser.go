@@ -208,9 +208,9 @@ func parseValue(expr syntax.Expr, source []byte) AttributeValue {
 	case *syntax.Literal:
 		switch e.Token {
 		case syntax.STRING:
-			// Remove quotes from string literal
-			s, _ := strconv.Unquote(e.Raw)
-			return StringValue{Value: s}
+			// The parser has already decoded the literal, whichever
+			// quotes it was written with.
+			return StringValue{Value: e.Value.(string)}
 		case syntax.INT:
 			val, _ := strconv.ParseInt(e.Raw, 0, 64)
 			return IntValue{Value: val}
@@ -255,8 +255,7 @@ func parseListValue(list *syntax.ListExpr, source []byte) AttributeValue {
 
 	for _, elem := range list.List {
 		if lit, ok := elem.(*syntax.Literal); ok && lit.Token == syntax.STRING {
-			s, _ := strconv.Unquote(lit.Raw)
-			strings = append(strings, s)
+			strings = append(strings, lit.Value.(string))
 		} else {
 			allStrings = false
 			break
