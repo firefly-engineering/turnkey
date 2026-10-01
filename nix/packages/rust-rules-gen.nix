@@ -12,6 +12,9 @@ let
   projection = cargoLib.workspaceProjection {
     inherit root;
     members = [ "src/cmd/rust-rules-gen" ];
+    # The conditions module's shared test cases, which the crate's testdata/
+    # links to
+    extraFiles = [ "src/go/pkg/conditions/testdata/split-vectors.json" ];
   };
 in
 pkgs.rustPlatform.buildRustPackage {
@@ -30,9 +33,6 @@ pkgs.rustPlatform.buildRustPackage {
     "-p"
     "rust-rules-gen"
   ];
-
-  # The select() keys follow the conditions module's shared test cases
-  TURNKEY_SPLIT_VECTORS = ../../src/go/pkg/conditions/testdata/split-vectors.json;
 
   meta = {
     description = "Generate a vendored Rust crate's rules.star from its package slice";
