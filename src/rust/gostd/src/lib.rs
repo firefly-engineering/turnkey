@@ -11,9 +11,11 @@
 //!
 //! - [`unicode`]: `unicode.IsPrint`, `unicode.IsSpace`, `unicode.IsLetter`
 //! - [`strconv`]: `strconv.Quote` and `strconv.Unquote`
+//! - [`strings`]: `strings.ToLower` and `unicode.ToLower`
 //! - [`path`]: `path.Clean`, `path.Join`, `path.Dir` and `filepath.Rel`,
 //!   for slash-separated paths (turnkey runs on Linux and macOS only)
 
 pub mod path;
 pub mod strconv;
+pub mod strings;
 pub mod unicode;
