@@ -3,6 +3,8 @@ package buckgen
 import (
 	"fmt"
 	"io"
+	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -22,8 +24,16 @@ import (
 // false, writing nothing, if no configuration builds the package (e.g. a
 // Windows-only package).
 func RenderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) (bool, error) {
+	_, built, err := renderPackage(w, pkg, cfg)
+	return built, err
+}
+
+// renderPackage is RenderPackage, also returning the non-stdlib import
+// paths its deps reference, in any configuration.
+func renderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) ([]string, bool, error) {
 	space := packageSpace(pkg, cfg)
 	deps := make(map[string][]string, len(space.Configurations))
+	referenced := map[string]bool{}
 	built := false
 	for _, config := range space.Configurations {
 		imports, ok := pkg.Imports(buildContext(config, cfg))
@@ -38,11 +48,12 @@ func RenderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) (bool, erro
 				continue
 			}
 			targets = append(targets, importToTarget(imp, cfg))
+			referenced[imp] = true
 		}
 		deps[config.String()] = targets
 	}
 	if !built {
-		return false, nil
+		return nil, false, nil
 	}
 
 	if cfg.Buck.Preambule != "" {
@@ -70,7 +81,8 @@ func RenderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) (bool, erro
 	}
 	fmt.Fprintln(w, ")")
 
-	return true, nil
+	imports := slices.Sorted(maps.Keys(referenced))
+	return imports, true, nil
 }
 
 // packageSpace returns the configurations a package's deps are resolved
@@ -96,66 +108,70 @@ func buildContext(config conditions.Configuration, cfg *Config) goparse.BuildCon
 	return ctx
 }
 
-// RenderCell generates rules.star files for all packages in a vendor directory
-func RenderCell(vendorDir string, cfg *Config) ([]string, error) {
-	absVendor, err := filepath.Abs(vendorDir)
-	if err != nil {
-		return nil, err
-	}
+// A RenderedPackage is a Go package RenderModule wrote a rules.star for:
+// its directory in the module ("." for the module's root), and its target.
+type RenderedPackage struct {
+	Subdir string
+	Target string
+}
 
-	var generated []string
-
-	err = filepath.Walk(absVendor, func(path string, info os.FileInfo, err error) error {
+// RenderModule generates a rules.star file for each Go package of the
+// module in moduleDir, whose module path is modulePath, as the go command
+// sees its packages: directories named testdata, or starting with "." or
+// "_", hold none. It returns the packages it rendered, by directory, and
+// the non-stdlib import paths their deps reference.
+func RenderModule(moduleDir, modulePath string, cfg *Config) ([]RenderedPackage, []string, error) {
+	var rendered []RenderedPackage
+	referenced := map[string]bool{}
+	err := filepath.WalkDir(moduleDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() {
+		if !d.IsDir() {
 			return nil
 		}
-
-		// Skip hidden directories
-		if strings.HasPrefix(info.Name(), ".") {
-			return filepath.SkipDir
-		}
-
-		// Calculate import path relative to vendorDir
-		rel, err := filepath.Rel(absVendor, path)
+		rel, err := filepath.Rel(moduleDir, path)
 		if err != nil {
-			return nil
+			return err
 		}
-		if rel == "." {
-			return nil
+		rel = filepath.ToSlash(rel)
+		importPath := modulePath
+		if rel != "." {
+			name := d.Name()
+			if name == "testdata" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
+				return filepath.SkipDir
+			}
+			importPath += "/" + rel
 		}
-		// Strip @version suffixes from path components
-		// e.g., "golang.org/x/mod@v0.31.0/module" -> "golang.org/x/mod/module"
-		importPath := stripVersionsFromPath(filepath.ToSlash(rel))
 
-		// Try to parse as a Go package
 		pkg, err := goparse.ScanPackage(path, importPath)
 		if err != nil || pkg == nil {
-			// Not a go package or other error, just skip
+			// Not a Go package
 			return nil
 		}
 
 		// Generate rules.star, unless no configuration builds the package
 		var content strings.Builder
-		built, err := RenderPackage(&content, pkg, cfg)
+		imports, built, err := renderPackage(&content, pkg, cfg)
 		if err != nil {
 			return err
 		}
 		if !built {
 			return nil
 		}
-		buildFile := filepath.Join(path, cfg.Buck.BuildfileName)
-		if err := os.WriteFile(buildFile, []byte(content.String()), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(path, cfg.Buck.BuildfileName), []byte(content.String()), 0o644); err != nil {
 			return err
 		}
-
-		generated = append(generated, buildFile)
+		rendered = append(rendered, RenderedPackage{Subdir: rel, Target: filepath.Base(importPath)})
+		for _, imp := range imports {
+			referenced[imp] = true
+		}
 		return nil
 	})
-
-	return generated, err
+	if err != nil {
+		return nil, nil, err
+	}
+	return rendered, slices.Sorted(maps.Keys(referenced)), nil
 }
 
 func isStdLib(importPath string) bool {
@@ -166,44 +182,10 @@ func isStdLib(importPath string) bool {
 	return !strings.Contains(parts[0], ".")
 }
 
-// stripVersionsFromPath removes @version suffixes from path components.
-// e.g., "golang.org/x/mod@v0.31.0/module" -> "golang.org/x/mod/module"
-func stripVersionsFromPath(path string) string {
-	parts := strings.Split(path, "/")
-	for i, part := range parts {
-		if idx := strings.Index(part, "@"); idx != -1 {
-			parts[i] = part[:idx]
-		}
-	}
-	return strings.Join(parts, "/")
-}
-
+// importToTarget is the label of an imported package in the deps cell:
+// its directory name (the import path's last component) is its target
+// name, as RenderPackage names it.
 func importToTarget(importPath string, cfg *Config) string {
-	// Check if this import path has a local replacement
-	if cfg.LocalReplaces != nil {
-		if target, ok := cfg.LocalReplaces[importPath]; ok {
-			return target
-		}
-		// Also check for prefix matches (e.g., github.com/foo/bar/pkg matches github.com/foo/bar)
-		for replacePrefix, target := range cfg.LocalReplaces {
-			if strings.HasPrefix(importPath, replacePrefix+"/") {
-				// Append the subpath to the target
-				// e.g., "//src/mylib:mylib" + "/subpkg" -> "//src/mylib/subpkg:subpkg"
-				subpath := strings.TrimPrefix(importPath, replacePrefix)
-				subpkgName := filepath.Base(importPath)
-				// Extract the cell/path part from target (e.g., "//src/mylib" from "//src/mylib:mylib")
-				colonIdx := strings.LastIndex(target, ":")
-				if colonIdx != -1 {
-					basePath := target[:colonIdx]
-					return fmt.Sprintf("%s%s:%s", basePath, subpath, subpkgName)
-				}
-				return fmt.Sprintf("%s%s:%s", target, subpath, subpkgName)
-			}
-		}
-	}
-
-	// Use directory name (last path component) as target name.
-	// This matches the target name generation in RenderPackage.
 	parts := strings.Split(importPath, "/")
 	name := parts[len(parts)-1]
 	return fmt.Sprintf("%s%s:%s", cfg.Buck.DepsTargetLabelPrefix, importPath, name)

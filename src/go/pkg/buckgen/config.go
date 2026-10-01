@@ -19,8 +19,6 @@ type Config struct {
 	// GoVersion is the Go toolchain's version (e.g. "1.24"): files
 	// constrained to a later release are left out.
 	GoVersion string `json:"go_version"`
-
-	LocalReplaces map[string]string `json:"local_replaces,omitempty"` // import path -> Buck2 target
 }
 
 type BuckConfig struct {

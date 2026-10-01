@@ -3,6 +3,9 @@ package buckgen
 import (
 	"bytes"
 	"go/build/constraint"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -178,57 +181,70 @@ func TestRenderPackageNotBuilt(t *testing.T) {
 	}
 }
 
-func TestRenderPackageWithLocalReplaces(t *testing.T) {
-	pkg := &goparse.GoPackage{
-		ImportPath: "github.com/example/testpkg",
-		Files: []*goparse.GoFile{file(t, "a.go", "",
-			"fmt",
-			"github.com/company/shared-lib",        // locally replaced
-			"github.com/company/shared-lib/subpkg", // subpkg of locally replaced
-			"github.com/external/dep",              // not replaced
-		)},
-	}
-	cfg := testConfig()
-	cfg.LocalReplaces = map[string]string{
-		"github.com/company/shared-lib": "//src/shared-lib:shared-lib",
-	}
-	output := render(t, pkg, cfg)
-	for _, want := range []string{
-		"\"//src/shared-lib:shared-lib\"",
-		"\"//src/shared-lib/subpkg:subpkg\"",
-		"\"godeps//github.com/external/dep:dep\"",
-	} {
-		if !strings.Contains(output, want) {
-			t.Errorf("output missing %s:\n%s", want, output)
+func writeFiles(t *testing.T, dir string, files map[string]string) {
+	t.Helper()
+	for name, content := range files {
+		path := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
 		}
 	}
 }
 
-func TestImportToTargetWithLocalReplace(t *testing.T) {
-	cfg := testConfig()
-	cfg.LocalReplaces = map[string]string{
-		"github.com/company/mylib": "//libs/mylib:mylib",
+func TestRenderModule(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"go.mod":              "module example.com/mod\n",
+		"mod.go":              "package mod\n\nimport (\n\t\"fmt\"\n\t\"example.com/other/x\"\n)\n",
+		"sub/sub.go":          "package sub\n\nimport \"example.com/mod\"\nimport \"example.com/other/y\"\n",
+		"win/win.go":          "//go:build windows\n\npackage win\n\nimport \"example.com/never\"\n",
+		"docs/README.md":      "not a package\n",
+		"testdata/t/t.go":     "package t\n\nimport \"example.com/testonly\"\n",
+		"_examples/e/e.go":    "package e\n",
+		"internal/deep/d.go":  "package deep\n\nimport \"example.com/other/x\"\n",
+		"sub/sub_test.go":     "package sub\n\nimport \"example.com/testdep\"\n",
+		".hidden/h/h.go":      "package h\n",
+		"internal/deep/d.s":   "#include \"textflag.h\"\n",
+		"internal/deep/doc.h": "\n",
+	})
+
+	rendered, imports, err := RenderModule(dir, "example.com/mod", testConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantRendered := []RenderedPackage{
+		{Subdir: ".", Target: "mod"},
+		{Subdir: "internal/deep", Target: "deep"},
+		{Subdir: "sub", Target: "sub"},
+	}
+	if !slices.Equal(rendered, wantRendered) {
+		t.Errorf("rendered = %v, want %v", rendered, wantRendered)
+	}
+	// sub's import of its parent is a self-reference; test-only and
+	// unbuilt packages reference nothing
+	wantImports := []string{"example.com/other/x", "example.com/other/y"}
+	if !slices.Equal(imports, wantImports) {
+		t.Errorf("imports = %v, want %v", imports, wantImports)
 	}
 
-	tests := []struct {
-		importPath string
-		expected   string
-	}{
-		// Direct match
-		{"github.com/company/mylib", "//libs/mylib:mylib"},
-		// Subpackage of replaced module
-		{"github.com/company/mylib/subpkg", "//libs/mylib/subpkg:subpkg"},
-		{"github.com/company/mylib/deep/nested", "//libs/mylib/deep/nested:nested"},
-		// Non-replaced import
-		{"github.com/external/pkg", "godeps//github.com/external/pkg:pkg"},
+	sub, err := os.ReadFile(filepath.Join(dir, "sub", "rules.star"))
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	for _, tc := range tests {
-		t.Run(tc.importPath, func(t *testing.T) {
-			result := importToTarget(tc.importPath, cfg)
-			if result != tc.expected {
-				t.Errorf("importToTarget(%q) = %q, want %q", tc.importPath, result, tc.expected)
-			}
-		})
+	for _, want := range []string{
+		`package_name = "example.com/mod/sub"`,
+		`"godeps//example.com/other/y:y"`,
+	} {
+		if !strings.Contains(string(sub), want) {
+			t.Errorf("sub/rules.star missing %s:\n%s", want, sub)
+		}
+	}
+	for _, unrendered := range []string{"win", "docs", "testdata/t", "_examples/e", ".hidden/h"} {
+		if _, err := os.Stat(filepath.Join(dir, unrendered, "rules.star")); err == nil {
+			t.Errorf("%s rendered", unrendered)
+		}
 	}
 }

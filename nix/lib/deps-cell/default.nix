@@ -29,8 +29,8 @@ let
   # Each unversioned name's package: for keys grouped by parseKey's
   # basePath, the key with the highest version (builtins.compareVersions:
   # 1.0.100 is higher than 1.0.99).
-  # { <basePath> = <key>; }. The cell's unversioned symlinks and the cell
-  # index's unversioned alias packages both follow it.
+  # { <basePath> = <key>; }. The cell index's unversioned alias packages
+  # follow it.
   unversionedKeys =
     parseKey: keys:
     let
@@ -63,26 +63,49 @@ let
   # aliases maps each alias package's path to the package it forwards to.
   # It records the deps file's content hash, which tk compares with the
   # file on disk.
+  #
+  # modules adds the packages of store paths holding several (ADR 0008's Go
+  # modules): it maps each module path to its derivation, whose `targets`
+  # output lists its Go packages ("<subdir> <target>") and `imports` output
+  # the import paths they reference. Each Go package becomes a package at
+  # vendor/<import path>; one two modules offer goes to the longer module
+  # path. Each referenced import path a member (members: module path -> its
+  # directory in the project) owns becomes a forwarding alias package, to
+  # its package in rootCell.
   mkCellIndex =
     {
       cellName,
       depsFile,
       packages,
       aliases,
+      modules ? { },
+      members ? { },
+      rootCell ? null,
     }:
     pkgs.runCommand "${cellName}-index.json"
       {
         nativeBuildInputs = [ pkgs.python3 ];
-        spec = builtins.toJSON {
-          cell = cellName;
-          deps_file_sha256 = builtins.hashFile "sha256" depsFile;
-          buckconfig = cellBuckconfig cellName;
-          packages = lib.mapAttrs (_: package: {
-            store = "${package}";
-            targets = "${package.targets}";
-          }) packages;
-          inherit aliases;
-        };
+        spec = builtins.toJSON (
+          {
+            cell = cellName;
+            deps_file_sha256 = builtins.hashFile "sha256" depsFile;
+            buckconfig = cellBuckconfig cellName;
+            packages = lib.mapAttrs (_: package: {
+              store = "${package}";
+              targets = "${package.targets}";
+            }) packages;
+            inherit aliases;
+          }
+          // lib.optionalAttrs (modules != { }) {
+            modules = lib.mapAttrs (_: module: {
+              store = "${module}";
+              targets = "${module.targets}";
+              imports = "${module.imports}";
+            }) modules;
+            inherit members;
+            root_cell = rootCell;
+          }
+        );
         passAsFile = [ "spec" ];
       }
       ''
@@ -97,8 +120,6 @@ let
 
       # Directory structure options
       keyToPath ? (key: key), # key -> vendor subdirectory path
-      createSymlinks ? false, # Create unversioned symlinks
-      parseKeyForSymlink ? null, # key -> { basePath, version } for symlink grouping
 
       # User patches (from FUSE edit layer)
       userPatchesDir ? null, # Path to .turnkey/patches directory
@@ -111,36 +132,6 @@ let
       # Passthru
       passthru ? { },
     }:
-    let
-      # Generate symlink creation commands
-      symlinkCommands =
-        if createSymlinks && parseKeyForSymlink != null then
-          let
-            # Each basePath's symlink points at its highest version
-            mkSymlink =
-              basePath: highestKey:
-              let
-                targetPath = keyToPath highestKey;
-                # Get parent directory path for mkdir
-                parentDir = lib.concatStringsSep "/" (lib.init (lib.splitString "/" basePath));
-                # Get relative path from basePath to targetPath
-                # For simple cases like "serde" -> "serde@1.0.219", just use the target name
-                baseDepth = lib.length (lib.splitString "/" basePath);
-                targetName = lib.last (lib.splitString "/" targetPath);
-              in
-              ''
-                # Create parent directories for symlink
-                ${if parentDir != "" then ''mkdir -p "$out/vendor/${parentDir}"'' else ""}
-                # Create symlink: ${basePath} -> ${targetPath}
-                ln -sfn "${targetName}" "$out/vendor/${basePath}"
-              '';
-          in
-          lib.concatStringsSep "\n" (
-            lib.mapAttrsToList mkSymlink (unversionedKeys parseKeyForSymlink (lib.attrNames depPackages))
-          )
-        else
-          "";
-    in
     pkgs.runCommand "${cellName}-cell"
       {
         nativeBuildInputs = cellBuildInputs ++ [ pkgs.patch ];
@@ -166,9 +157,6 @@ let
             ''
           ) depPackages
         )}
-
-        # Create symlinks (if enabled)
-        ${symlinkCommands}
 
         # Apply user patches from FUSE edit layer
         # Patches are in .turnkey/patches/<cellName>/*.patch format

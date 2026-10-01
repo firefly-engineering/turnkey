@@ -23,7 +23,12 @@ This means Go won't try to compile generated Buck2 cells, Cargo won't discover t
 ├── books/           # mdbook serve output (gitignored)
 ├── prelude/         # Symlink to Buck2 prelude derivation
 ├── toolchains/      # Symlink to generated toolchains cell
-├── godeps/          # Symlink to Go dependencies cell
+├── godeps/          # Real directory: the write-once Go cell (tk materialize)
+│   ├── .buckconfig
+│   ├── .deps-file-sha256   # the go-deps.toml it was built from
+│   ├── _store/<store path name>  # one symlink per module, never retargeted
+│   └── vendor/<import path>/rules.star  # an alias package per Go package
+├── godeps.lock      # held while tk materialize runs
 ├── jsdeps/          # Symlink to JavaScript dependencies cell
 ├── rustdeps/        # Real directory: the write-once Rust cell (tk materialize)
 │   ├── .buckconfig
@@ -31,16 +36,17 @@ This means Go won't try to compile generated Buck2 cells, Cargo won't discover t
 │   ├── _store/<store path name>  # one symlink per crate, never retargeted
 │   └── vendor/<crate>@<version>/rules.star, vendor/<crate>/rules.star  # aliases
 ├── rustdeps.lock    # held while tk materialize runs
-├── gcroots/rustdeps # GC root for the Rust cell's current index
+├── gcroots/godeps, gcroots/rustdeps # GC roots for the cells' current indexes
 ├── edits/, patches/ # tk compose's edits and generated patches
 └── sync.toml        # Symlink to the rules tk sync follows
 ```
 
 Most cells are symlinks to Nix store paths containing the generated Buck2
-cells. The Rust cell is a real directory that `tk materialize`, run by the
-shell, keeps in line with the cell index Nix builds: a dependency change
-rewrites only the entries for the crates that changed
-([ADR 0004](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0004-deps-cells-are-write-once-directories.md)).
+cells. The Go and Rust cells are real directories that `tk materialize`, run
+by the shell, keeps in line with the cell index Nix builds: a dependency
+change rewrites only the entries for the modules or crates that changed
+([ADR 0004](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0004-deps-cells-are-write-once-directories.md),
+[ADR 0008](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0008-godeps-stores-one-module-per-store-link.md)).
 Don't edit it; the shell rewrites it on every load.
 
 ## Buck2 Configuration

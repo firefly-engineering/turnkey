@@ -223,7 +223,6 @@ rec {
         ;
       # Packages live at vendor/<name>, unversioned, so no symlinks
       keyToPath = name: name;
-      createSymlinks = false;
       cellBuildInputs = cellBuildInputs;
     };
 }

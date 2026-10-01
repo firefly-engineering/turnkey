@@ -764,6 +764,42 @@
             assert lib.assertMsg (!flat.success) "rust user patches: a flat patch file was accepted";
             pkgs.runCommand "rust-user-patches-check" { } "touch $out";
 
+          # A Go user patch goes to its own module's derivation
+          # (nix/lib/deps-cell/adapters/go.nix's userPatchesOf): routed by its
+          # directory, vendor/<module path>/, nested modules included. A flat
+          # patch file, from the cell before modules had directories, and a
+          # directory that is a Go package inside a module, not a module,
+          # both fail evaluation.
+          checks.go-user-patches =
+            let
+              depsCell = import ./nix/lib/deps-cell { inherit pkgs lib; };
+              routed =
+                dir:
+                depsCell.adapters.go.userPatchesOf {
+                  inherit dir;
+                  cellName = "godeps";
+                  modulePaths = [
+                    "golang.org/x/mod"
+                    "cloud.google.com/go"
+                    "cloud.google.com/go/storage"
+                  ];
+                };
+              got = lib.mapAttrs (_: map baseNameOf) (routed ./nix/lib/deps-cell/testdata/patches);
+              flat = builtins.tryEval (routed ./nix/lib/deps-cell/testdata/flat-patches);
+              unknown = builtins.tryEval (routed ./nix/lib/deps-cell/testdata/unknown-patches);
+            in
+            assert lib.assertMsg (
+              got == {
+                "golang.org/x/mod" = [ "semver-semver.go.patch" ];
+                "cloud.google.com/go/storage" = [ "doc.go.patch" ];
+              }
+            ) "go user patches: routed ${builtins.toJSON got}";
+            assert lib.assertMsg (!flat.success) "go user patches: a flat patch file was accepted";
+            assert lib.assertMsg (
+              !unknown.success
+            ) "go user patches: a package directory was taken for a module";
+            pkgs.runCommand "go-user-patches-check" { } "touch $out";
+
           # A Nix-built Rust tool is built from its workspace projection
           # (nix/lib/cargo.nix), so a workspace change its members don't
           # reach leaves its source and lock alone: an unreachable package's

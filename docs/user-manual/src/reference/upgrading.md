@@ -2,6 +2,35 @@
 
 What changes when a project moves to a newer turnkey, and what to do about it.
 
+## The per-module Go cell
+
+The Go dependency cell is now built one package per module, and laid out by
+`tk materialize` as a real directory, `.turnkey/godeps`, instead of one
+symlink to a merged cell
+([ADR 0004](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0004-deps-cells-are-write-once-directories.md),
+[ADR 0008](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0008-godeps-stores-one-module-per-store-link.md)).
+Labels (`godeps//vendor/<import path>:<last component>`) are unchanged. A
+module bump now rebuilds that module alone and recompiles only its
+dependents: 8 actions for a one-module bump in turnkey's own repo.
+
+### Switching over
+
+- **The first shell load** after upgrading replaces the `.turnkey/godeps`
+  symlink with the directory. `tk` restarts the buck2 daemon once, and the
+  next build is a full one. Nothing else needs doing.
+- **User patches move.** They go under
+  `.turnkey/patches/godeps/vendor/<module path>/`, one directory per
+  module, and apply in that module's own derivation. A patch file directly
+  under `.turnkey/patches/godeps/` fails evaluation with where to move it:
+  move it into the directory of the module whose files it changes, keeping
+  its content. A patch spanning two modules is split into one per module.
+
+### Rolling back
+
+```bash
+rm -rf .turnkey/godeps .turnkey/godeps.lock .turnkey/gcroots/godeps
+```
+
 ## The per-crate Rust cell
 
 The Rust dependency cell is now built one package per crate, and laid out by
