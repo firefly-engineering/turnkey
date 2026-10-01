@@ -267,7 +267,7 @@ impl Syncer {
             Ok(output) => {
                 return Err(anyhow!(
                     "generator failed: {}\n{}",
-                    describe_status(output.status),
+                    crate::launch::exit_error(output.status),
                     String::from_utf8_lossy(&output.stderr)
                 ));
             }
@@ -291,16 +291,6 @@ impl Syncer {
 
     fn say(&mut self, message: std::fmt::Arguments<'_>) {
         let _ = self.output.write_fmt(message);
-    }
-}
-
-/// An exit status as Go's `ExitError` describes it
-fn describe_status(status: std::process::ExitStatus) -> String {
-    use std::os::unix::process::ExitStatusExt;
-    match (status.code(), status.signal()) {
-        (Some(code), _) => format!("exit status {code}"),
-        (None, Some(signal)) => format!("signal {signal}"),
-        _ => status.to_string(),
     }
 }
 

@@ -26,11 +26,10 @@
 mod snapshot;
 mod wrap;
 
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsString;
 use std::io::Write;
-use std::os::unix::fs::MetadataExt;
-use std::path::PathBuf;
 
+use project_sync::launch;
 use wrap::{Log, RealExec, Wrapper};
 
 const HELP: &str = r#"tw - turnkey wrapper for native language tools
@@ -101,21 +100,6 @@ fn parse_flags(mut args: &[OsString]) -> (Flags, &[OsString]) {
     (flags, args)
 }
 
-/// `os.Getwd`: the working directory, named as `$PWD` names it when that
-/// is the same directory (a path through a symbolic link, as the shell
-/// shows it), else as the system does
-fn getwd(pwd: Option<&OsStr>) -> std::io::Result<PathBuf> {
-    let dot = std::fs::metadata(".")?;
-    if let Some(dir) = pwd.filter(|d| d.as_encoded_bytes().first() == Some(&b'/'))
-        && let Ok(d) = std::fs::metadata(dir)
-        && d.dev() == dot.dev()
-        && d.ino() == dot.ino()
-    {
-        return Ok(PathBuf::from(dir));
-    }
-    std::env::current_dir()
-}
-
 fn print_help() {
     let mut stdout = std::io::stdout();
     let _ = stdout.write_all(HELP.as_bytes());
@@ -136,7 +120,7 @@ fn main() {
 
     let real = RealExec::new(std::env::vars_os());
     let launcher = real.launcher();
-    let cwd = match getwd(std::env::var_os("PWD").as_deref()) {
+    let cwd = match launch::getwd(std::env::var_os("PWD").as_deref()) {
         Ok(cwd) => cwd,
         Err(e) => {
             eprintln!("tw: failed to get working directory: {e}");
@@ -181,17 +165,5 @@ mod tests {
         assert!(parse_flags(&argv).0.help);
         let argv = args(&["--verbose"]);
         assert!(parse_flags(&argv).1.is_empty());
-    }
-
-    #[test]
-    fn getwd_takes_pwd_only_when_it_names_the_working_directory() {
-        let physical = std::env::current_dir().unwrap();
-        assert_eq!(getwd(None).unwrap(), physical);
-        assert_eq!(getwd(Some(OsStr::new("relative"))).unwrap(), physical);
-        // Another directory
-        assert_eq!(getwd(Some(OsStr::new("/"))).unwrap(), physical);
-        // Not cleaned: the root finder cleans it
-        let unclean = physical.join(".");
-        assert_eq!(getwd(Some(unclean.as_os_str())).unwrap(), unclean);
     }
 }

@@ -22,7 +22,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::atomic::{AtomicI32, AtomicU64, Ordering};
 
 use gostd::filepath;
 
@@ -164,14 +164,66 @@ pub fn exit_code(status: ExitStatus) -> i32 {
     status.code().unwrap_or(-1)
 }
 
+/// An exit status as a shell reports it: the code, or 128 plus the signal
+/// for a child killed by one
+pub fn shell_exit_code(status: ExitStatus) -> i32 {
+    use std::os::unix::process::ExitStatusExt;
+    match (status.code(), status.signal()) {
+        (Some(code), _) => code,
+        (None, Some(signal)) => 128 + signal,
+        (None, None) => -1,
+    }
+}
+
+/// How a command that ran failed, as Go's `*exec.ExitError` prints it
+pub fn exit_error(status: ExitStatus) -> String {
+    use std::os::unix::process::ExitStatusExt;
+    match (status.code(), status.signal()) {
+        (Some(code), _) => format!("exit status {code}"),
+        (None, Some(signal)) => format!("signal: {}", signal_name(signal)),
+        (None, None) => "exit status -1".to_string(),
+    }
+}
+
+/// A signal's name, as Go's `syscall.Signal` prints the common ones
+fn signal_name(signal: i32) -> String {
+    match signal {
+        libc::SIGHUP => "hangup".to_string(),
+        libc::SIGINT => "interrupt".to_string(),
+        libc::SIGKILL => "killed".to_string(),
+        libc::SIGTERM => "terminated".to_string(),
+        n => format!("signal {n}"),
+    }
+}
+
+/// `os.Getwd`: the working directory, named as `$PWD` (pwd) names it when
+/// that is the same directory (a path through a symbolic link, as the
+/// shell shows it), else as the system does
+pub fn getwd(pwd: Option<&OsStr>) -> std::io::Result<PathBuf> {
+    use std::os::unix::fs::MetadataExt;
+    let dot = std::fs::metadata(".")?;
+    if let Some(dir) = pwd.filter(|d| d.as_bytes().first() == Some(&b'/'))
+        && let Ok(d) = std::fs::metadata(dir)
+        && d.dev() == dot.dev()
+        && d.ino() == dot.ino()
+    {
+        return Ok(PathBuf::from(dir));
+    }
+    std::env::current_dir()
+}
+
 /// The child the signal handler forwards to; 0 when there is none
 static CHILD: AtomicI32 = AtomicI32::new(0);
 
-const FORWARDED: [libc::c_int; 3] = [libc::SIGINT, libc::SIGTERM, libc::SIGHUP];
+/// The signals the handler forwards, one bit per signal number; the
+/// others it catches it drops
+static FORWARD_MASK: AtomicU64 = AtomicU64::new(0);
+
+const CAUGHT: [libc::c_int; 3] = [libc::SIGINT, libc::SIGTERM, libc::SIGHUP];
 
 extern "C" fn forward(signal: libc::c_int) {
     let pid = CHILD.load(Ordering::SeqCst);
-    if pid > 0 {
+    if pid > 0 && FORWARD_MASK.load(Ordering::SeqCst) & (1 << signal) != 0 {
         // SAFETY: kill is async-signal-safe
         unsafe {
             libc::kill(pid, signal);
@@ -187,9 +239,30 @@ extern "C" fn forward(signal: libc::c_int) {
 /// arriving before the child started is dropped. Meant for one child at a
 /// time: the handlers are the process's.
 pub fn run_forwarding_signals(cmd: &mut Command) -> std::io::Result<ExitStatus> {
+    run_catching_signals(cmd, &CAUGHT)
+}
+
+/// Runs cmd to completion as [`run_forwarding_signals`] does, except that
+/// SIGINT is not forwarded: ^C reaches the child directly through the
+/// terminal's process group, and forwarding it too would read as a second
+/// ^C. It still doesn't stop this process.
+pub fn run_leaving_interrupts(cmd: &mut Command) -> std::io::Result<ExitStatus> {
+    run_catching_signals(cmd, &[libc::SIGTERM, libc::SIGHUP])
+}
+
+/// Runs cmd to completion, catching SIGINT, SIGTERM and SIGHUP and
+/// forwarding those in forwarded to it
+fn run_catching_signals(
+    cmd: &mut Command,
+    forwarded: &[libc::c_int],
+) -> std::io::Result<ExitStatus> {
+    FORWARD_MASK.store(
+        forwarded.iter().fold(0, |mask, &signal| mask | 1 << signal),
+        Ordering::SeqCst,
+    );
     // SAFETY: sigaction with a zeroed struct, an empty mask and a handler
     // that only calls async-signal-safe functions
-    let previous: Vec<libc::sigaction> = FORWARDED
+    let previous: Vec<libc::sigaction> = CAUGHT
         .iter()
         .map(|&signal| unsafe {
             let mut action: libc::sigaction = std::mem::zeroed();
@@ -209,7 +282,7 @@ pub fn run_forwarding_signals(cmd: &mut Command) -> std::io::Result<ExitStatus> 
         status
     });
 
-    for (&signal, old) in FORWARDED.iter().zip(&previous) {
+    for (&signal, old) in CAUGHT.iter().zip(&previous) {
         // SAFETY: restores the action saved above
         unsafe {
             libc::sigaction(signal, old, std::ptr::null_mut());
@@ -296,5 +369,34 @@ mod tests {
             .command(OsStr::new("sh"), &["-c", "kill -9 $$"], None)
             .unwrap();
         assert_eq!(exit_code(run_forwarding_signals(&mut cmd).unwrap()), -1);
+    }
+
+    #[test]
+    fn shell_exit_codes_count_signals_from_128() {
+        let launcher = Launcher::new(Some(OsString::from("/bin:/usr/bin")));
+        let mut cmd = launcher
+            .command(OsStr::new("sh"), &["-c", "exit 3"], None)
+            .unwrap();
+        let status = run_leaving_interrupts(&mut cmd).unwrap();
+        assert_eq!(shell_exit_code(status), 3);
+        assert_eq!(exit_error(status), "exit status 3");
+        let mut cmd = launcher
+            .command(OsStr::new("sh"), &["-c", "kill -9 $$"], None)
+            .unwrap();
+        let status = run_leaving_interrupts(&mut cmd).unwrap();
+        assert_eq!(shell_exit_code(status), 128 + 9);
+        assert_eq!(exit_error(status), "signal: killed");
+    }
+
+    #[test]
+    fn getwd_takes_pwd_only_when_it_names_the_working_directory() {
+        let physical = std::env::current_dir().unwrap();
+        assert_eq!(getwd(None).unwrap(), physical);
+        assert_eq!(getwd(Some(OsStr::new("relative"))).unwrap(), physical);
+        // Another directory
+        assert_eq!(getwd(Some(OsStr::new("/"))).unwrap(), physical);
+        // Not cleaned: the root finder cleans it
+        let unclean = physical.join(".");
+        assert_eq!(getwd(Some(unclean.as_os_str())).unwrap(), unclean);
     }
 }

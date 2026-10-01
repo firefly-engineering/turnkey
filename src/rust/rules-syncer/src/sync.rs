@@ -299,7 +299,10 @@ impl Syncer {
             .output()
             .map_err(|err| anyhow!("git status failed: {err}"))?;
         if !output.status.success() {
-            bail!("git status failed: {}", exit_error(&output.status));
+            bail!(
+                "git status failed: {}",
+                project_sync::launch::exit_error(output.status)
+            );
         }
 
         let patterns: Vec<&str> = self
@@ -342,27 +345,6 @@ impl Syncer {
             }
         }
         Ok(changed)
-    }
-}
-
-/// How a command that ran failed, as Go's `*exec.ExitError` prints it
-fn exit_error(status: &std::process::ExitStatus) -> String {
-    use std::os::unix::process::ExitStatusExt;
-    match (status.code(), status.signal()) {
-        (Some(code), _) => format!("exit status {code}"),
-        (None, Some(signal)) => format!("signal: {}", signal_name(signal)),
-        (None, None) => "exit status -1".to_string(),
-    }
-}
-
-/// A signal's name, as Go's `syscall.Signal` prints it
-fn signal_name(signal: i32) -> String {
-    match signal {
-        1 => "hangup".to_string(),
-        2 => "interrupt".to_string(),
-        9 => "killed".to_string(),
-        15 => "terminated".to_string(),
-        n => format!("signal {n}"),
     }
 }
 
