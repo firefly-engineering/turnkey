@@ -6,6 +6,8 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+
+	"golang.org/x/mod/module"
 )
 
 // Module is one module version whose source is hashed.
@@ -52,9 +54,22 @@ func (p *GoProxyPrefetcher) Prefetch(mods []Module) []Prefetched {
 	if len(mods) == 0 {
 		return nil
 	}
-	urls := make([]string, len(mods))
+	results := make([]Prefetched, len(mods))
+	// urls holds the modules that have one; at maps each back to its
+	// module's index
+	var urls []string
+	var at []int
 	for i, m := range mods {
-		urls[i] = proxyZipURL(m)
+		url, err := proxyZipURL(m)
+		if err != nil {
+			results[i].Err = err
+			continue
+		}
+		urls = append(urls, url)
+		at = append(at, i)
+	}
+	if len(urls) == 0 {
+		return results
 	}
 
 	command := p.Command
@@ -79,39 +94,33 @@ func (p *GoProxyPrefetcher) Prefetch(mods []Module) []Prefetched {
 	if err == nil && len(lines) != len(urls) {
 		err = fmt.Errorf("%d results for %d URLs", len(lines), len(urls))
 	}
-	results := make([]Prefetched, len(mods))
-	for i, url := range urls {
+	for j, url := range urls {
+		i := at[j]
 		switch {
 		case err != nil:
 			results[i].Err = fmt.Errorf("nix-prefetch-cached %s: %v: %s", url, err, strings.TrimSpace(stderr.String()))
-		case strings.HasPrefix(lines[i], "error: "):
-			results[i].Err = fmt.Errorf("nix-prefetch-cached %s: %s", url, strings.TrimPrefix(lines[i], "error: "))
+		case strings.HasPrefix(lines[j], "error: "):
+			results[i].Err = fmt.Errorf("nix-prefetch-cached %s: %s", url, strings.TrimPrefix(lines[j], "error: "))
 		default:
-			results[i].Hash = lines[i]
+			results[i].Hash = lines[j]
 		}
 	}
 	return results
 }
 
-// proxyZipURL is the proxy.golang.org zip of a module version.
-func proxyZipURL(m Module) string {
-	// Handles uppercase -> !lowercase per module proxy protocol
-	return fmt.Sprintf("https://proxy.golang.org/%s/@v/%s.zip", escapeModulePath(m.Path), m.Version)
-}
-
-// escapeModulePath escapes a module path for use in proxy.golang.org URLs.
-// Uppercase letters become !(lowercase) per the module proxy protocol.
-func escapeModulePath(path string) string {
-	var result strings.Builder
-	for _, r := range path {
-		if r >= 'A' && r <= 'Z' {
-			result.WriteByte('!')
-			result.WriteRune(r + 32) // lowercase
-		} else {
-			result.WriteRune(r)
-		}
+// proxyZipURL is the proxy.golang.org zip of a module version. The
+// module proxy protocol case-escapes both the path and the version
+// (uppercase becomes '!' + lowercase), which x/mod/module implements.
+func proxyZipURL(m Module) (string, error) {
+	path, err := module.EscapePath(m.Path)
+	if err != nil {
+		return "", err
 	}
-	return result.String()
+	version, err := module.EscapeVersion(m.Version)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("https://proxy.golang.org/%s/@v/%s.zip", path, version), nil
 }
 
 // DefaultPrefetcher returns the prefetcher godeps-gen uses: the Go proxy,
