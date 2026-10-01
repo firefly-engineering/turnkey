@@ -16,8 +16,6 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
-mod pep508;
-
 /// Generate python-deps.toml from Python dependency files
 #[derive(Parser, Debug)]
 #[command(name = "pydeps-gen")]

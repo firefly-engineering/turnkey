@@ -12,6 +12,7 @@ path = "src/main.rs"
 anyhow.workspace = true
 clap.workspace = true
 deps-gen-kit.workspace = true
+pep508.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 toml.workspace = true

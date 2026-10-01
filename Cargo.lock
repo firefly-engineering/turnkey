@@ -1552,6 +1552,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pep508"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "conditions",
+ "gostd",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1761,6 +1772,7 @@ dependencies = [
  "anyhow",
  "clap",
  "deps-gen-kit",
+ "pep508",
  "serde",
  "serde_json",
  "toml",

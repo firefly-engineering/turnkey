@@ -1,5 +1,5 @@
 {
-  "description": "PEP 508 requirements and markers: how requirements parse (name normalized per PEP 503, extras sorted, marker text), and on which environments markers hold. Read by src/go/pkg/pep508 and pydeps-gen (src/cmd/pydeps-gen) alike, so the two can't drift apart.",
+  "description": "PEP 508 requirements and markers: how requirements parse (name normalized per PEP 503, extras sorted, marker text), and on which environments markers hold. Read by src/go/pkg/pep508 and the pep508 crate (src/rust/pep508, which pydeps-gen uses) alike, so the two can't drift apart.",
   "environments": {
     "linux-x86_64": {
       "sys_platform": "linux",

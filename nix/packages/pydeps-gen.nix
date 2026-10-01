@@ -15,10 +15,12 @@ let
     members = [
       "src/cmd/pydeps-gen"
       "src/rust/deps-gen-kit"
+      "src/rust/conditions"
       "src/rust/gostd"
+      "src/rust/pep508"
       "src/rust/prefetch-cache"
     ];
-    # The PEP 508 cases src/go/pkg/pep508 runs too, which the crate's
+    # The PEP 508 cases src/go/pkg/pep508 runs too, which pep508's
     # testdata/ links to
     extraFiles = [ "src/go/pkg/pep508/testdata/pep508-vectors.json" ];
   };

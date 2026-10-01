@@ -29,6 +29,7 @@ members = [
     "src/rust/gomod",
     "src/rust/gostd",
     "src/rust/nix-eval",
+    "src/rust/pep508",
     "src/rust/prefetch-cache",
     "src/rust/starlark-parse",
 ]
@@ -105,4 +106,5 @@ deps-gen-kit = { path = "src/rust/deps-gen-kit" }
 gomod = { path = "src/rust/gomod" }
 gostd = { path = "src/rust/gostd" }
 nix-eval = { path = "src/rust/nix-eval" }
+pep508 = { path = "src/rust/pep508" }
 prefetch-cache = { path = "src/rust/prefetch-cache" }

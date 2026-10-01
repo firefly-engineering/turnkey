@@ -17,9 +17,9 @@ go_test(
     visibility = ["PUBLIC"],
 )
 
-# The PEP 508 cases, run by pydeps-gen's tests too
+# The PEP 508 cases, run by the pep508 crate's tests too
 export_file(
     name = "pep508-vectors",
     src = "testdata/pep508-vectors.json",
-    visibility = ["//src/cmd/pydeps-gen/..."],
+    visibility = ["//src/rust/pep508/..."],
 )

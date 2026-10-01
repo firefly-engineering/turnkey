@@ -8,6 +8,7 @@ rust_binary(
     deps = [
         # turnkey:auto-start
         "//src/rust/deps-gen-kit:deps-gen-kit",
+        "//src/rust/pep508:pep508",
         "rustdeps//vendor/anyhow:anyhow",
         "rustdeps//vendor/clap:clap",
         "rustdeps//vendor/serde:serde",
@@ -30,6 +31,7 @@ rust_test(
     deps = [
         # turnkey:auto-start
         "//src/rust/deps-gen-kit:deps-gen-kit",
+        "//src/rust/pep508:pep508",
         "rustdeps//vendor/anyhow:anyhow",
         "rustdeps//vendor/clap:clap",
         "rustdeps//vendor/serde:serde",
@@ -41,7 +43,4 @@ rust_test(
         "rustdeps//vendor/ring@0.17.14:ring_core_0_17_14__",
         # turnkey:preserve-end
     ],
-    # The PEP 508 cases src/go/pkg/pep508 runs too, embedded from where
-    # testdata/ links to them
-    mapped_srcs = {"//src/go/pkg/pep508:pep508-vectors": "testdata/pep508-vectors.json"},
 )
