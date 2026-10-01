@@ -29,7 +29,11 @@ func ParseFile(path string) (*GoFile, error) {
 	}
 
 	for _, imp := range f.Imports {
-		path := strings.Trim(imp.Path.Value, `"`)
+		// The path is a Go string literal, in double quotes or backquotes
+		path, err := strconv.Unquote(imp.Path.Value)
+		if err != nil {
+			return nil, fmt.Errorf("%s: import %s: %v", fset.Position(imp.Path.Pos()), imp.Path.Value, err)
+		}
 		gf.Imports = append(gf.Imports, path)
 		if path == "C" {
 			gf.HasCgo = true

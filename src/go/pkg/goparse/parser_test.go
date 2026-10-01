@@ -159,3 +159,19 @@ func TestParseFileRejectsAMalformedEmbed(t *testing.T) {
 		t.Error("ParseFile accepted an unterminated //go:embed pattern")
 	}
 }
+
+func TestParseFileRawStringImport(t *testing.T) {
+	content := "package testpkg\nimport (\n\t\"fmt\"\n\t`example.com/foo`\n)\n"
+	path := filepath.Join(t.TempDir(), "raw.go")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	gf, err := ParseFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"fmt", "example.com/foo"}; !reflect.DeepEqual(gf.Imports, want) {
+		t.Errorf("Imports = %q, want %q", gf.Imports, want)
+	}
+}
