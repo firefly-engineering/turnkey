@@ -2,6 +2,7 @@ package rulessync
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -412,5 +413,43 @@ rust_library(
 `
 	if string(out) != want {
 		t.Errorf("rules.star:\n%s\nwant:\n%s", out, want)
+	}
+}
+
+// The rules.star files of directories with changed sources are synced in
+// the directories' order, so the report is the same from run to run.
+func TestSyncDirectoryChangedDirectoriesInOrder(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not in PATH: sync asks git status what changed")
+	}
+	root := t.TempDir()
+	dirs := []string{"g", "c", "a", "h", "e", "b", "f", "d"}
+	for _, dir := range dirs {
+		writeFiles(t, root, map[string]string{
+			dir + "/rules.star": "fake_library(name = \"lib\", deps = [])\n",
+			dir + "/src.fake":   "",
+		})
+	}
+	if out, err := exec.Command("git", "-C", root, "init", "-q").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+
+	s, err := newSyncer(Config{ProjectRoot: root, DryRun: true, Sync: testSync(t, nil)},
+		mapper.NewWith(mapper.Config{ProjectRoot: root}, &fakeLanguage{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	results, err := s.SyncDirectory(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, r := range results {
+		rel, _ := filepath.Rel(root, r.Path)
+		got = append(got, rel)
+	}
+	want := []string{"a/rules.star", "b/rules.star", "c/rules.star", "d/rules.star", "e/rules.star", "f/rules.star", "g/rules.star", "h/rules.star"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("synced %v, want %v", got, want)
 	}
 }

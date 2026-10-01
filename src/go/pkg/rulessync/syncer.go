@@ -5,6 +5,7 @@ package rulessync
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -176,8 +177,9 @@ func (s *Syncer) SyncDirectory(dir string) ([]SyncResult, error) {
 			// No changes detected by git
 			return results, nil
 		} else {
-			// Only process rules.star files in changed directories
-			for pkgDir := range changedDirs {
+			// Only process rules.star files in changed directories, in
+			// order: the report doesn't depend on a map's
+			for _, pkgDir := range slices.Sorted(maps.Keys(changedDirs)) {
 				rulesPath := filepath.Join(pkgDir, "rules.star")
 				if _, err := os.Stat(rulesPath); err != nil {
 					continue // No rules.star in this directory
