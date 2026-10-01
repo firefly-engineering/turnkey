@@ -9,6 +9,7 @@ platforms = [
     "macos-arm64",
 ]
 manifests = [
+    "src/cmd/buckgen-rs/Cargo.toml",
     "src/cmd/check-rust-edition-rs/Cargo.toml",
     "src/cmd/check-source-coverage-rs/Cargo.toml",
     "src/cmd/godeps-gen/Cargo.toml",

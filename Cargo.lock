@@ -236,6 +236,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "buckgen-rs"
+version = "0.1.0"
+dependencies = [
+ "conditions",
+ "deps-gen-kit",
+ "goparse",
+ "gostd",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

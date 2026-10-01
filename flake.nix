@@ -193,6 +193,9 @@
           packages.pydeps-gen = import ./nix/packages/pydeps-gen.nix { inherit pkgs lib; };
           packages.rustdeps-gen = import ./nix/packages/rustdeps-gen.nix { inherit pkgs lib; };
           packages.buckgen = import ./nix/packages/buckgen.nix { inherit pkgs lib; };
+          # The Rust port of buckgen, compared with it by
+          # `nix run .#parity -- buckgen` until it replaces it (#213)
+          packages.buckgen-rs = import ./nix/packages/buckgen-rs.nix { inherit pkgs lib; };
           packages.tk = import ./nix/packages/tk.nix {
             inherit pkgs lib;
             inherit ((self.lib.pinnedBuck2Release system)) buck2;
