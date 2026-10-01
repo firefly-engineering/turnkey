@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -107,14 +108,15 @@ func (w *Wrapper) Run(tool string, args []string) int {
 		return w.Exec("", tool, args)
 	}
 
-	w.verbosef("tw: capturing state of %v\n", rule.WatchFiles)
-	before, err := snapshot.Capture(w.Root, rule.WatchFiles)
+	watched := w.watched(rule)
+	w.verbosef("tw: capturing state of %v\n", watched)
+	before, err := snapshot.Capture(w.Root, watched)
 	if err != nil {
 		w.logf("tw: failed to capture before state: %v\n", err)
 		return w.Exec("", tool, args)
 	}
 	exitCode := w.Exec("", tool, args)
-	after, err := snapshot.Capture(w.Root, rule.WatchFiles)
+	after, err := snapshot.Capture(w.Root, watched)
 	if err != nil {
 		w.logf("tw: failed to capture after state: %v\n", err)
 		return exitCode
@@ -124,7 +126,7 @@ func (w *Wrapper) Run(tool string, args []string) int {
 		return exitCode
 	}
 
-	w.verbosef("tw: detected changes in %v\n", rule.WatchFiles)
+	w.verbosef("tw: detected changes in %v\n", watched)
 	// Post-commands (go mod tidy after go get) settle the files before
 	// they are synced; one failing doesn't stop the sync.
 	for _, postCmd := range rule.PostCommands {
@@ -142,6 +144,22 @@ func (w *Wrapper) Run(tool string, args []string) int {
 		w.logf("tw: sync failed: %v\n", err)
 	}
 	return exitCode
+}
+
+// watched returns the files rule watches: its watch_files, and the sources
+// its deps rule's target lists (a Go workspace member's go.mod), which make
+// that target stale as much as the fixed ones do.
+func (w *Wrapper) watched(rule *syncconfig.WrapperRule) []string {
+	files := rule.WatchFiles
+	deps := w.Config.FindDepsRule(rule.DepsRule)
+	if deps == nil {
+		return files
+	}
+	listed, err := syncer.ListedSources(w.Root, *deps)
+	if err != nil {
+		w.logf("tw: %v\n", err)
+	}
+	return append(slices.Clone(files), listed...)
 }
 
 // syncRule regenerates the deps rule named name, then every rule left

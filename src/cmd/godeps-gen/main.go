@@ -1,16 +1,22 @@
-// godeps-gen generates go-deps.toml from go.mod and go.sum files.
+// godeps-gen generates go-deps.toml from a Go workspace: the members of
+// the project's go.work, or, without one, its go.mod (ADR 0007).
 //
-// This tool parses Go module files and outputs dependency declarations
-// in the format expected by turnkey's Go deps cell (nix/buck2/languages.nix).
+// The modules are those the members require, minus the members; their
+// versions are the build list `go list -m -json all` selects for the whole
+// workspace. go-deps.toml records the members and the files it was
+// generated from (go.work, go.work.sum, each member's go.mod and go.sum).
+// This tool outputs dependency declarations in the format expected by
+// turnkey's Go deps cell (nix/buck2/languages.nix).
 //
 // Its --output, --no-prefetch and --no-cache flags are the ones every deps
 // generator takes (src/rust/deps-gen-kit): prefetching is on by default.
-// tk sync runs it from the go sync rule (nix/buck2/languages.nix).
+// tk sync runs it from the go sync rule (nix/buck2/languages.nix), in the
+// project root.
 //
 // Usage:
 //
 //	godeps-gen -o go-deps.toml
-//	godeps-gen --go-mod go.mod --go-sum go.sum -o go-deps.toml
+//	godeps-gen --go-work go.work --go-mod go.mod --go-sum go.sum -o go-deps.toml
 package main
 
 import (
@@ -23,8 +29,9 @@ import (
 )
 
 func main() {
-	goModPath := flag.String("go-mod", "go.mod", "path to go.mod file")
-	goSumPath := flag.String("go-sum", "go.sum", "path to go.sum file")
+	goWorkPath := flag.String("go-work", "go.work", "path to go.work; when it exists, its members are the workspace and --go-mod and --go-sum are unused")
+	goModPath := flag.String("go-mod", "go.mod", "path to go.mod file, the only member without a go.work")
+	goSumPath := flag.String("go-sum", "go.sum", "path to go.sum file, with --go-mod")
 	var outputPath string
 	flag.StringVar(&outputPath, "o", "", "output file path (default: stdout)")
 	flag.StringVar(&outputPath, "output", "", "output file path (default: stdout)")
@@ -38,47 +45,26 @@ func main() {
 		os.Exit(2)
 	}
 
-	// Read go.mod
-	goModData, err := os.ReadFile(*goModPath)
+	// File paths are relative to the working directory, the project root
+	root, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error reading go.mod: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Parse go.mod dependencies
+	ws, err := godeps.LoadWorkspace(root, *goWorkPath, *goModPath, *goSumPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error reading the Go workspace: %v\n", err)
+		os.Exit(1)
+	}
+
+	lister := godeps.GoLister{Go: "go", Env: os.Environ()}
 	opts := godeps.ParseOptions{IncludeIndirect: *includeIndirect}
-	deps, err := godeps.ParseGoMod(goModData, opts)
+	deps, err := ws.Resolve(root, lister, opts)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error parsing go.mod: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error resolving the Go workspace: %v\n", err)
 		os.Exit(1)
 	}
-
-	// Parse replace directives
-	replaces, err := godeps.ParseReplaces(goModData)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error parsing replace directives: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Read and parse go.sum
-	goSumData, err := os.ReadFile(*goSumPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error reading go.sum: %v\n", err)
-		os.Exit(1)
-	}
-
-	hashes, err := godeps.ParseGoSum(goSumData)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error parsing go.sum: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Merge hashes into dependencies
-	godeps.MergeHashes(deps, hashes)
-
-	// Apply external replace directives to dependencies
-	// This sets FetchPath for deps that are replaced by external forks
-	godeps.ApplyExternalReplaces(deps, replaces)
 
 	// Prefetch Nix hashes unless asked not to
 	if !*noPrefetch {
@@ -102,9 +88,8 @@ func main() {
 		output = f
 	}
 
-	// Output TOML (with local replace directives)
-	outputOpts := godeps.DefaultOutputOptions()
-	if err := godeps.WriteTOMLWithReplaces(output, deps, replaces, outputOpts); err != nil {
+	file := godeps.DepsFile{Deps: deps, Sources: ws.Sources, Members: ws.Members}
+	if err := godeps.WriteDepsFile(output, file, godeps.DefaultOutputOptions()); err != nil {
 		fmt.Fprintf(os.Stderr, "error writing output: %v\n", err)
 		os.Exit(1)
 	}

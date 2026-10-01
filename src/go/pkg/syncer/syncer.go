@@ -236,6 +236,17 @@ func (s *Syncer) freshness(rule syncconfig.DepsRule) (freshness, error) {
 	}
 }
 
+// ListedSources returns the sources rule's target lists under the rule's
+// TargetSources, relative to the project root at root: none when the rule
+// has no TargetSources or the target doesn't list them yet.
+func ListedSources(root string, rule syncconfig.DepsRule) ([]string, error) {
+	if rule.TargetSources == "" {
+		return nil, nil
+	}
+	sources, _, err := targetSources(filepath.Join(root, rule.Target), rule.TargetSources)
+	return sources, err
+}
+
 // targetSources reads the sources a target lists under key: a top-level
 // array of paths. found is false when the target doesn't exist or doesn't
 // have the key, as a target written before its rule named the key.

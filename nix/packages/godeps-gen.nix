@@ -32,7 +32,9 @@ pkgs.buildGoModule {
 
   nativeBuildInputs = [ pkgs.makeWrapper ];
 
-  # Wrap the binary to include the prefetcher in PATH
+  # Wrap the binary to include the prefetcher in PATH. go, which resolves
+  # the workspace (go list -m all), is the shell's: the toolchain the
+  # project builds with, as rustdeps-gen's cargo is.
   postInstall = ''
     wrapProgram $out/bin/godeps-gen \
       --prefix PATH : ${
