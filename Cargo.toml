@@ -36,6 +36,7 @@ members = [
     "src/rust/pep508",
     "src/rust/prefetch-cache",
     "src/rust/project-sync",
+    "src/rust/rules-star",
     "src/rust/starlark-parse",
 ]
 
@@ -104,6 +105,9 @@ tree-sitter-typescript = "0.23"
 tree-sitter-solidity = "1.2.13"
 tree-sitter-starlark = "1.3"
 
+# rules.star editing: the parser Buck2 itself uses (#193)
+starlark_syntax = "0.14"
+
 # Workspace member references (for path dependencies between crates)
 buck2-test-executor = { path = "src/rust/buck2-test-executor" }
 composition = { path = "src/rust/composition", features = ["watcher"] }
@@ -116,3 +120,4 @@ nix-eval = { path = "src/rust/nix-eval" }
 pep508 = { path = "src/rust/pep508" }
 prefetch-cache = { path = "src/rust/prefetch-cache" }
 project-sync = { path = "src/rust/project-sync" }
+rules-star = { path = "src/rust/rules-star" }

@@ -4,8 +4,8 @@
 //!
 //! It is the one place that decides how a value per configuration is
 //! written, so the cell generators and rules sync agree on it. Reading one
-//! back (src/go/pkg/conditional's Read, ReadLabels and SetLabels) needs
-//! rules sync's Starlark parser, and comes with its port (#215).
+//! back from a parsed `rules.star` (src/go/pkg/conditional's Read,
+//! ReadLabels and SetLabels) is rules-star's `conditional` module.
 
 use crate::{Space, Split};
 use deps_gen_kit::starlark::{SelectBranch, SelectValue, Value};

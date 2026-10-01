@@ -38,6 +38,7 @@ manifests = [
     "src/rust/pep508/Cargo.toml",
     "src/rust/prefetch-cache/Cargo.toml",
     "src/rust/project-sync/Cargo.toml",
+    "src/rust/rules-star/Cargo.toml",
     "src/rust/starlark-parse/Cargo.toml",
 ]
 
@@ -59,7 +60,7 @@ features = [
 dependencies = [
     { package = "cfg-if@1.0.4" },
     { package = "getrandom@0.3.4" },
-    { package = "once_cell@1.21.3" },
+    { package = "once_cell@1.21.4" },
     { package = "zerocopy@0.8.37" },
 ]
 
@@ -72,7 +73,39 @@ features = [
     { name = "std" },
 ]
 dependencies = [
-    { package = "memchr@2.7.6" },
+    { package = "memchr@2.8.3" },
+]
+
+[deps."allocative@0.3.6"]
+name = "allocative"
+version = "0.3.6"
+hash = "sha256-J4BbM6SJA8r5UsQGagIx2X5zxQPM0TFw4/uBdVNrq8k="
+features = [
+    { name = "default" },
+    { name = "hashbrown" },
+]
+dependencies = [
+    { package = "allocative_derive@0.3.6" },
+    { package = "ctor@1.0.13" },
+    { package = "hashbrown@0.16.1" },
+]
+
+[deps."allocative_derive@0.3.6"]
+name = "allocative_derive"
+version = "0.3.6"
+hash = "sha256-IEUtbwE1lINv8PoGksxaTuxKZOvUba5EHvt+i6GbLAo="
+dependencies = [
+    { package = "proc-macro2@1.0.106" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
+]
+
+[deps."allocator-api2@0.2.21"]
+name = "allocator-api2"
+version = "0.2.21"
+hash = "sha256-hLo1e6smYMR3UUI5iSMCjnWlGuq8zT2tmgkeFEW4hUM="
+features = [
+    { name = "alloc" },
 ]
 
 [deps."android_system_properties@0.1.5"]
@@ -90,6 +123,17 @@ features = [
 dependencies = [
     { package = "anstyle@1.0.13" },
     { package = "unicode-width@0.2.2" },
+]
+
+[deps."annotate-snippets@0.9.2"]
+name = "annotate-snippets"
+version = "0.9.2"
+hash = "sha256-cxFj8n2TMN11ROO41gG0sA4ZT/iKG53AK80JCm0mVkc="
+features = [
+    { name = "default" },
+]
+dependencies = [
+    { package = "unicode-width@0.1.14" },
 ]
 
 [deps."anstream@0.6.21"]
@@ -141,10 +185,10 @@ features = [
     { name = "std" },
 ]
 
-[deps."anyhow@1.0.100"]
+[deps."anyhow@1.0.104"]
 name = "anyhow"
-version = "1.0.100"
-hash = "sha256-Kuzzp4+NZU7xGSKp2cT0LsiDNbTmkCH6MSfAUj0fQvo="
+version = "1.0.104"
+hash = "sha256-TeuEvx1w6kkozVeBlmhmG7E+QokvfUzmMzPI7+Y40sU="
 features = [
     { name = "default" },
     { name = "std" },
@@ -155,20 +199,39 @@ name = "arraydeque"
 version = "0.5.1"
 hash = "sha256-dLn5xL4hzk60R3JMwqBsEC0hgv8OAnGZSu5ODYaQxvs="
 
+[deps."arrayvec@0.7.8"]
+name = "arrayvec"
+version = "0.7.8"
+hash = "sha256-E2bKrv9Kn6XLjTV6JZX3IXXqoQsNEMYT4CJCss4Ram4="
+
 [deps."async-trait@0.1.92"]
 name = "async-trait"
 version = "0.1.92"
 hash = "sha256-7SLlt1UgE9GYy0xgphrYSOm0ds/8vF1846kWXqCjcj8="
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
+    { package = "quote@1.0.47" },
     { package = "syn@3.0.6" },
 ]
+
+[deps."atomic-polyfill@1.0.3"]
+name = "atomic-polyfill"
+version = "1.0.3"
+hash = "sha256-aGoC8nvd+5jZYZxCpquLO/1w7KkRYs+6BK7+K/Hu0k4="
 
 [deps."atomic-waker@1.1.2"]
 name = "atomic-waker"
 version = "1.1.2"
 hash = "sha256-lE9lB5cdz7j7rLhGiSxCIeOH1NNSKsvFyZAvOkTvFuI="
+
+[deps."atomic@0.5.3"]
+name = "atomic"
+version = "0.5.3"
+hash = "sha256-rntin0npmHWsbBQIFeFoAq7UPjaorR85ErVYpmlhpJ8="
+features = [
+    { name = "default" },
+    { name = "fallback" },
+]
 
 [deps."autocfg@1.5.0"]
 name = "autocfg"
@@ -205,7 +268,7 @@ dependencies = [
     { package = "http@1.5.0" },
     { package = "itoa@1.0.17" },
     { package = "matchit@0.8.4" },
-    { package = "memchr@2.7.6" },
+    { package = "memchr@2.8.3" },
     { package = "mime@0.3.17" },
     { package = "percent-encoding@2.3.2" },
     { package = "pin-project-lite@0.2.17" },
@@ -234,10 +297,32 @@ features = [
     { name = "default" },
 ]
 
+[deps."bit-set@0.8.0"]
+name = "bit-set"
+version = "0.8.0"
+hash = "sha256-vaAQDcDUaOb2QuhmBw7XzuaD6/atIchYX34TMbae5PM="
+features = [
+    { name = "std" },
+]
+dependencies = [
+    { package = "bit-vec@0.8.0" },
+]
+
+[deps."bit-vec@0.8.0"]
+name = "bit-vec"
+version = "0.8.0"
+hash = "sha256-P9ubN0k7axUI9AN93ZGmczAluZT56gAUHJmhsco04Wk="
+features = [
+    { name = "std" },
+]
+
 [deps."bitflags@1.3.2"]
 name = "bitflags"
 version = "1.3.2"
 hash = "sha256-qmZajdNZ7yvKWZJGJJXBGl0hqbgUht3Jof3qe4e2DQQ="
+features = [
+    { name = "default" },
+]
 
 [deps."bitflags@2.10.0"]
 name = "bitflags"
@@ -247,12 +332,39 @@ features = [
     { name = "std" },
 ]
 
+[deps."blake3@1.8.7"]
+name = "blake3"
+version = "1.8.7"
+hash = "sha256-bUxI0BLj1NeausteVmc0fYsCuL5rk34d9ArXLb/K60s="
+features = [
+    { name = "default" },
+    { name = "rayon" },
+    { name = "std" },
+    { name = "traits-preview" },
+]
+dependencies = [
+    { package = "arrayvec@0.7.8" },
+    { package = "cfg-if@1.0.4" },
+    { package = "constant_time_eq@0.4.2" },
+    { package = "cpufeatures@0.3.1", platforms = ["linux-x86_64", "macos-x86_64"] },
+    { package = "digest@0.11.3" },
+    { package = "rayon-core@1.13.0" },
+]
+
 [deps."block-buffer@0.10.4"]
 name = "block-buffer"
 version = "0.10.4"
 hash = "sha256-bwr2UJKHUL3gzEEU1xE1uhfZ0qK8nTXk/TTyKHLwSj4="
 dependencies = [
     { package = "generic-array@0.14.7" },
+]
+
+[deps."block-buffer@0.12.1"]
+name = "block-buffer"
+version = "0.12.1"
+hash = "sha256-e+r1va/puRC713K1PjJLsIuPFx0qd3N1cHtA26lkiQs="
+dependencies = [
+    { package = "hybrid-array@0.4.10" },
 ]
 
 [deps."block2@0.6.2"]
@@ -270,6 +382,41 @@ dependencies = [
 name = "bumpalo"
 version = "3.19.1"
 hash = "sha256-r7Ronebq8NWz3SUDjIF7HcceBkaLb7kQ+Mv6HIMDwek="
+
+[deps."bytemuck@1.25.2"]
+name = "bytemuck"
+version = "1.25.2"
+hash = "sha256-mabD5vu0gJXnmMAgoiDEEKRbbZYSQmwxWR/wnH1VUXk="
+features = [
+    { name = "bytemuck_derive" },
+    { name = "const_zeroed" },
+    { name = "derive" },
+    { name = "min_const_generics" },
+    { name = "must_cast" },
+    { name = "nightly_stdsimd" },
+]
+dependencies = [
+    { package = "bytemuck_derive@1.12.1" },
+]
+
+[deps."bytemuck_derive@1.12.1"]
+name = "bytemuck_derive"
+version = "1.12.1"
+hash = "sha256-QZSCdoFxHUeLQmXh/KXMHemQlMAUi9h1lSZhWrqF2p0="
+dependencies = [
+    { package = "proc-macro2@1.0.106" },
+    { package = "quote@1.0.47" },
+    { package = "syn@3.0.6" },
+]
+
+[deps."byteorder@1.5.0"]
+name = "byteorder"
+version = "1.5.0"
+hash = "sha256-+FkIbCxEQ4wKf9/nPC7yPreuhP3Dv7jHzsZLZT66fYk="
+features = [
+    { name = "default" },
+    { name = "std" },
+]
 
 [deps."bytes@1.12.1"]
 name = "bytes"
@@ -379,8 +526,8 @@ features = [
 dependencies = [
     { package = "heck@0.5.0" },
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."clap_lex@0.7.7"]
@@ -388,10 +535,39 @@ name = "clap_lex"
 version = "0.7.7"
 hash = "sha256-uZGDh4tEZ4eulxBHmHfpSLDdv5KmTFpYhaEs8NiYDRQ="
 
+[deps."cmov@0.5.4"]
+name = "cmov"
+version = "0.5.4"
+hash = "sha256-HlNXjjUIiJt1vkNftjn+BHZ3NaDIOuBTYAyRhx2vdAc="
+
+[deps."cobs@0.3.0"]
+name = "cobs"
+version = "0.3.0"
+hash = "sha256-8NVfFop6l5Bdy/hsmMBirpL1ezAg9gf+qRz7sYnWNUU="
+dependencies = [
+    { package = "thiserror@2.0.18" },
+]
+
 [deps."colorchoice@1.0.4"]
 name = "colorchoice"
 version = "1.0.4"
 hash = "sha256-pj4NbMr2xXv2IHlSEDvRmmmbGpM78YKjVrzbI3y5bmw="
+
+[deps."constant_time_eq@0.4.2"]
+name = "constant_time_eq"
+version = "0.4.2"
+hash = "sha256-r1bfEzIhouEYKulgBBO6sTm4cMLl+a4pj1oByw9vcJY="
+features = [
+    { name = "std" },
+]
+
+[deps."convert_case@0.6.0"]
+name = "convert_case"
+version = "0.6.0"
+hash = "sha256-rLSNjxfV3pt0IFCPIXDXQeynDwAypAEIKekkMot3OCc="
+dependencies = [
+    { package = "unicode-segmentation@1.13.3" },
+]
 
 [deps."core-foundation-sys@0.8.7"]
 name = "core-foundation-sys"
@@ -410,6 +586,16 @@ dependencies = [
     { package = "libc@0.2.180", platforms = ["linux-arm64", "macos-arm64"] },
 ]
 
+[deps."cpufeatures@0.3.1"]
+name = "cpufeatures"
+version = "0.3.1"
+hash = "sha256-ELBnIVFlLZ4nN+5YuhSNgjsWxeUh18fLuqEYFW5PHqQ="
+
+[deps."crc-catalog@2.5.0"]
+name = "crc-catalog"
+version = "2.5.0"
+hash = "sha256-xywXJc/BvFUSq7iidEAtkQoaAxWKKD//wb8jChQoYJc="
+
 [deps."crc32fast@1.5.0"]
 name = "crc32fast"
 version = "1.5.0"
@@ -420,6 +606,53 @@ features = [
 ]
 dependencies = [
     { package = "cfg-if@1.0.4" },
+]
+
+[deps."crc@3.4.0"]
+name = "crc"
+version = "3.4.0"
+hash = "sha256-3O+teJXzKjD6HqqEvtEWUDzwB2Ki1IWK/cZkrWRMUNs="
+dependencies = [
+    { package = "crc-catalog@2.5.0" },
+]
+
+[deps."critical-section@1.2.0"]
+name = "critical-section"
+version = "1.2.0"
+hash = "sha256-T1m9Qgn7seBNA4v6xRiEMa1im9ozHzWfL/0nY9qYNV0="
+
+[deps."crossbeam-deque@0.8.8"]
+name = "crossbeam-deque"
+version = "0.8.8"
+hash = "sha256-w+8s9szmlXwJVXRyW0kByNff/+gyiRIoH9UuknLim3k="
+features = [
+    { name = "default" },
+    { name = "std" },
+]
+dependencies = [
+    { package = "crossbeam-epoch@0.9.21" },
+    { package = "crossbeam-utils@0.8.23" },
+]
+
+[deps."crossbeam-epoch@0.9.21"]
+name = "crossbeam-epoch"
+version = "0.9.21"
+hash = "sha256-pfgrllPobT/UGtNaBJ0PnsQrSL0yL7GjA8XG/Gx9RPQ="
+features = [
+    { name = "alloc" },
+    { name = "std" },
+]
+dependencies = [
+    { package = "crossbeam-utils@0.8.23" },
+]
+
+[deps."crossbeam-utils@0.8.23"]
+name = "crossbeam-utils"
+version = "0.8.23"
+hash = "sha256-R87IZte4ytUgsJI94VOz8F3mnvh0eZCJmMuKCHqAjG0="
+features = [
+    { name = "default" },
+    { name = "std" },
 ]
 
 [deps."crypto-common@0.1.7"]
@@ -434,6 +667,29 @@ dependencies = [
     { package = "typenum@1.19.0" },
 ]
 
+[deps."crypto-common@0.2.2"]
+name = "crypto-common"
+version = "0.2.2"
+hash = "sha256-0uVnAHsgnH3Fn7pl1YReNhpGuAAM6um6lspXnLzLXKs="
+dependencies = [
+    { package = "hybrid-array@0.4.10" },
+]
+
+[deps."ctor@1.0.13"]
+name = "ctor"
+version = "1.0.13"
+hash = "sha256-OxYgVdyWwGFyCc6xC7nrhBfjDovgHmwtQmVuhqY6DbM="
+features = [
+    { name = "default" },
+    { name = "priority" },
+    { name = "proc_macro" },
+    { name = "std" },
+]
+dependencies = [
+    { package = "link-section@0.19.3" },
+    { package = "linktime-proc-macro@0.2.3" },
+]
+
 [deps."ctrlc@3.5.2"]
 name = "ctrlc"
 version = "3.5.2"
@@ -441,6 +697,113 @@ hash = "sha256-YtVb+XBxc9CMRg1ANGlQWM/dWkZVr6nNZKQ1Q0ICilU="
 dependencies = [
     { package = "dispatch2@0.3.0", platforms = ["macos-arm64", "macos-x86_64"] },
     { package = "nix@0.31.1" },
+]
+
+[deps."ctutils@0.4.2"]
+name = "ctutils"
+version = "0.4.2"
+hash = "sha256-1ZLk0Diyo6a2OCFuV38prHkTRmPDolTsffTxjgL17PE="
+dependencies = [
+    { package = "cmov@0.5.4" },
+]
+
+[deps."dashmap@6.2.1"]
+name = "dashmap"
+version = "6.2.1"
+hash = "sha256-RJb3C00gQi8LCtUoWc2OeDMD3D3eVCZoZMPhPbQRD0Y="
+dependencies = [
+    { package = "cfg-if@1.0.4" },
+    { package = "crossbeam-utils@0.8.23" },
+    { package = "hashbrown@0.14.5" },
+    { package = "lock_api@0.4.14" },
+    { package = "once_cell@1.21.4" },
+    { package = "parking_lot_core@0.9.12" },
+]
+
+[deps."derivative@2.2.0"]
+name = "derivative"
+version = "2.2.0"
+hash = "sha256-Dj5nPwQu/RQJ75OlJuqtJwO9GBYDp5640D/NDK6q95w="
+dependencies = [
+    { package = "proc-macro2@1.0.106" },
+    { package = "quote@1.0.47" },
+    { package = "syn@1.0.109" },
+]
+
+[deps."derive_more-impl@1.0.0"]
+name = "derive_more-impl"
+version = "1.0.0"
+hash = "sha256-4vAFOC6JS06rZhwFKFQx55aCqyW3J93OCZHGFDepi6s="
+features = [
+    { name = "add" },
+    { name = "add_assign" },
+    { name = "as_ref" },
+    { name = "constructor" },
+    { name = "debug" },
+    { name = "default" },
+    { name = "deref" },
+    { name = "deref_mut" },
+    { name = "display" },
+    { name = "error" },
+    { name = "from" },
+    { name = "from_str" },
+    { name = "index" },
+    { name = "index_mut" },
+    { name = "into" },
+    { name = "into_iterator" },
+    { name = "is_variant" },
+    { name = "mul" },
+    { name = "mul_assign" },
+    { name = "not" },
+    { name = "sum" },
+    { name = "try_from" },
+    { name = "try_into" },
+    { name = "try_unwrap" },
+    { name = "unwrap" },
+]
+dependencies = [
+    { package = "convert_case@0.6.0" },
+    { package = "proc-macro2@1.0.106" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
+    { package = "unicode-xid@0.2.6" },
+]
+
+[deps."derive_more@1.0.0"]
+name = "derive_more"
+version = "1.0.0"
+hash = "sha256-HHOtLhI1mGqUH2KpbLhhT3aZKJHX2fUwykesTh82A0Y="
+features = [
+    { name = "add" },
+    { name = "add_assign" },
+    { name = "as_ref" },
+    { name = "constructor" },
+    { name = "debug" },
+    { name = "default" },
+    { name = "deref" },
+    { name = "deref_mut" },
+    { name = "display" },
+    { name = "error" },
+    { name = "from" },
+    { name = "from_str" },
+    { name = "full" },
+    { name = "index" },
+    { name = "index_mut" },
+    { name = "into" },
+    { name = "into_iterator" },
+    { name = "is_variant" },
+    { name = "mul" },
+    { name = "mul_assign" },
+    { name = "not" },
+    { name = "std" },
+    { name = "sum" },
+    { name = "try_from" },
+    { name = "try_into" },
+    { name = "try_unwrap" },
+    { name = "unwrap" },
+]
+dependencies = [
+    { package = "derive_more-impl@1.0.0" },
 ]
 
 [deps."digest@0.10.7"]
@@ -457,6 +820,21 @@ features = [
 dependencies = [
     { package = "block-buffer@0.10.4" },
     { package = "crypto-common@0.1.7" },
+]
+
+[deps."digest@0.11.3"]
+name = "digest"
+version = "0.11.3"
+hash = "sha256-Xn33mLEr8gl3028A0KJSKNQPKxHzfmUm362qHBOz8wk="
+features = [
+    { name = "block-api" },
+    { name = "default" },
+    { name = "mac" },
+]
+dependencies = [
+    { package = "block-buffer@0.12.1" },
+    { package = "crypto-common@0.2.2", rename = "common" },
+    { package = "ctutils@0.4.2" },
 ]
 
 [deps."dirs-sys@0.4.1"]
@@ -501,8 +879,26 @@ version = "0.2.5"
 hash = "sha256-8oyaH88aXETb78VOTS2AzrdHAcq5QTGaLwn41AUH1cM="
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
+]
+
+[deps."dupe@0.9.1"]
+name = "dupe"
+version = "0.9.1"
+hash = "sha256-jO/iiEpQz6s+WvDMPsJwtw4yW7QPm6lj+wmj22PZvAE="
+dependencies = [
+    { package = "dupe_derive@0.9.1" },
+]
+
+[deps."dupe_derive@0.9.1"]
+name = "dupe_derive"
+version = "0.9.1"
+hash = "sha256-Knd7hkHA/0T6qpBBuMq2cN5+N9OlwDeT7jUfqQjm6Ls="
+dependencies = [
+    { package = "proc-macro2@1.0.106" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."either@1.18.0"]
@@ -510,9 +906,20 @@ name = "either"
 version = "1.18.0"
 hash = "sha256-QijDXSfg1+kRzwMNE5JOTLZ8efK478gG7Vm1NBfs8hc="
 features = [
+    { name = "default" },
     { name = "std" },
     { name = "use_std" },
 ]
+
+[deps."embedded-io@0.4.0"]
+name = "embedded-io"
+version = "0.4.0"
+hash = "sha256-iQqYSYcipgEZ5ZYEBTrdHsaX3efGwHdmPKSsJR5YDHg="
+
+[deps."embedded-io@0.6.1"]
+name = "embedded-io"
+version = "0.6.1"
+hash = "sha256-C0c/9Ctd4Q0m0MpmlByG6Oz4GXOIPKxWtzzhfZO1PJs="
 
 [deps."encoding_rs@0.8.35"]
 name = "encoding_rs"
@@ -543,7 +950,7 @@ features = [
 ]
 dependencies = [
     { package = "log@0.4.29" },
-    { package = "regex@1.12.2" },
+    { package = "regex@1.12.4" },
 ]
 
 [deps."env_logger@0.11.8"]
@@ -570,6 +977,20 @@ name = "equivalent"
 version = "1.0.2"
 hash = "sha256-uTefUNYrF+m59vVl+AHTdkPVQ6x/qC2rCfMwrE/71VU="
 
+[deps."erased-serde@0.4.10"]
+name = "erased-serde"
+version = "0.4.10"
+hash = "sha256-3/gypqbRKj2V0lZM5oY8yNwb60kwZc8XhmXpt4tFvPU="
+features = [
+    { name = "alloc" },
+    { name = "default" },
+    { name = "std" },
+]
+dependencies = [
+    { package = "serde_core@1.0.228" },
+    { package = "typeid@1.0.3" },
+]
+
 [deps."errno@0.3.14"]
 name = "errno"
 version = "0.3.14"
@@ -579,6 +1000,22 @@ features = [
 ]
 dependencies = [
     { package = "libc@0.2.180" },
+]
+
+[deps."fancy-regex@0.16.2"]
+name = "fancy-regex"
+version = "0.16.2"
+hash = "sha256-hrbGGx+jxEOBoLLRBMnhpVm87GlHD0XJ0vKOF2+DCq0="
+features = [
+    { name = "default" },
+    { name = "perf" },
+    { name = "std" },
+    { name = "unicode" },
+]
+dependencies = [
+    { package = "bit-set@0.8.0" },
+    { package = "regex-automata@0.4.13" },
+    { package = "regex-syntax@0.8.11" },
 ]
 
 [deps."fastrand@2.3.0"]
@@ -625,6 +1062,18 @@ dependencies = [
     { package = "miniz_oxide@0.8.9" },
 ]
 
+[deps."fluent-uri@0.1.4"]
+name = "fluent-uri"
+version = "0.1.4"
+hash = "sha256-W759LMCUV7RK3JkZOvbp3W1i8dnBdPcdg0s29dl0/kA="
+features = [
+    { name = "default" },
+    { name = "std" },
+]
+dependencies = [
+    { package = "bitflags@1.3.2" },
+]
+
 [deps."fnv@1.0.7"]
 name = "fnv"
 version = "1.0.7"
@@ -638,6 +1087,11 @@ features = [
 name = "foldhash"
 version = "0.1.5"
 hash = "sha256-YeUwrWYpIzQrO1ImmpWyKj9VZU925YwAmgm0JFdRPls="
+
+[deps."foldhash@0.2.0"]
+name = "foldhash"
+version = "0.2.0"
+hash = "sha256-YonVWSqqb8kkS+dyldw3r7tVltu1FqqlL9RAL+jyGoE="
 
 [deps."form_urlencoded@1.2.2"]
 name = "form_urlencoded"
@@ -671,7 +1125,7 @@ dependencies = [
     { package = "bitflags@2.10.0" },
     { package = "libc@0.2.180" },
     { package = "log@0.4.29" },
-    { package = "memchr@2.7.6" },
+    { package = "memchr@2.8.3" },
     { package = "nix@0.30.1" },
     { package = "num_enum@0.7.6" },
     { package = "page_size@0.6.0" },
@@ -710,7 +1164,7 @@ version = "0.3.34"
 hash = "sha256-makhRGW+ul+VU3paf+XHpDxMexBNwbumUxoVyN6md8Q="
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
+    { package = "quote@1.0.47" },
     { package = "syn@3.0.6" },
 ]
 
@@ -754,6 +1208,14 @@ dependencies = [
     { package = "slab@0.4.12" },
 ]
 
+[deps."fxhash@0.2.1"]
+name = "fxhash"
+version = "0.2.1"
+hash = "sha256-UrpEAfkTSmr/4UsWpN2NbDw9AyqNytumnhN2zjV2lVw="
+dependencies = [
+    { package = "byteorder@1.5.0" },
+]
+
 [deps."generic-array@0.14.7"]
 name = "generic-array"
 version = "0.14.7"
@@ -783,6 +1245,19 @@ dependencies = [
     { package = "libc@0.2.180" },
 ]
 
+[deps."getrandom@0.4.3"]
+name = "getrandom"
+version = "0.4.3"
+hash = "sha256-mrq7A2TXUKj7Bq72bae8Os3IFmrYvr3a8JssWKNiYNA="
+features = [
+    { name = "sys_rng" },
+]
+dependencies = [
+    { package = "cfg-if@1.0.4" },
+    { package = "libc@0.2.180" },
+    { package = "rand_core@0.10.1" },
+]
+
 [deps."glob@0.3.3"]
 name = "glob"
 version = "0.3.3"
@@ -799,11 +1274,27 @@ dependencies = [
     { package = "futures-core@0.3.34" },
     { package = "futures-sink@0.3.34" },
     { package = "http@1.5.0" },
-    { package = "indexmap@2.13.0" },
+    { package = "indexmap@2.14.2" },
     { package = "slab@0.4.12" },
     { package = "tokio-util@0.7.19" },
     { package = "tokio@1.50.0" },
     { package = "tracing@0.1.44" },
+]
+
+[deps."hash32@0.2.1"]
+name = "hash32"
+version = "0.2.1"
+hash = "sha256-KoW5+BJuF6LIDIb5OdUd+xZakXZoF42MUEcrDm35f2I="
+dependencies = [
+    { package = "byteorder@1.5.0" },
+]
+
+[deps."hashbrown@0.14.5"]
+name = "hashbrown"
+version = "0.14.5"
+hash = "sha256-aKUlYTODRAGjY8eLMtl6rJg7AkqJDGFWZHbfsIZyMLE="
+features = [
+    { name = "raw" },
 ]
 
 [deps."hashbrown@0.15.5"]
@@ -822,6 +1313,40 @@ dependencies = [
 name = "hashbrown"
 version = "0.16.1"
 hash = "sha256-dhLYAziGLEmhzYA83KUAStUVt3iIDf6dFG1HcI+0QKg="
+features = [
+    { name = "allocator-api2" },
+    { name = "default" },
+    { name = "default-hasher" },
+    { name = "equivalent" },
+    { name = "inline-more" },
+    { name = "raw-entry" },
+]
+dependencies = [
+    { package = "allocator-api2@0.2.21" },
+    { package = "equivalent@1.0.2" },
+    { package = "foldhash@0.2.0" },
+]
+
+[deps."hashbrown@0.17.1"]
+name = "hashbrown"
+version = "0.17.1"
+hash = "sha256-LkjO2+4jThvOnGyuKevw0SRHHbnFAX/PvdsXmHtRKbw="
+
+[deps."heapless@0.7.17"]
+name = "heapless"
+version = "0.7.17"
+hash = "sha256-WOfJzjMhUh9SY176i/FCoEzqPzRf3kgotaezjAbs1Qs="
+features = [
+    { name = "atomic-polyfill" },
+    { name = "cas" },
+    { name = "serde" },
+]
+dependencies = [
+    { package = "hash32@0.2.1" },
+    { package = "serde@1.0.228" },
+    { package = "spin@0.9.9", platforms = ["linux-x86_64", "macos-x86_64"] },
+    { package = "stable_deref_trait@1.2.1" },
+]
 
 [deps."heck@0.5.0"]
 name = "heck"
@@ -878,6 +1403,14 @@ features = [
 name = "httpdate"
 version = "1.0.3"
 hash = "sha256-F/aESFhBbC+M1KWz8nWOeh28sig6RNbi0f6j0+1zrGI="
+
+[deps."hybrid-array@0.4.10"]
+name = "hybrid-array"
+version = "0.4.10"
+hash = "sha256-eD5aVX8TbiAboedkEjfcDWRxiH/PwWPpLrnt9lBpquY="
+dependencies = [
+    { package = "typenum@1.19.0" },
+]
 
 [deps."hyper-timeout@0.5.2"]
 name = "hyper-timeout"
@@ -1078,17 +1611,19 @@ dependencies = [
     { package = "icu_properties@2.1.2" },
 ]
 
-[deps."indexmap@2.13.0"]
+[deps."indexmap@2.14.2"]
 name = "indexmap"
-version = "2.13.0"
-hash = "sha256-0EO8FeBPA87lIU5lbuyySmohuszHj5dAvlJQUkLC49g="
+version = "2.14.2"
+hash = "sha256-cH3QwfxFdyNFtsOWo00SxydrU5YqzEU/U6rvfNBah0w="
 features = [
     { name = "default" },
+    { name = "serde" },
     { name = "std" },
 ]
 dependencies = [
     { package = "equivalent@1.0.2" },
-    { package = "hashbrown@0.16.1" },
+    { package = "hashbrown@0.17.1" },
+    { package = "serde_core@1.0.228" },
 ]
 
 [deps."inotify-sys@0.1.5"]
@@ -1108,6 +1643,11 @@ dependencies = [
     { package = "inotify-sys@0.1.5" },
     { package = "libc@0.2.180" },
 ]
+
+[deps."inventory@0.3.24"]
+name = "inventory"
+version = "0.3.24"
+hash = "sha256-KJ/HDHDkkDAwy8jIUzeS2w9oKGw/YTT4uLP+Z6NMEn8="
 
 [deps."is_terminal_polyfill@1.70.2"]
 name = "is_terminal_polyfill"
@@ -1184,6 +1724,20 @@ name = "libredox"
 version = "0.1.12"
 hash = "sha256-IE50Q+XiAsSH3j5af5HUM1IQT+o8AQl0KcYCoPaQvms="
 
+[deps."link-section@0.19.3"]
+name = "link-section"
+version = "0.19.3"
+hash = "sha256-OvzCNSD0AW532d1Nq/IuS+ZwhYA8qVX423JHFSwoNGk="
+
+[deps."linktime-proc-macro@0.2.3"]
+name = "linktime-proc-macro"
+version = "0.2.3"
+hash = "sha256-yt7AT1sIDK017GY1ZomIlVtFPcTRh9HDxRHFZciQtf4="
+features = [
+    { name = "ctor" },
+    { name = "default" },
+]
+
 [deps."linux-raw-sys@0.11.0"]
 name = "linux-raw-sys"
 version = "0.11.0"
@@ -1214,6 +1768,18 @@ dependencies = [
     { package = "scopeguard@1.2.0" },
 ]
 
+[deps."lock_free_hashtable@0.1.4"]
+name = "lock_free_hashtable"
+version = "0.1.4"
+hash = "sha256-zsPmAc7K+HdTyo1HpCELv9Z7pJ2zBfUGEL1OlZbWJD4="
+features = [
+    { name = "default" },
+]
+dependencies = [
+    { package = "atomic@0.5.3" },
+    { package = "parking_lot@0.12.5" },
+]
+
 [deps."log@0.4.29"]
 name = "log"
 version = "0.4.29"
@@ -1231,9 +1797,9 @@ dependencies = [
     { package = "fnv@1.0.7" },
     { package = "lazy_static@1.5.0" },
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "regex-syntax@0.8.8" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "regex-syntax@0.8.11" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."logos-codegen@0.16.1"]
@@ -1243,10 +1809,10 @@ hash = "sha256-BAxA1dUn1ZU/THXhhSQPypfwQxyXTrMq1L6/NWnYS/s="
 dependencies = [
     { package = "fnv@1.0.7" },
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
+    { package = "quote@1.0.47" },
     { package = "regex-automata@0.4.13" },
-    { package = "regex-syntax@0.8.8" },
-    { package = "syn@2.0.114" },
+    { package = "regex-syntax@0.8.11" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."logos-derive@0.15.1"]
@@ -1293,6 +1859,21 @@ dependencies = [
     { package = "logos-derive@0.16.1" },
 ]
 
+[deps."lsp-types@0.97.0"]
+name = "lsp-types"
+version = "0.97.0"
+hash = "sha256-VZDtgEAhO7D5QX7K9Be+ina7pyjrwuJH1YWLa377+Go="
+features = [
+    { name = "default" },
+]
+dependencies = [
+    { package = "bitflags@1.3.2" },
+    { package = "fluent-uri@0.1.4" },
+    { package = "serde@1.0.228" },
+    { package = "serde_json@1.0.149" },
+    { package = "serde_repr@0.1.21" },
+]
+
 [deps."matchit@0.8.4"]
 name = "matchit"
 version = "0.8.4"
@@ -1301,10 +1882,10 @@ features = [
     { name = "default" },
 ]
 
-[deps."memchr@2.7.6"]
+[deps."memchr@2.8.3"]
 name = "memchr"
-version = "2.7.6"
-hash = "sha256-l/ki8GnJL7IF0Wr2Q4J/NLNp/dm0iZXdrgj3mPbHeMc="
+version = "2.8.3"
+hash = "sha256-kFqEpDSFGuLDWFECp8ySxqYSPlo6otrKaXm6UuJVhCo="
 features = [
     { name = "alloc" },
     { name = "default" },
@@ -1325,8 +1906,8 @@ version = "7.6.0"
 hash = "sha256-G6Q4OOnxybzmpJn0O5Lp5MhZIWwTGHY/m7dMp9tk44c="
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."miette@7.6.0"]
@@ -1473,12 +2054,40 @@ dependencies = [
     { package = "walkdir@2.5.0" },
 ]
 
+[deps."num-bigint@0.4.8"]
+name = "num-bigint"
+version = "0.4.8"
+hash = "sha256-jtuz7vlrh6tXzvk6kR6aZ23MKNhtyNy2WBMwuIdfrhw="
+features = [
+    { name = "default" },
+    { name = "serde" },
+    { name = "std" },
+]
+dependencies = [
+    { package = "num-integer@0.1.47" },
+    { package = "num-traits@0.2.19" },
+    { package = "serde@1.0.228" },
+]
+
+[deps."num-integer@0.1.47"]
+name = "num-integer"
+version = "0.1.47"
+hash = "sha256-Lo6bxRhd+HN9Cv7wCxjnhhKoJXDewfx42Jlf7D/+/LY="
+features = [
+    { name = "i128" },
+    { name = "std" },
+]
+dependencies = [
+    { package = "num-traits@0.2.19" },
+]
+
 [deps."num-traits@0.2.19"]
 name = "num-traits"
 version = "0.2.19"
 hash = "sha256-5L0mKAem8o1xs1FxPfdG39Eiogz5oKWWzEuYz1nJFUk="
 features = [
     { name = "default" },
+    { name = "i128" },
     { name = "std" },
 ]
 
@@ -1506,8 +2115,8 @@ features = [
 dependencies = [
     { package = "proc-macro-crate@3.5.0" },
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."objc2-encode@4.1.0"]
@@ -1531,10 +2140,10 @@ dependencies = [
     { package = "objc2-encode@4.1.0" },
 ]
 
-[deps."once_cell@1.21.3"]
+[deps."once_cell@1.21.4"]
 name = "once_cell"
-version = "1.21.3"
-hash = "sha256-cGcqplIEBDBQuhoS61S0nPbpxp6i4ZuhIjHS5v/yUMs="
+version = "1.21.4"
+hash = "sha256-zxpnYD8Plqi8KHQstLpaxBY8efqMEN3CPRuAAgyNtnY="
 features = [
     { name = "alloc" },
     { name = "default" },
@@ -1552,6 +2161,54 @@ name = "option-ext"
 version = "0.2.0"
 hash = "sha256-GCw0nQe98Gkrrpp7wKHuHAalakT5pn2rnEfjknlHDW4="
 
+[deps."pagable@0.4.2"]
+name = "pagable"
+version = "0.4.2"
+hash = "sha256-CSWcHghshpKHrZ1sDVut5gx038hqERaV9RVJnkA4fpw="
+features = [
+    { name = "default" },
+]
+dependencies = [
+    { package = "allocative@0.3.6" },
+    { package = "anyhow@1.0.104" },
+    { package = "async-trait@0.1.92" },
+    { package = "blake3@1.8.7" },
+    { package = "bytemuck@1.25.2" },
+    { package = "dashmap@6.2.1" },
+    { package = "dupe@0.9.1" },
+    { package = "either@1.18.0" },
+    { package = "erased-serde@0.4.10" },
+    { package = "fancy-regex@0.16.2" },
+    { package = "indexmap@2.14.2" },
+    { package = "inventory@0.3.24" },
+    { package = "num-bigint@0.4.8" },
+    { package = "once_cell@1.21.4" },
+    { package = "pagable_derive@0.4.2" },
+    { package = "parking_lot@0.12.5" },
+    { package = "postcard@1.1.3" },
+    { package = "regex@1.12.4" },
+    { package = "sequence_trie@0.3.6" },
+    { package = "serde@1.0.228" },
+    { package = "serde_json@1.0.149" },
+    { package = "smallvec@1.15.1" },
+    { package = "sorted_vector_map@0.2.1" },
+    { package = "static_assertions@1.1.0" },
+    { package = "static_interner@0.1.3" },
+    { package = "strong_hash@0.1.0" },
+    { package = "take_mut@0.2.2" },
+    { package = "triomphe@0.1.16" },
+]
+
+[deps."pagable_derive@0.4.2"]
+name = "pagable_derive"
+version = "0.4.2"
+hash = "sha256-WXhKjezkYfdCuzhGEXJiSJLc+8SS8EmAycleHfrlA1w="
+dependencies = [
+    { package = "proc-macro2@1.0.106" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
+]
+
 [deps."page_size@0.6.0"]
 name = "page_size"
 version = "0.6.0"
@@ -1566,6 +2223,7 @@ version = "0.12.5"
 hash = "sha256-kqQxmjJ/AeMVteOSbZBBDJb1IojTGZ79gmkPVrNjcFI="
 features = [
     { name = "default" },
+    { name = "send_guard" },
 ]
 dependencies = [
     { package = "lock_api@0.4.14" },
@@ -1602,7 +2260,7 @@ features = [
 dependencies = [
     { package = "fixedbitset@0.5.7" },
     { package = "hashbrown@0.15.5" },
-    { package = "indexmap@2.13.0" },
+    { package = "indexmap@2.14.2" },
 ]
 
 [deps."pin-project-internal@1.1.13"]
@@ -1611,8 +2269,8 @@ version = "1.1.13"
 hash = "sha256-b3wwgfQdWGC0kln1SIXtQ8BclUCtbD9jIyDKdBMvVMU="
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."pin-project-lite@0.2.17"]
@@ -1643,6 +2301,26 @@ name = "portable-atomic"
 version = "1.13.0"
 hash = "sha256-jxBqCk6Y/TBhsUbHGxGr3YU2tVgYZ6uXfyWWQff9oe8="
 
+[deps."postcard@1.1.3"]
+name = "postcard"
+version = "1.1.3"
+hash = "sha256-RckSbV6HwgFQjTeyb5Qzdtugoa/uHt5FkzVNNHU/e+4="
+features = [
+    { name = "alloc" },
+    { name = "crc" },
+    { name = "default" },
+    { name = "heapless" },
+    { name = "heapless-cas" },
+    { name = "use-crc" },
+    { name = "use-std" },
+]
+dependencies = [
+    { package = "cobs@0.3.0" },
+    { package = "crc@3.4.0" },
+    { package = "heapless@0.7.17" },
+    { package = "serde@1.0.228" },
+]
+
 [deps."potential_utf@0.1.4"]
 name = "potential_utf"
 version = "0.1.4"
@@ -1660,7 +2338,7 @@ version = "0.2.37"
 hash = "sha256-n8CjW/W4yvufu09Dv54vHtDWmA0mnR8l+GMvBRbzTg8="
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "syn@2.0.114" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."proc-macro-crate@3.5.0"]
@@ -1700,8 +2378,8 @@ dependencies = [
     { package = "prettyplease@0.2.37" },
     { package = "prost-types@0.14.4" },
     { package = "prost@0.14.4" },
-    { package = "regex@1.12.2" },
-    { package = "syn@2.0.114" },
+    { package = "regex@1.12.4" },
+    { package = "syn@2.0.119" },
     { package = "tempfile@3.24.0" },
 ]
 
@@ -1710,11 +2388,11 @@ name = "prost-derive"
 version = "0.14.4"
 hash = "sha256-ncK2pCXSIq5W9GG603e3sxFh/FcPCSK4nyxgdlIRecE="
 dependencies = [
-    { package = "anyhow@1.0.100" },
+    { package = "anyhow@1.0.104" },
     { package = "itertools@0.14.0" },
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."prost-reflect@0.16.5"]
@@ -1783,10 +2461,27 @@ dependencies = [
     { package = "thiserror@2.0.18" },
 ]
 
-[deps."quote@1.0.44"]
+[deps."quickcheck@1.1.0"]
+name = "quickcheck"
+version = "1.1.0"
+hash = "sha256-XA+wsa7YtDfnzeOIcELzVxGE1MrJhVaoEXUOBL9HpZE="
+features = [
+    { name = "default" },
+    { name = "env_logger" },
+    { name = "log" },
+    { name = "regex" },
+    { name = "use_logging" },
+]
+dependencies = [
+    { package = "env_logger@0.11.8" },
+    { package = "log@0.4.29" },
+    { package = "rand@0.10.3" },
+]
+
+[deps."quote@1.0.47"]
 name = "quote"
-version = "1.0.44"
-hash = "sha256-twbReqnmjLLv6FgdDl4dHAnWnEBgUTOtUKkR5m5xZxI="
+version = "1.0.47"
+hash = "sha256-4qohUUekSU2KcdbWn1sNXe4pzr9uCS4RGolAmSSGszQ="
 features = [
     { name = "default" },
     { name = "proc-macro" },
@@ -1799,6 +2494,37 @@ dependencies = [
 name = "r-efi"
 version = "5.3.0"
 hash = "sha256-7GkIPnWzp+SYzzhAqzQYilnLagps+2djhdoa+ye7xfk="
+
+[deps."r-efi@6.0.0"]
+name = "r-efi"
+version = "6.0.0"
+hash = "sha256-uO4fmFUms1GAdaMHe8TiwWAl+cDbCj53beSXeRzwBR4="
+
+[deps."rand@0.10.3"]
+name = "rand"
+version = "0.10.3"
+hash = "sha256-bxcCoCNDxuHIq2jws+P8CfauANcem/TmMGnvGV9fYOo="
+features = [
+    { name = "sys_rng" },
+]
+dependencies = [
+    { package = "getrandom@0.4.3" },
+    { package = "rand_core@0.10.1" },
+]
+
+[deps."rand_core@0.10.1"]
+name = "rand_core"
+version = "0.10.1"
+hash = "sha256-V+BZkd7qDg6MidHFg0zCiAKG2VwE0Qltg8+MCzJcSVU="
+
+[deps."rayon-core@1.13.0"]
+name = "rayon-core"
+version = "1.13.0"
+hash = "sha256-tQt6uge9erNKol8/unrKBoLU8INfxaUYyaTz/tKzPQg="
+dependencies = [
+    { package = "crossbeam-deque@0.8.8" },
+    { package = "crossbeam-utils@0.8.23" },
+]
 
 [deps."redox_syscall@0.5.18"]
 name = "redox_syscall"
@@ -1816,8 +2542,8 @@ version = "1.0.25"
 hash = "sha256-tRN51TXEZkrDEC7ZC2lJwOluNjm0D+U9vYq68EghqBs="
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."ref-cast@1.0.25"]
@@ -1864,14 +2590,14 @@ features = [
 ]
 dependencies = [
     { package = "aho-corasick@1.1.4" },
-    { package = "memchr@2.7.6" },
-    { package = "regex-syntax@0.8.8" },
+    { package = "memchr@2.8.3" },
+    { package = "regex-syntax@0.8.11" },
 ]
 
-[deps."regex-syntax@0.8.8"]
+[deps."regex-syntax@0.8.11"]
 name = "regex-syntax"
-version = "0.8.8"
-hash = "sha256-rTxBddikxOgSWef/GwuAde6hYexxco4yy+/W4gZoE68="
+version = "0.8.11"
+hash = "sha256-5Ivmv51xTRWLH4x7PY6T5YUDc01tdSsZblVrSeeKA8U="
 features = [
     { name = "default" },
     { name = "std" },
@@ -1885,10 +2611,10 @@ features = [
     { name = "unicode-segment" },
 ]
 
-[deps."regex@1.12.2"]
+[deps."regex@1.12.4"]
 name = "regex"
-version = "1.12.2"
-hash = "sha256-e8ldky6p1v3GWviwf87CujFNa9ZRqHs0OxewDcHtKQ0="
+version = "1.12.4"
+hash = "sha256-gFXt4RAKTYlqy8pLOUXzwPlIdDXPsqEvKY/t7NjeHKM="
 features = [
     { name = "default" },
     { name = "perf" },
@@ -1910,9 +2636,9 @@ features = [
 ]
 dependencies = [
     { package = "aho-corasick@1.1.4" },
-    { package = "memchr@2.7.6" },
+    { package = "memchr@2.8.3" },
     { package = "regex-automata@0.4.13" },
-    { package = "regex-syntax@0.8.8" },
+    { package = "regex-syntax@0.8.11" },
 ]
 
 [deps."ring@0.17.14"]
@@ -1994,7 +2720,7 @@ features = [
 ]
 dependencies = [
     { package = "log@0.4.29" },
-    { package = "once_cell@1.21.3" },
+    { package = "once_cell@1.21.4" },
     { package = "ring@0.17.14" },
     { package = "rustls-pki-types@1.14.0", rename = "pki_types" },
     { package = "rustls-webpki@0.103.9", rename = "webpki" },
@@ -2040,6 +2766,11 @@ dependencies = [
     { package = "serde_core@1.0.228", rename = "serde" },
 ]
 
+[deps."sequence_trie@0.3.6"]
+name = "sequence_trie"
+version = "0.3.6"
+hash = "sha256-pP7bA6wQJVf7z9bXsDOItLgs3r77mIZDMagZzh/hFP4="
+
 [deps."serde-saphyr@0.0.15"]
 name = "serde-saphyr"
 version = "0.0.15"
@@ -2054,7 +2785,7 @@ dependencies = [
     { package = "encoding_rs_io@0.1.7" },
     { package = "nohash-hasher@0.2.0" },
     { package = "num-traits@0.2.19" },
-    { package = "regex@1.12.2" },
+    { package = "regex@1.12.4" },
     { package = "saphyr-parser-bw@0.0.601", rename = "saphyr_parser" },
     { package = "serde@1.0.228" },
     { package = "serde_json@1.0.149" },
@@ -2067,8 +2798,10 @@ name = "serde"
 version = "1.0.228"
 hash = "sha256-rqFSEc0HLayISYEkiXwofcH2KX2fiZ/wdV+sdtCJ4AE="
 features = [
+    { name = "alloc" },
     { name = "default" },
     { name = "derive" },
+    { name = "rc" },
     { name = "serde_derive" },
     { name = "std" },
 ]
@@ -2082,7 +2815,9 @@ name = "serde_core"
 version = "1.0.228"
 hash = "sha256-GYsEoV8ezYpIQQt/LddKoj17AVZ/jawMRr9nxa8AGcg="
 features = [
+    { name = "alloc" },
     { name = "default" },
+    { name = "rc" },
     { name = "result" },
     { name = "std" },
 ]
@@ -2096,8 +2831,8 @@ features = [
 ]
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."serde_json@1.0.149"]
@@ -2108,14 +2843,25 @@ features = [
     { name = "default" },
     { name = "indexmap" },
     { name = "preserve_order" },
+    { name = "raw_value" },
     { name = "std" },
 ]
 dependencies = [
-    { package = "indexmap@2.13.0" },
+    { package = "indexmap@2.14.2" },
     { package = "itoa@1.0.17" },
-    { package = "memchr@2.7.6" },
+    { package = "memchr@2.8.3" },
     { package = "serde_core@1.0.228" },
     { package = "zmij@1.0.18" },
+]
+
+[deps."serde_repr@0.1.21"]
+name = "serde_repr"
+version = "0.1.21"
+hash = "sha256-B668/9WEzGVGVzwhBP9ywEPb7+u6LP0hwpq3gIhlWzc="
+dependencies = [
+    { package = "proc-macro2@1.0.106" },
+    { package = "quote@1.0.47" },
+    { package = "syn@3.0.6" },
 ]
 
 [deps."serde_spanned@0.6.9"]
@@ -2201,15 +2947,117 @@ dependencies = [
     { package = "libc@0.2.180" },
 ]
 
+[deps."sorted_vector_map@0.2.1"]
+name = "sorted_vector_map"
+version = "0.2.1"
+hash = "sha256-yXOIR+jeb47QPqYLX2KY8sbv45dPn/Il+fNkSltHaxc="
+dependencies = [
+    { package = "itertools@0.14.0" },
+    { package = "quickcheck@1.1.0" },
+]
+
+[deps."spin@0.9.9"]
+name = "spin"
+version = "0.9.9"
+hash = "sha256-nCmhrzUa+fnFM/bvojFLxspaVYuXSp5XsOpq/+H/278="
+features = [
+    { name = "barrier" },
+    { name = "default" },
+    { name = "lazy" },
+    { name = "lock_api" },
+    { name = "lock_api_crate" },
+    { name = "mutex" },
+    { name = "once" },
+    { name = "rwlock" },
+    { name = "spin_mutex" },
+]
+dependencies = [
+    { package = "lock_api@0.4.14", rename = "lock_api_crate" },
+]
+
 [deps."stable_deref_trait@1.2.1"]
 name = "stable_deref_trait"
 version = "1.2.1"
 hash = "sha256-Nha8xpy6Qa4bV/zC5ojob23IEgFOPjiOpdFtx2Q4Luo="
 
+[deps."starlark_map@0.14.2"]
+name = "starlark_map"
+version = "0.14.2"
+hash = "sha256-hI9PgDB4eWWnYsCWYoo9gRTRhagLDu/LT/ko8h9I29U="
+features = [
+    { name = "default" },
+]
+dependencies = [
+    { package = "allocative@0.3.6" },
+    { package = "dupe@0.9.1" },
+    { package = "equivalent@1.0.2" },
+    { package = "fxhash@0.2.1" },
+    { package = "hashbrown@0.16.1" },
+    { package = "serde@1.0.228" },
+    { package = "strong_hash@0.1.0" },
+]
+
+[deps."starlark_syntax@0.14.2"]
+name = "starlark_syntax"
+version = "0.14.2"
+hash = "sha256-ep+HXiK1tKDTN7AVI0EmTMNrS7XuCG4r3w989dF56CY="
+dependencies = [
+    { package = "allocative@0.3.6" },
+    { package = "annotate-snippets@0.9.2" },
+    { package = "anyhow@1.0.104" },
+    { package = "derivative@2.2.0" },
+    { package = "derive_more@1.0.0" },
+    { package = "dupe@0.9.1" },
+    { package = "logos@0.15.1" },
+    { package = "lsp-types@0.97.0" },
+    { package = "memchr@2.8.3" },
+    { package = "num-bigint@0.4.8" },
+    { package = "num-traits@0.2.19" },
+    { package = "once_cell@1.21.4" },
+    { package = "pagable@0.4.2" },
+    { package = "starlark_map@0.14.2" },
+    { package = "thiserror@2.0.18" },
+]
+
+[deps."static_assertions@1.1.0"]
+name = "static_assertions"
+version = "1.1.0"
+hash = "sha256-XvUdiCg5sVsjaZb+DxKqQa5fFkpbo/Lj1BPEahUIhlI="
+
+[deps."static_interner@0.1.3"]
+name = "static_interner"
+version = "0.1.3"
+hash = "sha256-+IBPvCGIzXwPyQGGHrnLq3OucTPj/DdT0zOUB5/+BiA="
+features = [
+    { name = "default" },
+]
+dependencies = [
+    { package = "equivalent@1.0.2" },
+    { package = "lock_free_hashtable@0.1.4" },
+]
+
 [deps."streaming-iterator@0.1.9"]
 name = "streaming-iterator"
 version = "0.1.9"
 hash = "sha256-qJkQqSbBzuZA02UJwCQGY8dJ9SITGwHGizDcZtld798="
+
+[deps."strong_hash@0.1.0"]
+name = "strong_hash"
+version = "0.1.0"
+hash = "sha256-9UpaUHfBAGJXShZG0QYXIoVznlI/cqDoRpn0h8Uq6Sg="
+dependencies = [
+    { package = "ref-cast@1.0.25" },
+    { package = "strong_hash_derive@0.1.0" },
+]
+
+[deps."strong_hash_derive@0.1.0"]
+name = "strong_hash_derive"
+version = "0.1.0"
+hash = "sha256-2DDtEe2c3Cd0ORc4F5uZ+k4u/5/rpE5aAO579+RSg1c="
+dependencies = [
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
+]
 
 [deps."strsim@0.11.1"]
 name = "strsim"
@@ -2221,10 +3069,31 @@ name = "subtle"
 version = "2.6.1"
 hash = "sha256-XYfBfa+RQxNkl+Clpr1j9/F9LwH0j594iphbdbZy6jk="
 
-[deps."syn@2.0.114"]
+[deps."syn@1.0.109"]
 name = "syn"
-version = "2.0.114"
-hash = "sha256-gbWfQTLTS6LQvWBBc1lvsgoIb8voveppUu4ROu/0ujw="
+version = "1.0.109"
+hash = "sha256-FcgsKZ5+03gugK0KHNM/izC6sHfe+BUOjJUWxohGlf8="
+features = [
+    { name = "clone-impls" },
+    { name = "default" },
+    { name = "derive" },
+    { name = "extra-traits" },
+    { name = "parsing" },
+    { name = "printing" },
+    { name = "proc-macro" },
+    { name = "quote" },
+    { name = "visit" },
+]
+dependencies = [
+    { package = "proc-macro2@1.0.106" },
+    { package = "quote@1.0.47" },
+    { package = "unicode-ident@1.0.22" },
+]
+
+[deps."syn@2.0.119"]
+name = "syn"
+version = "2.0.119"
+hash = "sha256-jgtRuCtasz+YryAyeOpxdZuIyzVoYAKcCeEvG3fj55k="
 features = [
     { name = "clone-impls" },
     { name = "default" },
@@ -2240,7 +3109,7 @@ features = [
 ]
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
+    { package = "quote@1.0.47" },
     { package = "unicode-ident@1.0.22" },
 ]
 
@@ -2260,7 +3129,7 @@ features = [
 ]
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
+    { package = "quote@1.0.47" },
     { package = "unicode-ident@1.0.22" },
 ]
 
@@ -2279,9 +3148,14 @@ features = [
 ]
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
 ]
+
+[deps."take_mut@0.2.2"]
+name = "take_mut"
+version = "0.2.2"
+hash = "sha256-G+oZ2vzwg2kkPtuhdGZThnBQxzwDyh6T+ZOGLslWLco="
 
 [deps."tar@0.4.46"]
 name = "tar"
@@ -2303,7 +3177,7 @@ features = [
 dependencies = [
     { package = "fastrand@2.3.0" },
     { package = "getrandom@0.3.4" },
-    { package = "once_cell@1.21.3" },
+    { package = "once_cell@1.21.4" },
     { package = "rustix@1.1.3" },
 ]
 
@@ -2318,8 +3192,8 @@ version = "2.0.18"
 hash = "sha256-Cv2RQLNSoLYvMzgumtjZeBsmEqqq9t5eIKe7z6P+lzY="
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."thiserror@1.0.69"]
@@ -2357,8 +3231,8 @@ version = "2.6.1"
 hash = "sha256-ytvsddG5RdLAul7RxFf/h0mVkjLTq4JdaAdjMdnVXtg="
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."tokio-stream@0.1.19"]
@@ -2468,7 +3342,7 @@ features = [
     { name = "serde" },
 ]
 dependencies = [
-    { package = "indexmap@2.13.0" },
+    { package = "indexmap@2.14.2" },
     { package = "serde@1.0.228" },
     { package = "serde_spanned@0.6.9" },
     { package = "toml_datetime@0.6.11" },
@@ -2486,7 +3360,7 @@ features = [
     { name = "parse" },
 ]
 dependencies = [
-    { package = "indexmap@2.13.0" },
+    { package = "indexmap@2.14.2" },
     { package = "toml_datetime@1.1.1+spec-1.1.0" },
     { package = "toml_parser@1.1.2+spec-1.1.0" },
     { package = "toml_writer@1.1.2+spec-1.1.0" },
@@ -2536,8 +3410,8 @@ features = [
 dependencies = [
     { package = "prettyplease@0.2.37" },
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."tonic-prost-build@0.14.6"]
@@ -2552,8 +3426,8 @@ dependencies = [
     { package = "proc-macro2@1.0.106" },
     { package = "prost-build@0.14.4" },
     { package = "prost-types@0.14.4" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
     { package = "tempfile@3.24.0" },
     { package = "tonic-build@0.14.6" },
 ]
@@ -2641,7 +3515,7 @@ features = [
 dependencies = [
     { package = "futures-core@0.3.34" },
     { package = "futures-util@0.3.34" },
-    { package = "indexmap@2.13.0" },
+    { package = "indexmap@2.14.2" },
     { package = "pin-project-lite@0.2.17" },
     { package = "slab@0.4.12" },
     { package = "sync_wrapper@1.0.2" },
@@ -2658,8 +3532,8 @@ version = "0.1.31"
 hash = "sha256-rTygwwyuC4K1DTQ0lbStDSoQ4d/JwIjP4k5jrEfZLoE="
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."tracing-core@0.1.36"]
@@ -2671,7 +3545,7 @@ features = [
     { name = "std" },
 ]
 dependencies = [
-    { package = "once_cell@1.21.3" },
+    { package = "once_cell@1.21.4" },
 ]
 
 [deps."tracing@0.1.44"]
@@ -2752,10 +3626,25 @@ features = [
     { name = "std" },
 ]
 dependencies = [
-    { package = "regex-syntax@0.8.8" },
-    { package = "regex@1.12.2" },
+    { package = "regex-syntax@0.8.11" },
+    { package = "regex@1.12.4" },
     { package = "streaming-iterator@0.1.9" },
     { package = "tree-sitter-language@0.1.6" },
+]
+
+[deps."triomphe@0.1.16"]
+name = "triomphe"
+version = "0.1.16"
+hash = "sha256-NBk/zmnZD5sfjYvHReLOxSe3nwg7XOkQnO3pPcGIlQY="
+features = [
+    { name = "default" },
+    { name = "serde" },
+    { name = "stable_deref_trait" },
+    { name = "std" },
+]
+dependencies = [
+    { package = "serde@1.0.228" },
+    { package = "stable_deref_trait@1.2.1" },
 ]
 
 [deps."try-lock@0.2.5"]
@@ -2763,10 +3652,18 @@ name = "try-lock"
 version = "0.2.5"
 hash = "sha256-gv4yBB+mOVLqkVWItJ/x0XNE+C/8AY9NXDtS9tRheZI="
 
+[deps."typeid@1.0.3"]
+name = "typeid"
+version = "1.0.3"
+hash = "sha256-0UuzDX6FxVUmXIbDK1qYN71SsCq+oTIUEE32GWw5+rQ="
+
 [deps."typenum@1.19.0"]
 name = "typenum"
 version = "1.19.0"
 hash = "sha256-5vBPNc316ZUAoQrSrL4wVapBpqOrjjvN5OWHmBL+mVY="
+features = [
+    { name = "const-generics" },
+]
 
 [deps."unicode-ident@1.0.22"]
 name = "unicode-ident"
@@ -2780,6 +3677,11 @@ hash = "sha256-sFjH3C+7sGGErJqUqtshEghN9e52ZjEjSi6SEUaWGWg="
 features = [
     { name = "general-category" },
 ]
+
+[deps."unicode-segmentation@1.13.3"]
+name = "unicode-segmentation"
+version = "1.13.3"
+hash = "sha256-oi10UQ+OOprRvARuFTgDrh/b0X95NMtqNTaoHVB3HTc="
 
 [deps."unicode-width@0.1.14"]
 name = "unicode-width"
@@ -2796,6 +3698,14 @@ version = "0.2.2"
 hash = "sha256-e9JTR5Bvcm8iGTPrGUFMGk+M106665kBEGayG4ZzLf0="
 features = [
     { name = "cjk" },
+    { name = "default" },
+]
+
+[deps."unicode-xid@0.2.6"]
+name = "unicode-xid"
+version = "0.2.6"
+hash = "sha256-915w07Y91OmWx2Irp3gm3oMvYxwF5VNvyb/csgZocGc="
+features = [
     { name = "default" },
 ]
 
@@ -2818,7 +3728,7 @@ dependencies = [
     { package = "base64@0.22.1" },
     { package = "flate2@1.1.8" },
     { package = "log@0.4.29" },
-    { package = "once_cell@1.21.3" },
+    { package = "once_cell@1.21.4" },
     { package = "rustls-pki-types@1.14.0" },
     { package = "rustls@0.23.36" },
     { package = "serde@1.0.228" },
@@ -3160,8 +4070,8 @@ version = "0.8.1"
 hash = "sha256-KK8weDkilTf/9vpzHODTADlfb30wPdMpx26mnZPSfSU="
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
     { package = "synstructure@0.13.2" },
 ]
 
@@ -3185,8 +4095,8 @@ version = "0.8.37"
 hash = "sha256-AUFK6xMYZtPpeu//QoJyIkiBQxe5EI0wTQfFDUGfLmk="
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."zerocopy@0.8.37"]
@@ -3208,8 +4118,8 @@ version = "0.1.6"
 hash = "sha256-Ahx4paD9Mp1XTxa2ZVRdNEiTrJH5Dnmfec6Bft+rK+Q="
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
     { package = "synstructure@0.13.2" },
 ]
 
@@ -3253,8 +4163,8 @@ version = "0.11.2"
 hash = "sha256-p5fY9PeXZvjJ7QFRZjmV7Tm2LhLBtdrU8RGPTnOZru4="
 dependencies = [
     { package = "proc-macro2@1.0.106" },
-    { package = "quote@1.0.44" },
-    { package = "syn@2.0.114" },
+    { package = "quote@1.0.47" },
+    { package = "syn@2.0.119" },
 ]
 
 [deps."zerovec@0.11.5"]

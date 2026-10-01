@@ -1,7 +1,10 @@
 # Crates whose build script turnkey's builds need nothing from: turnkey
 # builds them without running it, as Buck2 never runs build.rs. Most only
 # probe the rustc version or target, emit cfgs for features turnkey doesn't
-# use, or exist for targets it doesn't build for (Windows, wasm).
+# use, or exist for targets it doesn't build for (Windows, wasm). blake3's
+# picks a SIMD implementation (without it, the portable one is built), and
+# heapless's gates APIs postcard doesn't use; starlark_syntax (rules-star)
+# brings both, through pagable.
 #
 # A crate that turns out to need its build script's output gets a real
 # fixup in its own family instead.
@@ -12,10 +15,18 @@
     lib.genAttrs
       [
         "ahash"
+        "allocative"
         "anyhow"
+        "atomic-polyfill"
+        "blake3"
         "crc32fast"
+        "crossbeam-deque"
+        "crossbeam-epoch"
+        "crossbeam-utils"
+        "erased-serde"
         "generic-array"
         "getrandom"
+        "heapless"
         "httparse"
         "iana-time-zone-haiku"
         "icu_normalizer_data"
@@ -31,10 +42,13 @@
         "prettyplease"
         "proc-macro2"
         "quote"
-        "ref-cast"
+        "rayon-core"
         "rustls"
         "rustversion"
+        "starlark_map"
+        "syn"
         "tree-sitter-language"
+        "typeid"
         "typenum"
         "wasm-bindgen"
         "wasm-bindgen-shared"
