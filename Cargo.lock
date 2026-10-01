@@ -3255,9 +3255,13 @@ dependencies = [
 name = "tk-rs"
 version = "0.1.0"
 dependencies = [
+ "buck2-args",
  "deps-cells",
  "gostd",
+ "project-sync",
+ "rules-syncer",
  "tempfile",
+ "testcache",
 ]
 
 [[package]]
