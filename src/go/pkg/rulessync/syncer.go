@@ -205,10 +205,10 @@ func (s *Syncer) SyncDirectory(dir string) ([]SyncResult, error) {
 			return err
 		}
 
-		// Skip vendor and hidden directories
+		// Skip vendor and hidden directories below the one synced
 		if info.IsDir() {
 			name := info.Name()
-			if name == "vendor" || name == "testdata" || strings.HasPrefix(name, ".") {
+			if path != dir && (name == "vendor" || name == "testdata" || strings.HasPrefix(name, ".")) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -437,12 +437,13 @@ func (s *Syncer) isStale(rulesPath, pkgDir string, patterns []string) (bool, err
 			return err
 		}
 
-		// Skip hidden directories and common non-source directories
+		// Skip hidden directories and common non-source directories below
+		// the package's
 		if info.IsDir() {
 			name := info.Name()
-			if name == "vendor" || name == "node_modules" || name == "testdata" ||
+			if path != pkgDir && (name == "vendor" || name == "node_modules" || name == "testdata" ||
 				name == "__pycache__" || name == ".venv" || name == "target" ||
-				strings.HasPrefix(name, ".") {
+				strings.HasPrefix(name, ".")) {
 				return filepath.SkipDir
 			}
 			return nil

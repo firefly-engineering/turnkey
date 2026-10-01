@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/mapper"
@@ -451,5 +452,44 @@ func TestSyncDirectoryChangedDirectoriesInOrder(t *testing.T) {
 	want := []string{"a/rules.star", "b/rules.star", "c/rules.star", "d/rules.star", "e/rules.star", "f/rules.star", "g/rules.star", "h/rules.star"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("synced %v, want %v", got, want)
+	}
+}
+
+// The directory synced is walked whatever its name, a project root such as
+// ~/.dotfiles included, and so is a package directory checked for stale
+// sources: only the directories below them are skipped by name.
+func TestSyncDirectoryWalksAHiddenRoot(t *testing.T) {
+	root := filepath.Join(t.TempDir(), ".dotfiles")
+	writeFiles(t, root, map[string]string{
+		"rules.star":         fakeLib,
+		"src.fake":           "",
+		".hidden/rules.star": fakeLib,
+	})
+	lang := &fakeLanguage{}
+	s, err := newSyncer(Config{ProjectRoot: root, Force: true, DryRun: true, Sync: testSync(t, defaultPlatforms)},
+		mapper.NewWith(mapper.Config{ProjectRoot: root}, lang))
+	if err != nil {
+		t.Fatal(err)
+	}
+	results, err := s.SyncDirectory(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].Path != filepath.Join(root, "rules.star") || !results[0].Updated {
+		t.Errorf("results %+v, want the root's rules.star synced", results)
+	}
+
+	// Without --force: the package's source is newer than its rules.star
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(filepath.Join(root, "rules.star"), old, old); err != nil {
+		t.Fatal(err)
+	}
+	s.config.Force = false
+	result, err := s.SyncFile(filepath.Join(root, "rules.star"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Skipped || !result.Updated {
+		t.Errorf("result %+v, want a stale rules.star synced", result)
 	}
 }
