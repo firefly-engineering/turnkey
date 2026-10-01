@@ -3,54 +3,43 @@
 //!
 //! Go's `conditions.Platform` has no JSON names, so a key matches its
 //! fields (`OS`, `CPU`) ignoring case ([`deps_gen_kit::gojson`]).
-//! `encoding/json` decodes an array into the slice that is there: each
-//! element into the one already at its index, if any (so a field it doesn't
-//! set, or a `null` element, keeps its value), the slice ending as long as
-//! the array, and the elements past its end that its capacity still holds
-//! reused by a later array. A `null` empties the slice, capacity and all.
+//! `encoding/json` decodes an array into the slice that is there
+//! ([`deps_gen_kit::gojson::Slice`]): each element into the one already at
+//! its index, if any, so a field it doesn't set, or a `null` element, keeps
+//! its value.
 
 use crate::Platform;
-use deps_gen_kit::gojson::key_is;
+use deps_gen_kit::gojson::{Slice, key_is};
 use serde::de::{Deserialize, Deserializer, IgnoredAny, MapAccess, Visitor};
 use std::fmt;
 
-/// The platforms decoded so far into a field, with the elements past the
-/// end the Go slice's capacity still holds
+/// The platforms decoded so far into a field
 #[derive(Debug, Default)]
 pub struct Platforms {
-    /// The field's value
-    pub platforms: Vec<Platform>,
-    backing: Vec<Platform>,
+    slice: Slice<Platform>,
 }
 
 impl Platforms {
     /// Decodes the map's next value, an array of platforms or `null`, into
     /// the field
     pub fn next_value<'de, A: MapAccess<'de>>(&mut self, map: &mut A) -> Result<(), A::Error> {
-        match map.next_value::<Option<Vec<Option<JsonPlatform>>>>()? {
-            Some(array) => self.decode(array),
-            None => {
-                self.platforms.clear();
-                self.backing.clear();
+        let array = map.next_value::<Option<Vec<Option<JsonPlatform>>>>()?;
+        self.slice.decode(array, |element, p| {
+            if let Some(element) = element {
+                element.apply(p);
             }
-        }
+        });
         Ok(())
     }
 
-    fn decode(&mut self, array: Vec<Option<JsonPlatform>>) {
-        let mut all = std::mem::take(&mut self.platforms);
-        all.append(&mut self.backing);
-        let n = array.len();
-        for (i, element) in array.into_iter().enumerate() {
-            if i >= all.len() {
-                all.push(Platform::default());
-            }
-            if let Some(element) = element {
-                element.apply(&mut all[i]);
-            }
-        }
-        self.backing = all.split_off(n);
-        self.platforms = all;
+    /// The field's value
+    pub fn platforms(&self) -> &[Platform] {
+        &self.slice.items
+    }
+
+    /// The field's value, taken
+    pub fn into_platforms(self) -> Vec<Platform> {
+        self.slice.items
     }
 }
 
@@ -129,7 +118,7 @@ mod tests {
                             map.next_value::<IgnoredAny>()?;
                         }
                     }
-                    Ok(Field(platforms.platforms))
+                    Ok(Field(platforms.into_platforms()))
                 }
             }
             d.deserialize_map(V)
@@ -170,6 +159,11 @@ mod tests {
                 platform("macos", "arm64"),
                 Platform::default()
             ]
+        );
+        // An empty array drops them
+        assert_eq!(
+            decode(r#"{"platforms": [{"os": "linux"}], "platforms": [], "platforms": [null]}"#),
+            [Platform::default()]
         );
         assert!(serde_json::from_str::<Field>(r#"{"platforms": {}}"#).is_err());
         assert!(serde_json::from_str::<Field>(r#"{"platforms": [{"os": 1}]}"#).is_err());

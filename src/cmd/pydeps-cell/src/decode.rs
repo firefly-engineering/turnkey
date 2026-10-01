@@ -52,7 +52,7 @@ impl<'de> Deserialize<'de> for Config {
                         map.next_value::<IgnoredAny>()?;
                     }
                 }
-                cfg.platforms = platforms.platforms;
+                cfg.platforms = platforms.into_platforms();
                 Ok(cfg)
             }
         }
