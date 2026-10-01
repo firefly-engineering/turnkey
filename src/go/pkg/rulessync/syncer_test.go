@@ -481,3 +481,84 @@ rust_test(
 		t.Errorf("unreadable = %+v, want %+v", result.Unreadable, wantUnreadable)
 	}
 }
+
+// In a go.work workspace, an import of a member maps to the member's
+// package, including a member that is a local fork of a third-party
+// module; a rules.star under a go.mod that isn't a member is left alone.
+func TestSyncFileGoWorkspace(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go not in PATH: the Go extractor runs go list")
+	}
+
+	root := t.TempDir()
+	stale := `load("@prelude//:rules.bzl", "go_binary")
+
+go_binary(
+    name = "hello",
+    srcs = glob(["*.go"]),
+    deps = [
+        # turnkey:auto-start
+        "//old:old",
+        # turnkey:auto-end
+    ],
+)
+`
+	writeFiles(t, root, map[string]string{
+		"go.work":                      "go 1.22\n\nuse (\n\t./app\n\t./lib\n\t./third_party/x-sys\n)\n",
+		"go-deps.toml":                 "schema_version = 2\n\n[members.\"example.com/app\"]\ndir = \"app\"\n\n[members.\"example.com/lib\"]\ndir = \"lib\"\n\n[members.\"golang.org/x/sys\"]\ndir = \"third_party/x-sys\"\n",
+		"app/go.mod":                   "module example.com/app\n\ngo 1.22\n",
+		"lib/go.mod":                   "module example.com/lib\n\ngo 1.22\n",
+		"lib/lib.go":                   "package lib\n\nfunc Hello() string { return \"hello\" }\n",
+		"third_party/x-sys/go.mod":     "module golang.org/x/sys\n\ngo 1.22\n",
+		"third_party/x-sys/cpu/cpu.go": "package cpu\n\nconst X86 = false\n",
+		"app/cmd/hello/main.go": `package main
+
+import (
+	"fmt"
+
+	"example.com/lib"
+	"golang.org/x/sys/cpu"
+)
+
+func main() { fmt.Println(lib.Hello(), cpu.X86) }
+`,
+		"app/cmd/hello/rules.star":        stale,
+		"app/testdata/fixture/go.mod":     "module example.com/fixture\n\ngo 1.22\n",
+		"app/testdata/fixture/main.go":    "package main\n\nfunc main() {}\n",
+		"app/testdata/fixture/rules.star": stale,
+	})
+
+	s, err := NewSyncer(Config{ProjectRoot: root, Force: true, Sync: testSync(t, nil)})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rulesPath := filepath.Join(root, "app/cmd/hello/rules.star")
+	result, err := s.SyncFile(rulesPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Errors) != 0 {
+		t.Fatalf("sync errors: %v", result.Errors)
+	}
+	f, err := starlark.ParseFile(rulesPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"//lib:lib", "//third_party/x-sys/cpu:cpu"}
+	if got := f.Targets[0].GetDeps(); !reflect.DeepEqual(got, want) {
+		t.Errorf("deps = %v, want %v", got, want)
+	}
+
+	fixture := filepath.Join(root, "app/testdata/fixture/rules.star")
+	result, err = s.SyncFile(fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Updated || len(result.Errors) != 0 {
+		t.Errorf("fixture outside the workspace: updated %v, errors %v", result.Updated, result.Errors)
+	}
+	if got, _ := os.ReadFile(fixture); string(got) != stale {
+		t.Errorf("fixture rules.star changed:\n%s", got)
+	}
+}

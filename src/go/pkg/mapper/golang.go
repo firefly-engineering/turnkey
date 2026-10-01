@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -19,8 +20,10 @@ import (
 
 // GoConfig holds Go-specific configuration.
 type GoConfig struct {
-	// ModulePath is the Go module path (from go.mod).
-	ModulePath string
+	// Members are the workspace's modules (ADR 0007), the only first-party
+	// Go code: go-deps.toml's [members], or the root go.mod alone when it
+	// records none.
+	Members []GoMember
 
 	// ExternalCell is the Buck2 cell for external deps (e.g., "godeps").
 	ExternalCell string
@@ -30,6 +33,15 @@ type GoConfig struct {
 
 	// ExternalDeps maps import paths to their entries from go-deps.toml.
 	ExternalDeps map[string]bool
+}
+
+// A GoMember is a module of the Go workspace.
+type GoMember struct {
+	// Path is its module path.
+	Path string
+	// Dir is its directory, relative to the project root ("." for the
+	// root), with forward slashes.
+	Dir string
 }
 
 // goRules are the Go rule kinds. A binary or a test is built with its
@@ -128,11 +140,6 @@ func (l *goLanguage) extract(pkgDir string, env, tags []string) (*extraction.Res
 		}
 	}
 
-	modulePath := ""
-	if l.cfg != nil {
-		modulePath = l.cfg.ModulePath
-	}
-
 	// Parse JSON stream
 	dec := json.NewDecoder(strings.NewReader(string(output)))
 	for dec.More() {
@@ -160,7 +167,7 @@ func (l *goLanguage) extract(pkgDir string, env, tags []string) (*extraction.Res
 		for _, imp := range pkg.Imports {
 			imports = append(imports, extraction.Import{
 				Path: imp,
-				Kind: classifyGoImport(imp, modulePath),
+				Kind: classifyGoImport(imp, l.cfg),
 			})
 		}
 
@@ -168,7 +175,7 @@ func (l *goLanguage) extract(pkgDir string, env, tags []string) (*extraction.Res
 		for _, imp := range append(pkg.TestImports, pkg.XTestImports...) {
 			testImports = append(testImports, extraction.Import{
 				Path: imp,
-				Kind: classifyGoImport(imp, modulePath),
+				Kind: classifyGoImport(imp, l.cfg),
 			})
 		}
 
@@ -183,8 +190,12 @@ func (l *goLanguage) extract(pkgDir string, env, tags []string) (*extraction.Res
 	return result, nil
 }
 
-// classifyGoImport determines if an import is stdlib, external, or internal.
-func classifyGoImport(imp, modulePath string) extraction.ImportKind {
+// classifyGoImport determines if an import is stdlib, external, or internal:
+// internal when the module that owns it is a workspace member, the longest
+// module path prefixing it on a / boundary among the members and the
+// modules of go-deps.toml (a member's module path can prefix a third-party
+// one's).
+func classifyGoImport(imp string, cfg *GoConfig) extraction.ImportKind {
 	// Standard library check
 	firstSlash := strings.Index(imp, "/")
 	firstElement := imp
@@ -195,12 +206,43 @@ func classifyGoImport(imp, modulePath string) extraction.ImportKind {
 		return extraction.ImportKindStdlib
 	}
 
-	// Internal check
-	if modulePath != "" && strings.HasPrefix(imp, modulePath) {
-		return extraction.ImportKindInternal
+	if cfg != nil {
+		if m, ok := cfg.member(imp); ok && len(m.Path) >= len(cfg.externalModule(imp)) {
+			return extraction.ImportKindInternal
+		}
 	}
-
 	return extraction.ImportKindExternal
+}
+
+// within reports whether importPath is in the module modulePath: the module
+// path itself, or below it on a / boundary.
+func within(importPath, modulePath string) bool {
+	return importPath == modulePath || strings.HasPrefix(importPath, modulePath+"/")
+}
+
+// member returns the workspace member that owns importPath: the one whose
+// module path is its longest prefix, on a / boundary.
+func (c *GoConfig) member(importPath string) (GoMember, bool) {
+	var owner GoMember
+	found := false
+	for _, m := range c.Members {
+		if within(importPath, m.Path) && (!found || len(m.Path) > len(owner.Path)) {
+			owner, found = m, true
+		}
+	}
+	return owner, found
+}
+
+// externalModule returns the longest module path of go-deps.toml that
+// importPath is in, or "".
+func (c *GoConfig) externalModule(importPath string) string {
+	owner := ""
+	for dep := range c.ExternalDeps {
+		if within(importPath, dep) && len(dep) > len(owner) {
+			owner = dep
+		}
+	}
+	return owner
 }
 
 // detectGoConfig auto-detects Go configuration from the project, with the
@@ -211,17 +253,21 @@ func detectGoConfig(projectRoot string, lang syncconfig.Language) (*GoConfig, er
 		ExternalDeps: make(map[string]bool),
 	}
 
-	// Read module path from go.mod
-	modPath := filepath.Join(projectRoot, "go.mod")
-	if content, err := os.ReadFile(modPath); err == nil {
-		cfg.ModulePath = extractModulePath(string(content))
-	}
-
 	// Load go-deps.toml
 	depsPath := filepath.Join(projectRoot, lang.DepsFile)
-	if deps, err := loadGoDeps(depsPath); err == nil {
+	if deps, members, err := loadGoDeps(depsPath); err == nil {
 		cfg.DepsFile = depsPath
 		cfg.ExternalDeps = deps
+		cfg.Members = members
+	}
+
+	// Without recorded members, the workspace is the root go.mod alone
+	if len(cfg.Members) == 0 {
+		if content, err := os.ReadFile(filepath.Join(projectRoot, "go.mod")); err == nil {
+			if modulePath := extractModulePath(string(content)); modulePath != "" {
+				cfg.Members = []GoMember{{Path: modulePath, Dir: "."}}
+			}
+		}
 	}
 
 	return cfg, nil
@@ -233,23 +279,27 @@ func extractModulePath(content string) string {
 	return modfile.ModulePath([]byte(content))
 }
 
-// loadGoDeps loads the import paths of the modules in go-deps.toml.
+// loadGoDeps loads the import paths of the modules in go-deps.toml, and the
+// workspace members it records, sorted by directory.
 //
 // Entries are keyed "path@version" (schema 2), so the import path comes from
 // each entry's import_path; a key without one is taken as the path itself.
-func loadGoDeps(path string) (map[string]bool, error) {
+func loadGoDeps(path string) (map[string]bool, []GoMember, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var depsFile struct {
 		Deps map[string]struct {
 			ImportPath string `toml:"import_path"`
 		} `toml:"deps"`
+		Members map[string]struct {
+			Dir string `toml:"dir"`
+		} `toml:"members"`
 	}
 	if err := toml.Unmarshal(content, &depsFile); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	result := make(map[string]bool)
@@ -260,7 +310,12 @@ func loadGoDeps(path string) (map[string]bool, error) {
 			result[key] = true
 		}
 	}
-	return result, nil
+	var members []GoMember
+	for modulePath, m := range depsFile.Members {
+		members = append(members, GoMember{Path: modulePath, Dir: m.Dir})
+	}
+	slices.SortFunc(members, func(a, b GoMember) int { return strings.Compare(a.Dir, b.Dir) })
+	return result, members, nil
 }
 
 // mapImport maps a single Go import to a Buck2 dependency.
@@ -279,15 +334,23 @@ func (l *goLanguage) mapImport(imp extraction.Import) MappedDep {
 	return unmappedDep(imp.Path)
 }
 
-// mapInternal maps an internal Go import to a Buck2 target.
+// mapInternal maps an internal Go import to the target of its package in
+// the member that owns it, named after the import path's last component, as
+// buckgen names every Go package (and the godeps cell's forwarding aliases
+// name a member's packages).
 func (l *goLanguage) mapInternal(importPath string) MappedDep {
-	// Remove module path prefix to get relative path
-	relPath := strings.TrimPrefix(importPath, l.cfg.ModulePath+"/")
+	m, ok := l.cfg.member(importPath)
+	if !ok {
+		return unmappedDep(importPath)
+	}
 
-	// Convert to Buck2 target path
-	// e.g., "src/go/pkg/foo" -> "//src/go/pkg/foo:foo"
-	targetName := filepath.Base(relPath)
-	target := fmt.Sprintf("//%s:%s", relPath, targetName)
+	// e.g. "src/go/pkg/foo" -> "//src/go/pkg/foo:foo", or a member's root
+	// package github.com/x/foo in third_party/fork -> "//third_party/fork:foo"
+	dir := path.Join(m.Dir, strings.TrimPrefix(importPath[len(m.Path):], "/"))
+	if dir == "." {
+		dir = ""
+	}
+	target := fmt.Sprintf("//%s:%s", dir, path.Base(importPath))
 
 	return MappedDep{
 		Target:     target,
@@ -317,21 +380,36 @@ func (l *goLanguage) mapExternal(importPath string) MappedDep {
 
 // isKnownDep checks if an import is in go-deps.toml or is a subpackage.
 func (l *goLanguage) isKnownDep(importPath string) bool {
-	if l.cfg.ExternalDeps == nil {
+	return l.cfg.externalModule(importPath) != ""
+}
+
+// Manages reports whether rules sync manages the Go rules of the package in
+// pkgDir: whether the module it is in, the nearest go.mod above it, is a
+// workspace member. Any other go.mod is outside the Go build, as it is for
+// go ./... in the workspace (ADR 0007), e.g. a test fixture's.
+func (l *goLanguage) Manages(pkgDir string) bool {
+	if l.cfg == nil {
 		return false
 	}
-
-	// Check exact match
-	if l.cfg.ExternalDeps[importPath] {
-		return true
+	root, err := filepath.Abs(l.projectRoot)
+	if err != nil {
+		return false
 	}
-
-	// Check if any registered dep is a prefix
-	for dep := range l.cfg.ExternalDeps {
-		if strings.HasPrefix(importPath, dep+"/") {
-			return true
+	abs, err := filepath.Abs(pkgDir)
+	if err != nil {
+		return false
+	}
+	rel, err := filepath.Rel(root, abs)
+	if err != nil {
+		return false
+	}
+	for dir := filepath.ToSlash(rel); dir != ".." && !strings.HasPrefix(dir, "../"); dir = path.Dir(dir) {
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(dir), "go.mod")); err == nil {
+			return slices.ContainsFunc(l.cfg.Members, func(m GoMember) bool { return path.Clean(m.Dir) == dir })
+		}
+		if dir == "." {
+			break
 		}
 	}
-
 	return false
 }

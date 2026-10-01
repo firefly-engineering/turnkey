@@ -54,7 +54,9 @@ type Member struct {
 func LoadWorkspace(root, workFile, modFile, sumFile string) (*Workspace, error) {
 	workData, err := os.ReadFile(filepath.Join(root, workFile))
 	if errors.Is(err, os.ErrNotExist) {
-		ws := &Workspace{Sources: []string{clean(modFile), clean(sumFile)}}
+		// go.work is a source though absent: adding one changes the
+		// workspace
+		ws := &Workspace{Sources: []string{clean(workFile), clean(workFile) + ".sum", clean(modFile), clean(sumFile)}}
 		dir := path.Dir(clean(modFile))
 		if err := ws.addMember(root, dir, clean(modFile), clean(sumFile)); err != nil {
 			return nil, err
