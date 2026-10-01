@@ -25,6 +25,7 @@ members = [
     "src/cmd/tw",
     "src/examples/rust-hello",
     "src/examples/rust-hello-deps",
+    "src/rust/buck2-args",
     "src/rust/buck2-test-executor",
     "src/rust/composition",
     "src/rust/conditions",
@@ -114,6 +115,7 @@ tree-sitter-starlark = "1.3"
 starlark_syntax = "0.14"
 
 # Workspace member references (for path dependencies between crates)
+buck2-args = { path = "src/rust/buck2-args" }
 buck2-test-executor = { path = "src/rust/buck2-test-executor" }
 composition = { path = "src/rust/composition", features = ["watcher"] }
 conditions = { path = "src/rust/conditions" }

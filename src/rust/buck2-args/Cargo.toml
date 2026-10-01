@@ -1,0 +1,11 @@
+[package]
+name = "buck2-args"
+version = "0.1.0"
+edition.workspace = true
+description = "buck2's command line as tk reads and rewrites it, and the local target overrides it injects"
+
+[dependencies]
+toml.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

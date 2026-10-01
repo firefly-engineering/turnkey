@@ -317,6 +317,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "buck2-args"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
+ "toml",
+]
+
+[[package]]
 name = "buck2-test-executor"
 version = "0.1.0"
 dependencies = [

@@ -27,6 +27,7 @@ manifests = [
     "src/cmd/tw/Cargo.toml",
     "src/examples/rust-hello/Cargo.toml",
     "src/examples/rust-hello-deps/Cargo.toml",
+    "src/rust/buck2-args/Cargo.toml",
     "src/rust/buck2-test-executor/Cargo.toml",
     "src/rust/composition/Cargo.toml",
     "src/rust/conditions/Cargo.toml",
