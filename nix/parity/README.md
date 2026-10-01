@@ -54,7 +54,9 @@ Before comparing, each side's own paths are rewritten to placeholders:
 its scratch root to `<root>`, its private dir (stubs, `TMPDIR`) to
 `<private>`, its package to `<pkg>`, and the hash of every
 `/nix/store/<hash>-<name>` path to `<hash>`, so a cell built by the Rust
-`buckgen` (a different derivation) compares equal to the Go one.
+`buckgen` (a different derivation) compares equal to the Go one. A case's
+`random_suffixes` names prefixes whose run of letters and digits after
+them is a random name (a temporary file's), rewritten to `<random>`.
 
 ### Compare modes
 
@@ -115,6 +117,7 @@ env = { GOTOOLCHAIN = "local" }            # {root}, {work}, {out} expand here t
 inherit_env = ["GOMODCACHE", "GOPROXY"]    # copied from the caller when set
 exit = 0                                   # the exit code both sides must have
 timeout = 600                              # seconds
+random_suffixes = ["tk-test-report-"]      # <prefix><letters and digits> -> <prefix><random>
 outputs = [
   { path = "work/go-deps.toml" },                    # compare = "bytes"
   { stream = "stdout", compare = "toml" },

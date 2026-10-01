@@ -110,6 +110,7 @@ def load_case_file(path, tool):
                 "timeout",
                 "outputs",
                 "stubs",
+                "random_suffixes",
             ],
         )
         if case["name"] in names:
@@ -130,6 +131,7 @@ def load_case_file(path, tool):
             if not isinstance(v, str):
                 raise CaseError(f"{cw}.env.{k}: expected a string")
         check_strings(f"{cw}.inherit_env", case.get("inherit_env", []))
+        check_strings(f"{cw}.random_suffixes", case.get("random_suffixes", []))
         if "exit" in case and not isinstance(case["exit"], int):
             raise CaseError(f"{cw}.exit: expected an integer")
         for j, out in enumerate(case.get("outputs", [])):
@@ -195,19 +197,42 @@ def normalise_store_hashes(data):
             i = h
 
 
+def normalise_random_suffix(data, prefix):
+    """Replace the run of letters and digits after each prefix with
+    <random>: a temporary file's name, which differs between runs."""
+    out = bytearray()
+    i = 0
+    while True:
+        j = data.find(prefix, i)
+        if j < 0:
+            out += data[i:]
+            return bytes(out)
+        k = j + len(prefix)
+        end = k
+        while end < len(data) and chr(data[end]).isalnum() and data[end] < 128:
+            end += 1
+        out += data[i:k]
+        if end > k:
+            out += b"<random>"
+        i = end
+
+
 class Normaliser:
     """Rewrites one side's own paths to placeholders both sides share."""
 
-    def __init__(self, replacements):
+    def __init__(self, replacements, random_suffixes=()):
         # Longest first, so a path inside another is replaced as itself
         self.pairs = sorted(
             ((k.encode(), v.encode()) for k, v in replacements.items()),
             key=lambda kv: -len(kv[0]),
         )
+        self.random_suffixes = [p.encode() for p in random_suffixes]
 
     def bytes(self, data):
         for old, new in self.pairs:
             data = data.replace(old, new)
+        for prefix in self.random_suffixes:
+            data = normalise_random_suffix(data, prefix)
         return normalise_store_hashes(data)
 
     def str(self, text):
@@ -441,7 +466,7 @@ def run_side(label, program, pkg, case, config, scratch):
         "after": after,
         "written": written(before, after),
         "calls": calls,
-        "norm": Normaliser(replacements),
+        "norm": Normaliser(replacements, case.get("random_suffixes", [])),
     }
 
 
