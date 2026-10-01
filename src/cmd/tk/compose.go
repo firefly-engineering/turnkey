@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -181,7 +182,10 @@ func runComposeEdit(args []string) int {
 // package's own store path: the cell index resolves vendor/<pkg>/..., and
 // an alias package (vendor/anyhow) to the package it forwards to
 // (vendor/anyhow@1.0.100), which is the path patches are routed by; pkg is
-// that package's path, and empty for a symlinked cell.
+// that package's path, and empty for a symlinked cell. In the Go cell, pkg
+// is the module's path (vendor/<module path>), whichever of its Go packages
+// holds the file (ADR 0008); a path under a forwarding alias package is a
+// go.work member's code, edited in the repo, not composed.
 func resolveCellFile(root, cell, relPath string) (storeFile, patchPath, pkg string, err error) {
 	cellDir := filepath.Join(root, ".turnkey", cell)
 	info, err := os.Lstat(cellDir)
@@ -199,9 +203,12 @@ func resolveCellFile(root, cell, relPath string) (storeFile, patchPath, pkg stri
 	if err != nil {
 		return "", "", "", err
 	}
-	pkg, store, rest, ok := index.Resolve(relPath)
-	if !ok {
-		return "", "", "", fmt.Errorf("%s/%s is in no package of the %s cell", cell, relPath, cell)
+	pkg, store, rest, err := index.Resolve(relPath)
+	if errors.Is(err, materialize.ErrFirstParty) {
+		return "", "", "", fmt.Errorf("%s/%s is the repo's own code, not the %s cell's: %w; edit it in place", cell, relPath, cell, err)
+	}
+	if err != nil {
+		return "", "", "", err
 	}
 	return filepath.Join(store, rest), pkg + "/" + rest, pkg, nil
 }

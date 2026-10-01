@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -282,12 +283,114 @@ func TestResolvesPathsThroughTheCurrentIndex(t *testing.T) {
 	}
 	store := filepath.Join(f.store, "aaa-dep-rust-anyhow-1.0.100")
 	for _, path := range []string{"vendor/anyhow@1.0.100/src/lib.rs", "vendor/anyhow/src/lib.rs"} {
-		pkg, gotStore, rest, ok := current.Resolve(path)
-		if !ok || pkg != "vendor/anyhow@1.0.100" || gotStore != store || rest != "src/lib.rs" {
-			t.Errorf("Resolve(%s) = %s, %s, %s, %v", path, pkg, gotStore, rest, ok)
+		pkg, gotStore, rest, err := current.Resolve(path)
+		if err != nil || pkg != "vendor/anyhow@1.0.100" || gotStore != store || rest != "src/lib.rs" {
+			t.Errorf("Resolve(%s) = %s, %s, %s, %v", path, pkg, gotStore, rest, err)
 		}
 	}
-	if _, _, _, ok := current.Resolve("vendor/serde/src/lib.rs"); ok {
+	if _, _, _, err := current.Resolve("vendor/serde/src/lib.rs"); err == nil {
 		t.Errorf("resolved a package the index doesn't list")
+	}
+}
+
+// goIndex writes a Go cell index (ADR 0008): cloud.google.com/go at
+// version, with packages at its root and in civil/, and its nested module
+// cloud.google.com/go/storage; and a forwarding alias package for
+// example.com/fork/pkg, a go.work member's package
+func (f *fixture) goIndex(version string, withCivil bool) string {
+	f.t.Helper()
+	gocloud := f.storePath("ccc-dep-go-cloud-google-com-go-" + version)
+	packages := map[string]Package{
+		"vendor/cloud.google.com/go":         {Store: gocloud, Targets: []string{"go"}},
+		"vendor/cloud.google.com/go/storage": {Store: f.storePath("ddd-dep-go-cloud-google-com-go-storage"), Targets: []string{"storage"}},
+	}
+	if withCivil {
+		packages["vendor/cloud.google.com/go/civil"] = Package{Store: gocloud, Subdir: "civil", Targets: []string{"civil"}}
+	}
+	index := Index{
+		Cell:           "godeps",
+		DepsFileSHA256: "sha-" + version,
+		Buckconfig:     "[cells]\n    godeps = .\n",
+		Packages:       packages,
+		Forwards:       map[string]string{"vendor/example.com/fork/pkg": "root//fork/pkg:pkg"},
+	}
+	data, err := json.Marshal(index)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	path := filepath.Join(f.store, "go-index-"+version+".json")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		f.t.Fatal(err)
+	}
+	return path
+}
+
+func (f *fixture) readGo(path string) string {
+	f.t.Helper()
+	data, err := os.ReadFile(filepath.Join(CellDir(f.root, "godeps"), path))
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	return string(data)
+}
+
+func TestMaterializesNestedAndForwardingAliasPackages(t *testing.T) {
+	f := newFixture(t)
+	result := f.materialize(f.goIndex("v0.1.0", true))
+	if result.StoreLinksAdded != 2 || result.PackagesWritten != 4 {
+		t.Errorf("result %+v: want 2 store links and 4 packages", result)
+	}
+	for path, want := range map[string]string{
+		"vendor/cloud.google.com/go/rules.star":         `alias(name = "go", actual = "//_store/ccc-dep-go-cloud-google-com-go-v0.1.0:go", visibility = ["PUBLIC"])`,
+		"vendor/cloud.google.com/go/civil/rules.star":   `alias(name = "civil", actual = "//_store/ccc-dep-go-cloud-google-com-go-v0.1.0/civil:civil", visibility = ["PUBLIC"])`,
+		"vendor/cloud.google.com/go/storage/rules.star": `alias(name = "storage", actual = "//_store/ddd-dep-go-cloud-google-com-go-storage:storage", visibility = ["PUBLIC"])`,
+		"vendor/example.com/fork/pkg/rules.star":        `alias(name = "pkg", actual = "root//fork/pkg:pkg", visibility = ["PUBLIC"])`,
+	} {
+		if got := f.readGo(path); !strings.Contains(got, want) {
+			t.Errorf("%s:\n%s\nwant %s", path, got, want)
+		}
+	}
+
+	// A bump that drops civil/ removes its alias package, and keeps the
+	// packages it nests in and beside
+	result = f.materialize(f.goIndex("v0.2.0", false))
+	if result.PackagesGone != 1 || result.StoreLinksAdded != 1 || result.StoreLinksGone != 1 {
+		t.Errorf("result %+v: want 1 package gone, 1 store link swapped", result)
+	}
+	cell := CellDir(f.root, "godeps")
+	if _, err := os.Stat(filepath.Join(cell, "vendor/cloud.google.com/go/civil")); err == nil {
+		t.Errorf("civil/ survived the bump")
+	}
+	for _, kept := range []string{"vendor/cloud.google.com/go/rules.star", "vendor/cloud.google.com/go/storage/rules.star"} {
+		if _, err := os.Stat(filepath.Join(cell, kept)); err != nil {
+			t.Errorf("%s: %v", kept, err)
+		}
+	}
+}
+
+func TestResolvesAModulesFilesAndRefusesFirstPartyOnes(t *testing.T) {
+	f := newFixture(t)
+	data, err := os.ReadFile(f.goIndex("v0.1.0", true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var index Index
+	if err := json.Unmarshal(data, &index); err != nil {
+		t.Fatal(err)
+	}
+	gocloud := filepath.Join(f.store, "ccc-dep-go-cloud-google-com-go-v0.1.0")
+	storage := filepath.Join(f.store, "ddd-dep-go-cloud-google-com-go-storage")
+	for path, want := range map[string][3]string{
+		"vendor/cloud.google.com/go/civil/civil.go":     {"vendor/cloud.google.com/go", gocloud, "civil/civil.go"},
+		"vendor/cloud.google.com/go/internal/doc.md":    {"vendor/cloud.google.com/go", gocloud, "internal/doc.md"},
+		"vendor/cloud.google.com/go/storage/storage.go": {"vendor/cloud.google.com/go/storage", storage, "storage.go"},
+	} {
+		root, store, rest, err := index.Resolve(path)
+		if err != nil || [3]string{root, store, rest} != want {
+			t.Errorf("Resolve(%s) = %s, %s, %s, %v; want %v", path, root, store, rest, err, want)
+		}
+	}
+	if _, _, _, err := index.Resolve("vendor/example.com/fork/pkg/pkg.go"); !errors.Is(err, ErrFirstParty) {
+		t.Errorf("Resolve of a forwarded package's file: %v, want ErrFirstParty", err)
 	}
 }

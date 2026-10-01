@@ -128,7 +128,7 @@ When you enter the devenv shell, Turnkey generates:
 | `.buckconfig` | Symlink to Nix-managed Buck2 configuration |
 | `.buckroot` | Empty file marking project boundary |
 | `.turnkey/toolchains` | Symlink to generated toolchains cell |
-| `.turnkey/godeps` | Symlink to Go dependencies cell (if configured) |
+| `.turnkey/godeps` | Go dependencies cell, a directory `tk materialize` maintains (if configured) |
 | `.turnkey/prelude` | Symlink to the prelude |
 
 ## The Prelude

@@ -1,0 +1,5 @@
+--- a/vendor/cloud.google.com/go/storage/doc.go
++++ b/vendor/cloud.google.com/go/storage/doc.go
+@@ -1,1 +1,2 @@
+ // Copyright 2016 Google LLC
++// Patched.

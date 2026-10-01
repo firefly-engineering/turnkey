@@ -137,7 +137,6 @@ rec {
       '';
       # Python uses simple name-only paths, no versioning or symlinks
       keyToPath = name: name;
-      createSymlinks = false;
       cellBuildInputs = cellBuildInputs;
     };
 
