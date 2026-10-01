@@ -427,7 +427,8 @@ godeps-gen [OPTIONS]
 | `--indirect` | Include indirect dependencies (default: true) |
 
 Prefetching hashes the modules' proxy.golang.org zips, the source the godeps
-cell fetches (through `nix-prefetch-cached`).
+cell fetches, in one `nix-prefetch-cached --batch` call: turnkey's prefetch
+cache answers the modules it has seen, and the rest are fetched in parallel.
 
 ### Examples
 
