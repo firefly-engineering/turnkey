@@ -383,6 +383,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "conditions"
+version = "0.1.0"
+dependencies = [
+ "deps-gen-kit",
+ "gostd",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "core-foundation-sys"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

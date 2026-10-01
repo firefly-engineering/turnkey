@@ -17,11 +17,13 @@ go_test(
     visibility = ["PUBLIC"],
 )
 
-# The split test cases, run by rust-rules-gen's tests too
+# The split test cases, run by rust-rules-gen's and the conditions crate's
+# tests too
 export_file(
     name = "split-vectors",
     src = "testdata/split-vectors.json",
     visibility = [
         "//src/cmd/rust-rules-gen/...",
+        "//src/rust/conditions/...",
     ],
 )

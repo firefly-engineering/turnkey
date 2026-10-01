@@ -1,0 +1,13 @@
+[package]
+name = "conditions"
+version = "0.1.0"
+edition.workspace = true
+description = "The build configurations deps depend on, and the select() turnkey writes for them"
+
+[dependencies]
+deps-gen-kit.workspace = true
+gostd.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
