@@ -29,6 +29,7 @@ members = [
     "src/rust/buck2-test-executor",
     "src/rust/composition",
     "src/rust/conditions",
+    "src/rust/deps-cells",
     "src/rust/deps-extract",
     "src/rust/deps-gen-kit",
     "src/rust/gomod",
@@ -119,6 +120,7 @@ buck2-args = { path = "src/rust/buck2-args" }
 buck2-test-executor = { path = "src/rust/buck2-test-executor" }
 composition = { path = "src/rust/composition", features = ["watcher"] }
 conditions = { path = "src/rust/conditions" }
+deps-cells = { path = "src/rust/deps-cells" }
 deps-extract = { path = "src/rust/deps-extract", default-features = false }
 deps-gen-kit = { path = "src/rust/deps-gen-kit" }
 gomod = { path = "src/rust/gomod" }

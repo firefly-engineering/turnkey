@@ -31,6 +31,7 @@ manifests = [
     "src/rust/buck2-test-executor/Cargo.toml",
     "src/rust/composition/Cargo.toml",
     "src/rust/conditions/Cargo.toml",
+    "src/rust/deps-cells/Cargo.toml",
     "src/rust/deps-extract/Cargo.toml",
     "src/rust/deps-gen-kit/Cargo.toml",
     "src/rust/gomod/Cargo.toml",

@@ -718,6 +718,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "deps-cells"
+version = "0.1.0"
+dependencies = [
+ "gostd",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "walkdir",
+]
+
+[[package]]
 name = "deps-extract"
 version = "0.1.0"
 dependencies = [

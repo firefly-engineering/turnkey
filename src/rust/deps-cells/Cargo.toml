@@ -1,0 +1,13 @@
+[package]
+name = "deps-cells"
+version = "0.1.0"
+edition.workspace = true
+description = "The deps cells under .turnkey: materialized from their cell indexes, kept fresh in buck2's daemon, and edited into patches"
+
+[dependencies]
+gostd.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
+walkdir.workspace = true
