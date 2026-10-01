@@ -26,6 +26,7 @@ manifests = [
     "src/rust/composition/Cargo.toml",
     "src/rust/deps-extract/Cargo.toml",
     "src/rust/deps-gen-kit/Cargo.toml",
+    "src/rust/gomod/Cargo.toml",
     "src/rust/gostd/Cargo.toml",
     "src/rust/nix-eval/Cargo.toml",
     "src/rust/prefetch-cache/Cargo.toml",

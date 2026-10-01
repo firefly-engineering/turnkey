@@ -1,0 +1,8 @@
+[package]
+name = "gomod"
+version = "0.1.0"
+edition.workspace = true
+description = "go.mod and go.work files, module paths and versions, as golang.org/x/mod reads them"
+
+[dependencies]
+gostd.workspace = true

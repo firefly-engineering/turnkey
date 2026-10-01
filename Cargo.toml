@@ -24,6 +24,7 @@ members = [
     "src/rust/composition",
     "src/rust/deps-extract",
     "src/rust/deps-gen-kit",
+    "src/rust/gomod",
     "src/rust/gostd",
     "src/rust/nix-eval",
     "src/rust/prefetch-cache",
@@ -98,6 +99,7 @@ tree-sitter-starlark = "1.3"
 buck2-test-executor = { path = "src/rust/buck2-test-executor" }
 composition = { path = "src/rust/composition", features = ["watcher"] }
 deps-gen-kit = { path = "src/rust/deps-gen-kit" }
+gomod = { path = "src/rust/gomod" }
 gostd = { path = "src/rust/gostd" }
 nix-eval = { path = "src/rust/nix-eval" }
 prefetch-cache = { path = "src/rust/prefetch-cache" }
