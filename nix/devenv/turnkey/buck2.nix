@@ -204,6 +204,13 @@ let
 
   # turnkey's tk, from the registry (it is built in), or whatever tk is on PATH
   tk = if turnkeyCfg.registry ? tk then "${resolvedRegistry.tk}/bin/tk" else "tk";
+
+  # A shell with buck2 has tk on PATH without declaring it (it is built into
+  # the registry). One that declares it in toolchain.toml already has the
+  # declared version.
+  tkPackage = lib.optional (
+    turnkeyCfg.registry ? tk && !(declaredToolchains ? tk)
+  ) resolvedRegistry.tk;
   materializeCommand = lib.optionalString (cellIndexes != [ ]) ''
     "${tk}" --quiet materialize ${lib.escapeShellArgs cellIndexes}
   '';
@@ -354,7 +361,8 @@ in
     # - cfg.package: the pinned buck2 binary
     # - runtimePackages: tools needed in PATH for Buck2 actions (e.g., clang for cxx)
     # - internalPackages: turnkey generators (godeps-gen, etc.) based on enabled languages
-    packages = [ cfg.package ] ++ runtimePackages ++ internalPackages;
+    # - tkPackage: tk, which wraps buck2
+    packages = [ cfg.package ] ++ tkPackage ++ runtimePackages ++ internalPackages;
 
     turnkey.managedLinks = links;
     turnkey.materializedCells = cellIndexes;
