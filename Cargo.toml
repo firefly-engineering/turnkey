@@ -15,6 +15,7 @@ members = [
     "src/cmd/nix-prefetch-cached",
     "src/cmd/pydeps-cell",
     "src/cmd/pydeps-gen",
+    "src/cmd/rules-sync-rs",
     "src/cmd/rustdeps-gen",
     "src/cmd/rust-rules-gen",
     "src/cmd/soldeps-gen",

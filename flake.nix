@@ -199,6 +199,8 @@
           };
           # The rules-sync tk runs (nix/packages/tk.nix chooses it)
           packages.rules-sync = config.packages.tk.rulesSync;
+          # rules-sync's Rust port, compared with it until the switch (#215)
+          packages.rules-sync-rs = import ./nix/packages/rules-sync-rs.nix { inherit pkgs lib; };
           packages.tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
           packages.e2e-runner = import ./nix/packages/e2e-runner.nix { inherit pkgs lib; };
           packages.jsdeps-gen = import ./nix/packages/jsdeps-gen.nix { inherit pkgs lib; };

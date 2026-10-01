@@ -2574,6 +2574,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rules-sync-rs"
+version = "0.1.0"
+dependencies = [
+ "gostd",
+ "project-sync",
+ "rules-sync",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "rust-hello"
 version = "0.1.0"
 
