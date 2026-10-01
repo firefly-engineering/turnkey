@@ -154,6 +154,23 @@ func TestRenderPackageTags(t *testing.T) {
 	}
 }
 
+// Go lets a package import its parent (cobra/doc imports cobra): that's a
+// dep, not a self-reference.
+func TestRenderPackageImportsParent(t *testing.T) {
+	pkg := &goparse.GoPackage{
+		ImportPath: "github.com/example/parent/child",
+		Files: []*goparse.GoFile{
+			file(t, "child.go", "", "github.com/example/parent", "github.com/example/parent/child"),
+		},
+	}
+	got := render(t, pkg, testConfig())
+	want := `    deps = ["godeps//github.com/example/parent:parent"],
+`
+	if !strings.Contains(got, want) {
+		t.Errorf("output:\n%s\nwant deps:\n%s", got, want)
+	}
+}
+
 func TestRenderPackageNoDeps(t *testing.T) {
 	pkg := &goparse.GoPackage{
 		ImportPath: "github.com/example/nodeps",
@@ -223,9 +240,9 @@ func TestRenderModule(t *testing.T) {
 	if !slices.Equal(rendered, wantRendered) {
 		t.Errorf("rendered = %v, want %v", rendered, wantRendered)
 	}
-	// sub's import of its parent is a self-reference; test-only and
-	// unbuilt packages reference nothing
-	wantImports := []string{"example.com/other/x", "example.com/other/y"}
+	// sub's import of its parent is a dep; test-only and unbuilt packages
+	// reference nothing
+	wantImports := []string{"example.com/mod", "example.com/other/x", "example.com/other/y"}
 	if !slices.Equal(imports, wantImports) {
 		t.Errorf("imports = %v, want %v", imports, wantImports)
 	}
@@ -236,6 +253,7 @@ func TestRenderModule(t *testing.T) {
 	}
 	for _, want := range []string{
 		`package_name = "example.com/mod/sub"`,
+		`"godeps//example.com/mod:mod"`,
 		`"godeps//example.com/other/y:y"`,
 	} {
 		if !strings.Contains(string(sub), want) {

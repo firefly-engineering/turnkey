@@ -43,8 +43,8 @@ func renderPackage(w io.Writer, pkg *goparse.GoPackage, cfg *Config) ([]string, 
 			if isStdLib(imp) {
 				continue
 			}
-			// Skip self-references (package importing itself or parent)
-			if imp == pkg.ImportPath || strings.HasPrefix(pkg.ImportPath, imp+"/") {
+			// Skip a package importing itself; its parent is a real dep
+			if imp == pkg.ImportPath {
 				continue
 			}
 			targets = append(targets, importToTarget(imp, cfg))
