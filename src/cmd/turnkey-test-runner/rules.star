@@ -37,5 +37,5 @@ rust_test(
         "rustdeps//vendor/tonic@0.14.6:tonic",
     ],
     # What tk passes the runner, shared with tk's tests
-    env = {"TURNKEY_RUNNER_CONTRACT": "$(location //src/go/pkg/testcache:runner-contract)"},
+    env = {"TURNKEY_RUNNER_CONTRACT": "$(location //src/testdata:runner-contract)"},
 )

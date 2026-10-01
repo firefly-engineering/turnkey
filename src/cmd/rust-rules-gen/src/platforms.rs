@@ -1,7 +1,7 @@
 //! The platforms turnkey builds for, and the select() keys that tell them
 //! apart.
 //!
-//! The same rules as src/go/pkg/conditions and turnkey.cfg (src/python/cfg):
+//! The same rules as src/rust/conditions and turnkey.cfg (src/python/cfg):
 //! a platform is an (os, cpu) pair in Buck2's constraint names, and values
 //! that differ between platforms are keyed on the smallest exact key:
 //! `config//os:<os>` when they differ only by OS (`config//cpu:<cpu>` by CPU
@@ -160,8 +160,8 @@ mod tests {
     use super::*;
     use serde_json::Value;
 
-    /// The shared test cases of src/go/pkg/conditions. testdata/ links to
-    /// the file, and Buck2 maps it to the same path.
+    /// The conditions core's shared test cases (src/testdata). testdata/
+    /// links to the file, and Buck2 maps it to the same path.
     fn vectors() -> Value {
         serde_json::from_str(include_str!("../testdata/split-vectors.json")).unwrap()
     }

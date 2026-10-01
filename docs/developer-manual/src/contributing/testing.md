@@ -11,10 +11,8 @@ tk test //...
 ### Specific Packages
 
 ```bash
-# Go packages
-tk test //src/go/pkg/syncer:syncer_test
-
 # Rust crates
+tk test //src/rust/project-sync:project-sync-test
 tk test //src/rust/prefetch-cache:prefetch-cache-test
 
 # Python modules

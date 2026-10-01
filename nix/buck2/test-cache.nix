@@ -4,7 +4,7 @@
 # here: the generated .buckconfig (buckconfig.nix's testCache), which buck2
 # reads, and the TURNKEY_TEST_CACHE variable, which tk reads. So they can't
 # disagree on where the cache is, who runs it or whether it takes TLS. The
-# variable's shape is src/go/pkg/testcache/testdata/shell-contract.json,
+# variable's shape is src/testdata/shell-contract.json,
 # which checks.buck2-generators and tk's tests both hold to.
 { lib }:
 
@@ -37,7 +37,7 @@ in
   # buckconfig.nix's testCache: null when caching is off
   buckconfig = cache;
 
-  # The descriptor tk reads (src/go/pkg/testcache): the address, whether it
+  # The descriptor tk reads (src/rust/testcache): the address, whether it
   # takes TLS, and, for the local cache only, the server tk runs
   env = lib.optionalAttrs (cache != null) {
     TURNKEY_TEST_CACHE = builtins.toJSON (

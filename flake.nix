@@ -108,7 +108,6 @@
           "soldeps-gen"
           # Turnkey CLIs
           "tk"
-          "rules-sync"
           "tw"
           # Native-tool wrappers (tw-driven)
           "tw-go"
@@ -197,13 +196,6 @@
             inherit pkgs lib;
             inherit ((self.lib.pinnedBuck2Release system)) buck2;
           };
-          # The rules-sync tk runs (nix/packages/tk.nix chooses it)
-          packages.rules-sync = config.packages.tk.rulesSync;
-          # tk's Rust port, until it switches (#216): outside the shell
-          packages.tk-rs = import ./nix/packages/tk-rs.nix {
-            inherit pkgs lib;
-            inherit ((self.lib.pinnedBuck2Release system)) buck2;
-          };
           packages.tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
           packages.e2e-runner = import ./nix/packages/e2e-runner.nix { inherit pkgs lib; };
           packages.jsdeps-gen = import ./nix/packages/jsdeps-gen.nix { inherit pkgs lib; };
@@ -245,20 +237,6 @@
           # Expose turnkey-prelude for CI builds: the pinned buck2 release's
           # prelude, as the dev shell uses it
           packages.turnkey-prelude = (self.lib.pinnedBuck2Release system).prelude;
-
-          # `nix run .#parity -- <tool>`: diff a Go tool against its Rust
-          # port (nix/parity/README.md). Temporary: the tk switch deletes it.
-          apps.parity = {
-            type = "app";
-            program = lib.getExe (
-              import ./nix/parity {
-                inherit pkgs lib;
-                inherit (config) packages;
-                source = self;
-              }
-            );
-            meta.description = "Diff a turnkey Go tool against its Rust port on the same inputs";
-          };
 
           # `nix fmt` formats the Nix files with the nixfmt checks.nix-format
           # holds them to
@@ -486,9 +464,7 @@
               };
 
               # How the shell describes the cache to tk, as tk's tests read it
-              shellContract = builtins.fromJSON (
-                builtins.readFile ./src/go/pkg/testcache/testdata/shell-contract.json
-              );
+              shellContract = builtins.fromJSON (builtins.readFile ./src/testdata/shell-contract.json);
               describes =
                 example:
                 let
@@ -613,14 +589,14 @@
             pkgs.runCommand "buck2-generators-check" { } "touch $out";
 
           # nix/buck2/platforms.nix's split agrees with the conditions
-          # module's (src/go/pkg/conditions) on its test cases, and every
+          # crate's (src/rust/conditions) on its test cases, and every
           # combined key it writes names a config_setting settingsBuckFile
-          # defines. Cases with Go build tag dimensions are the Go module's
+          # defines. Cases with Go build tag dimensions are the crate's
           # alone. Checked at evaluation.
           checks.split-vectors =
             let
               platforms = import ./nix/buck2/platforms.nix { inherit lib; };
-              vectors = builtins.fromJSON (builtins.readFile ./src/go/pkg/conditions/testdata/split-vectors.json);
+              vectors = builtins.fromJSON (builtins.readFile ./src/testdata/split-vectors.json);
               cases = builtins.filter (case: case.dimensions == [ ]) vectors.cases;
               # A platform's labels: those of every rule whose when it includes
               labelsOf =

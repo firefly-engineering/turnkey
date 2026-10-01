@@ -2,9 +2,8 @@
 //! files' deps kept in step with their sources, through the rules-syncer
 //! library
 //!
-//! The Rust port of src/cmd/tk/rules.go. The Go tk ran rules sync as a
-//! separate binary and read back its JSON report (#203); here the report
-//! comes straight from the library.
+//! The Go tk ran rules sync as a separate binary and read back its JSON
+//! report (#203); here the report comes straight from the library.
 
 use std::io::Write;
 use std::path::Path;

@@ -14,7 +14,7 @@ use nix_eval::NixClient;
 use crate::config::{CellConfig, CompositionConfig};
 
 /// The file `tk materialize` writes into a write-once deps cell
-/// (src/go/pkg/materialize: the deps file's hash)
+/// (src/rust/deps-cells: the deps file's hash)
 const WRITE_ONCE_MARKER: &str = ".deps-file-sha256";
 
 /// The write-once deps cells of a repo (ADR 0004): each `.turnkey/<cell>`

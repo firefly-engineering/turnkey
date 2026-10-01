@@ -7,10 +7,10 @@
 //! [`mapper`] plug-in, in every build configuration of the project, and
 //! writes it back with rules-star: a plain list, or `[...] + select({...})`
 //! for deps that differ between configurations. [`report`] is what it did,
-//! as the rules-sync binary prints it for tk.
+//! which tk prints.
 //!
-//! Ported from Go's mapper, rulessync and rulesreport (#215); tk (Go)
-//! still reads the report with src/go/pkg/rulesreport.
+//! Ported from Go's mapper, rulessync and rulesreport (#215); tk calls it
+//! directly (#216).
 
 pub mod mapper;
 pub mod report;

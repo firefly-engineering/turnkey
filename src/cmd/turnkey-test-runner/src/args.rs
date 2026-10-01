@@ -49,7 +49,7 @@ mod tests {
         let path = std::env::var("TURNKEY_RUNNER_CONTRACT").unwrap_or_else(|_| {
             let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
                 .expect("TURNKEY_RUNNER_CONTRACT is unset outside a Cargo build");
-            format!("{manifest_dir}/../../go/pkg/testcache/testdata/runner-contract.json")
+            format!("{manifest_dir}/../../testdata/runner-contract.json")
         });
         let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
         serde_json::from_str(&text).unwrap()

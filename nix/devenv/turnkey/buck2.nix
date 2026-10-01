@@ -383,7 +383,7 @@ in
     // {
       TURNKEY_TEST_RUNNER_PROTOCOL = "${testRunnerProtocol}";
     }
-    # The test result cache, as tk reads it (src/go/pkg/testcache)
+    # The test result cache, as tk reads it (src/rust/testcache)
     // testCache.env
     # Native forge compiles with the solc the toolchains cell's solc target
     # runs, and never touches the network, as the Buck2 Solidity rules do

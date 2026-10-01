@@ -12,9 +12,8 @@
 //! tk --no-sync build ...     # skip sync, run buck2 directly
 //! ```
 //!
-//! The Rust port of src/cmd/tk (#216). What tk reads of its process (its
-//! arguments, environment and working directory) is read once, here, and
-//! handed down.
+//! Ported from Go (#216). What tk reads of its process (its arguments,
+//! environment and working directory) is read once, here, and handed down.
 
 mod buck2;
 mod completion;

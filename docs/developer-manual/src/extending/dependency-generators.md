@@ -422,8 +422,8 @@ the cell to `.buckconfig`, symlinks it under `.turnkey/`, puts the
 generator on the shell's PATH and writes the sync rules into
 `.turnkey/sync.toml`, with the cell and deps file in its `[[languages]]`.
 
-Rules sync (`src/rust/rules-syncer`, run by `tk` through the `rules-sync`
-binary in `src/cmd/rules-sync`) reads `[[languages]]` and creates, for each
+Rules sync (`src/rust/rules-syncer`, a library `tk` calls) reads
+`[[languages]]` and creates, for each
 language, the plug-in registered under the record's name in
 `Mapper::new` (`src/rust/rules-syncer/src/mapper/mod.rs`): a language
 without one is an error, so add the plug-in with the record, and update the

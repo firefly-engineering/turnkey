@@ -471,7 +471,7 @@ tk compose down
 - [x] Copy-on-write overlay - `edit_overlay.rs` with `EditOverlay` struct
 - [x] Patch generation - `patch_generator.rs` with LCS-based unified diff
 - [x] Nix fixup integration - `userPatchesDir` parameter in `genericMkDepsCell` and adapters
-- [x] Edit workflow CLI - `src/cmd/tk/compose.go` with status/edit/patch/reset commands
+- [x] Edit workflow CLI - `src/cmd/tk/src/compose.rs` with status/edit/patch/reset commands
 
 ### Phase 6: Layout Plugins
 - [x] Layout trait definition - `layout.rs` with `Layout` trait
@@ -565,7 +565,7 @@ daemon process even though DICE would have skipped most recomputation anyway.
 
 #### Strategy 1: Stamp file + daemon kill (current, symlink backend)
 
-The `cellfresh` package (`src/go/pkg/cellfresh/`) detects when `.turnkey/*`
+The freshness check (`src/rust/deps-cells/src/freshness.rs`) detects when `.turnkey/*`
 symlinks change target and runs `buck2 kill`. This works for the symlink backend
 and as a fallback for the FUSE backend:
 

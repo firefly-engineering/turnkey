@@ -1,5 +1,5 @@
 {
-  "description": "How the dev shell describes the test result cache to tk: the variable, and the JSON it holds for given testCache options. The Nix side (nix/buck2/test-cache.nix, checked by checks.buck2-generators) must produce exactly these descriptors from these options; tk's side (src/go/pkg/testcache) must read them. Change both sides together.",
+  "description": "How the dev shell describes the test result cache to tk: the variable, and the JSON it holds for given testCache options. The Nix side (nix/buck2/test-cache.nix, checked by checks.buck2-generators) must produce exactly these descriptors from these options; tk's side (src/rust/testcache) must read them. Change both sides together.",
   "env": "TURNKEY_TEST_CACHE",
   "caches": [
     {

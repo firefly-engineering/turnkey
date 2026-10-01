@@ -18,10 +18,10 @@
 //! value written in `rules.star`, and [`json`] decodes the platforms of a
 //! JSON configuration as the Go tools did.
 //!
-//! The Rust port of src/go/pkg/conditions and Go's conditional package
-//! (#212), with the same keys and the same splits: testdata/split-vectors.json
-//! holds the test cases src/go/pkg/conditions, turnkey.cfg
-//! (src/python/cfg), rust-rules-gen and nix/buck2/platforms.nix run too.
+//! Ported from Go's conditions and conditional packages (#212), with the
+//! same keys and the same splits: src/testdata/split-vectors.json holds the
+//! test cases turnkey.cfg (src/python/cfg), rust-rules-gen and
+//! nix/buck2/platforms.nix run too.
 
 pub mod conditional;
 pub mod json;
@@ -846,9 +846,9 @@ mod tests {
         labels: Vec<String>,
     }
 
-    /// The test cases src/go/pkg/conditions, turnkey.cfg, rust-rules-gen
-    /// and nix/buck2/platforms.nix run too. testdata/ links to the file,
-    /// and Buck2 maps it to the same path.
+    /// The test cases turnkey.cfg, rust-rules-gen and
+    /// nix/buck2/platforms.nix run too (src/testdata). testdata/ links to
+    /// the file, and Buck2 maps it to the same path.
     #[test]
     fn split_vectors() {
         let vectors: Vectors =

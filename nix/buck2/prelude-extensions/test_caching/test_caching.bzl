@@ -54,7 +54,7 @@ docs/specs/test-result-caching.md.
 load("@prelude//tests:re_utils.bzl", "RemoteTestExecutorConfig")
 
 # Marks a test whose passes turnkey's test runner may record
-# (src/go/pkg/testcache/testdata/runner-contract.json).
+# (src/testdata/runner-contract.json).
 _CACHEABLE_LABEL = "turnkey-cacheable"
 
 # Keeps a target out of test result caching (docs/specs/test-result-caching.md).

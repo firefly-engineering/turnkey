@@ -1,8 +1,9 @@
-//! The report rules-sync prints on stdout and tk reads: what rules sync
-//! did to each `rules.star` file, or the error that stopped it
+//! The report of a rules sync, which tk prints: what rules sync did to each
+//! `rules.star` file, or the error that stopped it
 //!
-//! The Rust port of src/go/pkg/rulesreport, the wire format between tk and
-//! rules-sync, written as Go's `json.Encoder` writes it.
+//! Ported from Go's rulesreport, once the wire format between tk and a
+//! separate rules-sync binary (#215). It still writes itself as JSON, as
+//! Go's `json.Encoder` writes it.
 
 use serde::Serialize;
 

@@ -24,7 +24,7 @@ rust_test(
         "rustdeps//vendor/serde:serde",
         "rustdeps//vendor/serde_json:serde_json",
     ],
-    # The split cases src/go/pkg/conditions runs too, embedded from where
-    # testdata/ links to them
-    mapped_srcs = {"//src/go/pkg/conditions:split-vectors": "testdata/split-vectors.json"},
+    # The shared split cases (src/testdata), embedded from where testdata/
+    # links to them
+    mapped_srcs = {"//src/testdata:split-vectors": "testdata/split-vectors.json"},
 )

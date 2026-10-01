@@ -10,8 +10,8 @@
 //! Nothing here runs a process or reads the environment: tk passes in what
 //! roots a store path and what kills buck2's daemon.
 //!
-//! The Rust port of src/go/pkg/materialize, src/go/pkg/cellfresh and the
-//! file handling of src/cmd/tk/compose.go (#216), with the same results.
+//! Ported from Go's materialize and cellfresh packages and the file
+//! handling of the Go tk's compose (#216), with the same results.
 
 pub mod edits;
 pub mod freshness;

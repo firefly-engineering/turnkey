@@ -330,7 +330,7 @@ impl Syncer {
                 continue;
             }
             // Walk up to the nearest rules.star: a change in
-            // src/cmd/tk/main.go is src/cmd/tk/rules.star's
+            // src/cmd/tk/src/main.rs is src/cmd/tk/rules.star's
             let mut d = gostd::path::dir(&abs);
             while d.starts_with(root.as_str()) {
                 if std::fs::metadata(gostd::path::join(&[&d, "rules.star"])).is_ok() {

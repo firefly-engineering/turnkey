@@ -162,7 +162,7 @@ async fn record_if_pass<C: ActionCache>(
 }
 
 /// The report `tk test` reads the number of hits from
-/// (src/go/pkg/testcache/testdata/runner-contract.json).
+/// (src/testdata/runner-contract.json).
 pub fn hits_report(hits: usize) -> String {
     format!("{hits}\n")
 }

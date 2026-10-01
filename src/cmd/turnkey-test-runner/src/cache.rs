@@ -21,7 +21,7 @@ use buck2_test_executor::proto::build::bazel::remote::execution::v2::{
 const MAX_INLINE_OUTPUT: usize = 1024 * 1024;
 
 /// What the runner does with the cache for a test run. `tk test` chooses it
-/// by the reuse policy (src/go/pkg/testcache); the runner only obeys it.
+/// by the reuse policy (src/rust/testcache); the runner only obeys it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum Mode {
     /// Neither read nor record: tests run as under buck2's bundled runner.

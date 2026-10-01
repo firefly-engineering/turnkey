@@ -89,8 +89,8 @@ Simple TOML format for declaring which toolchains are needed.
 ### CLI Tools
 
 #### `src/cmd/tk/` - Buck2 Wrapper
-The `tk` command wraps `buck2` with automatic dependency sync:
-- Runs `tk sync` before commands that read the build graph (`build`, `test`, `run`, etc.)
+The `tk` command (Rust) wraps `buck2` with automatic dependency sync:
+- Runs `tk sync`, then rules sync (`src/rust/rules-syncer`), before commands that read the build graph (`build`, `test`, `run`, etc.)
 - Pass-through for commands that don't need sync (`clean`, `kill`, etc.)
 - Configured via `.turnkey/sync.toml`
 
@@ -112,8 +112,7 @@ tw -v cargo add serde           # Verbose mode
 
 **Key packages:**
 - `src/cmd/tw/` - `tw` itself (Rust): running the tool, and hashing the watched files for change detection
-- `src/rust/project-sync/` - `.turnkey/sync.toml` parsing, staleness and sync execution (Rust, for `tw`)
-- `src/go/pkg/syncconfig/`, `src/go/pkg/syncer/` - the same for `tk`, until `tk` is ported
+- `src/rust/project-sync/` - `.turnkey/sync.toml` parsing, staleness and sync execution (shared by `tw` and `tk`)
 - `nix/packages/tw-wrappers.nix` - Shell wrappers that shadow real tools
 
 See `docs/user-manual/src/reference/cli.md` (the `tw` section) for full documentation.
@@ -226,10 +225,10 @@ This ensures:
 ├── go.mod                        # Single module: github.com/firefly-engineering/turnkey
 ├── go.sum                        # All dependency hashes
 ├── go-deps.toml                  # Generated for Nix/Buck2
-└── src/cmd/tk/main.go            # NO go.mod here - uses root module
+└── src/examples/go-hello-deps/   # NO go.mod here - uses root module
 ```
 
-- All Go code shares one module
+- All Go code shares one module. turnkey's own tools are Rust; the Go code left is the examples (`src/examples/go-*`)
 - No nested go.mod files, except test fixtures (`src/cmd/godeps-gen/testdata/godeps/*`), which are outside the Go build
 - Add deps with `go get` from repo root
 

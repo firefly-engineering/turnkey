@@ -175,10 +175,8 @@ If you have manual dependencies that shouldn't be auto-detected, use preservatio
 Dependencies within these markers are preserved during sync.
 
 **How tk runs it:** `tk rules`, and the rules sync `tk` runs before a Buck2
-command, run the `rules-sync` binary that comes with `tk` (its Nix package
-builds the binary's store path into `tk`). `rules-sync` takes the project
-root, `--dry-run`, `--verbose` and `--force`, and prints what it did as a
-JSON report that `tk` turns into the output above.
+command, call the rules-syncer library (`src/rust/rules-syncer`) linked
+into `tk`, and print what it reports as above.
 
 ### tk Flags
 

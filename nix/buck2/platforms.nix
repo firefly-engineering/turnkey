@@ -80,13 +80,13 @@ in
 
   # Split each platform's list of values (valuesOf platform) into the values
   # every platform has and select() branches, with the conditions core's
-  # key rules (src/go/pkg/conditions): the smallest exact key, the OS's
+  # key rules (src/rust/conditions): the smallest exact key, the OS's
   # (config//os:<os>), the CPU's (config//cpu:<cpu>), or the combined
   # <settings>:<os>-<cpu>, and a branch for every platform, with no
   # DEFAULT. conditions is `conditions`'s result. Returns { common;
   # branches = [ { key; values; } ] sorted by key, empty when every
   # platform has the same values }. The split-vectors flake check runs the
-  # conditions core's test cases (testdata/split-vectors.json) against it.
+  # conditions core's test cases (src/testdata/split-vectors.json) against it.
   split =
     conditions: valuesOf:
     let
@@ -144,7 +144,7 @@ in
   # and the allowed Go build tags: one per value combination of every set
   # of two or more dimensions (os, cpu, then each tag, set or unset), named
   # by the values' tokens joined with "-" (a tag's token is the tag when
-  # set, no_<tag> when unset), as src/go/pkg/conditions names them.
+  # set, no_<tag> when unset), as src/rust/conditions names them.
   settingsBuckFile =
     platforms: tags:
     let

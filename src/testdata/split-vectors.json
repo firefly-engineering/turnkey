@@ -1,5 +1,5 @@
 {
-  "description": "Label lists that differ between configurations, and the [<common>] + select({<key>: [<labels>]}) src/go/pkg/conditions splits them into. Each configuration's labels are those of every entry of labels whose when it includes, in order. Read by src/go/pkg/conditions, rust-rules-gen (src/cmd/rust-rules-gen) and nix/buck2/platforms.nix alike, so the three can't drift apart; the last two only have os and cpu, so they skip cases with dimensions: the on/off dimensions (Go build tags') a language adds, each with its name, the constraint whose [set] and [unset] values back it, and the token naming set in a combined key.",
+  "description": "Label lists that differ between configurations, and the [<common>] + select({<key>: [<labels>]}) src/rust/conditions splits them into. Each configuration's labels are those of every entry of labels whose when it includes, in order. Read by the conditions crate (src/rust/conditions), rust-rules-gen (src/cmd/rust-rules-gen) and nix/buck2/platforms.nix alike, so the three can't drift apart; the last two only have os and cpu, so they skip cases with dimensions: the on/off dimensions (Go build tags') a language adds, each with its name, the constraint whose [set] and [unset] values back it, and the token naming set in a combined key.",
   "cases": [
     {
       "name": "the same labels everywhere are common",

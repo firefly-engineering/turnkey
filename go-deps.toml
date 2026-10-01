@@ -19,11 +19,6 @@ import_path = "github.com/google/uuid"
 version = "v1.6.0"
 hash = "sha256-Oz3yds86lLivFbfBZNWKBB+WTSu3h/GlIplzIG+0OqE="
 
-[deps."github.com/pelletier/go-toml/v2@v2.2.4"]
-import_path = "github.com/pelletier/go-toml/v2"
-version = "v2.2.4"
-hash = "sha256-iqpke1tz6+U3KCpY2NYEXL8Zg7bwMua4eblXjnhRJho="
-
 [deps."golang.org/x/sys@v0.40.0"]
 import_path = "golang.org/x/sys"
 version = "v0.40.0"

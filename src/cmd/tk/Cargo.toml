@@ -1,14 +1,16 @@
 [package]
-name = "rules-sync"
+name = "tk"
 version = "0.1.0"
 edition.workspace = true
-description = "Keep a project's rules.star deps in step with their sources, and report what was done as JSON"
+description = "tk, turnkey's buck2 wrapper: sync before the buck2 commands that read the build graph"
 
 [dependencies]
+buck2-args.workspace = true
+deps-cells.workspace = true
 gostd.workspace = true
 project-sync.workspace = true
 rules-syncer.workspace = true
+testcache.workspace = true
 
 [dev-dependencies]
-serde_json.workspace = true
 tempfile.workspace = true

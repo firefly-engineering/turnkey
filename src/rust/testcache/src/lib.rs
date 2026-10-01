@@ -11,7 +11,7 @@
 //! Nothing here reads the environment: tk passes in how to look a variable
 //! up ([`Getenv`]).
 //!
-//! The Rust port of src/go/pkg/testcache (#216), with the same results.
+//! Ported from Go's testcache package (#216), with the same results.
 
 mod server;
 mod tls;

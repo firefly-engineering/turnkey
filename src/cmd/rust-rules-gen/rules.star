@@ -29,5 +29,5 @@ rust_test(
     ],
     # The select() keys follow the conditions module's shared test cases,
     # embedded from where testdata/ links to them
-    mapped_srcs = {"//src/go/pkg/conditions:split-vectors": "testdata/split-vectors.json"},
+    mapped_srcs = {"//src/testdata:split-vectors": "testdata/split-vectors.json"},
 )

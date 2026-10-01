@@ -126,7 +126,7 @@ mod tests {
     }
 
     /// What labels_value writes reads back as every configuration's labels
-    /// (the round trip of src/go/pkg/conditional's TestLabelsValueRoundTrip,
+    /// (the round trip of Go's conditional TestLabelsValueRoundTrip,
     /// read back from the value rather than reparsed).
     #[test]
     fn labels_value_round_trip() {

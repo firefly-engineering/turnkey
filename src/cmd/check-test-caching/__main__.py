@@ -35,7 +35,7 @@ from pathlib import Path
 BXL = "//src/cmd/check-test-caching/check.bxl:main"
 
 # The label the runner records by, as tk and the runner agree on it.
-CONTRACT = Path("src/go/pkg/testcache/testdata/runner-contract.json")
+CONTRACT = Path("src/testdata/runner-contract.json")
 CACHEABLE_LABEL = json.loads(CONTRACT.read_text())["labels"]["cacheable"]
 
 # Gives re-profile-test a remote_execution profile (see rules.star).
@@ -44,7 +44,6 @@ RE_PROFILE = ["-c", "turnkey.check_test_caching_re_profile=true"]
 # target -> (executor with caching on, executor with caching off)
 EXPECTED_EXECUTORS: dict[str, tuple[str, str]] = {
     "root//src/examples/rust-hello:rust-hello-test": ("cache", "local"),
-    "root//src/go/pkg/syncconfig:syncconfig_test": ("cache", "local"),
     "root//src/python/cfg:test": ("cache", "local"),
     "root//src/examples/jsonnet-config:common-test": ("cache", "none"),
     "root//src/examples/solidity-hello:counter_test": ("cache", "none"),

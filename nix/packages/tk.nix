@@ -1,59 +1,66 @@
 # tk Nix package
 #
 # Builds the tk CLI - a transparent wrapper around buck2 that auto-syncs.
-# This tool ensures generated files (rules.star files, dependency cells) are
-# up-to-date before running buck2 commands that read the build graph.
+# This tool ensures generated files (deps files, rules.star files, deps
+# cells) are up-to-date before running buck2 commands that read the build
+# graph.
 #
 # Usage:
 #   tk build //some:target     # syncs first, then runs buck2 build
 #   tk sync                    # explicit sync
 #   tk check                   # check staleness (for CI)
+#
+# Written in Rust (ported from Go, #216), built from the root Cargo
+# workspace like rustdeps-gen. Rules sync is the rules-syncer library,
+# linked in.
 {
   pkgs,
   lib,
-  # The pinned buck2 (turnkeyLib.pinnedBuck2Release system).buck2
+  # The pinned buck2 (turnkeyLib.pinnedBuck2Release system).buck2, whose
+  # completions tk's are made from
   buck2,
 }:
 
 let
-  fs = lib.fileset;
   root = ../..;
-  # The rules-sync tk runs for rules sync: the one place it is chosen
-  rulesSync = import ./rules-sync.nix { inherit pkgs lib; };
+  cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
+  projection = cargoLib.workspaceProjection {
+    inherit root;
+    members = [
+      "src/cmd/tk"
+      "src/rust/buck2-args"
+      "src/rust/conditions"
+      "src/rust/deps-cells"
+      "src/rust/deps-extract"
+      "src/rust/deps-gen-kit"
+      "src/rust/gomod"
+      "src/rust/goparse"
+      "src/rust/gostd"
+      "src/rust/pep508"
+      "src/rust/prefetch-cache"
+      "src/rust/project-sync"
+      "src/rust/rules-star"
+      "src/rust/rules-syncer"
+      "src/rust/testcache"
+    ];
+  };
 in
-pkgs.buildGoModule {
+pkgs.rustPlatform.buildRustPackage {
   pname = "tk";
   version = "0.1.0";
 
-  src = fs.toSource {
-    inherit root;
-    fileset = fs.unions [
-      (root + "/go.mod")
-      (root + "/go.sum")
-      (root + "/src/cmd/tk")
-      (root + "/src/go/pkg/buck2args")
-      (root + "/src/go/pkg/localconfig")
-      (root + "/src/go/pkg/syncconfig")
-      (root + "/src/go/pkg/conditions")
-      (root + "/src/go/pkg/syncer")
-      (root + "/src/go/pkg/staleness")
-      # rules-sync's report, which tk reads
-      (root + "/src/go/pkg/rulesreport")
-      (root + "/src/go/pkg/cellfresh")
-      (root + "/src/go/pkg/materialize")
-      (root + "/src/go/pkg/testcache")
-    ];
-  };
-  subPackages = [ "src/cmd/tk" ];
+  inherit (projection) src;
 
-  vendorHash = "sha256-Lz9kCfY4vE6ytq1jzrX1qIRFx6EmBe/nxfhPc4sdGng=";
+  cargoLock.lockFileContents = projection.lock;
 
-  # tk runs the rules-sync it was built with, never one found on PATH
-  # (src/cmd/tk/rules.go)
-  ldflags = [ "-X main.rulesSyncPath=${lib.getExe rulesSync}" ];
-
-  # The rules-sync above, which flake.nix exposes as packages.rules-sync
-  passthru = { inherit rulesSync; };
+  cargoBuildFlags = [
+    "-p"
+    "tk"
+  ];
+  cargoTestFlags = [
+    "-p"
+    "tk"
+  ];
 
   # buck2 is needed at build time to generate shell completions: the pinned
   # one, so they describe the buck2 the shell runs

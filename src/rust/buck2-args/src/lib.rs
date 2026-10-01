@@ -11,8 +11,8 @@
 //! The command line is that of the pinned buck2 release
 //! (docs/adr/0002-turnkey-owns-the-buck2-version.md).
 //!
-//! The Rust port of src/go/pkg/buck2args, src/go/pkg/localconfig and the
-//! command line handling of src/cmd/tk (#216), with the same results.
+//! Ported from Go's buck2args and localconfig packages and the Go tk's
+//! command line handling (#216), with the same results.
 
 mod local;
 

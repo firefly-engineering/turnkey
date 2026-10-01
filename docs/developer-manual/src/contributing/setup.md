@@ -60,7 +60,7 @@ turnkey/
 tk test //...
 
 # Specific package
-tk test //src/go/pkg/syncer:syncer_test
+tk test //src/rust/project-sync:project-sync-test
 ```
 
 ## Pre-commit Hooks

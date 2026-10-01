@@ -34,10 +34,10 @@ rust_test(
         "rustdeps//vendor/serde_json:serde_json",
         "rustdeps//vendor/tempfile:tempfile",
     ],
-    # The contracts src/go/pkg/testcache checks too, embedded from where
-    # testdata/ links to them
+    # The contracts shared with the runner and the shell (src/testdata),
+    # embedded from where testdata/ links to them
     mapped_srcs = {
-        "//src/go/pkg/testcache:runner-contract": "testdata/runner-contract.json",
-        "//src/go/pkg/testcache:shell-contract": "testdata/shell-contract.json",
+        "//src/testdata:runner-contract": "testdata/runner-contract.json",
+        "//src/testdata:shell-contract": "testdata/shell-contract.json",
     },
 )
