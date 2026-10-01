@@ -1,5 +1,5 @@
 //! The rules.star files of the pydeps cell's vendored Python packages,
-//! with the dependencies between them (src/go/pkg/pydepscell)
+//! with the dependencies between them
 //!
 //! A package's dependencies come from python-deps.toml (pydeps-gen records
 //! them from uv.lock): its own, and those of the extras some package or

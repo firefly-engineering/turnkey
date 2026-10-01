@@ -1,5 +1,5 @@
-//! pydeps-cell.json and python-deps.toml, decoded as the Go version's
-//! libraries decode them
+//! pydeps-cell.json and python-deps.toml, decoded as the Go version of
+//! pydeps-cell (#212) decoded them, with Go's encoding/json and go-toml
 //!
 //! encoding/json and go-toml match a key to a struct field ignoring case
 //! (go-toml compares `strings.ToLower` of the key, encoding/json folds it

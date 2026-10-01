@@ -1766,7 +1766,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pydeps-cell-rs"
+name = "pydeps-cell"
 version = "0.1.0"
 dependencies = [
  "anyhow",

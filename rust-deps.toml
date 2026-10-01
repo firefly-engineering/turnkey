@@ -14,7 +14,7 @@ manifests = [
     "src/cmd/godeps-gen/Cargo.toml",
     "src/cmd/jsdeps-gen/Cargo.toml",
     "src/cmd/nix-prefetch-cached/Cargo.toml",
-    "src/cmd/pydeps-cell-rs/Cargo.toml",
+    "src/cmd/pydeps-cell/Cargo.toml",
     "src/cmd/pydeps-gen/Cargo.toml",
     "src/cmd/rust-rules-gen/Cargo.toml",
     "src/cmd/rustdeps-gen/Cargo.toml",

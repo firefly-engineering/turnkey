@@ -12,7 +12,7 @@ members = [
     "src/cmd/godeps-gen",
     "src/cmd/jsdeps-gen",
     "src/cmd/nix-prefetch-cached",
-    "src/cmd/pydeps-cell-rs",
+    "src/cmd/pydeps-cell",
     "src/cmd/pydeps-gen",
     "src/cmd/rustdeps-gen",
     "src/cmd/rust-rules-gen",

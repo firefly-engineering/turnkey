@@ -5,8 +5,8 @@
 //! (nix/lib/deps-cell/adapters/python.nix), once the packages are merged
 //! into the cell.
 //!
-//! It is the Rust port of src/cmd/pydeps-cell and src/go/pkg/pydepscell
-//! (#212), and writes the same bytes.
+//! It was ported from Go (#212), and writes the bytes the Go version
+//! wrote.
 //!
 //! Usage:
 //!

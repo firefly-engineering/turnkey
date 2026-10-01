@@ -2,33 +2,42 @@
 #
 # Builds the tool that writes the pydeps cell's rules.star files, with the
 # dependencies between vendored Python packages evaluated per platform
-# (src/go/pkg/pydepscell). The Python cell adapter runs it at merge time.
+# (src/cmd/pydeps-cell). The Python cell adapter runs it at merge time.
+# Written in Rust (ported from Go, #212), built from the workspace
+# projection like the other Rust tools.
 { pkgs, lib }:
 
 let
-  fs = lib.fileset;
   root = ../..;
+  cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
+  projection = cargoLib.workspaceProjection {
+    inherit root;
+    members = [
+      "src/cmd/pydeps-cell"
+      "src/rust/conditions"
+      "src/rust/deps-gen-kit"
+      "src/rust/gostd"
+      "src/rust/pep508"
+      "src/rust/prefetch-cache"
+    ];
+  };
 in
-pkgs.buildGoModule {
+pkgs.rustPlatform.buildRustPackage {
   pname = "pydeps-cell";
   version = "0.1.0";
 
-  src = fs.toSource {
-    inherit root;
-    fileset = fs.unions [
-      (root + "/go.mod")
-      (root + "/go.sum")
-      (root + "/src/cmd/pydeps-cell")
-      (root + "/src/go/pkg/pydepscell")
-      (root + "/src/go/pkg/conditional")
-      (root + "/src/go/pkg/conditions")
-      (root + "/src/go/pkg/pep508")
-      (root + "/src/go/pkg/starlark")
-    ];
-  };
-  subPackages = [ "src/cmd/pydeps-cell" ];
+  inherit (projection) src;
 
-  vendorHash = "sha256-Vgqdy+jGLYByPiGY8z45+nSYo5YHpmlyHjmfAcYEyjU=";
+  cargoLock.lockFileContents = projection.lock;
+
+  cargoBuildFlags = [
+    "-p"
+    "pydeps-cell"
+  ];
+  cargoTestFlags = [
+    "-p"
+    "pydeps-cell"
+  ];
 
   meta = {
     description = "Write the pydeps cell's rules.star files, with per-platform dependencies";

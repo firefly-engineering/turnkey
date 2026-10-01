@@ -1,10 +1,9 @@
 [package]
-name = "pydeps-cell-rs"
+name = "pydeps-cell"
 version = "0.1.0"
 edition.workspace = true
 description = "Write the pydeps cell's rules.star files, with per-platform dependencies"
 
-# The binary is named after the tool it ports
 [[bin]]
 name = "pydeps-cell"
 path = "src/main.rs"

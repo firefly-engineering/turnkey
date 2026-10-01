@@ -190,13 +190,6 @@
           # Export tools as packages
           packages.godeps-gen = import ./nix/packages/godeps-gen.nix { inherit pkgs lib; };
           packages.nix-prefetch-cached = import ./nix/packages/nix-prefetch-cached.nix { inherit pkgs lib; };
-          # The tool the Python cell adapter runs (nix/buck2/languages.nix),
-          # for `nix run .#parity -- pydeps-cell`: packages.pydeps-cell is the
-          # pydeps cell itself (nix/flake-parts/turnkey exposes the cells)
-          packages.pydeps-cell-go = import ./nix/packages/pydeps-cell.nix { inherit pkgs lib; };
-          # The Rust port of pydeps-cell, compared with it by
-          # `nix run .#parity -- pydeps-cell` until it replaces it (#212)
-          packages.pydeps-cell-rs = import ./nix/packages/pydeps-cell-rs.nix { inherit pkgs lib; };
           packages.pydeps-gen = import ./nix/packages/pydeps-gen.nix { inherit pkgs lib; };
           packages.rustdeps-gen = import ./nix/packages/rustdeps-gen.nix { inherit pkgs lib; };
           packages.buckgen = import ./nix/packages/buckgen.nix { inherit pkgs lib; };
