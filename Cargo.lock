@@ -3252,6 +3252,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tk-rs"
+version = "0.1.0"
+dependencies = [
+ "deps-cells",
+ "gostd",
+ "tempfile",
+]
+
+[[package]]
 name = "tokio"
 version = "1.50.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

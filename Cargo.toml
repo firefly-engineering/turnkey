@@ -20,6 +20,7 @@ members = [
     "src/cmd/rust-rules-gen",
     "src/cmd/soldeps-gen",
     "src/cmd/test-runner-codegen",
+    "src/cmd/tk-rs",
     "src/cmd/turnkey-composed",
     "src/cmd/turnkey-test-runner",
     "src/cmd/tw",

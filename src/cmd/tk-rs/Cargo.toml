@@ -1,0 +1,15 @@
+[package]
+name = "tk-rs"
+version = "0.1.0"
+edition.workspace = true
+description = "tk, turnkey's buck2 wrapper (Rust port, in progress)"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+deps-cells.workspace = true
+gostd.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
