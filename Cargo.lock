@@ -1766,6 +1766,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "pydeps-cell-rs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "conditions",
+ "deps-gen-kit",
+ "gostd",
+ "pep508",
+ "serde",
+ "serde_json",
+ "toml",
+]
+
+[[package]]
 name = "pydeps-gen"
 version = "0.1.0"
 dependencies = [
