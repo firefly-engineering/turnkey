@@ -26,6 +26,7 @@ manifests = [
     "src/rust/composition/Cargo.toml",
     "src/rust/deps-extract/Cargo.toml",
     "src/rust/deps-gen-kit/Cargo.toml",
+    "src/rust/gostd/Cargo.toml",
     "src/rust/nix-eval/Cargo.toml",
     "src/rust/prefetch-cache/Cargo.toml",
     "src/rust/starlark-parse/Cargo.toml",
@@ -2754,6 +2755,14 @@ hash = "sha256-5vBPNc316ZUAoQrSrL4wVapBpqOrjjvN5OWHmBL+mVY="
 name = "unicode-ident"
 version = "1.0.22"
 hash = "sha256-rc3TZsoOsLwiWa37mfR9Vdz19t0/ZLov6YMaItqsf4s="
+
+[deps."unicode-properties@0.1.1"]
+name = "unicode-properties"
+version = "0.1.1"
+hash = "sha256-sFjH3C+7sGGErJqUqtshEghN9e52ZjEjSi6SEUaWGWg="
+features = [
+    { name = "general-category" },
+]
 
 [deps."unicode-width@0.1.14"]
 name = "unicode-width"

@@ -1,0 +1,19 @@
+//! gostd: ports of the Go standard library behaviours turnkey's generated
+//! files depend on
+//!
+//! turnkey's tools were written in Go, and the files they generate (deps
+//! files, `rules.star`) carry the marks of Go's standard library: strings
+//! quoted by `strconv.Quote`, paths cleaned by `path.Clean`. A Rust port
+//! has to produce the same bytes, so it uses these ports rather than the
+//! nearest Rust equivalent, which differs at the edges (`char::escape_debug`
+//! is not `strconv.Quote`, `Path::join` replaces on an absolute path where
+//! `filepath.Join` concatenates).
+//!
+//! - [`unicode`]: `unicode.IsPrint`, `unicode.IsSpace`, `unicode.IsLetter`
+//! - [`strconv`]: `strconv.Quote` and `strconv.Unquote`
+//! - [`path`]: `path.Clean`, `path.Join`, `path.Dir` and `filepath.Rel`,
+//!   for slash-separated paths (turnkey runs on Linux and macOS only)
+
+pub mod path;
+pub mod strconv;
+pub mod unicode;

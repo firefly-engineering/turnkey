@@ -1,0 +1,8 @@
+[package]
+name = "gostd"
+version = "0.1.0"
+edition.workspace = true
+description = "Ports of the Go standard library behaviours turnkey's generated files depend on"
+
+[dependencies]
+unicode-properties.workspace = true
