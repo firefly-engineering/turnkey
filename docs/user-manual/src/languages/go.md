@@ -52,6 +52,23 @@ go_binary(
 )
 ```
 
+## Tests
+
+A `go_test` compiles its `srcs` with the package of its `target_under_test`,
+as `go test` does:
+
+```python
+go_test(
+    name = "mylib_test",
+    srcs = glob(["*_test.go"]),
+    target_under_test = ":mylib",
+)
+```
+
+Test files can be in the package itself (`package mylib`) or in an external
+test package (`package mylib_test`), which sees only the package's exported
+API. Both kinds can be in the same `go_test`.
+
 ## External Dependencies
 
 Reference third-party packages via the `godeps` cell:

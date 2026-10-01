@@ -1,0 +1,343 @@
+go_test: build external test packages (package <name>_test).
+
+Upstream go_test fails on a source that declares package <name>_test
+("External tests are not supported"). go test compiles those files as a
+package of their own, <import path>_test, which imports the package as
+built with its internal tests, and the generated test main imports both.
+go_test now does the same:
+
+- pkg_analyzer reports XTestImports and XTestEmbedPatterns next to the
+  internal tests' imports and embeds, and go_list.bzl parses them.
+- The internal test package leaves the external test files out instead of
+  failing on them. A GoBuildConfig with x_test builds the external ones
+  instead (go_list_for_x_test), reusing the internal build's go list
+  (declare_package_build's new go_list_out). Its argsfile lists the
+  external test files.
+- go_test builds that package after the internal one, with the internal
+  one in its pkgs, and links it in. Without external test files it is
+  empty, and nothing imports it.
+- testmaingen takes the external test files with --xtest-files and imports
+  their package as _xtest, as cmd/go/internal/load/test.go does; the test
+  lister (TPX_LIST_TESTS_COMMAND) reads them too.
+- A test files argsfile with no files is empty instead of a blank line,
+  which the generator and the lister would read as a file name.
+
+The external test package is never coverage-instrumented, as with go test.
+A dep that itself depends on the package under test would conflict with
+the internal test package (merge_pkgs); go test recompiles such deps, and
+this doesn't.
+
+--- a/go/go_list.bzl
++++ b/go/go_list.bzl
+@@ -18,6 +18,7 @@
+     name = field(str),
+     imports = field(list[str], default = []),
+     test_imports = field(list[str], default = []),
++    x_test_imports = field(list[str], default = []),
+     go_files = field(list[Artifact], default = []),
+     h_files = field(list[Artifact], default = []),
+     c_files = field(list[Artifact], default = []),
+@@ -33,6 +34,7 @@
+     cgo_cppflags = field(list[str], default = []),
+     embed_patterns = field(list[str], default = []),
+     test_embed_patterns = field(list[str], default = []),
++    x_test_embed_patterns = field(list[str], default = []),
+     error = field(GoListError | None, default = None),
+ )
+ 
+@@ -120,16 +122,19 @@
+     name = go_list.get("Name", "")
+     imports = go_list.get("Imports", [])
+     test_imports = go_list.get("TestImports", [])
++    x_test_imports = go_list.get("XTestImports", [])
+     cgo_cflags = go_list.get("CgoCFLAGS", [])
+     cgo_cppflags = go_list.get("CgoCPPFLAGS", [])
+     embed_patterns = go_list.get("EmbedPatterns", [])
+     test_embed_patterns = go_list.get("TestEmbedPatterns", [])
++    x_test_embed_patterns = go_list.get("XTestEmbedPatterns", [])
+     error = _parse_error(go_list.get("Error", None))
+ 
+     return GoListOut(
+         name = name,
+         imports = imports,
+         test_imports = test_imports,
++        x_test_imports = x_test_imports,
+         go_files = go_files,
+         h_files = h_files,
+         c_files = c_files,
+@@ -145,6 +150,7 @@
+         ignored_other_files = ignored_other_files,
+         embed_patterns = embed_patterns,
+         test_embed_patterns = test_embed_patterns,
++        x_test_embed_patterns = x_test_embed_patterns,
+         error = error,
+     )
+ 
+--- a/go/go_test.bzl
++++ b/go/go_test.bzl
+@@ -36,6 +36,7 @@
+     coverage_mode: [GoCoverageMode, None],
+     cover_packages: list[str],  # packages those are included for coverage
+     test_go_files_argsfile: Artifact,
++    x_test_go_files_argsfile: Artifact,
+ ) -> Artifact:
+     """
+     Generate a `main.go` which calls tests from the given sources.
+@@ -53,6 +54,7 @@
+         cover_pkgs_argsfile = ctx.actions.declare_output("cover_pkgs_argsfile", has_content_based_path = True)
+         ctx.actions.write(cover_pkgs_argsfile, [["--cover-pkgs", pkg] for pkg in cover_packages])
+         cmd.append(cmd_args(cover_pkgs_argsfile, format = "@{}"))
++    cmd.append(cmd_args(x_test_go_files_argsfile, format = "--xtest-files={}"))
+     cmd.append(cmd_args(test_go_files_argsfile, format = "@{}"))
+     ctx.actions.run(cmd_args(cmd), category = "go_test_main_gen", allow_cache_upload = ctx.attrs._go_toolchain[GoToolchainInfo].allow_cache_upload)
+     return output
+@@ -122,9 +124,35 @@
+ 
+     pkgs[pkg_import_path] = tests
+ 
++    # Compile the external tests (package <name>_test) into a package of their
++    # own, against the package with its internal tests, as go test does.
++    # Without external test files it is empty, and the test main doesn't
++    # import it.
++    x_tests, _, x_test_go_files_argsfile = declare_package_build(
++        ctx = ctx,
++        pkg_import_path = pkg_import_path + "_test",
++        main = False,
++        sources = GoSourceInputs(
++            srcs = tests_pkg_info.srcs,
++            embed_srcs = from_named_set(ctx.attrs.embed_srcs),
++            package_root = tests_pkg_info.package_root,
++        ),
++        cgo_build_context = None,
++        config = GoBuildConfig(
++            compiler_flags = ctx.attrs.compiler_flags,
++            build_tags = ctx.attrs._build_tags,
++            x_test = True,
++        ),
++        pkgs = pkgs,
++        deps = deps,
++        cgo_gen_dir_name = "cgo_gen_x_test",
++        go_list_out = tests_pkg_info.go_list_out,
++    )
++    pkgs[pkg_import_path + "_test"] = x_tests
++
+     # Generate a 'main.go' file (test runner) which runs the actual tests from the package above.
+     # Build the it as a separate package (<foo>.test) - which imports and invokes the test package.
+-    gen_main = _gen_test_main(ctx, pkg_import_path, coverage_mode, cover_packages, test_go_files_argsfile)
++    gen_main = _gen_test_main(ctx, pkg_import_path, coverage_mode, cover_packages, test_go_files_argsfile, x_test_go_files_argsfile)
+     main, _, _ = declare_package_build(
+         ctx = ctx,
+         pkg_import_path = pkg_import_path + ".test",
+@@ -173,6 +201,7 @@
+         [ctx.attrs._list_tests[RunInfo]],
+         "-match=^Test.*",
+         cmd_args(test_go_files_argsfile, format = "@{}"),
++        cmd_args(x_test_go_files_argsfile, format = "@{}"),
+     )
+ 
+     return inject_test_run_info(
+--- a/go/package_builder.bzl
++++ b/go/package_builder.bzl
+@@ -32,6 +32,9 @@
+     coverage_mode = field(GoCoverageMode | None, None),
+     cgo_enabled = field(bool, False),
+     with_tests = field(bool, False),
++    # Build the package's external tests, the files of its <name>_test
++    # package, instead of the package
++    x_test = field(bool, False),
+ )
+ 
+ GoSourceInputs = record(
+@@ -50,6 +53,7 @@
+     pkgs: dict[str, GoPkg] = {},
+     deps: list[Dependency] = [],
+     cgo_gen_dir_name: str = "cgo_gen",
++    go_list_out: Artifact | None = None,
+ ) -> (GoPkg, GoPackageInfo, Artifact):
+     actions = ctx.actions
+     target_label = ctx.label
+@@ -76,7 +80,10 @@
+ 
+     package_root = sources.package_root if sources.package_root != None else infer_package_root(srcs)
+ 
+-    go_list_out = go_list(actions, go_toolchain, pkg_import_path, srcs, package_root, config.build_tags, config.cgo_enabled, with_tests = config.with_tests)
++    # A go list of the same sources can be reused: an external test
++    # package's comes from the internal test package's build
++    if go_list_out == None:
++        go_list_out = go_list(actions, go_toolchain, pkg_import_path, srcs, package_root, config.build_tags, config.cgo_enabled, with_tests = config.with_tests)
+ 
+     test_go_files_argsfile = actions.declare_output(paths.basename(pkg_import_path) + "_test_go_files.go_package_argsfile", has_content_based_path = True)
+ 
+@@ -152,8 +159,14 @@
+     if go_list.error != None:
+         fail("Invalid go package: {}", go_list.error.err)
+ 
+-    if len(go_list.x_test_go_files) > 0:
+-        fail("External tests are not supported, remove suffix '_test' from package declaration '{}': {}", go_list.name, target_label)
++    # The internal test package leaves out the external test files: go_test
++    # builds them as a package of their own (config.x_test)
++    if config.x_test:
++        build_go_list = go_list_for_x_test(go_list)
++        test_go_files = go_list.x_test_go_files
++    else:
++        build_go_list = go_list_for_build(go_list, config.with_tests)
++        test_go_files = go_list.test_go_files if config.with_tests else []
+ 
+     go_stdlib_value = go_stdlib_value.providers[GoStdlibDynamicValue]
+ 
+@@ -162,7 +175,7 @@
+         target_label = target_label,
+         go_toolchain = go_toolchain,
+         cgo_build_context = cgo_build_context,
+-        go_list = go_list_for_build(go_list, config.with_tests),
++        go_list = build_go_list,
+         params = BuildPackageParams(
+             main = main,
+             standard = False,
+@@ -178,7 +191,9 @@
+         ),
+     )
+ 
+-    actions.write(test_go_files_argsfile, cmd_args((go_list.test_go_files if config.with_tests else []), ""))
++    # One file per line; empty, not a blank line, without test files: the
++    # test main generator and lister read each line as a file
++    actions.write(test_go_files_argsfile, cmd_args(test_go_files, "") if test_go_files else "")
+     actions.copy_dir(cgo_gen_dir, result.cgo_gen_dir)
+ 
+     actions.copy_file(out_x, result.x_file)
+@@ -249,6 +264,24 @@
+         cgo_cppflags = go_list_out.cgo_cppflags,
+     )
+ 
++# A package's external tests, the files declaring package <name>_test, as a
++# package of their own, like go test builds them. They import the package as
++# it is built with its internal tests.
++def go_list_for_x_test(go_list_out: GoListOut) -> BuildPackageGoList:
++    return BuildPackageGoList(
++        pkg_name = go_list_out.name + "_test",
++        go_files = go_list_out.x_test_go_files,
++        cgo_files = [],
++        s_files = [],
++        h_files = [],
++        c_cxx_files = [],
++        syso_files = [],
++        imports = set(go_list_out.x_test_imports),
++        embed_patterns = go_list_out.x_test_embed_patterns,
++        cgo_cflags = [],
++        cgo_cppflags = [],
++    )
++
+ BuildPackageParams = record(
+     main = field(bool),
+     standard = field(bool),
+--- a/go/tools/pkg_analyzer.go
++++ b/go/tools/pkg_analyzer.go
+@@ -32,24 +32,25 @@
+ // go list results and embedcfg for the Go compiler.
+ type AnalyzerOutput struct {
+ 	// Package information (matches go list -json output expected by go_list.bzl)
+-	Name              string   `json:"Name"`
+-	Imports           []string `json:"Imports,omitempty"`
+-	TestImports       []string `json:"TestImports,omitempty"`
+-	XTestImports      []string `json:"XTestImports,omitempty"`
+-	GoFiles           []string `json:"GoFiles,omitempty"`
+-	HFiles            []string `json:"HFiles,omitempty"`
+-	CFiles            []string `json:"CFiles,omitempty"`
+-	CXXFiles          []string `json:"CXXFiles,omitempty"`
+-	CgoFiles          []string `json:"CgoFiles,omitempty"`
+-	SFiles            []string `json:"SFiles,omitempty"`
+-	TestGoFiles       []string `json:"TestGoFiles,omitempty"`
+-	XTestGoFiles      []string `json:"XTestGoFiles,omitempty"`
+-	IgnoredGoFiles    []string `json:"IgnoredGoFiles,omitempty"`
+-	IgnoredOtherFiles []string `json:"IgnoredOtherFiles,omitempty"`
+-	CgoCFLAGS         []string `json:"CgoCFLAGS,omitempty"`
+-	CgoCPPFLAGS       []string `json:"CgoCPPFLAGS,omitempty"`
+-	EmbedPatterns     []string `json:"EmbedPatterns,omitempty"`
+-	TestEmbedPatterns []string `json:"TestEmbedPatterns,omitempty"`
++	Name               string   `json:"Name"`
++	Imports            []string `json:"Imports,omitempty"`
++	TestImports        []string `json:"TestImports,omitempty"`
++	XTestImports       []string `json:"XTestImports,omitempty"`
++	GoFiles            []string `json:"GoFiles,omitempty"`
++	HFiles             []string `json:"HFiles,omitempty"`
++	CFiles             []string `json:"CFiles,omitempty"`
++	CXXFiles           []string `json:"CXXFiles,omitempty"`
++	CgoFiles           []string `json:"CgoFiles,omitempty"`
++	SFiles             []string `json:"SFiles,omitempty"`
++	TestGoFiles        []string `json:"TestGoFiles,omitempty"`
++	XTestGoFiles       []string `json:"XTestGoFiles,omitempty"`
++	IgnoredGoFiles     []string `json:"IgnoredGoFiles,omitempty"`
++	IgnoredOtherFiles  []string `json:"IgnoredOtherFiles,omitempty"`
++	CgoCFLAGS          []string `json:"CgoCFLAGS,omitempty"`
++	CgoCPPFLAGS        []string `json:"CgoCPPFLAGS,omitempty"`
++	EmbedPatterns      []string `json:"EmbedPatterns,omitempty"`
++	TestEmbedPatterns  []string `json:"TestEmbedPatterns,omitempty"`
++	XTestEmbedPatterns []string `json:"XTestEmbedPatterns,omitempty"`
+ 
+ 	// Error information (matches go list -e output)
+ 	Error *PackageError `json:"Error,omitempty"`
+@@ -157,6 +158,8 @@
+ 		out.XTestGoFiles = pkg.XTestGoFiles
+ 		out.TestImports = pkg.TestImports
+ 		out.TestEmbedPatterns = pkg.TestEmbedPatterns
++		out.XTestImports = pkg.XTestImports
++		out.XTestEmbedPatterns = pkg.XTestEmbedPatterns
+ 	}
+ 
+ 	jsonData, err := json.MarshalIndent(out, "", "\t")
+--- a/go/tools/testmaingen.go
++++ b/go/tools/testmaingen.go
+@@ -63,6 +63,7 @@
+ 	outputFile    string
+ 	testCoverMode string
+ 	coverPkgs     = make(stringSetFlag)
++	xtestFiles    string
+ )
+ 
+ func init() {
+@@ -70,6 +71,7 @@
+ 	flag.StringVar(&outputFile, "output", "", "The path to the output file. Default to stdout.")
+ 	flag.Var(&coverPkgs, "cover-pkgs", "A comma-separated list of packages to gather coverage info on")
+ 	flag.StringVar(&testCoverMode, "cover-mode", "", "Cover mode (see `go tool cover`)")
++	flag.StringVar(&xtestFiles, "xtest-files", "", "A file listing the external test files (package <name>_test), one per line")
+ }
+ 
+ // Resolve argsfiles in args (e.g. `@file.txt`).
+@@ -102,7 +104,11 @@
+ 		testCoverPaths = append(testCoverPaths, importPath)
+ 	}
+ 
+-	testFuncs, err := loadTestFuncsFromFiles(pkgImportPath, flag.Args())
++	var xtests []string
++	if xtestFiles != "" {
++		xtests = loadArgs([]string{"@" + xtestFiles})
++	}
++	testFuncs, err := loadTestFuncsFromFiles(pkgImportPath, flag.Args(), xtests)
+ 	if err != nil {
+ 		log.Fatalln("Could not read test files:", err)
+ 	}
+@@ -128,7 +134,7 @@
+ 	}
+ }
+ 
+-func loadTestFuncsFromFiles(packageImportPath string, files []string) (*testFuncs, error) {
++func loadTestFuncsFromFiles(packageImportPath string, files, xtestFiles []string) (*testFuncs, error) {
+ 	t := &testFuncs{
+ 		Package: &Package{
+ 			ImportPath: packageImportPath,
+@@ -139,6 +145,15 @@
+ 			return nil, err
+ 		}
+ 	}
++	// As go test does: the external test package is imported as _xtest
++	for _, filename := range xtestFiles {
++		if filename == "" {
++			continue
++		}
++		if err := t.load(filename, "_xtest", &t.ImportXtest, &t.NeedXtest); err != nil {
++			return nil, err
++		}
++	}
+ 	return t, nil
+ }
+ 
