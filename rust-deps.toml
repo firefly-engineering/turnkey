@@ -40,7 +40,7 @@ manifests = [
     "src/rust/prefetch-cache/Cargo.toml",
     "src/rust/project-sync/Cargo.toml",
     "src/rust/rules-star/Cargo.toml",
-    "src/rust/rules-sync/Cargo.toml",
+    "src/rust/rules-syncer/Cargo.toml",
     "src/rust/starlark-parse/Cargo.toml",
 ]
 

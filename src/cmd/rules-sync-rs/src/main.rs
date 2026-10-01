@@ -1,5 +1,5 @@
 //! rules-sync keeps the deps of a project's rules.star files in step with
-//! their sources (the rules-sync crate's syncer), and prints what it did as
+//! their sources (the rules-syncer crate's syncer), and prints what it did as
 //! a JSON report on stdout.
 //!
 //! tk runs it for `tk rules check`, `tk rules sync` and the rules sync
@@ -19,8 +19,8 @@
 //! and the same exit codes.
 
 use project_sync::launch::Launcher;
-use rules_sync::report::{Error, Report, Stage};
-use rules_sync::sync::{Config, Syncer};
+use rules_syncer::report::{Error, Report, Stage};
+use rules_syncer::sync::{Config, Syncer};
 use std::io::Write;
 
 fn main() {

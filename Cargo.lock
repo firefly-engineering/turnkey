@@ -2554,7 +2554,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "rules-sync"
+name = "rules-sync-rs"
+version = "0.1.0"
+dependencies = [
+ "gostd",
+ "project-sync",
+ "rules-syncer",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "rules-syncer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2571,17 +2582,6 @@ dependencies = [
  "serde_json",
  "tempfile",
  "toml",
-]
-
-[[package]]
-name = "rules-sync-rs"
-version = "0.1.0"
-dependencies = [
- "gostd",
- "project-sync",
- "rules-sync",
- "serde_json",
- "tempfile",
 ]
 
 [[package]]

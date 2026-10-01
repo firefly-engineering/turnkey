@@ -1,8 +1,8 @@
-# rules-sync - rules.star files' deps kept in step with their sources
+# rules-syncer - rules.star files' deps kept in step with their sources
 load("@prelude//:rules.bzl", "rust_library", "rust_test")
 
 rust_library(
-    name = "rules-sync",
+    name = "rules-syncer",
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
     deps = [
@@ -24,7 +24,7 @@ rust_library(
 )
 
 rust_test(
-    name = "rules-sync-test",
+    name = "rules-syncer-test",
     srcs = glob(["src/**/*.rs"]),
     edition = "2024",
     deps = [

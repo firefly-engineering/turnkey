@@ -1,5 +1,5 @@
 [package]
-name = "rules-sync"
+name = "rules-syncer"
 version = "0.1.0"
 edition.workspace = true
 description = "rules.star files' deps kept in step with their sources"

@@ -30,10 +30,10 @@ go_test(
     visibility = ["PUBLIC"],
 )
 
-# The sync.toml turnkey's shell writes, read by the rules-sync crate's
+# The sync.toml turnkey's shell writes, read by the rules-syncer crate's
 # tests too
 export_file(
     name = "sync-contract",
     src = "testdata/sync.toml",
-    visibility = ["//src/rust/rules-sync/..."],
+    visibility = ["//src/rust/rules-syncer/..."],
 )

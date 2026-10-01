@@ -1,4 +1,4 @@
-//! rules-sync: the deps of a project's `rules.star` files kept in step with
+//! rules-syncer: the deps of a project's `rules.star` files kept in step with
 //! their sources
 //!
 //! [`sync::Syncer`] walks a project's `rules.star` files (or those under

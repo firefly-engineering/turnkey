@@ -23,7 +23,7 @@ let
       "src/rust/prefetch-cache"
       "src/rust/project-sync"
       "src/rust/rules-star"
-      "src/rust/rules-sync"
+      "src/rust/rules-syncer"
     ];
   };
 in

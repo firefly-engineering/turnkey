@@ -17,9 +17,9 @@ go_test(
     visibility = ["PUBLIC"],
 )
 
-# The test cases, run by the rules-sync crate's tests too
+# The test cases, run by the rules-syncer crate's tests too
 export_file(
     name = "cfg-vectors",
     src = "testdata/cfg-vectors.json",
-    visibility = ["//src/rust/rules-sync/..."],
+    visibility = ["//src/rust/rules-syncer/..."],
 )

@@ -9,7 +9,7 @@ rust_binary(
     deps = [
         "//src/rust/gostd:gostd",
         "//src/rust/project-sync:project-sync",
-        "//src/rust/rules-sync:rules-sync",
+        "//src/rust/rules-syncer:rules-syncer",
     ],
     visibility = ["PUBLIC"],
 )
@@ -22,7 +22,7 @@ rust_test(
     deps = [
         "//src/rust/gostd:gostd",
         "//src/rust/project-sync:project-sync",
-        "//src/rust/rules-sync:rules-sync",
+        "//src/rust/rules-syncer:rules-syncer",
         "rustdeps//vendor/serde_json:serde_json",
         "rustdeps//vendor/tempfile:tempfile",
     ],

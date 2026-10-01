@@ -38,7 +38,7 @@ members = [
     "src/rust/prefetch-cache",
     "src/rust/project-sync",
     "src/rust/rules-star",
-    "src/rust/rules-sync",
+    "src/rust/rules-syncer",
     "src/rust/starlark-parse",
 ]
 
@@ -127,4 +127,4 @@ pep508 = { path = "src/rust/pep508" }
 prefetch-cache = { path = "src/rust/prefetch-cache" }
 project-sync = { path = "src/rust/project-sync" }
 rules-star = { path = "src/rust/rules-star" }
-rules-sync = { path = "src/rust/rules-sync" }
+rules-syncer = { path = "src/rust/rules-syncer" }
