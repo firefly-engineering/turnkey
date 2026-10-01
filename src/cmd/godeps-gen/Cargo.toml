@@ -1,10 +1,9 @@
 [package]
-name = "godeps-gen-rs"
+name = "godeps-gen"
 version = "0.1.0"
 edition.workspace = true
 description = "Generate go-deps.toml from a Go module or workspace for Buck2/Nix integration"
 
-# The binary is named after the tool it ports
 [[bin]]
 name = "godeps-gen"
 path = "src/main.rs"

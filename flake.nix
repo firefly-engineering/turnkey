@@ -189,9 +189,6 @@
         {
           # Export tools as packages
           packages.godeps-gen = import ./nix/packages/godeps-gen.nix { inherit pkgs lib; };
-          # The Rust port of godeps-gen, compared with it by
-          # `nix run .#parity -- godeps-gen` until it replaces it (#211)
-          packages.godeps-gen-rs = import ./nix/packages/godeps-gen-rs.nix { inherit pkgs lib; };
           packages.nix-prefetch-cached = import ./nix/packages/nix-prefetch-cached.nix { inherit pkgs lib; };
           packages.pydeps-gen = import ./nix/packages/pydeps-gen.nix { inherit pkgs lib; };
           packages.rustdeps-gen = import ./nix/packages/rustdeps-gen.nix { inherit pkgs lib; };
@@ -795,7 +792,7 @@
           # godeps-gen hashed, so nix/lib/deps-cell/fetchers.nix must
           # case-escape the path and the version exactly as
           # golang.org/x/mod/module does (vectors from
-          # src/go/pkg/godeps/prefetch_test.go).
+          # src/cmd/godeps-gen/src/prefetch.rs's tests).
           checks.go-proxy-url =
             let
               inherit (import ./nix/lib/deps-cell/fetchers.nix { inherit pkgs lib; }) goProxyZipUrl;

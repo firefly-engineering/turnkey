@@ -1,6 +1,6 @@
 //! go-deps.toml: the deps file the godeps cell is built from
 //!
-//! The file is written line by line, as Go's godeps-gen wrote it, rather
+//! The file is written line by line, as the Go godeps-gen wrote it, rather
 //! than serialized: its layout (comments, the go.sum hash comment after an
 //! empty hash) is what turnkey's committed go-deps.toml files hold.
 
@@ -105,7 +105,7 @@ pub fn render(file: &DepsFile, opts: OutputOptions) -> String {
 }
 
 /// One dependency, under its versioned key `[deps."path@version"]`. Its
-/// strings are written as they are, unescaped, as Go's godeps-gen wrote
+/// strings are written as they are, unescaped, as the Go godeps-gen wrote
 /// them.
 fn write_dependency(w: &mut String, dep: &Dependency) {
     let _ = writeln!(w, "[deps.\"{}@{}\"]", dep.import_path, dep.version);
@@ -339,8 +339,8 @@ dir = "a"
         );
     }
 
-    /// The Go tests' integration cases: src/testdata/godeps/*, whose
-    /// go.mod and go.sum give expected.toml
+    /// The fixtures in testdata/godeps/*, whose go.mod and go.sum give
+    /// expected.toml
     #[test]
     fn golden_files() {
         let cases = [

@@ -24,8 +24,6 @@ pkgs.buildGoModule {
       (root + "/src/go/pkg/rulesreport")
       (root + "/src/go/pkg/rulessync")
       (root + "/src/go/pkg/mapper")
-      # mapper's tests import it; go mod vendor reads tests too
-      (root + "/src/go/pkg/godeps")
       (root + "/src/go/pkg/goparse")
       (root + "/src/go/pkg/extraction")
       (root + "/src/go/pkg/starlark")

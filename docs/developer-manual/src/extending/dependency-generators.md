@@ -49,8 +49,9 @@ The Rust generators take all three from `src/rust/deps-gen-kit`:
 `OutputArgs` and `PrefetchArgs` to flatten into their clap `Args`, the
 `Prefetcher` seam (`NixPrefetcher` on the `prefetch-cache` crate, and
 `MemoryPrefetcher` for tests), and `OutputArgs::write` for a serde-serialized
-record. godeps-gen takes the same flags and prefetches through one
-`nix-prefetch-cached --batch` call, built on the same crate.
+record. godeps-gen flattens the same flags, but prefetches through one
+`nix-prefetch-cached --batch` call (built on the same crate) and writes
+go-deps.toml line by line, in the layout its Go version wrote.
 
 `tk sync` runs a generator from its language's sync rule
 (`nix/buck2/languages.nix`) and reads the deps file from stdout.
@@ -59,13 +60,13 @@ record. godeps-gen takes the same flags and prefetches through one
 
 ### godeps-gen (Go)
 
-Located at `cmd/godeps-gen/`.
+Located at `src/cmd/godeps-gen/` (Rust).
 
 ```bash
 godeps-gen -o go-deps.toml
 ```
 
-Reads: `go.mod`, `go.sum`
+Reads: `go.work` and its members' `go.mod`/`go.sum`, or `go.mod`, `go.sum`
 
 ### rustdeps-gen (Rust)
 

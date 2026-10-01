@@ -11,7 +11,7 @@ platforms = [
 manifests = [
     "src/cmd/check-rust-edition-rs/Cargo.toml",
     "src/cmd/check-source-coverage-rs/Cargo.toml",
-    "src/cmd/godeps-gen-rs/Cargo.toml",
+    "src/cmd/godeps-gen/Cargo.toml",
     "src/cmd/jsdeps-gen/Cargo.toml",
     "src/cmd/nix-prefetch-cached/Cargo.toml",
     "src/cmd/pydeps-gen/Cargo.toml",

@@ -13,8 +13,8 @@
 //! tk sync runs it from the go sync rule (nix/buck2/languages.nix), in the
 //! project root.
 //!
-//! It is the Rust port of src/cmd/godeps-gen (#211), and writes the same
-//! bytes.
+//! It was ported from Go (#211), and writes the bytes the Go version
+//! wrote.
 //!
 //! Usage:
 //!

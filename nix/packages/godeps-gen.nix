@@ -1,40 +1,48 @@
 # godeps-gen Nix package
 #
-# Builds the godeps-gen tool that generates go-deps.toml from go.mod/go.sum.
-# This tool is used to create declarative Go dependency files for Buck2 integration.
+# Builds the godeps-gen tool that generates go-deps.toml from a Go module or
+# workspace, for Buck2 integration. Written in Rust (ported from Go, #211),
+# built from the workspace projection like the other Rust tools.
 #
-# Uses buildGoModule (standard Nix pattern for Go tools).
-# The vendorHash is for this tool's build process only - dependency cells
-# use per-module fetching as described in docs/dependency-management.md.
+# Wrapped to put the prefetcher on PATH. go, which resolves the workspace
+# (go list -m all), is the shell's: the toolchain the project builds with,
+# as rustdeps-gen's cargo is.
 { pkgs, lib }:
 
 let
-  fs = lib.fileset;
   root = ../..;
+  cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
   nix-prefetch-cached = import ./nix-prefetch-cached.nix { inherit pkgs lib; };
+  projection = cargoLib.workspaceProjection {
+    inherit root;
+    members = [
+      "src/cmd/godeps-gen"
+      "src/rust/deps-gen-kit"
+      "src/rust/gomod"
+      "src/rust/gostd"
+      "src/rust/prefetch-cache"
+    ];
+  };
 in
-pkgs.buildGoModule {
+pkgs.rustPlatform.buildRustPackage {
   pname = "godeps-gen";
   version = "0.1.0";
 
-  src = fs.toSource {
-    inherit root;
-    fileset = fs.unions [
-      (root + "/go.mod")
-      (root + "/go.sum")
-      (root + "/src/cmd/godeps-gen")
-      (root + "/src/go/pkg/godeps")
-    ];
-  };
-  subPackages = [ "src/cmd/godeps-gen" ];
+  inherit (projection) src;
 
-  vendorHash = "sha256-EOYz9OnH3nfGDZf9IP8o2R+Kb7W/yH2yeMBwycV8FmY=";
+  cargoLock.lockFileContents = projection.lock;
+
+  cargoBuildFlags = [
+    "-p"
+    "godeps-gen"
+  ];
+  cargoTestFlags = [
+    "-p"
+    "godeps-gen"
+  ];
 
   nativeBuildInputs = [ pkgs.makeWrapper ];
 
-  # Wrap the binary to include the prefetcher in PATH. go, which resolves
-  # the workspace (go list -m all), is the shell's: the toolchain the
-  # project builds with, as rustdeps-gen's cargo is.
   postInstall = ''
     wrapProgram $out/bin/godeps-gen \
       --prefix PATH : ${

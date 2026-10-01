@@ -1,12 +1,5 @@
 # Test data fixtures
-load("@prelude//:rules.bzl", "export_file", "filegroup")
-
-# Godeps integration test fixtures
-filegroup(
-    name = "godeps_fixtures",
-    srcs = glob(["godeps/**/*"]),
-    visibility = ["PUBLIC"],
-)
+load("@prelude//:rules.bzl", "export_file")
 
 # Rust/Cargo test data
 export_file(

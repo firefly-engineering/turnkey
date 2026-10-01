@@ -108,8 +108,8 @@ rec {
   # The proxy.golang.org zip of a module version. The module proxy protocol
   # case-escapes both the module path and the version: an uppercase letter
   # becomes "!" and its lowercase (https://go.dev/ref/mod#goproxy-protocol).
-  # godeps-gen hashes the same URL, built by golang.org/x/mod/module
-  # (src/go/pkg/godeps/prefetch.go), so the two must agree.
+  # godeps-gen hashes the same URL, built as golang.org/x/mod/module builds
+  # it (src/cmd/godeps-gen/src/prefetch.rs), so the two must agree.
   goProxyZipUrl =
     { modulePath, version, ... }:
     let

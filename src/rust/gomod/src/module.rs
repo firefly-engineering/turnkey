@@ -305,7 +305,7 @@ mod tests {
 
     #[test]
     fn escapes_upper_case_in_paths_and_versions() {
-        // The proxy URLs src/go/pkg/godeps/prefetch_test.go checks, and
+        // The proxy URLs godeps-gen's prefetch tests check, and
         // x/mod's escape test table
         assert_eq!(
             escape_path("github.com/foo/bar").unwrap(),

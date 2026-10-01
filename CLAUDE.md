@@ -226,11 +226,11 @@ This ensures:
 ├── go.mod                        # Single module: github.com/firefly-engineering/turnkey
 ├── go.sum                        # All dependency hashes
 ├── go-deps.toml                  # Generated for Nix/Buck2
-└── src/cmd/godeps-gen/main.go    # NO go.mod here - uses root module
+└── src/cmd/tk/main.go            # NO go.mod here - uses root module
 ```
 
 - All Go code shares one module
-- No nested go.mod files, except test fixtures (`src/testdata/godeps/*`), which are outside the Go build
+- No nested go.mod files, except test fixtures (`src/cmd/godeps-gen/testdata/godeps/*`), which are outside the Go build
 - Add deps with `go get` from repo root
 
 ### Rust
