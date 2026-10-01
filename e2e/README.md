@@ -40,6 +40,7 @@ e2e/
 │       └── setup.sh        # setup_test_project, run_in_devshell
 ├── fixtures/
 │   ├── greenfield-go/      # Minimal Go project
+│   ├── go-coverage/        # go.work monorepo covering the Go path (see its README.md)
 │   └── multi-language/     # Go + Rust + Python
 └── tests/
     ├── 01-greenfield-template.sh
@@ -60,6 +61,7 @@ e2e/
 | reproducibility | Same build across machines | turnkey-s52 |
 | error-recovery | Error handling and recovery | turnkey-dw7 |
 | rules-star-sync | Auto-sync rules.star deps | turnkey-rlv3 |
+| go-coverage | `go.work` monorepo through tk sync, rules sync, build and cached tests ([fixture README](fixtures/go-coverage/README.md)) | [#208](https://github.com/firefly-engineering/turnkey/issues/208) |
 
 ## Writing Tests
 
