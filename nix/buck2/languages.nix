@@ -68,6 +68,16 @@ let
   # Where a cell is linked into the project, relative to its root
   cellLink = cellName: ".turnkey/${cellName}";
 
+  # The files that choose the Go workspace: a go.work at the project root,
+  # or the go.mod alone. Its members' go.mod and go.sum come from the deps
+  # file, through the sync rule's target_sources.
+  goSources = langCfg: [
+    "go.work"
+    "go.work.sum"
+    langCfg.modFile
+    langCfg.sumFile
+  ];
+
   # Solidity's root remappings.txt, next to foundry.toml, where forge reads it
   remappingsFile =
     langCfg:
@@ -97,18 +107,21 @@ map (language: language // { cellLink = cellLink language.cellName; }) [
         inherit userPatchesDir resolveFixups;
         buckgen = import ../packages/buckgen.nix { inherit pkgs lib; };
       };
-    # go-deps.toml has a default name, so an enabled Go always has a rule
+    # go-deps.toml has a default name, so an enabled Go always has a rule.
+    # A go.work at the project root makes its members the workspace (ADR
+    # 0007), and godeps-gen lists their go.mod and go.sum files in the deps
+    # file's `sources`: target_sources makes them sources too
     syncRules =
       { langCfg, ... }:
       lib.optional langCfg.enable {
         name = "go";
-        sources = [
-          langCfg.modFile
-          langCfg.sumFile
-        ];
+        sources = goSources langCfg;
+        target_sources = "sources";
         target = depsFile langCfg;
         generator = [
           "godeps-gen"
+          "--go-work"
+          "go.work"
           "--go-mod"
           langCfg.modFile
           "--go-sum"
@@ -121,11 +134,9 @@ map (language: language // { cellLink = cellLink language.cellName; }) [
         mutating_subcommands = [
           "get"
           "mod"
+          "work"
         ];
-        watch_files = [
-          langCfg.modFile
-          langCfg.sumFile
-        ];
+        watch_files = goSources langCfg;
         deps_rule = "go";
         post_commands = [ "go mod tidy" ];
       };

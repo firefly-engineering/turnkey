@@ -206,3 +206,24 @@ deps_rule = "go"
 		t.Errorf("go-deps.toml = %q, want the line count of the changed go.mod", got)
 	}
 }
+
+func TestRunWatchesTheSourcesTheDepsFileLists(t *testing.T) {
+	w, tool, synced := newWrapper(t)
+	// A go.work workspace: go-deps.toml lists a member's go.mod, which
+	// `go get` in that member changes
+	w.Config.Deps = []syncconfig.DepsRule{{
+		Name:          "go",
+		Sources:       []string{"go.work"},
+		Target:        "go-deps.toml",
+		TargetSources: "sources",
+	}}
+	w.Config.Wrappers[0].WatchFiles = []string{"go.work"}
+	if err := os.WriteFile(filepath.Join(w.Root, "go-deps.toml"), []byte("sources = [\"go.mod\"]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	w.Run("go", []string{"get", "example.com/dep"})
+	if want := []string{"go"}; !reflect.DeepEqual(*synced, want) {
+		t.Errorf("synced %v, want %v: go.mod is listed in go-deps.toml (ran %q)", *synced, want, tool.ran)
+	}
+}

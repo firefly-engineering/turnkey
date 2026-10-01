@@ -11,6 +11,7 @@ go_library(
         "parser.go",
         "prefetch.go",
         "types.go",
+        "workspace.go",
     ],
     deps = [
         # turnkey:auto-start
@@ -27,6 +28,7 @@ go_test(
         "output_test.go",
         "parser_test.go",
         "prefetch_test.go",
+        "workspace_test.go",
     ],
     target_under_test = ":godeps",
     # Integration fixtures, copied next to the test binary by go_test
