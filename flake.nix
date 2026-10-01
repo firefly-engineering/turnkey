@@ -241,6 +241,20 @@
           # prelude, as the dev shell uses it
           packages.turnkey-prelude = (self.lib.pinnedBuck2Release system).prelude;
 
+          # `nix run .#parity -- <tool>`: diff a Go tool against its Rust
+          # port (nix/parity/README.md). Temporary: the tk switch deletes it.
+          apps.parity = {
+            type = "app";
+            program = lib.getExe (
+              import ./nix/parity {
+                inherit pkgs lib;
+                inherit (config) packages;
+                source = self;
+              }
+            );
+            meta.description = "Diff a turnkey Go tool against its Rust port on the same inputs";
+          };
+
           # `nix fmt` formats the Nix files with the nixfmt checks.nix-format
           # holds them to
           formatter = pkgs.nixfmt;

@@ -1,0 +1,87 @@
+# godeps-gen: go-deps.toml from a Go module or workspace.
+#
+# --no-prefetch on every case: the prefetched hashes come over the network
+# (#204). go list still resolves the module graph with the real go, from
+# the caller's module cache (HOME, GOMODCACHE) or the proxy.
+#
+# The port adds `rust = "<package>"` below; its switch deletes this file.
+
+[tool]
+go = "godeps-gen"
+
+[[cases]]
+name = "testdata-simple"
+description = "src/testdata/godeps/simple: one direct dependency"
+inputs = { work = "src/testdata/godeps/simple" }
+args = ["--no-prefetch"]
+env = { GOTOOLCHAIN = "local" }
+inherit_env = ["GOMODCACHE", "GOPROXY", "GOPATH"]
+exit = 0
+outputs = [{ stream = "stdout" }]
+
+[[cases]]
+name = "testdata-medium"
+# The medium and edge-cases fixtures feed the Go tests' parser, not go
+# list: medium's go.mod is untidy and edge-cases' go.sum is malformed, so
+# godeps-gen rejects both, and the two versions must reject them alike
+description = "src/testdata/godeps/medium: an untidy go.mod, which go list -mod=readonly rejects"
+inputs = { work = "src/testdata/godeps/medium" }
+args = ["--no-prefetch"]
+env = { GOTOOLCHAIN = "local" }
+inherit_env = ["GOMODCACHE", "GOPROXY", "GOPATH"]
+exit = 1
+outputs = [{ stream = "stdout" }]
+
+[[cases]]
+name = "testdata-edge-cases"
+description = "src/testdata/godeps/edge-cases: a go.sum with a malformed line, which go list rejects"
+inputs = { work = "src/testdata/godeps/edge-cases" }
+args = ["--no-prefetch"]
+env = { GOTOOLCHAIN = "local" }
+inherit_env = ["GOMODCACHE", "GOPROXY", "GOPATH"]
+exit = 1
+outputs = [{ stream = "stdout" }]
+
+[[cases]]
+name = "e2e-greenfield-go"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+args = ["--no-prefetch", "-o", "go-deps.toml"]
+env = { GOTOOLCHAIN = "local" }
+inherit_env = ["GOMODCACHE", "GOPROXY", "GOPATH"]
+exit = 0
+outputs = [{ path = "work/go-deps.toml" }]
+
+[[cases]]
+name = "e2e-multi-language"
+inputs = { work = "e2e/fixtures/multi-language" }
+args = ["--no-prefetch", "-o", "go-deps.toml"]
+env = { GOTOOLCHAIN = "local" }
+inherit_env = ["GOMODCACHE", "GOPROXY", "GOPATH"]
+exit = 0
+outputs = [{ path = "work/go-deps.toml" }]
+
+[[cases]]
+name = "turnkey-repo"
+description = "turnkey's own module, as its go deps rule runs godeps-gen"
+inputs = { work = "." }
+args = ["--no-prefetch", "--go-work", "go.work", "--go-mod", "go.mod", "--go-sum", "go.sum", "-o", "go-deps.toml"]
+env = { GOTOOLCHAIN = "local" }
+inherit_env = ["GOMODCACHE", "GOPROXY", "GOPATH"]
+exit = 0
+outputs = [{ path = "work/go-deps.toml" }]
+
+[[cases]]
+name = "missing-go-mod"
+description = "an unreadable workspace is an error"
+inputs = { work = "src/testdata/godeps/simple" }
+args = ["--no-prefetch", "--go-mod", "absent.mod"]
+exit = 1
+outputs = [{ stream = "stdout" }]
+
+[[cases]]
+name = "conflicting-flags"
+description = "--no-prefetch with --no-cache is a usage error"
+inputs = { work = "src/testdata/godeps/simple" }
+args = ["--no-prefetch", "--no-cache"]
+exit = 2
+outputs = [{ stream = "stdout" }]
