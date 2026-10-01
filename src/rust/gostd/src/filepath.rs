@@ -71,6 +71,64 @@ pub fn is_abs(path: &Path) -> bool {
     bytes(path).first() == Some(&SEPARATOR)
 }
 
+/// `filepath.Rel`: a relative path that names targ when joined to base,
+/// by lexical processing only; `None` where Go returns an error (one path
+/// absolute and the other not, or base reaching above targ through `..`)
+pub fn rel(base: &Path, targ: &Path) -> Option<PathBuf> {
+    let base = clean_bytes(bytes(base));
+    let targ = clean_bytes(bytes(targ));
+    if targ == base {
+        return Some(PathBuf::from("."));
+    }
+    let base: &[u8] = if base == b"." { b"" } else { &base };
+    let targ: &[u8] = &targ;
+    let base_slashed = base.first() == Some(&SEPARATOR);
+    let targ_slashed = targ.first() == Some(&SEPARATOR);
+    if base_slashed != targ_slashed {
+        return None;
+    }
+    // Position base[b0..bi] and targ[t0..ti] at the first differing
+    // elements
+    let (bl, tl) = (base.len(), targ.len());
+    let (mut b0, mut bi, mut t0, mut ti) = (0, 0, 0, 0);
+    loop {
+        while bi < bl && base[bi] != SEPARATOR {
+            bi += 1;
+        }
+        while ti < tl && targ[ti] != SEPARATOR {
+            ti += 1;
+        }
+        if targ[t0..ti] != base[b0..bi] {
+            break;
+        }
+        if bi < bl {
+            bi += 1;
+        }
+        if ti < tl {
+            ti += 1;
+        }
+        b0 = bi;
+        t0 = ti;
+    }
+    if &base[b0..bi] == b".." {
+        return None;
+    }
+    if b0 != bl {
+        // Base elements left: go up before going down
+        let seps = base[b0..bl].iter().filter(|&&c| c == SEPARATOR).count();
+        let mut buf = b"..".to_vec();
+        for _ in 0..seps {
+            buf.extend_from_slice(b"/..");
+        }
+        if t0 != tl {
+            buf.push(SEPARATOR);
+            buf.extend_from_slice(&targ[t0..]);
+        }
+        return Some(path_buf(buf));
+    }
+    Some(path_buf(targ[t0..].to_vec()))
+}
+
 /// `filepath.ErrBadPattern`: a malformed pattern
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BadPattern;
@@ -398,6 +456,68 @@ fn glob_dir(dir: &Path, pattern: &Path, mut matches: Vec<PathBuf>) -> Vec<PathBu
 
 #[cfg(test)]
 mod tests {
+
+    /// Go's TestRel cases, those for Unix
+    #[test]
+    fn rel_as_go_computes_it() {
+        let ok: &[(&str, &str, &str)] = &[
+            ("a/b", "a/b", "."),
+            ("a/b/.", "a/b", "."),
+            ("a/b", "a/b/.", "."),
+            ("./a/b", "a/b", "."),
+            ("a/b", "./a/b", "."),
+            ("ab/cd", "ab/cde", "../cde"),
+            ("ab/cd", "ab/c", "../c"),
+            ("a/b", "a/b/c/d", "c/d"),
+            ("a/b", "a/b/../c", "../c"),
+            ("a/b/../c", "a/b", "../b"),
+            ("a/b/c", "a/c/d", "../../c/d"),
+            ("a/b", "c/d", "../../c/d"),
+            ("a/b/c/d", "a/b", "../.."),
+            ("a/b/c/d", "a/b/", "../.."),
+            ("a/b/c/d/", "a/b", "../.."),
+            ("a/b/c/d/", "a/b/", "../.."),
+            ("../../a/b", "../../a/b/c/d", "c/d"),
+            ("/a/b", "/a/b", "."),
+            ("/a/b/.", "/a/b", "."),
+            ("/a/b", "/a/b/.", "."),
+            ("/ab/cd", "/ab/cde", "../cde"),
+            ("/ab/cd", "/ab/c", "../c"),
+            ("/a/b", "/a/b/c/d", "c/d"),
+            ("/a/b", "/a/b/../c", "../c"),
+            ("/a/b/../c", "/a/b", "../b"),
+            ("/a/b/c", "/a/c/d", "../../c/d"),
+            ("/a/b", "/c/d", "../../c/d"),
+            ("/a/b/c/d", "/a/b", "../.."),
+            ("/a/b/c/d", "/a/b/", "../.."),
+            ("/a/b/c/d/", "/a/b", "../.."),
+            ("/a/b/c/d/", "/a/b/", "../.."),
+            ("/../../a/b", "/../../a/b/c/d", "c/d"),
+            (".", "a/b", "a/b"),
+            (".", "..", ".."),
+        ];
+        for (root, path, want) in ok {
+            assert_eq!(
+                rel(Path::new(root), Path::new(path)),
+                Some(PathBuf::from(want)),
+                "rel({root:?}, {path:?})"
+            );
+        }
+        for (root, path) in [
+            ("..", "."),
+            ("..", "a"),
+            ("../..", ".."),
+            ("a", "/a"),
+            ("/a", "a"),
+        ] {
+            assert_eq!(
+                rel(Path::new(root), Path::new(path)),
+                None,
+                "rel({root:?}, {path:?})"
+            );
+        }
+    }
+
     use super::*;
 
     fn s(p: PathBuf) -> String {
