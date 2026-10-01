@@ -199,6 +199,11 @@
           };
           # The rules-sync tk runs (nix/packages/tk.nix chooses it)
           packages.rules-sync = config.packages.tk.rulesSync;
+          # tk's Rust port, until it switches (#216): outside the shell
+          packages.tk-rs = import ./nix/packages/tk-rs.nix {
+            inherit pkgs lib;
+            inherit ((self.lib.pinnedBuck2Release system)) buck2;
+          };
           packages.tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
           packages.e2e-runner = import ./nix/packages/e2e-runner.nix { inherit pkgs lib; };
           packages.jsdeps-gen = import ./nix/packages/jsdeps-gen.nix { inherit pkgs lib; };
