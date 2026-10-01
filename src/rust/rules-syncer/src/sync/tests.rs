@@ -1507,19 +1507,24 @@ fn sync_file_go_is_host_independent() {
     ] {
         let (_dir, root) = go_conditional_fixture();
         let bin = format!("{root}/.host-bin");
-        write_files(
-            &root,
-            &[(
-                ".host-bin/go",
-                &format!(
-                    "#!/bin/sh\n: \"${{GOOS:={goos}}}\" \"${{GOARCH:={goarch}}}\"\nexport GOOS GOARCH\nexec {} \"$@\"\n",
-                    go.display()
-                ),
-            )],
-        );
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(format!("{bin}/go"), std::fs::Permissions::from_mode(0o755))
+        // Written by a child shell so this test binary never holds it open
+        // for writing: a test forking in another thread meanwhile would
+        // inherit that descriptor, and running it while it is open fails
+        // with ETXTBSY (rust-lang/rust#114554)
+        let status = std::process::Command::new("/bin/sh")
+            .args([
+                "-c",
+                r#"mkdir -p "$1" && printf '%s' "$2" > "$1/go" && chmod 755 "$1/go""#,
+                "sh",
+                &bin,
+            ])
+            .arg(format!(
+                "#!/bin/sh\n: \"${{GOOS:={goos}}}\" \"${{GOARCH:={goarch}}}\"\nexport GOOS GOARCH\nexec {} \"$@\"\n",
+                go.display()
+            ))
+            .status()
             .unwrap();
+        assert!(status.success(), "writing {bin}/go");
         let host = Launcher::new(Some(bin.into()));
         assert_eq!(
             sync_go(&root, "pkg/watch/rules.star", host),

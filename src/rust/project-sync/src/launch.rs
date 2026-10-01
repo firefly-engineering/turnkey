@@ -294,11 +294,22 @@ fn run_catching_signals(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::os::unix::fs::PermissionsExt;
 
+    /// An empty script at `path`, written by a child shell so this test
+    /// binary never holds it open for writing: a test forking in another
+    /// thread meanwhile would inherit that descriptor, and running the
+    /// script while it is open fails with ETXTBSY (rust-lang/rust#114554).
     fn executable(path: &Path) {
-        std::fs::write(path, "#!/bin/sh\n").unwrap();
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let status = std::process::Command::new("/bin/sh")
+            .args([
+                "-c",
+                r#"printf '#!/bin/sh\n' > "$1" && chmod 755 "$1""#,
+                "sh",
+            ])
+            .arg(path)
+            .status()
+            .unwrap();
+        assert!(status.success(), "writing {}", path.display());
     }
 
     #[test]

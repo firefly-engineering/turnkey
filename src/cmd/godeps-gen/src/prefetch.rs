@@ -199,7 +199,6 @@ pub fn prefetch_all(
 mod tests {
     use super::*;
     use std::collections::HashMap;
-    use std::os::unix::fs::PermissionsExt;
 
     /// A test double: answers from fixed tables and records every call
     #[derive(Default)]
@@ -315,11 +314,21 @@ mod tests {
         }
     }
 
-    /// A stand-in nix-prefetch-cached running `script`
+    /// A stand-in nix-prefetch-cached running `script`.
+    ///
+    /// A child shell writes it, so this test binary never holds it open
+    /// for writing: a test forking in another thread meanwhile would
+    /// inherit that descriptor, and running the stand-in while it is open
+    /// fails with ETXTBSY (rust-lang/rust#114554).
     fn stand_in(dir: &tempfile::TempDir, script: &str) -> OsString {
         let path = dir.path().join("nix-prefetch-cached");
-        std::fs::write(&path, format!("#!/bin/sh\n{script}")).unwrap();
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let status = Command::new("/bin/sh")
+            .args(["-c", r#"printf '%s' "$1" > "$2" && chmod 755 "$2""#, "sh"])
+            .arg(format!("#!/bin/sh\n{script}"))
+            .arg(&path)
+            .status()
+            .unwrap();
+        assert!(status.success(), "writing {}", path.display());
         path.into_os_string()
     }
 
