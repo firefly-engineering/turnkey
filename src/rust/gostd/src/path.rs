@@ -81,6 +81,19 @@ pub fn dir(p: &str) -> String {
     clean(&p[..i])
 }
 
+/// `path.Base` (and `filepath.Base` on Unix): the last element, without
+/// trailing slashes; "." for an empty path and "/" for slashes alone
+pub fn base(p: &str) -> String {
+    if p.is_empty() {
+        return ".".to_string();
+    }
+    let p = p.trim_end_matches('/');
+    if p.is_empty() {
+        return "/".to_string();
+    }
+    p[p.rfind('/').map_or(0, |i| i + 1)..].to_string()
+}
+
 /// `filepath.IsAbs` on Unix
 pub fn is_abs(p: &str) -> bool {
     p.starts_with('/')
@@ -211,6 +224,26 @@ mod tests {
         assert_eq!(dir("a/go.mod"), "a");
         assert_eq!(dir("/go.mod"), "/");
         assert_eq!(dir("a/b/"), "a/b");
+    }
+
+    #[test]
+    fn base_as_go() {
+        // Go's path.Base test table (src/path/path_test.go)
+        for (input, want) in [
+            ("", "."),
+            (".", "."),
+            ("/.", "."),
+            ("/", "/"),
+            ("////", "/"),
+            ("x/", "x"),
+            ("abc", "abc"),
+            ("abc/def", "def"),
+            ("a/b/.x", ".x"),
+            ("a/b/c.", "c."),
+            ("a/b/c.x", "c.x"),
+        ] {
+            assert_eq!(base(input), want, "base({input:?})");
+        }
     }
 
     #[test]

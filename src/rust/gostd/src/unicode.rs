@@ -6,7 +6,7 @@
 //! 1.26), so a character new in a later Unicode version is classified as
 //! Go classifies it.
 
-use unicode_properties::{GeneralCategoryGroup, UnicodeGeneralCategory};
+use unicode_properties::{GeneralCategory, GeneralCategoryGroup, UnicodeGeneralCategory};
 
 /// `unicode.IsPrint`: letters, marks, numbers, punctuation, symbols and
 /// the ASCII space (U+0020), but no other space
@@ -22,6 +22,11 @@ pub fn is_print(c: char) -> bool {
 /// `unicode.IsLetter`: category L
 pub fn is_letter(c: char) -> bool {
     c.general_category_group() == GeneralCategoryGroup::Letter
+}
+
+/// `unicode.IsDigit`: category Nd, decimal digits
+pub fn is_digit(c: char) -> bool {
+    c.general_category() == GeneralCategory::DecimalNumber
 }
 
 /// `unicode.IsSpace`: '\t', '\n', '\v', '\f', '\r', ' ', U+0085, U+00A0,
@@ -82,6 +87,13 @@ mod tests {
         }
         assert!(!is_space('\u{200b}'));
         assert!(!is_space('a'));
+    }
+
+    #[test]
+    fn digits() {
+        assert!(is_digit('0') && is_digit('9') && is_digit('\u{663}') && is_digit('\u{ff19}'));
+        // Other numbers are not digits
+        assert!(!is_digit('²') && !is_digit('½') && !is_digit('Ⅻ') && !is_digit('a'));
     }
 
     #[test]

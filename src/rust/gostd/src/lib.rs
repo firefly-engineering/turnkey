@@ -9,12 +9,18 @@
 //! is not `strconv.Quote`, `Path::join` replaces on an absolute path where
 //! `filepath.Join` concatenates).
 //!
-//! - [`unicode`]: `unicode.IsPrint`, `unicode.IsSpace`, `unicode.IsLetter`
-//! - [`strconv`]: `strconv.Quote` and `strconv.Unquote`
+//! - [`unicode`]: `unicode.IsPrint`, `unicode.IsSpace`, `unicode.IsLetter`,
+//!   `unicode.IsDigit`
+//! - [`strconv`]: `strconv.Quote`, `strconv.Unquote` and
+//!   `strconv.QuotedPrefix`
 //! - [`strings`]: `strings.ToLower` and `unicode.ToLower`
-//! - [`path`]: `path.Clean`, `path.Join`, `path.Dir` and `filepath.Rel`,
+//! - [`path`]: `path.Clean`, `path.Join`, `path.Dir`, `path.Base` and
+//!   `filepath.Rel`,
 //!   for slash-separated paths (turnkey runs on Linux and macOS only)
+//! - [`constraint`]: `go/build/constraint`, the `//go:build` and
+//!   `// +build` lines of Go files
 
+pub mod constraint;
 pub mod path;
 pub mod strconv;
 pub mod strings;

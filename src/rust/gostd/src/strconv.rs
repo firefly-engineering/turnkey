@@ -69,8 +69,14 @@ impl std::error::Error for SyntaxError {}
 /// back-quoted Go literal, which must be all of `s`
 ///
 /// Go's result is bytes, which `\x` and octal escapes can make invalid
-/// UTF-8; here that is an error.
+/// UTF-8; here that is an error ([`unquote_bytes`] has the bytes).
 pub fn unquote(s: &str) -> Result<String, SyntaxError> {
+    String::from_utf8(unquote_bytes(s)?).map_err(|_| SyntaxError)
+}
+
+/// `strconv.Unquote`, with its result as Go has it: bytes, which need not
+/// be UTF-8
+pub fn unquote_bytes(s: &str) -> Result<Vec<u8>, SyntaxError> {
     let bytes = s.as_bytes();
     if bytes.len() < 2 {
         return Err(SyntaxError);
@@ -86,7 +92,7 @@ pub fn unquote(s: &str) -> Result<String, SyntaxError> {
                 return Err(SyntaxError);
             }
             // Carriage returns are discarded from raw strings
-            Ok(body.replace('\r', ""))
+            Ok(body.replace('\r', "").into_bytes())
         }
         b'"' | b'\'' => {
             let mut out: Vec<u8> = Vec::with_capacity(body.len());
@@ -107,11 +113,58 @@ pub fn unquote(s: &str) -> Result<String, SyntaxError> {
                 rest = tail;
                 runes += 1;
             }
-            // A single-quoted literal is exactly one character
-            if quote == b'\'' && runes != 1 {
+            // A single-quoted literal is one character, or none: Go's
+            // fast path takes '' for the empty string
+            if quote == b'\'' && runes > 1 {
                 return Err(SyntaxError);
             }
-            String::from_utf8(out).map_err(|_| SyntaxError)
+            Ok(out)
+        }
+        _ => Err(SyntaxError),
+    }
+}
+
+/// `strconv.QuotedPrefix`: the quoted string (as `unquote` reads it) at
+/// the start of `s`, quotes included
+pub fn quoted_prefix(s: &str) -> Result<&str, SyntaxError> {
+    let bytes = s.as_bytes();
+    if bytes.len() < 2 {
+        return Err(SyntaxError);
+    }
+    let quote = bytes[0];
+    // Where the literal ends if it has no escaped quote
+    let end = bytes[1..]
+        .iter()
+        .position(|&b| b == quote)
+        .ok_or(SyntaxError)?
+        + 2;
+    match quote {
+        b'`' => Ok(&s[..end]),
+        b'"' | b'\'' => {
+            let lit = &s[..end];
+            // Without escapes or newlines, it ends there: a single-quoted
+            // literal must hold one character, or none
+            if !lit.contains('\\') && !lit.contains('\n') {
+                let body = &s[1..end - 1];
+                if quote == b'"' || body.chars().count() <= 1 {
+                    return Ok(lit);
+                }
+            }
+            let mut rest = &s[1..];
+            while !rest.is_empty() && rest.as_bytes()[0] != quote {
+                if rest.starts_with('\n') {
+                    return Err(SyntaxError);
+                }
+                let (_, tail) = unquote_char(rest, quote)?;
+                rest = tail;
+                if quote == b'\'' {
+                    break;
+                }
+            }
+            if rest.as_bytes().first() != Some(&quote) {
+                return Err(SyntaxError);
+            }
+            Ok(&s[..s.len() - rest.len() + 1])
         }
         _ => Err(SyntaxError),
     }
@@ -241,6 +294,7 @@ mod tests {
             ("'x'", "x"),
             (r"'\''", "'"),
             ("\"café\"", "café"),
+            ("''", ""),
         ];
         for (input, want) in ok {
             assert_eq!(unquote(input).as_deref(), Ok(want), "unquote({input:?})");
@@ -259,12 +313,95 @@ mod tests {
             r#""\U00110000""#,
             "\"a\nb\"",
             "'ab'",
-            "''",
             "`a`b`",
             r#""\xff""#,
         ];
         for input in bad {
             assert_eq!(unquote(input), Err(SyntaxError), "unquote({input:?})");
         }
+    }
+
+    /// Go 1.26's strconv tests of QuotedPrefix (testUnquote): a quoted
+    /// literal's prefix is the literal, whatever follows it, and a
+    /// malformed one has none
+    #[test]
+    fn unquote_bytes_keeps_what_isnt_utf8() {
+        assert_eq!(unquote_bytes(r#""abc\xffdef""#), Ok(b"abc\xffdef".to_vec()));
+        assert_eq!(unquote_bytes(r#""\377""#), Ok(vec![0xff]));
+        assert_eq!(unquote_bytes("`\\x00`"), Ok(b"\\x00".to_vec()));
+        assert_eq!(unquote_bytes(r#""\q""#), Err(SyntaxError));
+    }
+
+    #[test]
+    fn quoted_prefix_as_go() {
+        let ok = [
+            r#""""#,
+            r#""a""#,
+            r#""☺""#,
+            r#""\xFF""#,
+            r#""\377""#,
+            r#""\u1234""#,
+            r#""\U00010111""#,
+            r#""\a\b\f\n\r\t\v\\\"""#,
+            r#""'""#,
+            "'a'",
+            "'☹'",
+            r"'\a'",
+            r"'\x10'",
+            r"'\u1234'",
+            r"'\''",
+            "'\"'",
+            "''",
+            "``",
+            "`\\`",
+            "`\n`",
+            "`a\rb`",
+        ];
+        for lit in ok {
+            let suffix: String = "\n\r\\\"`'"
+                .chars()
+                .filter(|&c| !lit.starts_with(c))
+                .collect();
+            let input = format!("{lit}{suffix}");
+            assert_eq!(quoted_prefix(&input), Ok(lit), "quoted_prefix({input:?})");
+        }
+        // Go's misquoted strings with no valid prefix
+        let bad = [
+            "",
+            "\"",
+            "\"a",
+            "\"'",
+            "b\"",
+            r#""\9""#,
+            r#""\19""#,
+            r#""\129""#,
+            r"'\9'",
+            r"'\19'",
+            r"'\129'",
+            "'ab'",
+            r#""\x1!""#,
+            r#""\U12345678""#,
+            r#""\z""#,
+            "`",
+            "`xxx",
+            r#""\'""#,
+            r#"'\"'"#,
+            "\"\n\"",
+            "\"\\n\n\"",
+            "'\n'",
+            r#""\udead""#,
+        ];
+        for input in bad {
+            assert_eq!(
+                quoted_prefix(input),
+                Err(SyntaxError),
+                "quoted_prefix({input:?})"
+            );
+        }
+        // A literal followed by more is its prefix
+        assert_eq!(quoted_prefix("\"a\" b"), Ok("\"a\""));
+        assert_eq!(quoted_prefix("'' x"), Ok("''"));
+        assert_eq!(quoted_prefix("`x` y"), Ok("`x`"));
+        assert_eq!(quoted_prefix(r#""\x41"z"#), Ok(r#""\x41""#));
     }
 }
