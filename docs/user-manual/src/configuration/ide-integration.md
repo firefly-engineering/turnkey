@@ -158,18 +158,19 @@ tk rules sync              # Sync only stale files (git-based detection)
 tk rules sync --force      # Force sync all files
 tk rules sync --verbose    # Show detailed output
 tk rules sync --dry-run    # Show what would change without writing
-tk rules check             # Check if any files need sync (exit 1 if stale)
-tk rules check --force     # Check all files, not just git-changed
+tk rules check             # Check every rules.star file (exit 1 if any is stale)
 ```
 
 ## Staleness Detection
 
-Turnkey uses intelligent staleness detection to minimize unnecessary work:
+`tk rules sync` and the sync `tk` runs before buck2 commands skip work that can't have changed:
 
-1. **Git-based** (default): Only checks directories with uncommitted source file changes
-2. **Mtime-based** (with `--force`): Compares modification times of source files vs rules.star
+1. **Git-based**: only directories with uncommitted source file changes are considered
+2. **Mtime-based**: within those, a `rules.star` newer than every source file next to it is skipped
 
-This means `tk rules sync` is nearly instant in most cases, making it suitable for on-save hooks.
+`--force` (or `--all`) turns both off. This means `tk rules sync` is nearly instant in most cases, making it suitable for on-save hooks.
+
+`tk rules check` uses neither: it always checks every `rules.star`. Once a stale `rules.star` is committed, git reports no change for it and nothing makes its sources newer, so a filtered check would pass it forever.
 
 ## Preservation Markers
 

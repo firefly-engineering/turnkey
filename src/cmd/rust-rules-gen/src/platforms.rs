@@ -159,20 +159,11 @@ impl Platforms {
 mod tests {
     use super::*;
     use serde_json::Value;
-    use std::path::PathBuf;
 
-    /// The shared test cases of src/go/pkg/conditions: Buck2 and the Nix
-    /// build pass the file, a cargo run reads it from the tree
+    /// The shared test cases of src/go/pkg/conditions. testdata/ links to
+    /// the file, and Buck2 maps it to the same path.
     fn vectors() -> Value {
-        let path = std::env::var_os("TURNKEY_SPLIT_VECTORS")
-            .map(PathBuf::from)
-            .or_else(|| {
-                option_env!("CARGO_MANIFEST_DIR").map(|dir| {
-                    PathBuf::from(dir).join("../../go/pkg/conditions/testdata/split-vectors.json")
-                })
-            })
-            .expect("TURNKEY_SPLIT_VECTORS names the split test cases");
-        serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap()
+        serde_json::from_str(include_str!("../testdata/split-vectors.json")).unwrap()
     }
 
     #[test]

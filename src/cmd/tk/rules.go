@@ -12,7 +12,7 @@ import (
 // runRules handles the "tk rules" subcommand.
 // Usage:
 //
-//	tk rules check              # Check if rules.star files are stale
+//	tk rules check              # Check every rules.star file
 //	tk rules sync               # Update stale rules.star files
 //	tk rules sync --all         # Force update all rules.star files
 //	tk rules sync path/to/dir   # Update specific directory
@@ -47,14 +47,19 @@ func runRulesCheck(args []string) int {
 		fmt.Fprintf(os.Stderr, "tk rules: %v\n", err)
 		return 1
 	}
+	return checkRules(root, args)
+}
 
+// checkRules checks every rules.star under root, or under the directory
+// args names. It ignores git status and file times, which only tell what
+// changed since the last commit: a stale rules.star that was committed is
+// still stale. --all and --force are accepted and change nothing.
+func checkRules(root string, args []string) int {
 	// Parse check-specific flags
 	var targetDir string
-	var forceCheck bool
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--all", "-a", "--force", "-f":
-			forceCheck = true
 		case "--verbose", "-v":
 			verbose = true
 		case "--quiet", "-q":
@@ -78,7 +83,7 @@ func runRulesCheck(args []string) int {
 		ProjectRoot: root,
 		DryRun:      true,
 		Verbose:     verbose,
-		Force:       forceCheck,
+		Force:       true,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tk rules: %v\n", err)
@@ -320,24 +325,26 @@ func printRulesHelp() {
 	fmt.Fprintln(os.Stderr, `Usage: tk rules <command> [options] [path]
 
 Commands:
-  check              Check if rules.star files need updates
+  check              Check every rules.star file against its sources
   sync               Update rules.star files with detected dependencies
   help               Show this help
 
 Options:
-  --all, -a          Process all files (skip staleness detection)
+  --all, -a          sync: process all files (skip staleness detection)
   --force, -f        Same as --all
   --verbose, -v      Show detailed output including skipped files
   --quiet, -q        Suppress output
   --dry-run, -n      Show what would be changed without writing
 
 Staleness Detection:
-  By default, only files where source files are newer than rules.star
-  are processed. Use --all or --force to check/sync all files.
+  check always checks every rules.star file, so it also catches a stale
+  file that is already committed. sync, by default, only processes
+  directories with uncommitted changes whose source files are newer than
+  rules.star. Use --all or --force to sync all files.
 
 Examples:
-  tk rules check                    # Check stale rules.star files
-  tk rules check --all              # Check all rules.star files
+  tk rules check                    # Check all rules.star files
+  tk rules check src/cmd/tk         # Check one directory
   tk rules sync                     # Update stale rules.star files
   tk rules sync --all               # Force update all files
   tk rules sync src/cmd/tk          # Sync specific directory

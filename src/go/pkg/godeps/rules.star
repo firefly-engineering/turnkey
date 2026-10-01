@@ -16,6 +16,7 @@ go_library(
     deps = [
         # turnkey:auto-start
         "godeps//vendor/golang.org/x/mod/modfile:modfile",
+        "godeps//vendor/golang.org/x/mod/module:module",
         # turnkey:auto-end
     ],
     visibility = ["PUBLIC"],

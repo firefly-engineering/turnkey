@@ -17,6 +17,9 @@ let
       "src/rust/deps-gen-kit"
       "src/rust/prefetch-cache"
     ];
+    # The PEP 508 cases src/go/pkg/pep508 runs too, which the crate's
+    # testdata/ links to
+    extraFiles = [ "src/go/pkg/pep508/testdata/pep508-vectors.json" ];
   };
 in
 pkgs.rustPlatform.buildRustPackage {
@@ -36,11 +39,6 @@ pkgs.rustPlatform.buildRustPackage {
     "-p"
     "pydeps-gen"
   ];
-
-  # The PEP 508 cases src/go/pkg/pep508 runs too
-  preCheck = ''
-    export TURNKEY_PEP508_VECTORS=${../../src/go/pkg/pep508/testdata/pep508-vectors.json}
-  '';
 
   nativeBuildInputs = [ pkgs.makeWrapper ];
 

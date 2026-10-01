@@ -4,9 +4,9 @@
 # workspace narrowed to one tool's members, computed at evaluation time
 # (see "Workspace projection" in CONTEXT.md).
 #
-# A projection is `{ root, members } -> { src, lock }`:
-#   src   the members' directories, plus the projected Cargo.toml and
-#         Cargo.lock at the root
+# A projection is `{ root, members, extraFiles } -> { src, lock }`:
+#   src   the members' directories and the extra files, plus the projected
+#         Cargo.toml and Cargo.lock at the root
 #   lock  the projected Cargo.lock, as a string, for cargoLock.lockFileContents
 #
 # Nix names a derivation's output after its inputs, so neither the root
@@ -200,6 +200,8 @@ let
   #   root:     Path to the workspace root
   #   members:  Workspace members the tool is built from (e.g. ["src/cmd/foo",
   #             "src/rust/bar"]), path dependencies among them included
+  #   extraFiles: Other files the members read, at their path from root (e.g.
+  #             test cases a member's testdata/ links to)
   #   manifest: The parsed root Cargo.toml (defaults to root's)
   #   lock:     The parsed root Cargo.lock (defaults to root's)
   #
@@ -208,6 +210,7 @@ let
     {
       root,
       members,
+      extraFiles ? [ ],
       manifest ? readTOML (root + "/Cargo.toml"),
       lock ? readTOML (root + "/Cargo.lock"),
     }:
@@ -222,7 +225,7 @@ let
       });
       memberSources = fs.toSource {
         inherit root;
-        fileset = fs.unions (map (m: root + "/${m}") members);
+        fileset = fs.unions (map (path: root + "/${path}") (members ++ extraFiles));
       };
     in
     {

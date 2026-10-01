@@ -284,7 +284,6 @@ fn tokenize(s: &str) -> Result<Vec<Token>> {
 mod tests {
     use super::*;
     use serde::Deserialize;
-    use std::path::PathBuf;
 
     #[derive(Deserialize)]
     struct Vectors {
@@ -311,17 +310,10 @@ mod tests {
         marker: String,
     }
 
-    /// The cases src/go/pkg/pep508 runs too: Buck2 passes the exported
-    /// file, a Cargo run reads it from the tree.
+    /// The cases src/go/pkg/pep508 runs too. testdata/ links to the file,
+    /// and Buck2 maps it to the same path.
     fn vectors() -> Vectors {
-        let path = std::env::var("TURNKEY_PEP508_VECTORS")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| {
-                // Buck2 builds without CARGO_MANIFEST_DIR, and sets the variable
-                PathBuf::from(option_env!("CARGO_MANIFEST_DIR").unwrap_or("src/cmd/pydeps-gen"))
-                    .join("../../go/pkg/pep508/testdata/pep508-vectors.json")
-            });
-        serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap()
+        serde_json::from_str(include_str!("../testdata/pep508-vectors.json")).unwrap()
     }
 
     #[test]

@@ -27,6 +27,7 @@ rust_test(
         "rustdeps//vendor/toml:toml",
         "rustdeps//vendor/tempfile:tempfile",
     ],
-    # The select() keys follow the conditions module's shared test cases
-    env = {"TURNKEY_SPLIT_VECTORS": "$(location //src/go/pkg/conditions:split-vectors)"},
+    # The select() keys follow the conditions module's shared test cases,
+    # embedded from where testdata/ links to them
+    mapped_srcs = {"//src/go/pkg/conditions:split-vectors": "testdata/split-vectors.json"},
 )

@@ -132,7 +132,7 @@ It adds missing store links, rewrites alias packages whose target changed, remov
 Manage `rules.star` files that define Buck2 build targets from source files. This command automatically detects imports from source files and updates the `deps` list in `rules.star`.
 
 ```bash
-tk rules check              # Check if rules.star files need updates
+tk rules check              # Check every rules.star file against its sources
 tk rules sync               # Update rules.star files with detected dependencies
 tk rules help               # Show help
 ```
@@ -141,7 +141,7 @@ tk rules help               # Show help
 
 | Flag | Description |
 |------|-------------|
-| `--all`, `-a` | Process all files (skip staleness detection) |
+| `--all`, `-a` | `sync`: process all files (skip staleness detection) |
 | `--force`, `-f` | Same as `--all` |
 | `--verbose`, `-v` | Show detailed output including skipped files |
 | `--quiet`, `-q` | Suppress output |
@@ -149,13 +149,13 @@ tk rules help               # Show help
 
 **Staleness Detection:**
 
-By default, only files where source files are newer than `rules.star` are processed. Use `--all` or `--force` to check/sync all files.
+`check` always checks every `rules.star`, so it also catches a stale file that is already committed. `sync` by default only processes directories with uncommitted changes whose source files are newer than `rules.star`. Use `--all` or `--force` to sync all files.
 
 **Examples:**
 
 ```bash
-tk rules check                    # Check stale rules.star files
-tk rules check --all              # Check all rules.star files
+tk rules check                    # Check all rules.star files
+tk rules check src/cmd/tk         # Check one directory
 tk rules sync                     # Update stale rules.star files
 tk rules sync --all               # Force update all files
 tk rules sync src/cmd/tk          # Sync specific directory
