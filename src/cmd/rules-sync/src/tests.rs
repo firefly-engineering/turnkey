@@ -1,4 +1,4 @@
-//! src/cmd/rules-sync's tests, ported
+//! The Go rules-sync's tests, ported
 
 use super::*;
 use serde_json::Value;

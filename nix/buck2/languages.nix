@@ -6,7 +6,7 @@
 # module builds the cells from these records, and the devenv module derives
 # the cell symlinks, the shell's generators and .turnkey/sync.toml from them,
 # so adding a language is a change to this file. sync.toml carries each
-# record's cell and deps file to rules sync (src/go/pkg/mapper).
+# record's cell and deps file to rules sync (src/rust/rules-syncer).
 #
 # Each record has:
 #   name         the option name under turnkey.buck2 (e.g. "go")

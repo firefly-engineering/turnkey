@@ -17,7 +17,8 @@ rust_library(
 
 rust_test(
     name = "rules-star-test",
-    srcs = glob(["src/**/*.rs"]),
+    # The syntax trees go.starlark.net builds, embedded with include_str!
+    srcs = glob(["src/**/*.rs", "testdata/**/*"]),
     edition = "2024",
     deps = [
         "//src/rust/conditions:conditions",
@@ -27,7 +28,4 @@ rust_test(
         "rustdeps//vendor/serde_json:serde_json",
         "rustdeps//vendor/starlark_syntax:starlark_syntax",
     ],
-    # The syntax trees src/go/pkg/starlark checks against go.starlark.net,
-    # embedded from where testdata/ links to them
-    mapped_srcs = {"//src/go/pkg/starlark:syntax-vectors": "testdata/syntax-vectors.json"},
 )

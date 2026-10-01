@@ -1,4 +1,4 @@
-//! src/go/pkg/rulessync's tests, ported: those that need neither Go's build
+//! The Go rulessync's tests, ported: those that need neither Go's build
 //! constraints (goparse) nor reading sync.toml (syncconfig)
 
 use super::*;
@@ -25,7 +25,7 @@ fn default_platforms() -> Vec<Platform> {
 }
 
 /// The sync configuration of a project with every language, as turnkey's
-/// shell lists them (src/go/pkg/rulessync/testdata/sync.toml), built for
+/// shell lists them (testdata/sync.toml), built for
 /// `platforms`
 fn test_sync(platforms: Vec<Platform>) -> sync_config::Config {
     sync_config::Config {
@@ -1028,9 +1028,8 @@ fn sync_directory_walks_in_order() {
 // writes, and the Go plug-in
 
 /// .turnkey/sync.toml as turnkey's shell writes it for a project with
-/// every language (src/go/pkg/rulessync/testdata/sync.toml, which
-/// checks.sync-config-contract checks against nix/buck2/sync-config.nix).
-/// testdata/ links to the file, which Buck2 maps there.
+/// every language (testdata/sync.toml, which checks.sync-config-contract
+/// checks against nix/buck2/sync-config.nix)
 const CONTRACT_SYNC_TOML: &str = include_str!("../../testdata/sync.toml");
 
 /// Rules sync reads the sync.toml turnkey writes: every language gets its

@@ -20,9 +20,6 @@ let
       "src/rust/pep508"
       "src/rust/prefetch-cache"
     ];
-    # The PEP 508 cases src/go/pkg/pep508 runs too, which pep508's
-    # testdata/ links to
-    extraFiles = [ "src/go/pkg/pep508/testdata/pep508-vectors.json" ];
   };
 in
 pkgs.rustPlatform.buildRustPackage {

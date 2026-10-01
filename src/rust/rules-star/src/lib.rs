@@ -13,8 +13,8 @@
 //! and layout elsewhere are kept byte for byte. [`conditional`] reads and
 //! writes an attribute whose value depends on the build configuration.
 //!
-//! The Rust port of src/go/pkg/starlark and of src/go/pkg/conditional's
-//! Read, ReadLabels and SetLabels, for rules sync (#215). What it reads
+//! Ported from Go's starlark package and conditional's Read, ReadLabels
+//! and SetLabels, for rules sync (#215). What it reads
 //! from a file is what go.starlark.net's syntax tree holds (the `syntax`
 //! module rebuilds it from starlark_syntax's), and what it writes is
 //! byte-identical to the Go version's: values are written with

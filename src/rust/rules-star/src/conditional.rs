@@ -5,7 +5,7 @@
 //! It decides what such a value is in each configuration, so rules sync
 //! and the mapper's plug-ins agree on it; how a value per configuration is
 //! written is [`conditions::conditional`]'s, which the cell generators
-//! share. The Rust port of src/go/pkg/conditional's Read, ReadLabels and
+//! share. Ported from Go's conditional package: its Read, ReadLabels and
 //! SetLabels.
 
 use crate::{Error, SelectBranch, SelectValue, Target, Value, labels};

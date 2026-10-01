@@ -17,7 +17,8 @@ rust_library(
 
 rust_test(
     name = "pep508-test",
-    srcs = glob(["src/**/*.rs"]),
+    # The PEP 508 cases, embedded with include_str!
+    srcs = glob(["src/**/*.rs", "testdata/**/*"]),
     edition = "2024",
     deps = [
         "//src/rust/conditions:conditions",
@@ -26,7 +27,4 @@ rust_test(
         "rustdeps//vendor/serde:serde",
         "rustdeps//vendor/serde_json:serde_json",
     ],
-    # The PEP 508 cases src/go/pkg/pep508 runs too, embedded from where
-    # testdata/ links to them
-    mapped_srcs = {"//src/go/pkg/pep508:pep508-vectors": "testdata/pep508-vectors.json"},
 )

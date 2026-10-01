@@ -1,1 +1,218 @@
-../../../go/pkg/pep508/testdata/pep508-vectors.json
+{
+  "description": "PEP 508 requirements and markers: how requirements parse (name normalized per PEP 503, extras sorted, marker text), and on which environments markers hold. Read by the pep508 crate's tests (src/rust/pep508, which pydeps-gen, pydeps-cell and rules sync use).",
+  "environments": {
+    "linux-x86_64": {
+      "sys_platform": "linux",
+      "platform_system": "Linux",
+      "os_name": "posix",
+      "platform_machine": "x86_64",
+      "python_version": "3.13",
+      "python_full_version": "3.13.12",
+      "implementation_name": "cpython",
+      "platform_python_implementation": "CPython",
+      "extra": ""
+    },
+    "macos-arm64": {
+      "sys_platform": "darwin",
+      "platform_system": "Darwin",
+      "os_name": "posix",
+      "platform_machine": "arm64",
+      "python_version": "3.13",
+      "python_full_version": "3.13.12",
+      "implementation_name": "cpython",
+      "platform_python_implementation": "CPython",
+      "extra": ""
+    }
+  },
+  "markers": [
+    {
+      "marker": "sys_platform == \"linux\"",
+      "holds": [
+        "linux-x86_64"
+      ]
+    },
+    {
+      "marker": "sys_platform == 'win32'",
+      "holds": []
+    },
+    {
+      "marker": "sys_platform != \"win32\"",
+      "holds": [
+        "linux-x86_64",
+        "macos-arm64"
+      ]
+    },
+    {
+      "marker": "platform_system == \"Darwin\"",
+      "holds": [
+        "macos-arm64"
+      ]
+    },
+    {
+      "marker": "os_name == \"nt\"",
+      "holds": []
+    },
+    {
+      "marker": "platform_machine == \"arm64\" or platform_machine == \"aarch64\"",
+      "holds": [
+        "macos-arm64"
+      ]
+    },
+    {
+      "marker": "sys_platform == \"linux\" and platform_machine == \"x86_64\"",
+      "holds": [
+        "linux-x86_64"
+      ]
+    },
+    {
+      "marker": "(sys_platform == \"linux\" or sys_platform == \"darwin\") and python_version >= \"3.8\"",
+      "holds": [
+        "linux-x86_64",
+        "macos-arm64"
+      ]
+    },
+    {
+      "marker": "python_version < \"3.10\"",
+      "holds": []
+    },
+    {
+      "marker": "python_version >= \"3.11\"",
+      "holds": [
+        "linux-x86_64",
+        "macos-arm64"
+      ]
+    },
+    {
+      "marker": "python_full_version >= \"3.13.1\"",
+      "holds": [
+        "linux-x86_64",
+        "macos-arm64"
+      ]
+    },
+    {
+      "marker": "python_version == \"3.13.*\"",
+      "holds": [
+        "linux-x86_64",
+        "macos-arm64"
+      ]
+    },
+    {
+      "marker": "python_full_version == \"3.13.*\"",
+      "holds": [
+        "linux-x86_64",
+        "macos-arm64"
+      ]
+    },
+    {
+      "marker": "python_version ~= \"3.12\"",
+      "holds": [
+        "linux-x86_64",
+        "macos-arm64"
+      ]
+    },
+    {
+      "marker": "python_version ~= \"3.12.0\"",
+      "holds": []
+    },
+    {
+      "marker": "\"linux\" in sys_platform",
+      "holds": [
+        "linux-x86_64"
+      ]
+    },
+    {
+      "marker": "\"win\" not in sys_platform",
+      "holds": [
+        "linux-x86_64"
+      ]
+    },
+    {
+      "marker": "implementation_name == \"pypy\"",
+      "holds": []
+    },
+    {
+      "marker": "platform_python_implementation == \"CPython\"",
+      "holds": [
+        "linux-x86_64",
+        "macos-arm64"
+      ]
+    },
+    {
+      "marker": "extra == \"socks\"",
+      "holds": []
+    },
+    {
+      "marker": "\"3.8\" <= python_version",
+      "holds": [
+        "linux-x86_64",
+        "macos-arm64"
+      ]
+    },
+    {
+      "marker": "python_version == \"3.12.*\"",
+      "holds": []
+    }
+  ],
+  "requirements": [
+    {
+      "requirement": "requests",
+      "want": {
+        "name": "requests",
+        "extras": [],
+        "marker": ""
+      }
+    },
+    {
+      "requirement": "requests[socks,security] >= 2.8.1, == 2.8.* ; python_version < '2.7'",
+      "want": {
+        "name": "requests",
+        "extras": [
+          "security",
+          "socks"
+        ],
+        "marker": "python_version < '2.7'"
+      }
+    },
+    {
+      "requirement": "Foo_Bar.baz>=1.0;sys_platform=='linux'",
+      "want": {
+        "name": "foo-bar-baz",
+        "extras": [],
+        "marker": "sys_platform=='linux'"
+      }
+    },
+    {
+      "requirement": "name @ https://example.com/x.zip ; os_name == 'posix'",
+      "want": {
+        "name": "name",
+        "extras": [],
+        "marker": "os_name == 'posix'"
+      }
+    },
+    {
+      "requirement": "pip @ https://github.com/pypa/pip/archive/1.3.1.zip#sha1=da9234ee9982d4bbb3c72346a6de940a148ea686",
+      "want": {
+        "name": "pip",
+        "extras": [],
+        "marker": ""
+      }
+    },
+    {
+      "requirement": "colorama (>=0.4) ; sys_platform == 'win32'",
+      "want": {
+        "name": "colorama",
+        "extras": [],
+        "marker": "sys_platform == 'win32'"
+      }
+    }
+  ],
+  "invalid": [
+    "",
+    "[extra]",
+    "name[",
+    "name ; sys_platform ==",
+    "name ; (sys_platform == 'linux'",
+    "name ; foo == 'x'",
+    "name ; sys_platform = 'linux'"
+  ]
+}

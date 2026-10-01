@@ -2,14 +2,14 @@
 //! a `cfg()` expression or a target triple, evaluated for the platforms
 //! turnkey builds for
 //!
-//! The Rust port of src/go/pkg/cargocfg: its grammar (Cargo's), parsed by
+//! Ported from Go's cargocfg (#215): its grammar (Cargo's), parsed by
 //! a tokenizer and a recursive-descent parser, with each predicate
 //! evaluated by cfg-expr against its copy of rustc's target table, as rustc
 //! sets cfgs for the triple. cfg-expr's own parser is stricter than Cargo
 //! on some predicates (`cfg(feature)`, `cfg(unix = "x")`, a known key with
 //! a value it doesn't know) and laxer on others (`cfg(any(unix,,))`), so it
 //! only reads one predicate at a time; one it can't read is not set.
-//! testdata/cfg-vectors.json holds the test cases each runs.
+//! testdata/cfg-vectors.json holds its test cases.
 //!
 //! Reference: https://doc.rust-lang.org/reference/conditional-compilation.html
 
@@ -345,8 +345,8 @@ mod tests {
         matches: Vec<String>,
     }
 
-    /// The cases src/go/pkg/cargocfg runs too. testdata/ links to the
-    /// file, which Buck2 maps there.
+    /// The cases of testdata/cfg-vectors.json, which the Go version ran
+    /// too
     #[test]
     fn shared_vectors() {
         let v: Vectors =

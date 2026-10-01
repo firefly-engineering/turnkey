@@ -1,9 +1,9 @@
 //! A request for a crate's features expanded the way Cargo does: what a
 //! set of requested features turns on in the crate
 //!
-//! The Rust port of src/go/pkg/cargofeatures, which mirrors
+//! Ported from Go's cargofeatures (#215), which mirrored
 //! turnkey.cargo.features.activate; testdata/activation-vectors.json holds
-//! the test cases each runs.
+//! its test cases.
 //!
 //! Reference: https://doc.rust-lang.org/cargo/reference/features.html
 
@@ -158,8 +158,8 @@ mod tests {
         dep_features: BTreeMap<String, Vec<String>>,
     }
 
-    /// The cases src/go/pkg/cargofeatures runs too. testdata/ links to the
-    /// file, which Buck2 maps there.
+    /// The cases of testdata/activation-vectors.json, which the Go version
+    /// ran too
     #[test]
     fn shared_vectors() {
         let doc: Doc =

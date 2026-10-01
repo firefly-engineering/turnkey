@@ -1,4 +1,4 @@
-//! src/go/pkg/starlark's tests, ported
+//! The Go starlark package's tests, ported
 
 use super::*;
 

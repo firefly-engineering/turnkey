@@ -1,6 +1,6 @@
 //! Starlark attribute values, written as turnkey writes them in `rules.star`
 //!
-//! The value model and writer of src/go/pkg/starlark, whose output the
+//! The value model and writer of Go's starlark package, whose output the
 //! cell generators (pydeps-cell, buckgen) and rules sync write: strings
 //! quoted by Go's `strconv.Quote` ([`gostd::strconv::quote`]), a list of
 //! one label on one line, longer lists one label per line, and
@@ -8,7 +8,7 @@
 //! the configuration.
 //!
 //! Only the values are here; rules sync's parser and span-preserving file
-//! writer join them when rules sync is ported (#215).
+//! writer are rules-star's.
 
 use gostd::strconv::quote;
 

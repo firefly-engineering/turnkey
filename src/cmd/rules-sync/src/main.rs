@@ -14,9 +14,10 @@
 //! ```
 //!
 //! dir is the directory whose rules.star files are synced, the project root
-//! by default. The Rust port of src/cmd/rules-sync (#215): the same flags,
-//! parsed as Go's flag package parses them, the same report, byte for byte,
-//! and the same exit codes.
+//! by default. Ported from Go (#215): the flags are parsed as Go's flag
+//! package parses them, the report is written as Go's encoding/json writes
+//! it, and the exit codes are the Go version's. Once tk is Rust, rules sync
+//! goes back into tk.
 
 use project_sync::launch::Launcher;
 use rules_syncer::report::{Error, Report, Stage};

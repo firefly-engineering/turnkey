@@ -1,4 +1,4 @@
-//! src/go/pkg/mapper's tests, ported
+//! The Go mapper's tests, ported
 
 use super::golang::{GoLanguage, classify_go_import, detect_go_config};
 use super::*;

@@ -18,8 +18,7 @@
 let
   fs = lib.fileset;
   root = ../..;
-  # The rules-sync tk runs for rules sync: the one place it is chosen, so a
-  # Rust rules-sync switches over by repointing this import
+  # The rules-sync tk runs for rules sync: the one place it is chosen
   rulesSync = import ./rules-sync.nix { inherit pkgs lib; };
 in
 pkgs.buildGoModule {
@@ -47,7 +46,7 @@ pkgs.buildGoModule {
   };
   subPackages = [ "src/cmd/tk" ];
 
-  vendorHash = "sha256-yJBhZBLYe5LRvDccN2gdIETa6J4H3G9FMzfwqPjFeuQ=";
+  vendorHash = "sha256-Lz9kCfY4vE6ytq1jzrX1qIRFx6EmBe/nxfhPc4sdGng=";
 
   # tk runs the rules-sync it was built with, never one found on PATH
   # (src/cmd/tk/rules.go)

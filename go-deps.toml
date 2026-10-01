@@ -24,16 +24,6 @@ import_path = "github.com/pelletier/go-toml/v2"
 version = "v2.2.4"
 hash = "sha256-iqpke1tz6+U3KCpY2NYEXL8Zg7bwMua4eblXjnhRJho="
 
-[deps."go.starlark.net@v0.0.0-20260102030733-3fee463870c9"]
-import_path = "go.starlark.net"
-version = "v0.0.0-20260102030733-3fee463870c9"
-hash = "sha256-5b2LBr4Q5UhcO6iBKXr6vjjstjUt6uZT9gCWDXojeOo="
-
-[deps."golang.org/x/mod@v0.31.0"]
-import_path = "golang.org/x/mod"
-version = "v0.31.0"
-hash = "sha256-iJGWfJ4QtUB0gv4Im0zrQgRK2uKVFDll1+orBEXRytk="
-
 [deps."golang.org/x/sys@v0.40.0"]
 import_path = "golang.org/x/sys"
 version = "v0.40.0"

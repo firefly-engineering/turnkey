@@ -199,8 +199,6 @@
           };
           # The rules-sync tk runs (nix/packages/tk.nix chooses it)
           packages.rules-sync = config.packages.tk.rulesSync;
-          # rules-sync's Rust port, compared with it until the switch (#215)
-          packages.rules-sync-rs = import ./nix/packages/rules-sync-rs.nix { inherit pkgs lib; };
           packages.tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
           packages.e2e-runner = import ./nix/packages/e2e-runner.nix { inherit pkgs lib; };
           packages.jsdeps-gen = import ./nix/packages/jsdeps-gen.nix { inherit pkgs lib; };
@@ -1033,8 +1031,8 @@
             '';
 
           # .turnkey/sync.toml as the shell writes it for a project with every
-          # language, byte for byte what rulessync's tests read
-          # (src/go/pkg/rulessync/testdata/sync.toml): the seam between the
+          # language, byte for byte what rules sync's tests read
+          # (src/rust/rules-syncer/testdata/sync.toml): the seam between the
           # language records and rules sync, checked from both sides.
           checks.sync-config-contract =
             let
@@ -1066,11 +1064,11 @@
                 languages = import ./nix/buck2/languages.nix { inherit pkgs lib; };
                 buck2 = buck2Options;
               };
-              fixture = ./src/go/pkg/rulessync/testdata/sync.toml;
+              fixture = ./src/rust/rules-syncer/testdata/sync.toml;
             in
             pkgs.runCommand "sync-config-contract-check" { } ''
               if ! diff -u ${fixture} ${syncConfig.file}; then
-                echo "sync.toml changed: copy ${syncConfig.file} to src/go/pkg/rulessync/testdata/sync.toml" >&2
+                echo "sync.toml changed: copy ${syncConfig.file} to src/rust/rules-syncer/testdata/sync.toml" >&2
                 exit 1
               fi
               touch $out

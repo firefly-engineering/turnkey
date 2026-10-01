@@ -25,7 +25,9 @@ rust_library(
 
 rust_test(
     name = "rules-syncer-test",
-    srcs = glob(["src/**/*.rs"]),
+    # The cfg() and feature activation cases and the sync.toml turnkey
+    # writes, embedded with include_str!
+    srcs = glob(["src/**/*.rs", "testdata/**/*"]),
     edition = "2024",
     deps = [
         "//src/rust/conditions:conditions",
@@ -43,12 +45,4 @@ rust_test(
         "rustdeps//vendor/tempfile:tempfile",
         "rustdeps//vendor/toml:toml",
     ],
-    # The cfg() and feature activation cases src/go/pkg/cargocfg and
-    # src/go/pkg/cargofeatures run too, and the sync.toml turnkey writes,
-    # embedded from where testdata/ links to them
-    mapped_srcs = {
-        "//src/go/pkg/cargocfg:cfg-vectors": "testdata/cfg-vectors.json",
-        "//src/go/pkg/cargofeatures:activation-vectors": "testdata/activation-vectors.json",
-        "//src/go/pkg/rulessync:sync-contract": "testdata/sync.toml",
-    },
 )

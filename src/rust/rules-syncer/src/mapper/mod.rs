@@ -6,7 +6,7 @@
 //! package's deps are resolved. It says what a package wants; [`Package`]
 //! composes that into what each target wants, and the syncer writes it.
 //!
-//! The Rust port of src/go/pkg/mapper.
+//! Ported from Go's mapper (#215).
 
 mod cargo;
 mod cargo_cfg;

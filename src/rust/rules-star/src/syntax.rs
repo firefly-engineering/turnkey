@@ -795,9 +795,9 @@ mod tests {
         nodes: Vec<String>,
     }
 
-    /// The tree is go.starlark.net's, on the cases src/go/pkg/starlark
-    /// checks against it: its nodes, their spans and their comments.
-    /// testdata/ links to the file, which Buck2 maps there.
+    /// The tree is go.starlark.net's, on the cases of
+    /// testdata/syntax-vectors.json, taken from it: its nodes, their spans
+    /// and their comments.
     #[test]
     fn shared_vectors() {
         let vectors: Vectors =

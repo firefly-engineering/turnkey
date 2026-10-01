@@ -1,43 +1,50 @@
 # rules-sync Nix package
 #
 # Builds rules-sync, which keeps the deps of a project's rules.star files in
-# step with their sources and prints what it did as a JSON report. tk runs
-# it for `tk rules` and the rules sync before a buck2 command: tk's package
-# (nix/packages/tk.nix) imports this file, and builds the store path of its
-# binary into tk. That import is the one a Rust rules-sync repoints.
+# step with their sources and prints what it did as a JSON report
+# (src/cmd/rules-sync). tk runs it for `tk rules` and the rules sync before
+# a buck2 command: tk's package (nix/packages/tk.nix) imports this file, and
+# builds the store path of its binary into tk. Written in Rust (ported from
+# Go, #215), built from the workspace projection like the other Rust tools.
 { pkgs, lib }:
 
 let
-  fs = lib.fileset;
   root = ../..;
+  cargoLib = import ../lib/cargo.nix { inherit pkgs lib; };
+  projection = cargoLib.workspaceProjection {
+    inherit root;
+    members = [
+      "src/cmd/rules-sync"
+      "src/rust/conditions"
+      "src/rust/deps-extract"
+      "src/rust/deps-gen-kit"
+      "src/rust/gomod"
+      "src/rust/goparse"
+      "src/rust/gostd"
+      "src/rust/pep508"
+      "src/rust/prefetch-cache"
+      "src/rust/project-sync"
+      "src/rust/rules-star"
+      "src/rust/rules-syncer"
+    ];
+  };
 in
-pkgs.buildGoModule {
+pkgs.rustPlatform.buildRustPackage {
   pname = "rules-sync";
   version = "0.1.0";
 
-  src = fs.toSource {
-    inherit root;
-    fileset = fs.unions [
-      (root + "/go.mod")
-      (root + "/go.sum")
-      (root + "/src/cmd/rules-sync")
-      (root + "/src/go/pkg/rulesreport")
-      (root + "/src/go/pkg/rulessync")
-      (root + "/src/go/pkg/mapper")
-      (root + "/src/go/pkg/goparse")
-      (root + "/src/go/pkg/extraction")
-      (root + "/src/go/pkg/starlark")
-      (root + "/src/go/pkg/syncconfig")
-      (root + "/src/go/pkg/conditional")
-      (root + "/src/go/pkg/conditions")
-      (root + "/src/go/pkg/cargocfg")
-      (root + "/src/go/pkg/cargofeatures")
-      (root + "/src/go/pkg/pep508")
-    ];
-  };
-  subPackages = [ "src/cmd/rules-sync" ];
+  inherit (projection) src;
 
-  vendorHash = "sha256-yJBhZBLYe5LRvDccN2gdIETa6J4H3G9FMzfwqPjFeuQ=";
+  cargoLock.lockFileContents = projection.lock;
+
+  cargoBuildFlags = [
+    "-p"
+    "rules-sync"
+  ];
+  cargoTestFlags = [
+    "-p"
+    "rules-sync"
+  ];
 
   meta = {
     description = "Sync the deps of rules.star files with their sources, for tk";

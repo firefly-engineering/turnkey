@@ -1,8 +1,9 @@
 //! Extraction protocol types matching the Go implementation.
 //!
 //! This module defines the JSON output format that is consumed by
-//! the rules sync tooling. Reading it back, as src/go/pkg/extraction does
-//! with encoding/json, a field the output leaves out is empty.
+//! rules sync (src/rust/rules-syncer). Reading it back, as Go's extraction
+//! package did with encoding/json, a field the output leaves out is
+//! empty.
 
 use serde::{Deserialize, Serialize};
 

@@ -9,8 +9,8 @@
 //! for deps that differ between configurations. [`report`] is what it did,
 //! as the rules-sync binary prints it for tk.
 //!
-//! The Rust port of src/go/pkg/mapper, src/go/pkg/rulessync and
-//! src/go/pkg/rulesreport (#215).
+//! Ported from Go's mapper, rulessync and rulesreport (#215); tk (Go)
+//! still reads the report with src/go/pkg/rulesreport.
 
 pub mod mapper;
 pub mod report;

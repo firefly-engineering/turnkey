@@ -3,8 +3,9 @@
 //!
 //! pydeps-gen checks the specifiers and markers it reads with it, and the
 //! pydeps cell (pydeps-cell) evaluates each dependency's marker per
-//! platform with [`env_for`]. It parses and evaluates as src/go/pkg/pep508
-//! does; both run the cases in testdata/pep508-vectors.json.
+//! platform with [`env_for`], and so does rules sync. It parses and
+//! evaluates as Go's pep508 package did; testdata/pep508-vectors.json
+//! holds the cases both ran.
 //!
 //! Reference: https://packaging.python.org/en/latest/specifications/dependency-specifiers/
 
@@ -571,8 +572,7 @@ mod tests {
         marker: String,
     }
 
-    /// The cases src/go/pkg/pep508 runs too. testdata/ links to the file,
-    /// and Buck2 maps it to the same path.
+    /// The cases of testdata/pep508-vectors.json
     fn vectors() -> Vectors {
         serde_json::from_str(include_str!("../testdata/pep508-vectors.json")).unwrap()
     }

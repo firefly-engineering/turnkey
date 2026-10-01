@@ -1,7 +1,7 @@
 //! Rules sync: each `rules.star` file's deps brought in step with its
 //! sources, through the mapper's language plug-ins
 //!
-//! The Rust port of src/go/pkg/rulessync.
+//! Ported from Go's rulessync (#215).
 
 use crate::mapper::{self, Language, Mapper, Package, TargetKind, Want, path_error};
 use crate::report::{Result as SyncResult, TargetChange, UnreadableTarget};

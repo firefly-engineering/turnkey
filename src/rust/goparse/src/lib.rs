@@ -17,7 +17,7 @@
 //! literals that can hold `//`. Build constraints are parsed with
 //! [`gostd::constraint`], Go's `go/build/constraint`.
 //!
-//! The Rust port of src/go/pkg/goparse (#213), with the same results.
+//! Ported from Go's goparse (#213, #215), with the same results.
 
 mod build;
 mod comments;
