@@ -90,25 +90,35 @@ func TestPrefetchAll_WithErrors(t *testing.T) {
 	}
 }
 
-func TestEscapeModulePath(t *testing.T) {
+func TestProxyZipURLEscapesPathAndVersion(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
-		input    string
-		expected string
+		mod  Module
+		want string
 	}{
-		{"github.com/foo/bar", "github.com/foo/bar"},
-		{"github.com/Azure/azure-sdk", "github.com/!azure/azure-sdk"},
-		{"github.com/BurntSushi/toml", "github.com/!burnt!sushi/toml"},
-		{"ALLCAPS", "!a!l!l!c!a!p!s"},
-		{"MixedCase/Path", "!mixed!case/!path"},
+		{Module{"github.com/foo/bar", "v1.0.0"}, "https://proxy.golang.org/github.com/foo/bar/@v/v1.0.0.zip"},
+		{Module{"github.com/BurntSushi/toml", "v1.4.0"}, "https://proxy.golang.org/github.com/!burnt!sushi/toml/@v/v1.4.0.zip"},
+		{Module{"github.com/Azure/azure-sdk", "v1.0.0-RC1"}, "https://proxy.golang.org/github.com/!azure/azure-sdk/@v/v1.0.0-!r!c1.zip"},
 	}
-
 	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			result := escapeModulePath(tt.input)
-			if result != tt.expected {
-				t.Errorf("escapeModulePath(%s) = %s, want %s", tt.input, result, tt.expected)
-			}
-		})
+		got, err := proxyZipURL(tt.mod)
+		if err != nil || got != tt.want {
+			t.Errorf("proxyZipURL(%v) = %q, %v; want %q", tt.mod, got, err, tt.want)
+		}
+	}
+}
+
+func TestGoProxyPrefetcherFailsAModuleItCannotEscape(t *testing.T) {
+	t.Parallel()
+	command := standIn(t, `while read -r url; do echo "sha256-${url##*/}"; done
+`)
+	p := &GoProxyPrefetcher{Command: command}
+	got := p.Prefetch([]Module{
+		{Path: "github.com/foo/bar", Version: "v1.0.0!"},
+		{Path: "golang.org/x/mod", Version: "v0.20.0"},
+	})
+	if len(got) != 2 || got[0].Err == nil || got[1] != (Prefetched{Hash: "sha256-v0.20.0.zip"}) {
+		t.Errorf("Prefetch = %v, want an error then a hash", got)
 	}
 }
 

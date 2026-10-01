@@ -764,6 +764,37 @@
             assert lib.assertMsg (!flat.success) "rust user patches: a flat patch file was accepted";
             pkgs.runCommand "rust-user-patches-check" { } "touch $out";
 
+          # The godeps cell fetches each module from the proxy URL that
+          # godeps-gen hashed, so nix/lib/deps-cell/fetchers.nix must
+          # case-escape the path and the version exactly as
+          # golang.org/x/mod/module does (vectors from
+          # src/go/pkg/godeps/prefetch_test.go).
+          checks.go-proxy-url =
+            let
+              inherit (import ./nix/lib/deps-cell/fetchers.nix { inherit pkgs lib; }) goProxyZipUrl;
+              got = map goProxyZipUrl [
+                {
+                  modulePath = "github.com/foo/bar";
+                  version = "v1.0.0";
+                }
+                {
+                  modulePath = "github.com/BurntSushi/toml";
+                  version = "v1.4.0";
+                }
+                {
+                  modulePath = "github.com/Azure/azure-sdk";
+                  version = "v1.0.0-RC1";
+                }
+              ];
+              want = [
+                "https://proxy.golang.org/github.com/foo/bar/@v/v1.0.0.zip"
+                "https://proxy.golang.org/github.com/!burnt!sushi/toml/@v/v1.4.0.zip"
+                "https://proxy.golang.org/github.com/!azure/azure-sdk/@v/v1.0.0-!r!c1.zip"
+              ];
+            in
+            assert lib.assertMsg (got == want) "go proxy url: built ${builtins.toJSON got}";
+            pkgs.runCommand "go-proxy-url-check" { } "touch $out";
+
           # A Go user patch goes to its own module's derivation
           # (nix/lib/deps-cell/adapters/go.nix's userPatchesOf): routed by its
           # directory, vendor/<module path>/, nested modules included. A flat

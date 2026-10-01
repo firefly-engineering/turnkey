@@ -99,19 +99,27 @@ rec {
   # so we let fetchzip strip it (the default behavior) to get clean paths.
   fetchGoProxy =
     fetchSpec:
-    let
-      # Escape uppercase letters in module path for proxy URL
-      escapedPath = lib.concatStrings (
-        lib.forEach (lib.stringToCharacters fetchSpec.modulePath) (
-          c: if lib.strings.match "[A-Z]" c != null then "!${lib.toLower c}" else c
-        )
-      );
-    in
     pkgs.fetchzip {
-      url = "https://proxy.golang.org/${escapedPath}/@v/${fetchSpec.version}.zip";
+      url = goProxyZipUrl fetchSpec;
       sha256 = fetchSpec.sha256;
       # stripRoot = true by default, which strips the "modulePath@version/" root
     };
+
+  # The proxy.golang.org zip of a module version. The module proxy protocol
+  # case-escapes both the module path and the version: an uppercase letter
+  # becomes "!" and its lowercase (https://go.dev/ref/mod#goproxy-protocol).
+  # godeps-gen hashes the same URL, built by golang.org/x/mod/module
+  # (src/go/pkg/godeps/prefetch.go), so the two must agree.
+  goProxyZipUrl =
+    { modulePath, version, ... }:
+    let
+      escape =
+        s:
+        lib.concatMapStrings (c: if c != lib.toLower c then "!${lib.toLower c}" else c) (
+          lib.stringToCharacters s
+        );
+    in
+    "https://proxy.golang.org/${escape modulePath}/@v/${escape version}.zip";
 
   # Helper to create a fetch spec for GitHub
   mkGitHubSpec =

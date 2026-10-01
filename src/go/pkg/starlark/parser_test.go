@@ -559,3 +559,44 @@ rust_library(
 		t.Errorf("NoSync = %v, want %v", got, want)
 	}
 }
+
+func TestParseSingleQuotedStrings(t *testing.T) {
+	src := `go_library(
+    name = 'single',
+    srcs = ['a.go', "b.go"],
+    importpath = 'example.com/x',
+)
+`
+	f, err := Parse("test.star", []byte(src))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	lib := f.GetTarget("single")
+	if lib == nil {
+		t.Fatalf("Target single not found; got %d targets", len(f.Targets))
+	}
+	if got := lib.GetAttribute("srcs").Value; !reflect.DeepEqual(got, StringListValue{Values: []string{"a.go", "b.go"}}) {
+		t.Errorf("srcs = %#v", got)
+	}
+	if got := lib.GetAttribute("importpath").Value; got != (StringValue{Value: "example.com/x"}) {
+		t.Errorf("importpath = %#v", got)
+	}
+}
+
+func TestSetDepsAfterNonASCIIOnTheSameLine(t *testing.T) {
+	src := `go_library(name = "x", srcs = ["café"], deps = [])
+`
+	f, err := Parse("test.star", []byte(src))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	f.GetTarget("x").SetDeps([]string{"//a:b"})
+
+	out := string(f.Write())
+	if _, err := Parse("out.star", []byte(out)); err != nil {
+		t.Fatalf("rewritten file doesn't parse: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, `srcs = ["café"]`) || !strings.Contains(out, `"//a:b"`) {
+		t.Errorf("unexpected output:\n%s", out)
+	}
+}

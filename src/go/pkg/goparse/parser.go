@@ -1,17 +1,16 @@
 package goparse
 
 import (
-	"bufio"
+	"fmt"
 	"go/build/constraint"
 	"go/parser"
+	"go/scanner"
 	"go/token"
 	"os"
 	"path/filepath"
-	"regexp"
+	"strconv"
 	"strings"
 )
-
-var embedRegexp = regexp.MustCompile(`//go:embed\s+(.*)`)
 
 // ParseFile parses a single Go file and extracts metadata.
 // Uses go/parser with ImportsOnly mode for efficiency.
@@ -30,7 +29,11 @@ func ParseFile(path string) (*GoFile, error) {
 	}
 
 	for _, imp := range f.Imports {
-		path := strings.Trim(imp.Path.Value, `"`)
+		// The path is a Go string literal, in double quotes or backquotes
+		path, err := strconv.Unquote(imp.Path.Value)
+		if err != nil {
+			return nil, fmt.Errorf("%s: import %s: %v", fset.Position(imp.Path.Pos()), imp.Path.Value, err)
+		}
 		gf.Imports = append(gf.Imports, path)
 		if path == "C" {
 			gf.HasCgo = true
@@ -66,39 +69,80 @@ func ParseFile(path string) (*GoFile, error) {
 		gf.Constraint = plusBuild
 	}
 
-	// Extract //go:embed directives
-	// These can be anywhere but usually near variables.
-	// Since we used ImportsOnly, we might not get all comments if they are not at the top?
-	// Actually parser.ImportsOnly stops after imports, but ParseComments might still include them.
-	// If ImportsOnly stops too early, we might need to scan the file manually for embeds.
-	// Let's scan the file for embeds to be safe, or check if f.Comments has them.
-
-	// According to Go specs, go:embed can be anywhere.
-	// Let's use a scanner to find all //go:embed in the file.
-	embeds, err := extractEmbeds(path)
-	if err == nil {
-		gf.EmbedDirs = embeds
+	embeds, err := extractEmbeds(fset, path)
+	if err != nil {
+		return nil, err
 	}
+	gf.EmbedDirs = embeds
 
 	return gf, nil
 }
 
-func extractEmbeds(path string) ([]string, error) {
-	file, err := os.Open(path)
+// extractEmbeds returns the patterns of every //go:embed directive in a
+// file. A directive can follow the imports anywhere in the file, past
+// where the ImportsOnly parse stops, so the file is tokenized with
+// go/scanner: that finds the line comments that are directives, and not
+// a "//go:embed" inside a string, a block comment or another comment.
+func extractEmbeds(fset *token.FileSet, path string) ([]string, error) {
+	src, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
 
+	var s scanner.Scanner
+	// Errors in the rest of the file don't matter here; the parse above
+	// has already accepted the package clause and imports in ParseFile
+	s.Init(fset.AddFile(path, -1, len(src)), src, nil, scanner.ScanComments)
 	var embeds []string
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		matches := embedRegexp.FindStringSubmatch(line)
-		if len(matches) > 1 {
-			args := strings.Fields(matches[1])
-			embeds = append(embeds, args...)
+	for {
+		pos, tok, lit := s.Scan()
+		if tok == token.EOF {
+			return embeds, nil
 		}
+		if tok != token.COMMENT {
+			continue
+		}
+		args, ok := strings.CutPrefix(lit, "//go:embed")
+		if !ok || (args != "" && args[0] != ' ' && args[0] != '\t') {
+			continue
+		}
+		patterns, err := parseEmbedPatterns(args)
+		if err != nil {
+			return nil, fmt.Errorf("%s: invalid //go:embed: %v", fset.Position(pos), err)
+		}
+		embeds = append(embeds, patterns...)
 	}
-	return embeds, scanner.Err()
+}
+
+// parseEmbedPatterns splits a //go:embed directive's arguments as the go
+// command does: separated by spaces, each either bare or a Go string
+// literal in double quotes or backquotes.
+func parseEmbedPatterns(args string) ([]string, error) {
+	var patterns []string
+	for {
+		args = strings.TrimLeft(args, " \t")
+		if args == "" {
+			return patterns, nil
+		}
+		var pattern string
+		switch args[0] {
+		case '"', '`':
+			quoted, err := strconv.QuotedPrefix(args)
+			if err != nil {
+				return nil, fmt.Errorf("unterminated or malformed string %s", args)
+			}
+			pattern, _ = strconv.Unquote(quoted)
+			args = args[len(quoted):]
+			if args != "" && args[0] != ' ' && args[0] != '\t' {
+				return nil, fmt.Errorf("missing space after %s", quoted)
+			}
+		default:
+			end := strings.IndexAny(args, " \t")
+			if end < 0 {
+				end = len(args)
+			}
+			pattern, args = args[:end], args[end:]
+		}
+		patterns = append(patterns, pattern)
+	}
 }
