@@ -1,0 +1,23 @@
+[package]
+name = "rules-sync"
+version = "0.1.0"
+edition.workspace = true
+description = "rules.star files' deps kept in step with their sources"
+
+[dependencies]
+anyhow.workspace = true
+cfg-expr.workspace = true
+conditions.workspace = true
+deps-extract.workspace = true
+gomod.workspace = true
+goparse.workspace = true
+gostd.workspace = true
+pep508.workspace = true
+project-sync.workspace = true
+rules-star.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -39,6 +39,7 @@ manifests = [
     "src/rust/prefetch-cache/Cargo.toml",
     "src/rust/project-sync/Cargo.toml",
     "src/rust/rules-star/Cargo.toml",
+    "src/rust/rules-sync/Cargo.toml",
     "src/rust/starlark-parse/Cargo.toml",
 ]
 
@@ -442,6 +443,17 @@ dependencies = [
 name = "cc"
 version = "1.2.55"
 hash = "sha256-y3BLIviQHJabhrS+aat0eQ/oXYnEZG+zRB5vlO0/iw0="
+
+[deps."cfg-expr@0.20.9"]
+name = "cfg-expr"
+version = "0.20.9"
+hash = "sha256-hp1RihlNnGkLskeE5BntdZ/W5oNi/nG37xefCBDI4Yo="
+features = [
+    { name = "default" },
+]
+dependencies = [
+    { package = "smallvec@1.15.1" },
+]
 
 [deps."cfg-if@1.0.4"]
 name = "cfg-if"

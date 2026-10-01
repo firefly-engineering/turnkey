@@ -37,6 +37,7 @@ members = [
     "src/rust/prefetch-cache",
     "src/rust/project-sync",
     "src/rust/rules-star",
+    "src/rust/rules-sync",
     "src/rust/starlark-parse",
 ]
 
@@ -50,6 +51,9 @@ edition = "2024"
 anyhow = "1.0"
 base64 = "0.22"
 cargo-lock = "10"
+# Cargo target cfg() expressions, and rustc's targets to evaluate them for
+# (rules sync, #193)
+cfg-expr = "0.20"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.5", features = ["derive"] }
 ctrlc = "3.4"
@@ -112,6 +116,7 @@ starlark_syntax = "0.14"
 buck2-test-executor = { path = "src/rust/buck2-test-executor" }
 composition = { path = "src/rust/composition", features = ["watcher"] }
 conditions = { path = "src/rust/conditions" }
+deps-extract = { path = "src/rust/deps-extract", default-features = false }
 deps-gen-kit = { path = "src/rust/deps-gen-kit" }
 gomod = { path = "src/rust/gomod" }
 goparse = { path = "src/rust/goparse" }
@@ -121,3 +126,4 @@ pep508 = { path = "src/rust/pep508" }
 prefetch-cache = { path = "src/rust/prefetch-cache" }
 project-sync = { path = "src/rust/project-sync" }
 rules-star = { path = "src/rust/rules-star" }
+rules-sync = { path = "src/rust/rules-sync" }

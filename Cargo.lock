@@ -406,6 +406,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cfg-expr"
+version = "0.20.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe4ece8474b5f766c63426647e7b4b316b67431ade1036a8313cee24a03ae917"
+dependencies = [
+ "smallvec 1.15.1",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2542,6 +2551,26 @@ dependencies = [
  "serde",
  "serde_json",
  "starlark_syntax",
+]
+
+[[package]]
+name = "rules-sync"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cfg-expr",
+ "conditions",
+ "deps-extract",
+ "gomod",
+ "goparse",
+ "gostd",
+ "pep508",
+ "project-sync",
+ "rules-star",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
 ]
 
 [[package]]
