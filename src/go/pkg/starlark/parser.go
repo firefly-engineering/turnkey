@@ -369,13 +369,55 @@ func precedes(a, b syntax.Position) bool {
 	return a.Line < b.Line || (a.Line == b.Line && a.Col < b.Col)
 }
 
-// spanFromNode creates a Span from a syntax.Node.
+// spanFromNode creates a Span from a syntax.Node: the bytes of its whole
+// text.
 func spanFromNode(node syntax.Node, source []byte) Span {
-	start, end := node.Span()
+	start, _ := node.Span()
 	return Span{
 		Start: positionToOffset(start, source),
-		End:   positionToOffset(end, source),
+		End:   positionToOffset(nodeEnd(node), source),
 	}
+}
+
+// nodeEnd returns the position just after a node's text. go.starlark.net's
+// Span ends an index, a slice, an empty tuple and a load statement at
+// their closing bracket rather than after it, and so ends any expression
+// ending with one of them, e.g. a + b[0].
+func nodeEnd(node syntax.Node) syntax.Position {
+	switch n := node.(type) {
+	case *syntax.IndexExpr:
+		return after(n.Rbrack)
+	case *syntax.SliceExpr:
+		return after(n.Rbrack)
+	case *syntax.LoadStmt:
+		return after(n.Rparen)
+	case *syntax.TupleExpr:
+		if n.Lparen.IsValid() {
+			return after(n.Rparen)
+		}
+		return nodeEnd(n.List[len(n.List)-1])
+	case *syntax.BinaryExpr:
+		return nodeEnd(n.Y)
+	case *syntax.UnaryExpr:
+		if n.X != nil {
+			return nodeEnd(n.X)
+		}
+	case *syntax.CondExpr:
+		return nodeEnd(n.False)
+	case *syntax.LambdaExpr:
+		return nodeEnd(n.Body)
+	case *syntax.DictEntry:
+		return nodeEnd(n.Value)
+	}
+	_, end := node.Span()
+	return end
+}
+
+// after returns the position after the one-byte token (a closing bracket)
+// at pos.
+func after(pos syntax.Position) syntax.Position {
+	pos.Col++
+	return pos
 }
 
 // positionToOffset converts a syntax.Position to a byte offset.

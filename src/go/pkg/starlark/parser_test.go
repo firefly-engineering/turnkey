@@ -600,3 +600,42 @@ func TestSetDepsAfterNonASCIIOnTheSameLine(t *testing.T) {
 		t.Errorf("unexpected output:\n%s", out)
 	}
 }
+
+// go.starlark.net ends an index's, a slice's and an empty tuple's span at
+// their closing bracket: a value that is or ends with one is still kept
+// whole when its target is written again.
+func TestValuesEndingWithABracketAreKeptWhole(t *testing.T) {
+	// One line: the new attribute can't be inserted, so the whole target is
+	// written again from its values
+	src := "rust_library(name = \"lib\", srcs = SRCS[1:], env = ENV[\"x\"], t = (), n = -X[0], deps = [])\n"
+	f, err := Parse("rules.star", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.GetTarget("lib").SetSelect("features", []string{"default"}, nil)
+	want := `rust_library(
+    name = "lib",
+    srcs = SRCS[1:],
+    env = ENV["x"],
+    t = (),
+    n = -X[0],
+    deps = [],
+    features = ["default"],
+)
+`
+	if got := string(f.Write()); got != want {
+		t.Errorf("output:\n%s\nwant:\n%s", got, want)
+	}
+
+	// A last argument ending with a bracket still ends before its comma:
+	// the new attribute is inserted after it
+	src = "rust_library(\n    name = \"lib\",\n    srcs = SRCS[1:],\n)\n"
+	if f, err = Parse("rules.star", []byte(src)); err != nil {
+		t.Fatal(err)
+	}
+	f.GetTarget("lib").SetSelect("features", []string{"default"}, nil)
+	want = "rust_library(\n    name = \"lib\",\n    srcs = SRCS[1:],\n    features = [\"default\"],\n)\n"
+	if got := string(f.Write()); got != want {
+		t.Errorf("output:\n%s\nwant:\n%s", got, want)
+	}
+}
