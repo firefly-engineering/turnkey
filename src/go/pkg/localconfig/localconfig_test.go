@@ -179,3 +179,30 @@ func TestHasOverrides(t *testing.T) {
 		t.Error("expected HasOverrides() = true for config with override")
 	}
 }
+
+func TestGetOverrideTheMostSpecificPatternWins(t *testing.T) {
+	cfg := &Config{
+		Test: map[string]TargetOverride{
+			"//...":           {Args: []string{"everything"}},
+			"//src/...":       {Args: []string{"src"}},
+			"//src/pkg/...":   {Args: []string{"pkg"}},
+			"//src/pkg:...":   {Args: []string{"pkg-colon"}},
+			"//src/other/...": {Args: []string{"other"}},
+		},
+	}
+	for _, tc := range []struct{ target, want string }{
+		{"//src/pkg/sub:t", "pkg"},
+		// "//src/pkg/..." and "//src/pkg:..." both match, and are as long
+		{"//src/pkg:t", "pkg"},
+		{"//src/lib:t", "src"},
+		{"//docs:t", "everything"},
+	} {
+		// Map order is random: a pick that depended on it would flake
+		for range 20 {
+			o := cfg.GetOverride("test", tc.target)
+			if o == nil || o.Args[0] != tc.want {
+				t.Fatalf("GetOverride(test, %s) = %v, want %s", tc.target, o, tc.want)
+			}
+		}
+	}
+}

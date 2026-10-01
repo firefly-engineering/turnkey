@@ -101,8 +101,9 @@ func Parse(data []byte) (*Config, error) {
 }
 
 // GetOverride returns the override for a specific command and target.
-// The target can be an exact match or a pattern match (prefix match for "//pkg/...").
-// Returns nil if no matching override is found.
+// The target can be an exact match or a pattern match (prefix match for "//pkg/...");
+// of several matching patterns, the longest wins. Returns nil if no matching
+// override is found.
 func (c *Config) GetOverride(command, target string) *TargetOverride {
 	var overrides map[string]TargetOverride
 
@@ -122,12 +123,21 @@ func (c *Config) GetOverride(command, target string) *TargetOverride {
 		return &override
 	}
 
-	// Try pattern match (for "//pkg/..." style patterns)
-	for pattern, override := range overrides {
-		if matchTarget(pattern, target) {
-			o := override // Copy to avoid returning reference to map value
-			return &o
+	// Try pattern match (for "//pkg/..." style patterns). When several
+	// patterns match, the longest (the most specific) wins, and of two as
+	// long, the first in byte order: the map's order is random.
+	best, found := "", false
+	for pattern := range overrides {
+		if !matchTarget(pattern, target) {
+			continue
 		}
+		if !found || len(pattern) > len(best) || (len(pattern) == len(best) && pattern < best) {
+			best, found = pattern, true
+		}
+	}
+	if found {
+		o := overrides[best] // Copy to avoid returning reference to map value
+		return &o
 	}
 
 	return nil
