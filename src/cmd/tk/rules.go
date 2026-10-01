@@ -1,13 +1,73 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
-	"github.com/firefly-engineering/turnkey/src/go/pkg/rulessync"
+	"github.com/firefly-engineering/turnkey/src/go/pkg/rulesreport"
 	"github.com/firefly-engineering/turnkey/src/go/pkg/syncconfig"
 )
+
+// rulesSyncPath is the rules-sync binary (src/cmd/rules-sync) tk runs for
+// rules sync. tk's Nix package sets it to the binary's store path, with
+// -ldflags "-X main.rulesSyncPath=...", so tk always runs the rules-sync it
+// was built with; a tk built otherwise looks rules-sync up on PATH.
+var rulesSyncPath = "rules-sync"
+
+// rulesSyncRequest is what tk asks rules-sync to do: the inputs of
+// rulessync.Config, and the directory to sync.
+type rulesSyncRequest struct {
+	ProjectRoot string
+	Dir         string
+	DryRun      bool
+	Verbose     bool
+	Force       bool
+}
+
+// rulesSyncer runs rules sync and returns its report. An error is one
+// running rules sync, or reading its report; an error that stopped sync is
+// the report's.
+type rulesSyncer func(rulesSyncRequest) (rulesreport.Report, error)
+
+// execRulesSync is the rulesSyncer that runs the rules-sync binary at path.
+// Its stderr, where its verbose messages go, is tk's.
+func execRulesSync(path string) rulesSyncer {
+	return func(req rulesSyncRequest) (rulesreport.Report, error) {
+		var report rulesreport.Report
+		args := []string{"--project-root", req.ProjectRoot}
+		if req.DryRun {
+			args = append(args, "--dry-run")
+		}
+		if req.Verbose {
+			args = append(args, "--verbose")
+		}
+		if req.Force {
+			args = append(args, "--force")
+		}
+		args = append(args, "--", req.Dir)
+
+		cmd := exec.Command(path, args...)
+		var stdout bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = os.Stderr
+		runErr := cmd.Run()
+		if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+			if runErr != nil {
+				return report, fmt.Errorf("running %s: %w", path, runErr)
+			}
+			return report, fmt.Errorf("reading %s's report: %w", path, err)
+		}
+		// rules-sync exits 1 when its report has an error
+		if runErr != nil && report.Error == nil {
+			return report, fmt.Errorf("running %s: %w", path, runErr)
+		}
+		return report, nil
+	}
+}
 
 // runRules handles the "tk rules" subcommand.
 // Usage:
@@ -47,14 +107,14 @@ func runRulesCheck(args []string) int {
 		fmt.Fprintf(os.Stderr, "tk rules: %v\n", err)
 		return 1
 	}
-	return checkRules(root, args)
+	return checkRules(execRulesSync(rulesSyncPath), root, args)
 }
 
 // checkRules checks every rules.star under root, or under the directory
 // args names. It ignores git status and file times, which only tell what
 // changed since the last commit: a stale rules.star that was committed is
 // still stale. --all and --force are accepted and change nothing.
-func checkRules(root string, args []string) int {
+func checkRules(syncRules rulesSyncer, root string, args []string) int {
 	// Parse check-specific flags
 	var targetDir string
 	for i := 0; i < len(args); i++ {
@@ -78,9 +138,10 @@ func checkRules(root string, args []string) int {
 		dir = filepath.Join(root, targetDir)
 	}
 
-	// Use new syncer in dry-run mode
-	syncer, err := rulessync.NewSyncer(rulessync.Config{
+	// Sync in dry-run mode
+	report, err := syncRules(rulesSyncRequest{
 		ProjectRoot: root,
+		Dir:         dir,
 		DryRun:      true,
 		Verbose:     verbose,
 		Force:       true,
@@ -89,12 +150,15 @@ func checkRules(root string, args []string) int {
 		fmt.Fprintf(os.Stderr, "tk rules: %v\n", err)
 		return 1
 	}
-
-	results, err := syncer.SyncDirectory(dir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "tk rules: check failed: %v\n", err)
+	if e := report.Error; e != nil {
+		if e.Stage == rulesreport.StageSetup {
+			fmt.Fprintf(os.Stderr, "tk rules: %s\n", e.Message)
+		} else {
+			fmt.Fprintf(os.Stderr, "tk rules: check failed: %s\n", e.Message)
+		}
 		return 1
 	}
+	results := report.Results
 
 	anyNeedsUpdate := false
 	anyUnreadable := false
@@ -193,9 +257,10 @@ func runRulesSync(args []string) int {
 		dir = filepath.Join(root, targetDir)
 	}
 
-	// Create syncer with new architecture
-	syncer, err := rulessync.NewSyncer(rulessync.Config{
+	// Run sync
+	report, err := execRulesSync(rulesSyncPath)(rulesSyncRequest{
 		ProjectRoot: root,
+		Dir:         dir,
 		DryRun:      dryRun,
 		Verbose:     verbose,
 		Force:       forceSync,
@@ -204,13 +269,15 @@ func runRulesSync(args []string) int {
 		fmt.Fprintf(os.Stderr, "tk rules: %v\n", err)
 		return 1
 	}
-
-	// Run sync
-	results, err := syncer.SyncDirectory(dir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "tk rules: sync failed: %v\n", err)
+	if e := report.Error; e != nil {
+		if e.Stage == rulesreport.StageSetup {
+			fmt.Fprintf(os.Stderr, "tk rules: %s\n", e.Message)
+		} else {
+			fmt.Fprintf(os.Stderr, "tk rules: sync failed: %s\n", e.Message)
+		}
 		return 1
 	}
+	results := report.Results
 
 	// Report results
 	updatedCount := 0
@@ -274,7 +341,7 @@ func runRulesSync(args []string) int {
 }
 
 // printTargetChanges prints each changed target's added and removed deps.
-func printTargetChanges(changes []rulessync.TargetChange, addedLabel, removedLabel string) {
+func printTargetChanges(changes []rulesreport.TargetChange, addedLabel, removedLabel string) {
 	for _, c := range changes {
 		if len(c.Added) == 0 && len(c.Removed) == 0 {
 			continue
@@ -295,7 +362,7 @@ func printTargetChanges(changes []rulessync.TargetChange, addedLabel, removedLab
 
 // printKeptDeps reports, for each target of a rules.star file, the deps sync
 // kept instead of removing because the target has unmapped imports.
-func printKeptDeps(relPath string, changes []rulessync.TargetChange) {
+func printKeptDeps(relPath string, changes []rulesreport.TargetChange) {
 	for _, c := range changes {
 		if len(c.Kept) == 0 {
 			continue
@@ -308,7 +375,7 @@ func printKeptDeps(relPath string, changes []rulessync.TargetChange) {
 // printSkippedTargets reports the targets of a rules.star file that sync
 // skipped: always those whose deps it can't read, and with -v those opted
 // out with # turnkey:no-sync.
-func printSkippedTargets(relPath string, result rulessync.SyncResult) {
+func printSkippedTargets(relPath string, result rulesreport.Result) {
 	for _, u := range result.Unreadable {
 		fmt.Fprintf(os.Stderr, "UNREADABLE: %s:%s: %s is not a list of labels; write it as one, or add # turnkey:no-sync before the rule\n",
 			relPath, u.Target, u.Attribute)
@@ -385,26 +452,28 @@ func runRulesAutoSync() int {
 		fmt.Fprintln(os.Stderr, "tk: checking rules.star files...")
 	}
 
-	// Create syncer with new architecture
-	syncer, err := rulessync.NewSyncer(rulessync.Config{
+	// Run sync
+	report, err := execRulesSync(rulesSyncPath)(rulesSyncRequest{
 		ProjectRoot: root,
+		Dir:         root,
 		DryRun:      cfg.Rules.Strict || strictRules, // Dry-run in strict mode
 		Verbose:     verbose,
-		Sync:        cfg,
 	})
-	if err != nil {
-		if verbose {
-			fmt.Fprintf(os.Stderr, "tk: could not create rules syncer: %v\n", err)
-		}
-		return 0 // Don't fail on syncer creation issues
-	}
-
-	// Run sync
-	results, err := syncer.SyncDirectory(root)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tk: rules sync failed: %v\n", err)
 		return 1
 	}
+	if e := report.Error; e != nil {
+		if e.Stage == rulesreport.StageSetup {
+			if verbose {
+				fmt.Fprintf(os.Stderr, "tk: could not create rules syncer: %s\n", e.Message)
+			}
+			return 0 // Don't fail on syncer creation issues
+		}
+		fmt.Fprintf(os.Stderr, "tk: rules sync failed: %s\n", e.Message)
+		return 1
+	}
+	results := report.Results
 
 	// Count results
 	updatedCount := 0

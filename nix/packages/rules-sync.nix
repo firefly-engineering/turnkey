@@ -1,8 +1,10 @@
 # rules-sync Nix package
 #
 # Builds rules-sync, which keeps the deps of a project's rules.star files in
-# step with their sources and prints what it did as a JSON report, for tk to
-# run for `tk rules` and the rules sync before a buck2 command.
+# step with their sources and prints what it did as a JSON report. tk runs
+# it for `tk rules` and the rules sync before a buck2 command: tk's package
+# (nix/packages/tk.nix) imports this file, and builds the store path of its
+# binary into tk. That import is the one a Rust rules-sync repoints.
 { pkgs, lib }:
 
 let

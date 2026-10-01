@@ -18,6 +18,9 @@
 let
   fs = lib.fileset;
   root = ../..;
+  # The rules-sync tk runs for rules sync: the one place it is chosen, so a
+  # Rust rules-sync switches over by repointing this import
+  rulesSync = import ./rules-sync.nix { inherit pkgs lib; };
 in
 pkgs.buildGoModule {
   pname = "tk";
@@ -32,21 +35,11 @@ pkgs.buildGoModule {
       (root + "/src/go/pkg/buck2args")
       (root + "/src/go/pkg/localconfig")
       (root + "/src/go/pkg/syncconfig")
-      (root + "/src/go/pkg/conditional")
       (root + "/src/go/pkg/conditions")
-      (root + "/src/go/pkg/cargocfg")
-      (root + "/src/go/pkg/cargofeatures")
-      (root + "/src/go/pkg/pep508")
       (root + "/src/go/pkg/syncer")
       (root + "/src/go/pkg/staleness")
-      # rulessync and its dependencies
-      (root + "/src/go/pkg/rulessync")
-      (root + "/src/go/pkg/mapper")
-      # mapper's tests import it; go mod vendor reads tests too
-      (root + "/src/go/pkg/godeps")
-      (root + "/src/go/pkg/goparse")
-      (root + "/src/go/pkg/extraction")
-      (root + "/src/go/pkg/starlark")
+      # rules-sync's report, which tk reads
+      (root + "/src/go/pkg/rulesreport")
       (root + "/src/go/pkg/cellfresh")
       (root + "/src/go/pkg/materialize")
       (root + "/src/go/pkg/testcache")
@@ -55,6 +48,13 @@ pkgs.buildGoModule {
   subPackages = [ "src/cmd/tk" ];
 
   vendorHash = "sha256-yJBhZBLYe5LRvDccN2gdIETa6J4H3G9FMzfwqPjFeuQ=";
+
+  # tk runs the rules-sync it was built with, never one found on PATH
+  # (src/cmd/tk/rules.go)
+  ldflags = [ "-X main.rulesSyncPath=${lib.getExe rulesSync}" ];
+
+  # The rules-sync above, which flake.nix exposes as packages.rules-sync
+  passthru = { inherit rulesSync; };
 
   # buck2 is needed at build time to generate shell completions: the pinned
   # one, so they describe the buck2 the shell runs

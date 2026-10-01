@@ -12,7 +12,7 @@ go_binary(
         "//src/go/pkg/cellfresh:cellfresh",
         "//src/go/pkg/localconfig:localconfig",
         "//src/go/pkg/materialize:materialize",
-        "//src/go/pkg/rulessync:rulessync",
+        "//src/go/pkg/rulesreport:rulesreport",
         "//src/go/pkg/syncconfig:syncconfig",
         "//src/go/pkg/syncer:syncer",
         "//src/go/pkg/testcache:testcache",

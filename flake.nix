@@ -197,7 +197,8 @@
             inherit pkgs lib;
             inherit ((self.lib.pinnedBuck2Release system)) buck2;
           };
-          packages.rules-sync = import ./nix/packages/rules-sync.nix { inherit pkgs lib; };
+          # The rules-sync tk runs (nix/packages/tk.nix chooses it)
+          packages.rules-sync = config.packages.tk.rulesSync;
           packages.tw = import ./nix/packages/tw.nix { inherit pkgs lib; };
           packages.e2e-runner = import ./nix/packages/e2e-runner.nix { inherit pkgs lib; };
           packages.jsdeps-gen = import ./nix/packages/jsdeps-gen.nix { inherit pkgs lib; };
