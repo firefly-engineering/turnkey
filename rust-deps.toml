@@ -44,6 +44,7 @@ manifests = [
     "src/rust/rules-star/Cargo.toml",
     "src/rust/rules-syncer/Cargo.toml",
     "src/rust/starlark-parse/Cargo.toml",
+    "src/rust/testcache/Cargo.toml",
 ]
 
 [deps."adler2@2.0.1"]
@@ -328,10 +329,10 @@ features = [
     { name = "default" },
 ]
 
-[deps."bitflags@2.10.0"]
+[deps."bitflags@2.13.2"]
 name = "bitflags"
-version = "2.10.0"
-hash = "sha256-nNfYkzqnyqeQKO7BVPy8Gk8Zr7mY00+OLyT1zHLexZs="
+version = "2.13.2"
+hash = "sha256-Q2WhqSIZbJXoMNZXRS+u0vUwaSew9jiNzY6vpRM7Dw8="
 features = [
     { name = "std" },
 ]
@@ -591,6 +592,19 @@ hash = "sha256-J98GeYhncf4Vsuzy7qsbeFz1RTgBLzwez0/CNpR3ncA="
 features = [
     { name = "default" },
     { name = "link" },
+]
+
+[deps."core-foundation@0.10.1"]
+name = "core-foundation"
+version = "0.10.1"
+hash = "sha256-wZv8GI/d0CCczk+G6UkKAg45CDglrk1oTnDn1Rd0BYY="
+features = [
+    { name = "default" },
+    { name = "link" },
+]
+dependencies = [
+    { package = "core-foundation-sys@0.8.7" },
+    { package = "libc@0.2.180" },
 ]
 
 [deps."cpufeatures@0.2.17"]
@@ -882,7 +896,7 @@ features = [
     { name = "std" },
 ]
 dependencies = [
-    { package = "bitflags@2.10.0" },
+    { package = "bitflags@2.13.2" },
     { package = "block2@0.6.2" },
     { package = "libc@0.2.180" },
     { package = "objc2@0.6.3" },
@@ -1137,7 +1151,7 @@ features = [
     { name = "libfuse" },
 ]
 dependencies = [
-    { package = "bitflags@2.10.0" },
+    { package = "bitflags@2.13.2" },
     { package = "libc@0.2.180" },
     { package = "log@0.4.29" },
     { package = "memchr@2.8.3" },
@@ -1654,7 +1668,7 @@ name = "inotify"
 version = "0.11.0"
 hash = "sha256-a7TGGhM/Xq11+z0LbencbbUCJzPjiGjm4pFlAVx15+Q="
 dependencies = [
-    { package = "bitflags@2.10.0" },
+    { package = "bitflags@2.13.2" },
     { package = "inotify-sys@0.1.5" },
     { package = "libc@0.2.180" },
 ]
@@ -1997,7 +2011,7 @@ features = [
     { name = "user" },
 ]
 dependencies = [
-    { package = "bitflags@2.10.0" },
+    { package = "bitflags@2.13.2" },
     { package = "cfg-if@1.0.4" },
     { package = "libc@0.2.180" },
     { package = "memoffset@0.9.1" },
@@ -2012,7 +2026,7 @@ features = [
     { name = "signal" },
 ]
 dependencies = [
-    { package = "bitflags@2.10.0" },
+    { package = "bitflags@2.13.2" },
     { package = "cfg-if@1.0.4" },
     { package = "libc@0.2.180" },
 ]
@@ -2046,7 +2060,7 @@ name = "notify-types"
 version = "2.1.0"
 hash = "sha256-hOcfRhRIb4X1WLPzp2SXqCqpS74eTgfSqX5511iaiis="
 dependencies = [
-    { package = "bitflags@2.10.0" },
+    { package = "bitflags@2.13.2" },
 ]
 
 [deps."notify@8.2.0"]
@@ -2059,7 +2073,7 @@ features = [
     { name = "macos_fsevent" },
 ]
 dependencies = [
-    { package = "bitflags@2.10.0", platforms = ["macos-arm64", "macos-x86_64"] },
+    { package = "bitflags@2.13.2", platforms = ["macos-arm64", "macos-x86_64"] },
     { package = "fsevent-sys@4.1.0", platforms = ["macos-arm64", "macos-x86_64"] },
     { package = "inotify@0.11.0", platforms = ["linux-arm64", "linux-x86_64"] },
     { package = "libc@0.2.180" },
@@ -2170,6 +2184,11 @@ features = [
 name = "once_cell_polyfill"
 version = "1.70.2"
 hash = "sha256-4NVX2+GUAjhv6T9D0UjP0k3h/toEty1GfJY/d8VU7i4="
+
+[deps."openssl-probe@0.2.1"]
+name = "openssl-probe"
+version = "0.2.1"
+hash = "sha256-CC5W7g88LwHXWoD4aH4dbLg/dja1sylyuM3PsmHR/9g="
 
 [deps."option-ext@0.2.0"]
 name = "option-ext"
@@ -2688,10 +2707,20 @@ features = [
     { name = "std" },
 ]
 dependencies = [
-    { package = "bitflags@2.10.0" },
+    { package = "bitflags@2.13.2" },
     { package = "errno@0.3.14", rename = "libc_errno", platforms = ["macos-arm64", "macos-x86_64"] },
     { package = "libc@0.2.180", platforms = ["macos-arm64", "macos-x86_64"] },
     { package = "linux-raw-sys@0.11.0", platforms = ["linux-arm64", "linux-x86_64"] },
+]
+
+[deps."rustls-native-certs@0.8.4"]
+name = "rustls-native-certs"
+version = "0.8.4"
+hash = "sha256-eOz2NFwK/xb8jXU7lNB26Ma4P+fkZv/iJy67anNremQ="
+dependencies = [
+    { package = "openssl-probe@0.2.1", platforms = ["linux-arm64", "linux-x86_64"] },
+    { package = "rustls-pki-types@1.14.0", rename = "pki_types" },
+    { package = "security-framework@3.7.0", platforms = ["macos-arm64", "macos-x86_64"] },
 ]
 
 [deps."rustls-pki-types@1.14.0"]
@@ -2763,10 +2792,42 @@ dependencies = [
     { package = "thiserror@2.0.18" },
 ]
 
+[deps."schannel@0.1.29"]
+name = "schannel"
+version = "0.1.29"
+hash = "sha256-Z3uT4KKGZ7baqGo99cFsCVfsZSTG9vggds/JDHlCc1M="
+
 [deps."scopeguard@1.2.0"]
 name = "scopeguard"
 version = "1.2.0"
 hash = "sha256-1xO+CU6/LFPa/L4ysLG8FKJyCZt29/YaqraoltEsTbc="
+
+[deps."security-framework-sys@2.17.0"]
+name = "security-framework-sys"
+version = "2.17.0"
+hash = "sha256-MVU61ESIsr4hxsy0a9oAD0ViiU9zx1dwVgLopl1GcwA="
+dependencies = [
+    { package = "core-foundation-sys@0.8.7" },
+    { package = "libc@0.2.180" },
+]
+
+[deps."security-framework@3.7.0"]
+name = "security-framework"
+version = "3.7.0"
+hash = "sha256-pPhJTu34NmoBjuA7d1r+4yBkUt8qZDZrld3gsPxZ9Zw="
+features = [
+    { name = "OSX_10_14" },
+    { name = "alpn" },
+    { name = "default" },
+    { name = "session-tickets" },
+]
+dependencies = [
+    { package = "bitflags@2.13.2" },
+    { package = "core-foundation-sys@0.8.7" },
+    { package = "core-foundation@0.10.1" },
+    { package = "libc@0.2.180" },
+    { package = "security-framework-sys@2.17.0" },
+]
 
 [deps."semver@1.0.27"]
 name = "semver"

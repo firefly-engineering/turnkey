@@ -19,8 +19,20 @@ go_test(
 )
 
 # What tk passes turnkey-test-runner and reads back, checked from both sides
+# (and by the testcache crate, tk's side in Rust)
 export_file(
     name = "runner-contract",
     src = "testdata/runner-contract.json",
-    visibility = ["//src/cmd/turnkey-test-runner/..."],
+    visibility = [
+        "//src/cmd/turnkey-test-runner/...",
+        "//src/rust/testcache/...",
+    ],
+)
+
+# How the dev shell describes the test result cache, checked by the
+# testcache crate too
+export_file(
+    name = "shell-contract",
+    src = "testdata/shell-contract.json",
+    visibility = ["//src/rust/testcache/..."],
 )

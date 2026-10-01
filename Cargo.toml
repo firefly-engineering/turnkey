@@ -42,6 +42,7 @@ members = [
     "src/rust/rules-star",
     "src/rust/rules-syncer",
     "src/rust/starlark-parse",
+    "src/rust/testcache",
 ]
 
 # Shared package metadata for all workspace members
@@ -74,6 +75,10 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
 serde-saphyr = "0.0.15"
+# testcache checks a remote test result cache's TLS handshake as buck2's
+# client makes it: rustls, with the system's roots
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-native-certs = "0.8"
 sha1 = "0.10"
 sha2 = "0.10"
 tar = { version = "0.4", default-features = false }
@@ -132,3 +137,4 @@ prefetch-cache = { path = "src/rust/prefetch-cache" }
 project-sync = { path = "src/rust/project-sync" }
 rules-star = { path = "src/rust/rules-star" }
 rules-syncer = { path = "src/rust/rules-syncer" }
+testcache = { path = "src/rust/testcache" }
