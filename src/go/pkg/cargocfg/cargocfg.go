@@ -10,20 +10,29 @@ package cargocfg
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/firefly-engineering/turnkey/src/go/pkg/conditions"
 )
 
-// Target is what a cfg() expression can ask about a platform.
+// Target is what a cfg() expression can ask about a platform: the cfgs
+// rustc sets for its target triple (rustc --print cfg --target <triple>).
 type Target struct {
 	// Triple is the platform's Rust target triple.
 	Triple string
 
-	Arch, Vendor, OS, Env, Family string
+	Arch, Vendor, OS, Env, Family, ABI string
 
 	// PointerWidth is the pointer width in bits, e.g. "64".
 	PointerWidth string
+
+	// HasAtomic are the sizes of the atomic types it has, e.g. "64",
+	// "ptr".
+	HasAtomic []string
+
+	// Panic is the panic strategy, "unwind".
+	Panic string
 }
 
 // ForPlatform returns the Rust target of a platform, in Buck2's names. It
@@ -40,6 +49,7 @@ func ForPlatform(p conditions.Platform) (Target, bool) {
 	}
 	t.PointerWidth = "64"
 	t.Family = "unix"
+	t.Panic = "unwind"
 	switch p.OS {
 	case "linux":
 		t.OS, t.Vendor, t.Env = "linux", "unknown", "gnu"
@@ -49,6 +59,10 @@ func ForPlatform(p conditions.Platform) (Target, bool) {
 		t.Triple = t.Arch + "-apple-darwin"
 	default:
 		return Target{}, false
+	}
+	t.HasAtomic = []string{"8", "16", "32", "64", "ptr"}
+	if t.Triple != "x86_64-unknown-linux-gnu" {
+		t.HasAtomic = append(t.HasAtomic, "128")
 	}
 	return t, true
 }
@@ -136,35 +150,42 @@ func (p anyPred) eval(t Target) bool {
 func (p notPred) eval(t Target) bool { return !p.child.eval(t) }
 
 // A bare key other than a target family (test, miri, debug_assertions, a
-// custom --cfg) isn't set when a dependency is built.
+// custom --cfg) isn't set when a dependency is built. Names are matched
+// as rustc matches them: case-sensitively, so cfg(Unix) isn't set.
 func (p keyPred) eval(t Target) bool {
-	switch strings.ToLower(string(p)) {
+	switch string(p) {
 	case "unix", "windows":
-		return strings.EqualFold(string(p), t.Family)
+		return string(p) == t.Family
 	}
 	return false
 }
 
 // A key Cargo doesn't set for the target (a custom cfg such as
-// getrandom_backend) is false.
+// getrandom_backend) is false. Keys and values are case-sensitive, as in
+// rustc.
 func (p keyValuePred) eval(t Target) bool {
-	value := strings.ToLower(p.value)
-	switch strings.ToLower(p.key) {
+	switch p.key {
 	case "target_os":
-		return value == t.OS
+		return p.value == t.OS
 	case "target_arch":
-		return value == t.Arch
+		return p.value == t.Arch
 	case "target_family":
-		return value == t.Family
+		return p.value == t.Family
 	case "target_vendor":
-		return value == t.Vendor
+		return p.value == t.Vendor
 	case "target_env":
-		return value == t.Env
+		return p.value == t.Env
+	case "target_abi":
+		return p.value == t.ABI
 	case "target_pointer_width":
-		return value == t.PointerWidth
+		return p.value == t.PointerWidth
 	case "target_endian":
 		// Every platform turnkey knows is little-endian
-		return value == "little"
+		return p.value == "little"
+	case "target_has_atomic":
+		return slices.Contains(t.HasAtomic, p.value)
+	case "panic":
+		return p.value == t.Panic
 	}
 	return false
 }

@@ -187,6 +187,66 @@
         "linux-arm64",
         "linux-x86_64"
       ]
+    },
+    {
+      "spec": "cfg(Unix)",
+      "matches": []
+    },
+    {
+      "spec": "cfg(target_os = \"Linux\")",
+      "matches": []
+    },
+    {
+      "spec": "cfg(TARGET_OS = \"linux\")",
+      "matches": []
+    },
+    {
+      "spec": "cfg(target_has_atomic = \"64\")",
+      "matches": [
+        "linux-arm64",
+        "linux-x86_64",
+        "macos-arm64",
+        "macos-x86_64"
+      ]
+    },
+    {
+      "spec": "cfg(target_has_atomic = \"ptr\")",
+      "matches": [
+        "linux-arm64",
+        "linux-x86_64",
+        "macos-arm64",
+        "macos-x86_64"
+      ]
+    },
+    {
+      "spec": "cfg(target_has_atomic = \"128\")",
+      "matches": [
+        "linux-arm64",
+        "macos-arm64",
+        "macos-x86_64"
+      ]
+    },
+    {
+      "spec": "cfg(panic = \"unwind\")",
+      "matches": [
+        "linux-arm64",
+        "linux-x86_64",
+        "macos-arm64",
+        "macos-x86_64"
+      ]
+    },
+    {
+      "spec": "cfg(panic = \"abort\")",
+      "matches": []
+    },
+    {
+      "spec": "cfg(target_abi = \"\")",
+      "matches": [
+        "linux-arm64",
+        "linux-x86_64",
+        "macos-arm64",
+        "macos-x86_64"
+      ]
     }
   ],
   "triples": [
