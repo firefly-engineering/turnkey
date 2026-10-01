@@ -3,14 +3,14 @@ schema_version = 2
 [deps."github.com/google/uuid@v1.6.0"]
 import_path = "github.com/google/uuid"
 version = "v1.6.0"
-hash = ""
+hash = "" # go.sum h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0= - run godeps-gen without --no-prefetch to get correct hash
 
 [deps."golang.org/x/sys@v0.33.0"]
 import_path = "golang.org/x/sys"
 version = "v0.33.0"
-hash = ""
+hash = "" # go.sum h1:q3i8TbbEz+JRD9ywIRlyRAQbM0qF7hu24q3teo2hbuw= - run godeps-gen without --no-prefetch to get correct hash
 
 [deps."gopkg.in/yaml.v3@v3.0.1"]
 import_path = "gopkg.in/yaml.v3"
 version = "v3.0.1"
-hash = ""
+hash = "" # go.sum h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA= - run godeps-gen without --no-prefetch to get correct hash

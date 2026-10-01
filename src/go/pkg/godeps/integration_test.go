@@ -63,9 +63,7 @@ func runIntegrationTest(t *testing.T, testCase string) {
 	if err != nil {
 		t.Fatalf("failed to parse go.sum: %v", err)
 	}
-	for i := range deps {
-		deps[i].GoSumHash = hashes[deps[i].ImportPath+"@"+deps[i].Version]
-	}
+	MergeHashes(deps, hashes)
 
 	// Generate output (without headers for cleaner comparison)
 	var buf bytes.Buffer
