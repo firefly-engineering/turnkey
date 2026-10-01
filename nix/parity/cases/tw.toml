@@ -10,6 +10,7 @@
 
 [tool]
 go = "tw"
+rust = "tw-rs"
 
 # A project: the greenfield fixture, with the sync.toml turnkey would
 # generate for it, trimmed to one wrapper and a two-rule sync chain (the
@@ -150,3 +151,890 @@ outputs = [{ stream = "stdout" }]
 
 [[cases.stubs.go]]
 write."work/go.mod" = "module example.com/simple\n"
+
+# --- added by the port (#214) ---------------------------------------------
+#
+# The cases below cover what the Go tests of wrap, syncer, staleness and
+# syncconfig exercise, and how turnkey's shell uses tw: its flags, the
+# wrapper rules turnkey generates for Go, Rust and Python, and the
+# staleness rules of the sync that follows a change.
+
+[[cases]]
+name = "help-without-a-tool"
+description = "no tool: the help on stdout, exit 0"
+args = []
+exit = 0
+outputs = [{ stream = "stdout" }]
+
+[[cases]]
+name = "help-flag-stops-parsing"
+description = "--help among tw's flags: the help, and the tool isn't run"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+args = ["-v", "--no-sync", "-h", "go", "get", "example.com/dep"]
+exit = 0
+outputs = [{ stream = "stdout" }]
+
+[[cases.stubs.go]]
+
+[[cases]]
+name = "tool-flag-after-the-tool"
+description = "a tw flag after the tool is the tool's"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+args = ["go", "--help"]
+exit = 0
+outputs = [{ stream = "stdout" }]
+
+[[cases.stubs.go]]
+stdout = "go help\n"
+
+[[cases]]
+name = "tool-not-found"
+description = "a tool on no PATH entry: exit 1, nothing run"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+args = ["--verbose", "no-such-tool-anywhere", "x"]
+exit = 1
+outputs = [{ stream = "stdout" }]
+
+[[cases]]
+name = "verbose-from-a-subdirectory"
+description = "--verbose, run from below the project root: post-commands and generators run at the root, with PWD set to it"
+inputs = { work = "e2e/fixtures/go-coverage" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.work", "go.work.sum", "go.mod", "go.sum"]
+target = "go-deps.toml"
+target_sources = "sources"
+generator = ["godeps-gen", "--go-work", "go.work", "--go-mod", "go.mod", "--go-sum", "go.sum"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["get", "mod", "work"]
+watch_files = ["go.work", "go.work.sum", "go.mod", "go.sum"]
+deps_rule = "go"
+post_commands = ["go mod tidy"]
+"""
+files."work/go-deps.toml" = """
+schema_version = 2
+sources = ["app/go.mod", "app/go.sum", "lib/go.mod"]
+"""
+cwd = "work/app/cache"
+args = ["--verbose", "go", "get", "example.com/dep@v1.0.0"]
+exit = 0
+outputs = [{ stream = "stdout" }, { path = "work/go-deps.toml" }]
+
+[[cases.stubs.go]]
+args_prefix = ["get"]
+write."work/app/go.mod" = "module example.com/coverage/app\n\ngo 1.22\n\nrequire example.com/dep v1.0.0\n"
+
+[[cases.stubs.go]]
+args = ["mod", "tidy"]
+
+[[cases.stubs.godeps-gen]]
+stdout = """
+schema_version = 2
+sources = ["app/go.mod", "app/go.sum", "lib/go.mod"]
+"""
+
+[[cases]]
+name = "go-work-member-change"
+description = "only a go.work member's go.mod changes, which go-deps.toml lists: watched through target_sources"
+inputs = { work = "e2e/fixtures/go-coverage" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.work", "go.work.sum", "go.mod", "go.sum"]
+target = "go-deps.toml"
+target_sources = "sources"
+generator = ["godeps-gen", "--go-work", "go.work"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["get", "mod", "work"]
+watch_files = ["go.work", "go.work.sum", "go.mod", "go.sum"]
+deps_rule = "go"
+post_commands = ["go mod tidy"]
+"""
+files."work/go-deps.toml" = """
+sources = ["app/go.mod", "lib/go.mod"]
+"""
+cwd = "work/lib"
+args = ["go", "mod", "edit", "-require=example.com/dep@v1.0.0"]
+exit = 0
+outputs = [{ stream = "stdout" }, { path = "work/go-deps.toml" }]
+
+[[cases.stubs.go]]
+args_prefix = ["mod", "edit"]
+write."work/lib/go.mod" = "module example.com/coverage/lib\n\ngo 1.22\n\nrequire example.com/dep v1.0.0\n"
+
+[[cases.stubs.go]]
+args = ["mod", "tidy"]
+
+[[cases.stubs.godeps-gen]]
+stdout = "sources = [\"app/go.mod\", \"lib/go.mod\"]\n"
+
+[[cases]]
+name = "unreadable-target-sources"
+description = "go-deps.toml isn't TOML: its listed sources can't be watched, the fixed ones still are"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.mod", "go.sum"]
+target = "go-deps.toml"
+target_sources = "sources"
+generator = ["godeps-gen"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["get"]
+watch_files = ["go.mod", "go.sum"]
+deps_rule = "go"
+"""
+files."work/go-deps.toml" = "sources = [\n"
+args = ["go", "get", "example.com/dep"]
+exit = 0
+outputs = [{ stream = "stdout" }, { path = "work/go-deps.toml" }]
+
+[[cases.stubs.go]]
+write."work/go.sum" = "example.com/dep v1.0.0 h1:x\n"
+
+[[cases.stubs.godeps-gen]]
+stdout = "sources = [\"go.mod\"]\n"
+
+[[cases]]
+name = "no-sync-flag"
+description = "--no-sync: the tool changes go.mod, and nothing else runs"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.mod", "go.sum"]
+target = "go-deps.toml"
+generator = ["godeps-gen"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["get", "mod"]
+watch_files = ["go.mod", "go.sum"]
+deps_rule = "go"
+post_commands = ["go mod tidy"]
+"""
+args = ["--no-sync", "--verbose", "go", "get", "example.com/dep"]
+exit = 0
+outputs = [{ stream = "stdout" }]
+
+[[cases.stubs.go]]
+write."work/go.mod" = "module example.com/greenfield\n"
+
+[[cases.stubs.godeps-gen]]
+
+[[cases]]
+name = "non-mutating-subcommand-changes-a-file"
+description = "a subcommand the rule doesn't list changes go.mod: not watched, no sync; a tool without arguments too"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.mod", "go.sum"]
+target = "go-deps.toml"
+generator = ["godeps-gen"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["mod"]
+watch_files = ["go.mod", "go.sum"]
+deps_rule = "go"
+post_commands = ["go mod tidy"]
+"""
+args = ["-v", "go", "get", "example.com/dep"]
+exit = 0
+outputs = [{ stream = "stdout" }]
+
+[[cases.stubs.go]]
+write."work/go.mod" = "module example.com/greenfield\n"
+
+[[cases.stubs.godeps-gen]]
+
+[[cases]]
+name = "mutating-subcommand-without-change"
+description = "go mod verify changes nothing: no post-command, no sync"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.mod", "go.sum"]
+target = "go-deps.toml"
+generator = ["godeps-gen"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["get", "mod"]
+watch_files = ["go.mod", "go.sum"]
+deps_rule = "go"
+post_commands = ["go mod tidy"]
+"""
+args = ["-v", "go", "mod", "verify"]
+exit = 0
+outputs = [{ stream = "stdout" }]
+
+[[cases.stubs.go]]
+stdout = "all modules verified\n"
+# Rewritten with the same content: not a change
+write."work/go.mod" = """
+module example.com/greenfield
+
+go 1.21
+
+require github.com/google/uuid v1.6.0
+"""
+
+[[cases.stubs.godeps-gen]]
+
+[[cases]]
+name = "tool-fails-after-a-change"
+description = "the tool changes go.mod then fails: post-commands and sync run all the same, the tool's exit code is passed on"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.mod", "go.sum"]
+target = "go-deps.toml"
+generator = ["godeps-gen"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["get", "mod"]
+watch_files = ["go.mod", "go.sum"]
+deps_rule = "go"
+post_commands = ["go mod tidy"]
+"""
+args = ["go", "get", "example.com/dep"]
+exit = 2
+outputs = [{ stream = "stdout" }, { path = "work/go-deps.toml" }]
+
+[[cases.stubs.go]]
+args_prefix = ["get"]
+exit = 2
+stderr = "go: partial failure\n"
+write."work/go.mod" = "module example.com/greenfield\n"
+
+[[cases.stubs.godeps-gen]]
+stdout = "schema_version = 2\n"
+
+[[cases]]
+name = "post-commands-fail-and-blank"
+description = "post-commands run in order at the root, a blank one is skipped, one failing doesn't stop the next or the sync"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.mod", "go.sum"]
+target = "go-deps.toml"
+generator = ["godeps-gen"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["get", "mod"]
+watch_files = ["go.mod", "go.sum"]
+deps_rule = "go"
+post_commands = ["go mod tidy", "   ", "", "  go\\tmod   verify ", "no-such-post-command x"]
+"""
+args = ["--verbose", "go", "get", "example.com/dep"]
+exit = 0
+outputs = [{ stream = "stdout" }, { path = "work/go-deps.toml" }]
+
+[[cases.stubs.go]]
+args_prefix = ["get"]
+write."work/go.mod" = "module example.com/greenfield\n"
+
+[[cases.stubs.go]]
+args = ["mod", "tidy"]
+exit = 1
+stderr = "go: tidy failed\n"
+
+[[cases.stubs.go]]
+args = ["mod", "verify"]
+
+[[cases.stubs.godeps-gen]]
+stdout = "schema_version = 2\n"
+
+[[cases]]
+name = "generator-fails"
+description = "the rule's generator fails: its target isn't written, the rules after it aren't synced, the tool's exit code stands"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.mod", "go.sum"]
+target = "go-deps.toml"
+generator = ["godeps-gen", "--go-mod", "go.mod"]
+
+[[deps]]
+name = "derived"
+sources = ["go-deps.toml"]
+target = "derived.txt"
+generator = ["buck2", "bxl", "//gen:derived.bxl"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["get"]
+watch_files = ["go.mod", "go.sum"]
+deps_rule = "go"
+"""
+files."work/go-deps.toml" = "# the previous go-deps.toml\n"
+args = ["-v", "go", "get", "example.com/dep"]
+exit = 0
+outputs = [{ stream = "stdout" }, { path = "work/go-deps.toml" }]
+
+[[cases.stubs.go]]
+write."work/go.mod" = "module example.com/greenfield\n"
+
+[[cases.stubs.godeps-gen]]
+exit = 1
+stdout = "partial output\n"
+stderr = "godeps-gen: go.mod: bad module\n"
+
+[[cases.stubs.buck2]]
+
+[[cases]]
+name = "chained-generator-fails"
+description = "the rule syncs, a rule stale after it fails and one after that still runs"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.mod", "go.sum"]
+target = "go-deps.toml"
+generator = ["godeps-gen"]
+
+[[deps]]
+name = "derived"
+sources = ["go-deps.toml"]
+target = "derived.txt"
+generator = ["buck2", "bxl", "//gen:derived.bxl"]
+
+[[deps]]
+name = "missing-generator"
+sources = ["go-deps.toml"]
+target = "gen/out/missing.txt"
+generator = ["no-such-generator-anywhere", "--flag"]
+
+[[deps]]
+name = "later"
+sources = ["go-deps.toml"]
+target = "later.txt"
+generator = ["buck2", "bxl", "//gen:later.bxl"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["get"]
+watch_files = ["go.mod", "go.sum"]
+deps_rule = "go"
+"""
+args = ["go", "get", "example.com/dep"]
+exit = 0
+outputs = [
+  { stream = "stdout" },
+  { path = "work/go-deps.toml" },
+  { path = "work/later.txt" },
+]
+
+[[cases.stubs.go]]
+write."work/go.mod" = "module example.com/greenfield\n"
+
+[[cases.stubs.godeps-gen]]
+stdout = "schema_version = 2\n"
+
+[[cases.stubs.buck2]]
+args = ["bxl", "//gen:derived.bxl"]
+exit = 3
+stderr = "buck2: bxl failed\n"
+
+[[cases.stubs.buck2]]
+args = ["bxl", "//gen:later.bxl"]
+stdout = "later\n"
+
+[[cases]]
+name = "sync-staleness-rules"
+description = "after the rule syncs, every rule is checked: fresh, sourceless, glob and ** sources, target_sources listed or not, a bad pattern"
+inputs = { work = "e2e/fixtures/go-coverage" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.work", "go.work.sum"]
+target = "go-deps.toml"
+generator = ["gen", "go"]
+
+# Fresh: its source and target have the same mtime
+[[deps]]
+name = "fresh"
+sources = ["app/go.sum"]
+target = "fresh.txt"
+generator = ["gen", "fresh"]
+
+# None of its sources exists: skipped
+[[deps]]
+name = "sourceless"
+sources = ["missing.txt", "also-missing/*.txt"]
+target = "sourceless.txt"
+generator = ["gen", "sourceless"]
+
+# A glob matching the changed go.work: stale
+[[deps]]
+name = "glob"
+sources = ["*.work", "app/*.sum"]
+target = "glob.txt"
+generator = ["gen", "glob"]
+
+# ** over the Go files, with an existing target of the same age: fresh
+[[deps]]
+name = "doublestar-fresh"
+sources = ["lib/**/*.go"]
+target = "ds-fresh.txt"
+generator = ["gen", "doublestar-fresh"]
+
+# ** with a missing target: stale
+[[deps]]
+name = "doublestar-missing"
+sources = ["**/*_test.go"]
+target = "out/ds-missing.txt"
+generator = ["gen", "doublestar-missing"]
+
+# A target that doesn't list its target_sources yet: stale
+[[deps]]
+name = "unlisted"
+sources = ["app/go.mod"]
+target = "unlisted.toml"
+target_sources = "manifests"
+generator = ["gen", "unlisted"]
+
+# A target listing a source the sync made newer: stale
+[[deps]]
+name = "listed"
+sources = ["app/go.mod"]
+target = "listed.toml"
+target_sources = "manifests"
+generator = ["gen", "listed"]
+
+# A target listing only sources as old as it: fresh
+[[deps]]
+name = "listed-fresh"
+sources = ["app/go.mod"]
+target = "listed-fresh.toml"
+target_sources = "manifests"
+generator = ["gen", "listed-fresh"]
+
+# A malformed pattern: an error, and the rules after it still run
+[[deps]]
+name = "bad-pattern"
+sources = ["app/["]
+target = "bad.txt"
+generator = ["gen", "bad-pattern"]
+
+# A target listing something that isn't a path
+[[deps]]
+name = "bad-listing"
+sources = ["app/go.mod"]
+target = "bad-listing.toml"
+target_sources = "manifests"
+generator = ["gen", "bad-listing"]
+
+[[deps]]
+name = "last"
+sources = ["go-deps.toml"]
+target = "last.txt"
+generator = ["gen", "last"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["work"]
+watch_files = ["go.work"]
+deps_rule = "go"
+"""
+files."work/fresh.txt" = "fresh\n"
+files."work/ds-fresh.txt" = "ds\n"
+files."work/unlisted.toml" = "schema_version = 1\n"
+files."work/listed.toml" = "manifests = [\"go.work\"]\n"
+files."work/listed-fresh.toml" = "manifests = [\"lib/go.mod\"]\n"
+files."work/bad-listing.toml" = "manifests = [1]\n"
+args = ["go", "work", "use", "./lib"]
+exit = 0
+outputs = [
+  { stream = "stdout" },
+  { path = "work/go-deps.toml" },
+  { path = "work/glob.txt" },
+  { path = "work/out" },
+  { path = "work/unlisted.toml" },
+  { path = "work/listed.toml" },
+  { path = "work/last.txt" },
+]
+
+[[cases.stubs.go]]
+write."work/go.work" = "go 1.22\n\nuse (\n\t./app\n\t./lib\n)\n\n// touched\n"
+
+[[cases.stubs.gen]]
+args = ["unlisted"]
+stdout = "manifests = []\n"
+
+[[cases.stubs.gen]]
+args = ["listed"]
+stdout = "manifests = [\"go.work\"]\n"
+
+[[cases.stubs.gen]]
+stdout = "generated\n"
+
+[[cases]]
+name = "multi-language-uv-add"
+description = "turnkey's wrapper rules for Go, Rust and Python: uv add syncs pylock, then python, then the rules stale from the start"
+inputs = { work = "e2e/fixtures/multi-language" }
+files."work/.turnkey/sync.toml" = """
+[conditions]
+go_tags = []
+settings = "toolchains//conditions"
+
+[[conditions.platforms]]
+cpu = "arm64"
+os = "macos"
+
+[[deps]]
+generator = ["godeps-gen", "--go-work", "go.work", "--go-mod", "go.mod", "--go-sum", "go.sum"]
+name = "go"
+sources = ["go.work", "go.work.sum", "go.mod", "go.sum"]
+target = "go-deps.toml"
+target_sources = "sources"
+
+[[deps]]
+generator = ["rustdeps-gen", "--cargo-lock", "rust_lib/Cargo.lock", "--platform", "macos-arm64=aarch64-apple-darwin"]
+name = "rust"
+sources = ["rust_lib/Cargo.toml", "rust_lib/Cargo.lock"]
+target = "rust-deps.toml"
+target_sources = "manifests"
+
+[[deps]]
+generator = ["uv", "export", "--all-packages", "--no-dev", "--format", "pylock.toml", "--quiet"]
+name = "pylock"
+sources = ["python_app/pyproject.toml", "python_app/uv.lock"]
+target = "python_app/pylock.toml"
+
+[[deps]]
+generator = ["pydeps-gen", "--lock", "python_app/pylock.toml", "--uv-lock", "python_app/uv.lock"]
+name = "python"
+sources = ["python_app/pylock.toml", "python_app/uv.lock"]
+target = "python-deps.toml"
+
+[[languages]]
+cell = "godeps"
+deps_file = "go-deps.toml"
+name = "go"
+
+[[languages]]
+cell = "rustdeps"
+deps_file = "rust-deps.toml"
+name = "rust"
+
+[[languages]]
+cell = "pydeps"
+deps_file = "python-deps.toml"
+name = "python"
+
+[rules]
+auto_sync = true
+enabled = true
+strict = false
+
+[[wrappers]]
+command = "go"
+deps_rule = "go"
+mutating_subcommands = ["get", "mod", "work"]
+name = "go"
+post_commands = ["go mod tidy"]
+watch_files = ["go.work", "go.work.sum", "go.mod", "go.sum"]
+
+[[wrappers]]
+command = "cargo"
+deps_rule = "rust"
+mutating_subcommands = ["add", "remove", "update"]
+name = "cargo"
+watch_files = ["rust_lib/Cargo.toml", "rust_lib/Cargo.lock"]
+
+[[wrappers]]
+command = "uv"
+deps_rule = "pylock"
+mutating_subcommands = ["add", "remove", "lock", "sync"]
+name = "uv"
+watch_files = ["python_app/pyproject.toml", "python_app/uv.lock"]
+"""
+files."work/go-deps.toml" = "sources = [\"go.mod\", \"go.sum\"]\n"
+cwd = "work/python_app"
+args = ["uv", "add", "requests"]
+exit = 0
+outputs = [
+  { stream = "stdout" },
+  { path = "work/python_app/pylock.toml" },
+  { path = "work/python-deps.toml" },
+  { path = "work/rust-deps.toml" },
+]
+
+[[cases.stubs.uv]]
+args_prefix = ["add"]
+write."work/python_app/uv.lock" = "version = 1\n# requests added\n"
+
+[[cases.stubs.uv]]
+args_prefix = ["export"]
+stdout = "lock-version = \"1.0\"\n"
+
+[[cases.stubs.pydeps-gen]]
+stdout = "schema_version = 1\n"
+
+[[cases.stubs.rustdeps-gen]]
+stdout = "manifests = [\"rust_lib/Cargo.toml\"]\n"
+
+[[cases.stubs.godeps-gen]]
+
+[[cases]]
+name = "multi-language-cargo-add"
+description = "cargo add from the crate: the rust rule syncs, listing its manifests, then nothing else is stale"
+inputs = { work = "e2e/fixtures/multi-language" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+generator = ["godeps-gen"]
+name = "go"
+sources = ["go.work", "go.work.sum", "go.mod", "go.sum"]
+target = "go-deps.toml"
+target_sources = "sources"
+
+[[deps]]
+generator = ["rustdeps-gen", "--cargo-lock", "rust_lib/Cargo.lock"]
+name = "rust"
+sources = ["rust_lib/Cargo.toml", "rust_lib/Cargo.lock"]
+target = "rust-deps.toml"
+target_sources = "manifests"
+
+[[wrappers]]
+command = "cargo"
+deps_rule = "rust"
+mutating_subcommands = ["add", "remove", "update"]
+name = "cargo"
+watch_files = ["rust_lib/Cargo.toml", "rust_lib/Cargo.lock"]
+"""
+files."work/go-deps.toml" = "sources = [\"go.mod\", \"go.sum\"]\n"
+cwd = "work/rust_lib/src"
+args = ["-v", "cargo", "add", "serde"]
+exit = 0
+outputs = [{ stream = "stdout" }, { path = "work/rust-deps.toml" }]
+
+[[cases.stubs.cargo]]
+args_prefix = ["add"]
+write."work/rust_lib/Cargo.toml" = "[package]\nname = \"rust_lib\"\n\n[dependencies]\nserde = \"1\"\n"
+
+[[cases.stubs.rustdeps-gen]]
+stdout = "manifests = [\"rust_lib/Cargo.toml\"]\n"
+
+[[cases.stubs.godeps-gen]]
+
+[[cases]]
+name = "invalid-sync-toml"
+description = "a wrapper rule naming no deps rule: the config is refused, every tool passed through"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+files."work/.turnkey/sync.toml" = """
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["get"]
+watch_files = ["go.mod"]
+deps_rule = "go"
+"""
+args = ["-v", "go", "get", "example.com/dep"]
+exit = 4
+outputs = [{ stream = "stdout" }]
+
+[[cases.stubs.go]]
+exit = 4
+write."work/go.mod" = "module example.com/greenfield\n"
+
+[[cases]]
+name = "unparsable-sync-toml"
+description = "a sync.toml that isn't TOML, or holds a mistyped value: every tool passed through"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = "go.mod"
+target = "go-deps.toml"
+generator = ["godeps-gen"]
+"""
+args = ["go", "get", "example.com/dep"]
+exit = 0
+outputs = [{ stream = "stdout" }]
+
+[[cases.stubs.go]]
+write."work/go.mod" = "module example.com/greenfield\n"
+
+[[cases]]
+name = "keys-in-any-case"
+description = "sync.toml keys match whatever their case, as go-toml matches them; unknown keys are ignored"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+files."work/.turnkey/sync.toml" = """
+[[Deps]]
+Name = "go"
+SOURCES = ["go.mod"]
+Target = "go-deps.toml"
+generator = ["godeps-gen", "--first"]
+Generator = ["godeps-gen", "--second"]
+unknown_key = 1
+
+[[WRAPPERS]]
+Name = "go"
+Command = "go"
+Mutating_Subcommands = ["get"]
+watch_FILES = ["go.mod"]
+Deps_Rule = "go"
+"""
+args = ["go", "get", "example.com/dep"]
+exit = 0
+outputs = [{ stream = "stdout" }, { path = "work/go-deps.toml" }]
+
+[[cases.stubs.go]]
+write."work/go.mod" = "module example.com/greenfield\n"
+
+[[cases.stubs.godeps-gen]]
+stdout = "schema_version = 2\n"
+
+[[cases]]
+name = "buckconfig-root-without-sync-toml"
+description = "a .buckconfig marks the root, which has no sync.toml: no rules, so every tool passed through"
+inputs = { work = "e2e/fixtures/multi-language" }
+files."work/.buckconfig" = "[cells]\nroot = .\n"
+cwd = "work/python_app"
+args = ["--verbose", "uv", "add", "requests"]
+exit = 0
+outputs = [{ stream = "stdout" }]
+
+[[cases.stubs.uv]]
+write."work/python_app/uv.lock" = "version = 1\n"
+
+[[cases]]
+name = "watched-file-is-a-directory"
+description = "a watched path that can't be hashed: the tool is run untouched, no sync"
+inputs = { work = "e2e/fixtures/go-coverage" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.work"]
+target = "go-deps.toml"
+generator = ["godeps-gen"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["work"]
+watch_files = ["go.work", "app"]
+deps_rule = "go"
+"""
+args = ["go", "work", "sync"]
+exit = 0
+outputs = [{ stream = "stdout" }]
+
+[[cases.stubs.go]]
+write."work/go.work" = "go 1.22\n"
+
+[[cases.stubs.godeps-gen]]
+
+[[cases]]
+name = "logical-pwd"
+description = "PWD names the working directory uncleaned: tw takes it, and sets the cleaned root as PWD for what it runs at the root"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.mod"]
+target = "go-deps.toml"
+generator = ["godeps-gen"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["get"]
+watch_files = ["go.mod"]
+deps_rule = "go"
+post_commands = ["go mod tidy"]
+"""
+env = { PWD = "{work}/./" }
+args = ["go", "get", "example.com/dep"]
+exit = 0
+outputs = [{ stream = "stdout" }, { path = "work/go-deps.toml" }]
+
+[[cases.stubs.go]]
+args_prefix = ["get"]
+write."work/go.mod" = "module example.com/greenfield\n"
+
+[[cases.stubs.go]]
+
+[[cases.stubs.godeps-gen]]
+stdout = "schema_version = 2\n"
+
+[[cases]]
+name = "stale-pwd"
+description = "PWD names another directory: tw ignores it"
+inputs = { work = "e2e/fixtures/multi-language" }
+files."work/.turnkey/sync.toml" = """
+[[deps]]
+name = "go"
+sources = ["go.mod"]
+target = "go-deps.toml"
+generator = ["godeps-gen"]
+
+[[wrappers]]
+name = "go"
+command = "go"
+mutating_subcommands = ["get"]
+watch_files = ["go.mod"]
+deps_rule = "go"
+"""
+env = { PWD = "{work}/rust_lib" }
+cwd = "work/python_app"
+args = ["go", "get", "example.com/dep"]
+exit = 0
+outputs = [{ stream = "stdout" }, { path = "work/go-deps.toml" }]
+
+[[cases.stubs.go]]
+write."work/go.mod" = "module example.com/multi\n"
+
+[[cases.stubs.godeps-gen]]
+stdout = "schema_version = 2\n"
+
+[[cases]]
+name = "turnkey-real-tool-missing"
+description = "TURNKEY_REAL_GO names no file: the go on PATH is run"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+env = { TURNKEY_REAL_GO = "{work}/no/such/go" }
+args = ["go", "version"]
+exit = 0
+outputs = [{ stream = "stdout" }]
+
+[[cases.stubs.go]]
+stdout = "go version stub\n"
+
+[[cases]]
+name = "turnkey-real-tool-not-executable"
+description = "TURNKEY_REAL_CARGO names a file that can't run: exit 1, the cargo on PATH isn't tried"
+inputs = { work = "e2e/fixtures/greenfield-go" }
+files."work/real-cargo" = "not a program\n"
+env = { TURNKEY_REAL_CARGO = "{work}/real-cargo" }
+args = ["cargo", "build"]
+exit = 1
+outputs = [{ stream = "stdout" }]
+
+[[cases.stubs.cargo]]
