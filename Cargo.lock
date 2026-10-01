@@ -2750,6 +2750,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tw-rs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "gostd",
+ "project-sync",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
 name = "typenum"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

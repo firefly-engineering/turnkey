@@ -23,6 +23,7 @@ manifests = [
     "src/cmd/test-runner-codegen/Cargo.toml",
     "src/cmd/turnkey-composed/Cargo.toml",
     "src/cmd/turnkey-test-runner/Cargo.toml",
+    "src/cmd/tw-rs/Cargo.toml",
     "src/examples/rust-hello/Cargo.toml",
     "src/examples/rust-hello-deps/Cargo.toml",
     "src/rust/buck2-test-executor/Cargo.toml",

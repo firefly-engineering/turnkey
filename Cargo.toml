@@ -21,6 +21,7 @@ members = [
     "src/cmd/test-runner-codegen",
     "src/cmd/turnkey-composed",
     "src/cmd/turnkey-test-runner",
+    "src/cmd/tw-rs",
     "src/examples/rust-hello",
     "src/examples/rust-hello-deps",
     "src/rust/buck2-test-executor",
