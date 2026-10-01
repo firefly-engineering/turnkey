@@ -21,7 +21,7 @@
   testCache,
   # The Go build tags targets may use (buck2.go.allowedBuildTags)
   goAllowedBuildTags ? [ ],
-  # The directories buck2 doesn't see (buck2.ignore)
+  # The directories buck2 doesn't see besides alwaysIgnored (buck2.ignore)
   ignore ? [ ],
   # null, or { foundryToml, remappingsTxt, soldepsBundle, soldepsDir }: the
   # inputs the Solidity rules' macros stage (prelude solidity.bzl), the last
@@ -30,6 +30,19 @@
 }:
 
 let
+  # Directories no build reads but something writes to all the time: the
+  # VCS's metadata (the prompt's status calls write to it) and the
+  # devenv/direnv state (every shell entry writes to it). Ignoring them
+  # keeps their events out of buck2's file watcher and its "File changed"
+  # lines; buck2.ignore adds to them.
+  alwaysIgnored = [
+    ".git"
+    ".jj"
+    ".hg"
+    ".sl"
+    ".devenv"
+    ".direnv"
+  ];
   cellsConfig = lib.concatMapStringsSep "\n" (cell: "    ${cell.name} = ${cell.path}") cells;
   platformDetectors = lib.concatMapStringsSep "" (
     cell: " target:${cell.name}//...->prelude//platforms:default"
@@ -82,10 +95,10 @@ in
   [go]
       allowed_build_tags = ${lib.concatStringsSep "," goAllowedBuildTags}
 ''
-+ lib.optionalString (ignore != [ ]) ''
++ ''
 
   [project]
-      ignore = ${lib.concatStringsSep "," ignore}
+      ignore = ${lib.concatStringsSep "," (alwaysIgnored ++ ignore)}
 ''
 + lib.optionalString (solidity != null) (
   let

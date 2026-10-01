@@ -570,7 +570,7 @@
             assert lib.assertMsg (lib.hasInfix "allowed_build_tags = integration,e2e" taggedBuckconfig)
               "buckconfig: buck2.go.allowedBuildTags doesn't reach go.allowed_build_tags";
             assert lib.assertMsg
-              (lib.hasInfix "[project]\n    ignore = e2e/fixtures/a,e2e/fixtures/b\n" taggedBuckconfig)
+              (lib.hasInfix "[project]\n    ignore = .git,.jj,.hg,.sl,.devenv,.direnv,e2e/fixtures/a,e2e/fixtures/b\n" taggedBuckconfig)
               "buckconfig: buck2.ignore doesn't reach project.ignore";
             assert lib.assertMsg (
               lib.hasInfix "[solidity]\n    foundry_toml = root//:foundry.toml\n" withSoldeps

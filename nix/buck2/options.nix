@@ -102,8 +102,12 @@ in
       description = ''
         Directories, relative to the project root, that buck2 doesn't see:
         written to `.buckconfig`'s `project.ignore`, so `//...` skips their
-        `rules.star` files. For trees that are projects of their own, such
-        as test fixtures whose targets only build in their own checkout.
+        `rules.star` files and buck2's file watcher drops their events. For
+        trees that are projects of their own, such as test fixtures whose
+        targets only build in their own checkout. They add to the
+        directories turnkey always ignores: the VCS's metadata (`.git`,
+        `.jj`, `.hg`, `.sl`) and the devenv/direnv state (`.devenv`,
+        `.direnv`).
       '';
     };
 

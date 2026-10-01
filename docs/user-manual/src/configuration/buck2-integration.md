@@ -108,14 +108,24 @@ turnkey.toolchains.buck2.prelude.path = ./my-prelude;
 
 ## Directories Buck2 Doesn't See
 
-`ignore` lists directories, relative to the project root, that buck2 skips:
-they go to the generated `.buckconfig`'s `project.ignore`, so `//...` doesn't
-load their `rules.star` files. Use it for trees that are projects of their
-own, such as test fixtures whose targets only build in their own checkout:
+The generated `.buckconfig`'s `project.ignore` lists directories, relative to
+the project root, that buck2 skips: `//...` doesn't load their `rules.star`
+files, and buck2's file watcher drops their events, so they never show up as
+`File changed:` lines. turnkey always ignores two kinds of directory that no
+build reads but something writes to all the time:
+
+- the VCS's metadata: `.git`, `.jj`, `.hg`, `.sl`;
+- the devenv and direnv state: `.devenv`, `.direnv`.
+
+`ignore` adds to them. Use it for trees that are projects of their own, such
+as test fixtures whose targets only build in their own checkout:
 
 ```nix
 turnkey.toolchains.buck2.ignore = [ "e2e/fixtures" ];
 ```
+
+Buck2 reads `project.ignore` when its daemon starts, so a change takes effect
+after `buck2 kill`.
 
 ## Dependency Cells
 
