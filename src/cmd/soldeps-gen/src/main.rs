@@ -165,7 +165,7 @@ impl std::fmt::Display for Pin {
 ///
 /// It is (de)serialized as a PackageRecord, which spells the pin out as
 /// the `tag`, `branch` and `rev` keys.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct OutputPackage {
     name: String,
     /// The package version: npm's resolved version, or a git dependency's
@@ -1188,6 +1188,148 @@ fn root_remappings(recorded: &RecordedDeps, vendor_prefix: &str) -> Result<Strin
     Ok(out)
 }
 
+/// Where a package is declared
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Origin {
+    /// The root foundry.toml's `[dependencies]`
+    Foundry,
+    /// package.json's `dependencies`
+    Dependencies,
+    /// package.json's `devDependencies`
+    DevDependencies,
+}
+
+impl std::fmt::Display for Origin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Origin::Foundry => write!(f, "foundry.toml"),
+            Origin::Dependencies => write!(f, "package.json dependencies"),
+            Origin::DevDependencies => write!(f, "package.json devDependencies"),
+        }
+    }
+}
+
+/// A package as one declaration resolves it, before any prefetching
+#[derive(Debug, Clone)]
+struct Declared {
+    origin: Origin,
+    package: OutputPackage,
+}
+
+/// What a declaration resolved to, for messages
+fn resolution_label(pkg: &OutputPackage) -> String {
+    match pkg.source {
+        Source::Git => format!("git {} (version {})", pin_label(pkg), pkg.version),
+        Source::Npm => format!(
+            "npm {} ({})",
+            pkg.version,
+            pkg.url.as_deref().unwrap_or_default()
+        ),
+    }
+}
+
+/// Keep one package per name: the soldeps cell vendors each package at
+/// `vendor/<name>`, so it holds one version per name
+///
+/// Declarations of one name that resolve to the same package collapse into
+/// the first. Ones that resolve differently fail, naming every declaration
+/// and what it resolved to, rather than letting one of them silently win.
+fn one_per_name(declarations: Vec<Declared>) -> Result<Vec<Declared>> {
+    let mut by_name: BTreeMap<String, Vec<Declared>> = BTreeMap::new();
+    let mut order = Vec::new();
+    for declared in declarations {
+        let name = declared.package.name.clone();
+        let same_name = by_name.entry(name.clone()).or_default();
+        if same_name.is_empty() {
+            order.push(name);
+        }
+        same_name.push(declared);
+    }
+
+    let mut conflicts = Vec::new();
+    for same_name in by_name.values() {
+        let first = &same_name[0].package;
+        if same_name.iter().any(|d| d.package != *first) {
+            let mut message = format!(
+                "{} is declared more than once, and the declarations resolve differently:",
+                first.name
+            );
+            for d in same_name {
+                message.push_str(&format!(
+                    "\n  {}: {}",
+                    d.origin,
+                    resolution_label(&d.package)
+                ));
+            }
+            conflicts.push(message);
+        }
+    }
+    if !conflicts.is_empty() {
+        anyhow::bail!(
+            "{}\nThe soldeps cell holds one version per name: declare each package once, \
+             or declare it the same way everywhere",
+            conflicts.join("\n")
+        );
+    }
+
+    Ok(order
+        .into_iter()
+        .filter_map(|name| by_name.remove(&name)?.into_iter().next())
+        .collect())
+}
+
+/// The npm packages package.json declares, at the versions the pnpm lock
+/// (`integrity_map`, by `name@version`) resolves them to
+fn npm_declarations(
+    package_json: &PackageJson,
+    integrity_map: &BTreeMap<String, String>,
+) -> Vec<Declared> {
+    let dependencies = package_json
+        .dependencies
+        .iter()
+        .map(|dep| (Origin::Dependencies, dep));
+    let dev_dependencies = package_json
+        .dev_dependencies
+        .iter()
+        .map(|dep| (Origin::DevDependencies, dep));
+
+    let mut declarations = Vec::new();
+    for (origin, (name, version)) in dependencies.chain(dev_dependencies) {
+        let clean_version = version.trim_start_matches(['^', '~', '=']);
+
+        // Look up integrity hash from pnpm-lock.yaml
+        // The lock file uses resolved versions, not specifier versions
+        // Key format: "@scope/pkg@version" or "pkg@version"
+        // First try exact match, then search for any version of this package
+        let lock_key = format!("{}@{}", name, clean_version);
+        let (resolved_version, integrity) = if let Some(hash) = integrity_map.get(&lock_key) {
+            (clean_version.to_string(), Some(hash.clone()))
+        } else {
+            // Search for any version of this package in the lock file
+            let prefix = format!("{}@", name);
+            let found = integrity_map.iter().find(|(k, _)| k.starts_with(&prefix));
+
+            if let Some((key, hash)) = found {
+                // Extract version from key (e.g., "@openzeppelin/contracts@5.4.0" -> "5.4.0")
+                let ver = key.strip_prefix(&prefix).unwrap_or(clean_version);
+                (ver.to_string(), Some(hash.clone()))
+            } else {
+                (clean_version.to_string(), None)
+            }
+        };
+
+        if integrity.is_none() {
+            eprintln!("  {} -> no integrity hash found in lock file", name);
+        }
+
+        declarations.push(Declared {
+            origin,
+            package: npm_package(name, &resolved_version, integrity),
+        });
+    }
+    declarations
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
@@ -1244,6 +1386,9 @@ fn generate(args: GenerateArgs) -> Result<()> {
         BTreeMap::new()
     };
 
+    // Every package declaration, from foundry.toml then package.json
+    let mut declarations: Vec<Declared> = Vec::new();
+
     // Parse foundry.toml if it exists
     if args.foundry.exists() {
         let foundry_content = fs::read_to_string(&args.foundry)
@@ -1258,10 +1403,11 @@ fn generate(args: GenerateArgs) -> Result<()> {
         );
 
         for (name, spec) in &foundry_config.dependencies {
-            output_packages.push(
-                parse_dependency(name, spec)
+            declarations.push(Declared {
+                origin: Origin::Foundry,
+                package: parse_dependency(name, spec)
                     .with_context(|| format!("Invalid {}", args.foundry.display()))?,
-            );
+            });
         }
 
         if let Some(profile) = foundry_config.profile.get(DEFAULT_PROFILE) {
@@ -1274,9 +1420,6 @@ fn generate(args: GenerateArgs) -> Result<()> {
         );
     }
 
-    // The direct npm dependencies whose tarballs hold no Solidity
-    let mut not_solidity = Vec::new();
-
     // Parse package.json if provided
     if let Some(package_json_path) = &args.package_json {
         if package_json_path.exists() {
@@ -1286,62 +1429,40 @@ fn generate(args: GenerateArgs) -> Result<()> {
             let package_json: PackageJson = serde_json::from_str(&package_json_content)
                 .with_context(|| format!("Failed to parse {}", package_json_path.display()))?;
 
-            let mut candidates = Vec::new();
-            for (name, version) in package_json
-                .dependencies
-                .iter()
-                .chain(package_json.dev_dependencies.iter())
-            {
-                let clean_version = version.trim_start_matches(['^', '~', '=']);
-
-                // Look up integrity hash from pnpm-lock.yaml
-                // The lock file uses resolved versions, not specifier versions
-                // Key format: "@scope/pkg@version" or "pkg@version"
-                // First try exact match, then search for any version of this package
-                let lock_key = format!("{}@{}", name, clean_version);
-                let (resolved_version, integrity) = if let Some(hash) = integrity_map.get(&lock_key)
-                {
-                    (clean_version.to_string(), Some(hash.clone()))
-                } else {
-                    // Search for any version of this package in the lock file
-                    let prefix = format!("{}@", name);
-                    let found = integrity_map.iter().find(|(k, _)| k.starts_with(&prefix));
-
-                    if let Some((key, hash)) = found {
-                        // Extract version from key (e.g., "@openzeppelin/contracts@5.4.0" -> "5.4.0")
-                        let ver = key.strip_prefix(&prefix).unwrap_or(clean_version);
-                        (ver.to_string(), Some(hash.clone()))
-                    } else {
-                        (clean_version.to_string(), None)
-                    }
-                };
-
-                if integrity.is_none() {
-                    eprintln!("  {} -> no integrity hash found in lock file", name);
-                }
-
-                candidates.push(npm_package(name, &resolved_version, integrity));
-            }
-
-            let (solidity, others) = select_solidity(
-                candidates,
-                &previous,
-                inspector
-                    .as_mut()
-                    .map(|inspector| inspector as &mut dyn TarballInspector),
-            )?;
-            eprintln!(
-                "Found {} Solidity npm packages in package.json",
-                solidity.len()
-            );
-            output_packages.extend(solidity);
-            not_solidity = others;
+            declarations.extend(npm_declarations(&package_json, &integrity_map));
         } else {
             eprintln!(
                 "Note: {} not found, skipping npm deps",
                 package_json_path.display()
             );
         }
+    }
+
+    // Before anything is downloaded, so a conflict fails fast
+    let mut candidates = Vec::new();
+    for declared in one_per_name(declarations)? {
+        match declared.package.source {
+            Source::Git => output_packages.push(declared.package),
+            Source::Npm => candidates.push(declared.package),
+        }
+    }
+
+    // The direct npm dependencies whose tarballs hold no Solidity
+    let mut not_solidity = Vec::new();
+    if !candidates.is_empty() {
+        let (solidity, others) = select_solidity(
+            candidates,
+            &previous,
+            inspector
+                .as_mut()
+                .map(|inspector| inspector as &mut dyn TarballInspector),
+        )?;
+        eprintln!(
+            "Found {} Solidity npm packages in package.json",
+            solidity.len()
+        );
+        output_packages.extend(solidity);
+        not_solidity = others;
     }
 
     // Before any network work on git packages, so an invalid override fails
@@ -2517,5 +2638,97 @@ forge-std/=.turnkey/soldeps/vendor/forge-std/src/
         assert!(previous.package[0].remapping_overridden);
         assert_eq!(previous.package[1].source, Source::Npm);
         assert!(!previous.package[1].remapping_overridden);
+    }
+
+    // -- One package per name ------------------------------------------------
+
+    fn package_json(json: &str) -> PackageJson {
+        serde_json::from_str(json).unwrap()
+    }
+
+    fn oz_lock() -> BTreeMap<String, String> {
+        BTreeMap::from([(format!("{OZ}@5.4.0"), "sha512-oz".to_string())])
+    }
+
+    #[test]
+    fn test_one_per_name_writes_a_package_in_both_dependency_lists_once() {
+        let json = package_json(&format!(
+            r#"{{"dependencies": {{"{OZ}": "^5.4.0"}}, "devDependencies": {{"{OZ}": "^5.4.0"}}}}"#
+        ));
+        let declarations = npm_declarations(&json, &oz_lock());
+        assert_eq!(declarations.len(), 2);
+
+        let packages = one_per_name(declarations).unwrap();
+        assert_eq!(packages.len(), 1);
+        assert_eq!(packages[0].origin, Origin::Dependencies);
+        assert_eq!(packages[0].package, oz(Some("sha512-oz")));
+    }
+
+    #[test]
+    fn test_one_per_name_keeps_distinct_names_in_order() {
+        let declarations = vec![
+            Declared {
+                origin: Origin::Foundry,
+                package: forge_std(),
+            },
+            Declared {
+                origin: Origin::Dependencies,
+                package: oz(None),
+            },
+        ];
+        let packages = one_per_name(declarations).unwrap();
+        let names: Vec<_> = packages.iter().map(|d| d.package.name.as_str()).collect();
+        assert_eq!(names, ["forge-std", OZ]);
+    }
+
+    #[test]
+    fn test_one_per_name_fails_on_a_git_and_an_npm_declaration() {
+        let json = package_json(&format!(r#"{{"dependencies": {{"{OZ}": "5.4.0"}}}}"#));
+        let mut declarations = vec![Declared {
+            origin: Origin::Foundry,
+            package: git_dep(
+                OZ,
+                "https://github.com/OpenZeppelin/openzeppelin-contracts",
+                "tag = \"v5.4.0\"",
+            ),
+        }];
+        declarations.extend(npm_declarations(&json, &oz_lock()));
+
+        let err = format!("{:#}", one_per_name(declarations).unwrap_err());
+        assert!(err.contains(OZ), "{err}");
+        assert!(
+            err.contains(
+                "foundry.toml: git https://github.com/OpenZeppelin/openzeppelin-contracts \
+                 tag v5.4.0 (version 1.0.0)"
+            ),
+            "{err}"
+        );
+        assert!(
+            err.contains(&format!(
+                "package.json dependencies: npm 5.4.0 ({})",
+                npm_tarball_url(OZ, "5.4.0")
+            )),
+            "{err}"
+        );
+        assert!(err.contains("one version per name"), "{err}");
+    }
+
+    #[test]
+    fn test_one_per_name_fails_on_dependency_lists_resolving_differently() {
+        let json = package_json(
+            r#"{"dependencies": {"solady": "0.1.0"}, "devDependencies": {"solady": "0.1.1"}}"#,
+        );
+        let err = format!(
+            "{:#}",
+            one_per_name(npm_declarations(&json, &BTreeMap::new())).unwrap_err()
+        );
+        assert!(
+            err.contains("package.json dependencies: npm 0.1.0"),
+            "{err}"
+        );
+        assert!(
+            err.contains("package.json devDependencies: npm 0.1.1"),
+            "{err}"
+        );
     }
 }
