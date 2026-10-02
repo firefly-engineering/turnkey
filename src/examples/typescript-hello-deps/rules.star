@@ -8,8 +8,8 @@ typescript_binary(
     main = "main.ts",
     srcs = ["main.ts"],
     npm_deps = [
+        "jsdeps//:@types/lodash",
         "jsdeps//:lodash",
-        "jsdeps//:types_lodash",
     ],
     visibility = ["PUBLIC"],
 )

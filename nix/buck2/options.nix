@@ -381,9 +381,9 @@ in
         type = types.nullOr types.package;
         default = null;
         description = ''
-          Nix derivation containing the JavaScript dependencies cell.
-          When set, a 'jsdeps' cell will be added to .buckconfig
-          and symlinked to .turnkey/jsdeps.
+          Nix derivation containing the JavaScript dependencies cell: a
+          cell index (ADR 0004), which tk materializes at .turnkey/jsdeps.
+          When set, a 'jsdeps' cell will be added to .buckconfig.
 
           Prefer using depsFile instead for declarative configuration.
         '';
@@ -413,6 +413,23 @@ in
         description = ''
           Include dev dependencies when generating js-deps.toml.
           Passed as --include-dev to jsdeps-gen.
+        '';
+      };
+
+      tarballs = mkOption {
+        type = types.attrsOf types.path;
+        default = { };
+        example = lib.literalExpression ''
+          {
+            "http://localhost:4873/-/acme-utils-1.0.0.tgz" = ./registry/acme-utils-1.0.0.tgz;
+          }
+        '';
+        description = ''
+          npm tarballs kept in the project, by the URL pnpm-lock.yaml records
+          for them. A locked package whose tarball URL is listed is read from
+          the file instead of fetched, and the file must match the package's
+          integrity. For packages from a registry Nix can't fetch from, such
+          as a local one served only while locking.
         '';
       };
     };

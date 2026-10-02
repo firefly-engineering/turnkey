@@ -41,6 +41,7 @@ e2e/
 ├── fixtures/
 │   ├── greenfield-go/      # Minimal Go project
 │   ├── go-coverage/        # go.work monorepo covering the Go path (see its README.md)
+│   ├── jsdeps-graph/       # pnpm project covering the jsdeps package graph (see its README.md)
 │   └── multi-language/     # Go + Rust + Python
 └── tests/
     ├── 01-greenfield-template.sh
@@ -62,6 +63,7 @@ e2e/
 | error-recovery | Error handling and recovery | turnkey-dw7 |
 | rules-star-sync | Auto-sync rules.star deps | turnkey-rlv3 |
 | go-coverage | `go.work` monorepo through tk sync, rules sync, build and cached tests ([fixture README](fixtures/go-coverage/README.md)) | [#208](https://github.com/firefly-engineering/turnkey/issues/208) |
+| jsdeps-graph | npm package graph (undeclared transitive deps, two versions, a peer split, a cycle, transitive `@types`) through tk sync, build and tests, CommonJS and ES modules ([fixture README](fixtures/jsdeps-graph/README.md)) | [#232](https://github.com/firefly-engineering/turnkey/issues/232) |
 
 ## Writing Tests
 

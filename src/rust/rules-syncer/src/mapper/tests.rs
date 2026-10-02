@@ -1463,6 +1463,17 @@ name = "@openzeppelin/contracts"
 version = "5.4.0"
 url = "https://registry.npmjs.org/@openzeppelin%2fcontracts/-/contracts-5.4.0.tgz"
 integrity = "sha512-z"
+
+[[package]]
+name = "braces"
+version = "3.0.3"
+url = "https://registry.npmjs.org/braces/-/braces-3.0.3.tgz"
+integrity = "sha512-b"
+
+[direct]
+"@openzeppelin/contracts" = "@openzeppelin/contracts@5.4.0"
+"@types/lodash" = "@types/lodash@4.17.23"
+lodash = "lodash@4.17.21"
 "#,
             ),
         ],
@@ -1490,6 +1501,9 @@ fn map_typescript_imports() {
             // relative: same target
             import("./util", ImportKind::Internal),
             import("left-pad", ImportKind::External),
+            // locked, but only as another package's dependency: not the
+            // project's to import
+            import("braces", ImportKind::External),
         ],
         ..ExtractedPackage::default()
     });
@@ -1498,13 +1512,14 @@ fn map_typescript_imports() {
     assert_eq!(
         deps_to_targets(&mapping.deps),
         [
-            "jsdeps//:lodash",
-            "jsdeps//:openzeppelin_contracts",
+            // labels are npm names, verbatim
+            "jsdeps//:@openzeppelin/contracts",
             // lodash's DefinitelyTyped package, which code never imports
-            "jsdeps//:types_lodash",
+            "jsdeps//:@types/lodash",
+            "jsdeps//:lodash",
         ]
     );
-    assert_eq!(mapping.unmapped_imports, ["left-pad"]);
+    assert_eq!(mapping.unmapped_imports, ["left-pad", "braces"]);
 }
 
 #[test]

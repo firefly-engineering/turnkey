@@ -26,7 +26,7 @@ Example usage:
 
 load(":providers.bzl", _TypeScriptLibraryInfo = "TypeScriptLibraryInfo", _TypeScriptToolchainInfo = "TypeScriptToolchainInfo")
 load(":toolchain.bzl", _system_typescript_toolchain = "system_typescript_toolchain")
-load(":ts_binary.bzl", _typescript_binary = "typescript_binary")
+load(":ts_binary.bzl", _typescript_binary = "typescript_binary", _typescript_test = "typescript_test")
 load(":ts_library.bzl", _typescript_library = "typescript_library")
 
 # Re-export providers
@@ -37,11 +37,13 @@ TypeScriptLibraryInfo = _TypeScriptLibraryInfo
 system_typescript_toolchain = _system_typescript_toolchain
 typescript_library = _typescript_library
 typescript_binary = _typescript_binary
+typescript_test = _typescript_test
 
 # Rule implementations for registration with prelude
 implemented_rules = {
     "typescript_library": _typescript_library,
     "typescript_binary": _typescript_binary,
+    "typescript_test": _typescript_test,
     "system_typescript_toolchain": _system_typescript_toolchain,
 }
 
@@ -49,5 +51,6 @@ implemented_rules = {
 extra_attributes = {
     "typescript_library": {},
     "typescript_binary": {},
+    "typescript_test": {},
     "system_typescript_toolchain": {},
 }

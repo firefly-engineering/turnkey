@@ -34,7 +34,7 @@ use anyhow::{Context, Result, bail};
 use clap::Parser;
 use deps_gen_kit::OutputArgs;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -57,7 +57,9 @@ struct Args {
     include_dev: bool,
 }
 
-/// Represents a package in the output TOML
+/// A package's contents in the output TOML, one per `name@version`. Its
+/// dependencies are its instances' ([`OutputInstance`]): which ones it
+/// gets depends on the instance
 #[derive(Debug, Serialize)]
 struct OutputPackage {
     name: String,
@@ -66,14 +68,6 @@ struct OutputPackage {
     url: String,
     /// SRI hash (sha512-...)
     integrity: String,
-    /// Dependencies of this package, by name: the union over all its
-    /// instances
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    dependencies: Vec<String>,
-    /// Optional dependencies of this package: installed only where their
-    /// own os/cpu/libc allow, like esbuild's per-platform binaries
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    optional_dependencies: Vec<String>,
     /// The operating systems the package installs on, as npm names them
     /// (e.g. "darwin", or "!win32" to exclude one); empty for any
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -93,6 +87,10 @@ struct OutputPackage {
 struct OutputInstance {
     /// The snapshot key verbatim, peer and patch groups included
     key: String,
+    /// The `[[package]]` whose contents it installs, by name and version:
+    /// the key's, without its groups
+    name: String,
+    version: String,
     /// The name the package imports each dependency as, to the instance
     /// key it resolves to
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
@@ -134,10 +132,6 @@ struct PnpmImporter {
 #[serde(rename_all = "camelCase")]
 struct PnpmPackage {
     resolution: Option<PnpmResolution>,
-    #[serde(default)]
-    dependencies: BTreeMap<String, String>,
-    #[serde(default)]
-    optional_dependencies: BTreeMap<String, String>,
     #[serde(default)]
     dev: bool,
     #[serde(default)]
@@ -260,10 +254,6 @@ fn resolve_deps(
     Ok(resolved)
 }
 
-/// The dependency names that every instance of each package (`name`,
-/// `version`) imports, plain and optional
-type DepNames<'a> = BTreeMap<(&'a str, &'a str), (BTreeSet<String>, BTreeSet<String>)>;
-
 /// Builds js-deps.toml's contents from a parsed lockfile
 fn generate(lockfile: &PnpmLockfile, include_dev: bool) -> Result<OutputToml> {
     let with_instances = has_instances(&lockfile.lockfile_version);
@@ -276,7 +266,6 @@ fn generate(lockfile: &PnpmLockfile, include_dev: bool) -> Result<OutputToml> {
 
     // Instances: one per snapshot, as pnpm resolved it
     let mut instances: Vec<OutputInstance> = Vec::new();
-    let mut dep_names: DepNames = BTreeMap::new();
     if with_instances {
         for (snapshot_key, snapshot) in &lockfile.snapshots {
             let parsed = key::parse(snapshot_key)
@@ -284,6 +273,8 @@ fn generate(lockfile: &PnpmLockfile, include_dev: bool) -> Result<OutputToml> {
             let from = format!("`{snapshot_key}`");
             let instance = OutputInstance {
                 key: snapshot_key.clone(),
+                name: parsed.name.to_string(),
+                version: parsed.version.to_string(),
                 dependencies: resolve_deps(lockfile, &from, &snapshot.dependencies)?,
                 optional_dependencies: resolve_deps(
                     lockfile,
@@ -291,9 +282,6 @@ fn generate(lockfile: &PnpmLockfile, include_dev: bool) -> Result<OutputToml> {
                     &snapshot.optional_dependencies,
                 )?,
             };
-            let (deps, optional) = dep_names.entry((parsed.name, parsed.version)).or_default();
-            deps.extend(instance.dependencies.keys().cloned());
-            optional.extend(instance.optional_dependencies.keys().cloned());
             instances.push(instance);
         }
     }
@@ -347,23 +335,11 @@ fn generate(lockfile: &PnpmLockfile, include_dev: bool) -> Result<OutputToml> {
             None => npm_tarball_url(name, version),
         };
 
-        // Collect dependencies: from the package entry (pnpm before v9),
-        // and from every snapshot of the package, peer-suffixed ones too
-        let mut dependencies: BTreeSet<String> = pkg.dependencies.keys().cloned().collect();
-        let mut optional_dependencies: BTreeSet<String> =
-            pkg.optional_dependencies.keys().cloned().collect();
-        if let Some((deps, optional)) = dep_names.get(&(name, version)) {
-            dependencies.extend(deps.iter().cloned());
-            optional_dependencies.extend(optional.iter().cloned());
-        }
-
         output_packages.push(OutputPackage {
             name: name.to_string(),
             version: version.to_string(),
             url,
             integrity,
-            dependencies: dependencies.into_iter().collect(),
-            optional_dependencies: optional_dependencies.into_iter().collect(),
             os: pkg.os.clone(),
             cpu: pkg.cpu.clone(),
             libc: pkg.libc.clone(),
@@ -537,10 +513,8 @@ snapshots:
             .iter()
             .filter(|p| p.name == "react-dom")
             .collect();
+        // One package's contents, whatever its instances' deps
         assert_eq!(react_doms.len(), 1);
-        // The bare-name deps are the union over both instances, which no
-        // snapshot keyed exactly `react-dom@18.2.0` would have given
-        assert_eq!(react_doms[0].dependencies, vec!["react", "scheduler"]);
         // Instances are sorted by key, packages by name then version
         let keys: Vec<_> = output.instances.iter().map(|i| i.key.as_str()).collect();
         let mut sorted = keys.clone();
@@ -634,12 +608,12 @@ snapshots:
             instance(&output, "app@1.0.0").dependencies["@testing-library/react"],
             "@testing-library/react@14.0.0(@types/react@18.2.0(react@18.2.0))(react@18.2.0)"
         );
-        let testing = output
-            .packages
-            .iter()
-            .find(|p| p.name == "@testing-library/react")
-            .unwrap();
-        assert_eq!(testing.dependencies, vec!["react"]);
+        assert!(
+            output
+                .packages
+                .iter()
+                .any(|p| p.name == "@testing-library/react" && p.version == "14.0.0")
+        );
     }
 
     #[test]
@@ -669,15 +643,11 @@ snapshots:
             instance(&output, "app@1.0.0").dependencies["foo"],
             "foo@1.0.0"
         );
-        let foo = |version: &str| {
-            output
-                .packages
-                .iter()
-                .find(|p| p.name == "foo" && p.version == version)
-                .unwrap()
-        };
-        assert!(foo("1.0.0").dependencies.is_empty());
-        assert_eq!(foo("1.0.0-beta.1").dependencies, vec!["bar"]);
+        assert!(instance(&output, "foo@1.0.0").dependencies.is_empty());
+        assert_eq!(
+            instance(&output, "foo@1.0.0-beta.1(bar@2.0.0)").dependencies["bar"],
+            "bar@2.0.0"
+        );
     }
 
     #[test]
@@ -743,12 +713,15 @@ importers:
         let output = generate_from(PEER_SPLIT_LOCK, false).unwrap();
         let text = deps_gen_kit::render("jsdeps-gen", "pnpm-lock.yaml", &output).unwrap();
         for expected in [
-            "[[instance]]\nkey = \"react-dom@18.2.0(react@18.2.0)\"\n\n\
+            "[[instance]]\nkey = \"react-dom@18.2.0(react@18.2.0)\"\n\
+             name = \"react-dom\"\nversion = \"18.2.0\"\n\n\
              [instance.dependencies]\nreact = \"react@18.2.0\"\nscheduler = \"scheduler@0.23.0\"\n",
             "[direct]\nreact = \"react@18.2.0\"\nui = \"ui@1.0.0(react@18.2.0)\"\n",
         ] {
             assert!(text.contains(expected), "no {expected:?} in:\n{text}");
         }
+        // A package's deps are its instances': [[package]] names none
+        assert!(!text.contains("\ndependencies = "), "{text}");
     }
 
     #[test]

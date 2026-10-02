@@ -1,0 +1,9 @@
+{
+  "name": "@tkfixture/cyc-a",
+  "version": "1.0.0",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "dependencies": {
+    "@tkfixture/cyc-b": "1.0.0"
+  }
+}

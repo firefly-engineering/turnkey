@@ -29,7 +29,13 @@ This means Go won't try to compile generated Buck2 cells, Cargo won't discover t
 │   ├── _store/<store path name>  # one symlink per module, never retargeted
 │   └── vendor/<import path>/rules.star  # an alias package per Go package
 ├── godeps.lock      # held while tk materialize runs
-├── jsdeps/          # Symlink to JavaScript dependencies cell
+├── jsdeps/          # Real directory: the write-once JavaScript cell (tk materialize)
+│   ├── .buckconfig
+│   ├── .deps-file-sha256   # the js-deps.toml it was built from
+│   ├── rules.star          # an instance per pnpm snapshot, an alias per direct dependency
+│   ├── _store/<store path name>  # one symlink per package, never retargeted
+│   └── vendor/<name>@<version>/rules.star  # an alias package per package
+├── jsdeps.lock      # held while tk materialize runs
 ├── rustdeps/        # Real directory: the write-once Rust cell (tk materialize)
 │   ├── .buckconfig
 │   ├── .deps-file-sha256   # the rust-deps.toml it was built from
@@ -44,19 +50,20 @@ This means Go won't try to compile generated Buck2 cells, Cargo won't discover t
 │   └── vendor/<name>/rules.star  # an alias package per package, beside
 │                                 # links to its files for native forge
 ├── soldeps.lock     # held while tk materialize runs
-├── gcroots/godeps, gcroots/rustdeps, gcroots/soldeps # GC roots for the cells' current indexes
+├── gcroots/godeps, gcroots/rustdeps, gcroots/soldeps, gcroots/jsdeps # GC roots for the cells' current indexes
 ├── edits/, patches/ # tk compose's edits and generated patches
 └── sync.toml        # Symlink to the rules tk sync follows
 ```
 
 Most cells are symlinks to Nix store paths containing the generated Buck2
-cells. The Go, Rust and Solidity cells are real directories that
+cells. The Go, Rust, Solidity and JavaScript cells are real directories that
 `tk materialize`, run by the shell, keeps in line with the cell index Nix
 builds: a dependency change rewrites only the entries for the modules,
 crates or packages that changed
 ([ADR 0004](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0004-deps-cells-are-write-once-directories.md),
 [ADR 0008](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0008-godeps-stores-one-module-per-store-link.md),
-[ADR 0011](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0011-soldeps-stores-one-package-per-store-link.md)).
+[ADR 0011](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0011-soldeps-stores-one-package-per-store-link.md),
+[ADR 0012](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0012-jsdeps-separates-package-contents-from-the-instance-graph.md)).
 Don't edit it; the shell rewrites it on every load.
 
 ## Buck2 Configuration

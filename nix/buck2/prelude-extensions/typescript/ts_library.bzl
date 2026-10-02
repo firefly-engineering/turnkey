@@ -6,6 +6,8 @@
 """TypeScript library rule implementation."""
 
 load("@prelude//utils:utils.bzl", "flatten")
+load(":compile.bzl", "compile_with_npm_deps")
+load(":npm.bzl", "NpmPackageInfo")
 load(":providers.bzl", "TypeScriptLibraryInfo", "TypeScriptToolchainInfo", "get_transitive_outputs")
 
 def _typescript_library_impl(ctx: AnalysisContext) -> list[Provider]:
@@ -28,20 +30,9 @@ def _typescript_library_impl(ctx: AnalysisContext) -> list[Provider]:
             if dep_info.output_dir:
                 dep_outputs.append(dep_info.output_dir)
 
-    # Collect npm dependency artifacts
-    npm_dep_artifacts = []
-    for npm_dep in ctx.attrs.npm_deps:
-        default_info = npm_dep[DefaultInfo]
-        if default_info.default_outputs:
-            for output in default_info.default_outputs:
-                npm_dep_artifacts.append(output)
-
-    # If we have npm deps, use a wrapper script to set up node_modules
-    if npm_dep_artifacts:
-        # Create build script
-        build_script = ctx.actions.declare_output("build.sh")
-
-        # Collect tsc flags
+    # With npm deps, tsc compiles next to a node_modules of their package
+    # directories (compile.bzl)
+    if ctx.attrs.npm_deps:
         tsc_flags = list(toolchain.tsc_flags)
         tsc_flags.append("--outDir")
         tsc_flags.append("$OUT_DIR")
@@ -63,103 +54,7 @@ def _typescript_library_impl(ctx: AnalysisContext) -> list[Provider]:
                 "--strict",
             ])
 
-        tsc_flags_str = " ".join(['"{}"'.format(f) for f in tsc_flags])
-
-        script_content = """#!/usr/bin/env bash
-set -euo pipefail
-
-# toolchain.tsc.args expands to: tsc_path
-TSC="$1"
-OUT_DIR="$2"
-shift 2
-
-# Create temporary working directory
-WORK_DIR=$(mktemp -d)
-trap 'rm -rf "$WORK_DIR"' EXIT
-
-# Set up node_modules from npm deps
-mkdir -p "$WORK_DIR/node_modules"
-for npm_pkg in "$@"; do
-    if [[ "$npm_pkg" == "--srcs" ]]; then
-        break
-    fi
-    # Extract package name from package.json if it exists
-    if [[ -f "$npm_pkg/package.json" ]]; then
-        PKG_NAME=$(grep -o '"name"[[:space:]]*:[[:space:]]*"[^"]*"' "$npm_pkg/package.json" | head -1 | sed 's/.*"name"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/')
-        if [[ -n "$PKG_NAME" ]]; then
-            # Handle scoped packages (@scope/name)
-            if [[ "$PKG_NAME" == @* ]]; then
-                SCOPE_DIR="$WORK_DIR/node_modules/${PKG_NAME%/*}"
-                mkdir -p "$SCOPE_DIR"
-            fi
-            # Use absolute path for symlink to work from any location
-            ABS_PKG=$(cd "$(dirname "$npm_pkg")" && pwd)/$(basename "$npm_pkg")
-            ln -s "$ABS_PKG" "$WORK_DIR/node_modules/$PKG_NAME"
-        fi
-    fi
-done
-
-# Skip npm deps and get source files
-SRCS=()
-FOUND_SRCS=0
-for arg in "$@"; do
-    if [[ "$FOUND_SRCS" == "1" ]]; then
-        SRCS+=("$arg")
-    elif [[ "$arg" == "--srcs" ]]; then
-        FOUND_SRCS=1
-    fi
-done
-
-# Compile inside WORK_DIR, next to its node_modules: tsc looks for packages
-# in a node_modules above the sources, and the action's working directory
-# (the project root) is shared with every compile running at the same time.
-# The sources (and a tsconfig) are copied in at their relative paths, so tsc
-# lays the output out as it would have; copies, not symlinks, since tsc
-# resolves modules from a symlink's target.
-# A relative path, made absolute before leaving the working directory; a
-# bare command name stays one
-abs() { if [[ "$1" == */* && "$1" != /* ]]; then echo "$PWD/$1"; else echo "$1"; fi; }
-TSC=$(abs "$TSC")
-mkdir -p "$OUT_DIR"
-OUT_DIR="$(cd "$OUT_DIR" && pwd)"
-for arg in "${SRCS[@]}"; do
-    if [[ -f "$arg" && "$arg" != /* ]]; then
-        mkdir -p "$WORK_DIR/$(dirname "$arg")"
-        cp "$arg" "$WORK_DIR/$arg"
-    fi
-done
-cd "$WORK_DIR"
-
-"$TSC" """ + tsc_flags_str + """ "${SRCS[@]}"
-"""
-
-        ctx.actions.write(
-            build_script,
-            script_content,
-            is_executable = True,
-        )
-
-        # Build command: script tsc out_dir npm_deps... --srcs srcs...
-        build_cmd = cmd_args(build_script)
-        build_cmd.add(toolchain.tsc.args)
-        build_cmd.add(out_dir.as_output())
-
-        for artifact in npm_dep_artifacts:
-            build_cmd.add(artifact)
-
-        build_cmd.add("--srcs")
-        for src in ctx.attrs.srcs:
-            build_cmd.add(src)
-
-        if ctx.attrs.tsconfig:
-            build_cmd.add("--project")
-            build_cmd.add(ctx.attrs.tsconfig)
-
-        ctx.actions.run(
-            cmd_args(build_cmd, hidden = flatten([ctx.attrs.srcs, dep_outputs, npm_dep_artifacts])),
-            category = "typescript_compile",
-            identifier = ctx.label.name,
-        )
+        compile_with_npm_deps(ctx, toolchain.tsc, tsc_flags, out_dir, dep_outputs, link_node_modules = False)
     else:
         # No npm deps - use direct tsc invocation (original behavior)
         tsc_cmd = cmd_args(toolchain.tsc.args)
@@ -227,9 +122,9 @@ typescript_library = rule(
             doc = "Dependencies (other typescript_library targets)",
         ),
         "npm_deps": attrs.list(
-            attrs.dep(),
+            attrs.dep(providers = [NpmPackageInfo]),
             default = [],
-            doc = "npm package dependencies from jsdeps cell (e.g., //jsdeps:lodash)",
+            doc = "npm packages from the jsdeps cell, by their npm name (e.g., jsdeps//:@types/lodash)",
         ),
         "tsconfig": attrs.option(
             attrs.source(),

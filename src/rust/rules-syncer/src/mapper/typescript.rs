@@ -17,7 +17,8 @@ use std::collections::HashSet;
 pub struct TypeScriptConfig {
     /// The Buck2 cell of external deps, e.g. "jsdeps"
     pub external_cell: String,
-    /// The names of the npm packages in js-deps.toml
+    /// The npm names of the project's direct dependencies: js-deps.toml's
+    /// `[direct]`, the only packages its code may import (ADR 0012)
     pub external_deps: HashSet<String>,
 }
 
@@ -55,8 +56,8 @@ impl TypeScriptLanguage {
         }
     }
 
-    /// `deps` plus the @types package of each external one that js-deps.toml
-    /// has, deduplicated and sorted
+    /// `deps` plus the @types package of each external one that is a direct
+    /// dependency too, deduplicated and sorted
     pub(super) fn with_types(&self, deps: Vec<MappedDep>) -> Vec<MappedDep> {
         let Some(cfg) = &self.cfg else {
             return deps;
@@ -103,7 +104,7 @@ impl Language for TypeScriptLanguage {
     }
 
     /// Maps the package's imports, and adds for each npm package its
-    /// DefinitelyTyped package (@types/...) when js-deps.toml has one: code
+    /// DefinitelyTyped package (@types/...) when it is a direct dependency: code
     /// never imports those, but TypeScript needs them to type-check the
     /// import.
     fn resolve_deps(&self, pkg_dir: &str, _: &Request) -> Result<PackageMapping> {
@@ -172,9 +173,22 @@ fn detect_typescript_config(
     }
     Some(TypeScriptConfig {
         external_cell: lang.cell.clone(),
-        external_deps: load_package_names(&gostd::path::join(&[project_root, &lang.deps_file]))
+        external_deps: load_direct_names(&gostd::path::join(&[project_root, &lang.deps_file]))
             .unwrap_or_default(),
     })
+}
+
+/// js-deps.toml's direct dependencies, as jsdeps-gen writes them
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct DirectFile {
+    direct: std::collections::BTreeMap<String, String>,
+}
+
+/// The npm names of a js-deps.toml's direct dependencies
+fn load_direct_names(path: &str) -> Result<HashSet<String>> {
+    let file: DirectFile = read_toml(path)?;
+    Ok(file.direct.into_keys().collect())
 }
 
 /// A deps file of `[[package]]` tables, as jsdeps-gen and soldeps-gen write
@@ -197,13 +211,12 @@ pub(super) fn load_package_names(path: &str) -> Result<HashSet<String>> {
     Ok(file.package.into_iter().map(|p| p.name).collect())
 }
 
-/// The jsdeps cell's target for an npm package: the alias at the cell root,
-/// named with "@" dropped and "/" replaced by "_" (as
+/// The jsdeps cell's target for a direct dependency: the alias at the cell
+/// root, named by its npm name verbatim (as
 /// nix/lib/deps-cell/adapters/javascript.nix names it), e.g. "lodash" is
-/// "jsdeps//:lodash", "@types/node" "jsdeps//:types_node"
+/// "jsdeps//:lodash", "@types/node" "jsdeps//:@types/node"
 fn label(cfg: &TypeScriptConfig, pkg: &str) -> String {
-    let name = pkg.replace('@', "").replace('/', "_");
-    format!("{}//:{name}", cfg.external_cell)
+    format!("{}//:{pkg}", cfg.external_cell)
 }
 
 /// The package an import path names, scoped packages included:

@@ -320,7 +320,7 @@ map (language: language // { cellLink = cellLink language.cellName; }) [
       }:
       depsCell.mkJsDepsCell {
         inherit cellName conditions;
-        inherit (langCfg) depsFile;
+        inherit (langCfg) depsFile tarballs;
         inherit userPatchesDir resolveFixups;
       };
     syncRules =

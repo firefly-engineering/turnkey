@@ -307,8 +307,10 @@ expression.
   so a downstream namespace such as `acme.*` works the same way. Any other
   import maps to `pydeps`.
 - **TypeScript**: the npm packages imported by the sources, written to the
-  target's `npm_deps` as the jsdeps cell's `jsdeps//:<package>` aliases, plus
-  each one's `@types/...` package when `js-deps.toml` has it. The target's
+  target's `npm_deps` as the jsdeps cell's `jsdeps//:<npm name>` aliases
+  (`jsdeps//:@types/lodash`), plus each one's `@types/...` package when it
+  is a direct dependency too. Only the root `package.json`'s dependencies
+  (`js-deps.toml`'s `[direct]`) map: an import of anything else is unmapped. The target's
   `deps` (other TypeScript targets) are not synced.
 - **Other languages**: the imports found in the sources, mapped to targets.
 

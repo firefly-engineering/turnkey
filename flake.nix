@@ -897,6 +897,136 @@
               touch $out
             '';
 
+          # A JavaScript user patch goes to its own package's derivation
+          # (nix/lib/deps-cell/adapters/javascript.nix's userPatchesOf),
+          # routed by its directory, vendor/<name>@<version>/, or
+          # vendor/<name>/ for the version a direct dependency resolves to
+          # (two segments for a scoped package), and applies there: the check
+          # builds lodash and @types/lodash, pinned as js-deps.toml pins
+          # them, with their patches. A flat patch file, from the cell before
+          # packages had directories, and a directory that is no package,
+          # both fail evaluation.
+          checks.js-user-patches =
+            let
+              depsCell = import ./nix/lib/deps-cell { inherit pkgs lib; };
+              inherit (depsCell.adapters.javascript) userPatchesOf mkJsDepPackage;
+              routed =
+                dir:
+                userPatchesOf {
+                  inherit dir;
+                  cellName = "jsdeps";
+                  keys = [
+                    "lodash@4.17.21"
+                    "@types/lodash@4.17.23"
+                  ];
+                  direct = {
+                    "@types/lodash" = "@types/lodash@4.17.23";
+                  };
+                };
+              patches = routed ./nix/lib/deps-cell/testdata/patches;
+              got = lib.mapAttrs (_: map baseNameOf) patches;
+              flat = builtins.tryEval (routed ./nix/lib/deps-cell/testdata/flat-patches);
+              unknown = builtins.tryEval (routed ./nix/lib/deps-cell/testdata/unknown-patches);
+              lodash = mkJsDepPackage {
+                name = "lodash";
+                version = "4.17.21";
+                url = "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz";
+                integrity = "sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==";
+                userPatches = patches."lodash@4.17.21";
+              };
+              typesLodash = mkJsDepPackage {
+                name = "@types/lodash";
+                version = "4.17.23";
+                url = "https://registry.npmjs.org/@types%2flodash/-/lodash-4.17.23.tgz";
+                integrity = "sha512-RDvF6wTulMPjrNdCoYRC8gNR880JNGT8uB+REUpC2Ns4pRqQJhGz90wh7rgdXDPpCczF3VGktDuFGVnz8zP7HA==";
+                userPatches = patches."@types/lodash@4.17.23";
+              };
+            in
+            assert lib.assertMsg (
+              got == {
+                "lodash@4.17.21" = [ "README.md.patch" ];
+                "@types/lodash@4.17.23" = [ "common-array.d.ts.patch" ];
+              }
+            ) "js user patches: routed ${builtins.toJSON got}";
+            assert lib.assertMsg (!flat.success) "js user patches: a flat patch file was accepted";
+            assert lib.assertMsg (
+              !unknown.success
+            ) "js user patches: a directory that is no package was taken for one";
+            pkgs.runCommand "js-user-patches-check" { } ''
+              grep -qx 'Patched.' ${lodash}/README.md
+              grep -qx '// Patched.' ${typesLodash}/common/array.d.ts
+              touch $out
+            '';
+
+          # The jsdeps cell's root package (ADR 0012) names each instance as
+          # pnpm names its directory, hashed past the path-component limit,
+          # and collapses each dependency cycle into one component: checked
+          # at evaluation on nix/lib/deps-cell/adapters/javascript.nix's
+          # instanceName and stronglyConnected.
+          checks.js-instance-graph =
+            let
+              inherit ((import ./nix/lib/deps-cell { inherit pkgs lib; }).adapters.javascript)
+                instanceName
+                stronglyConnected
+                ;
+              long = "@scope/plugin@1.0.0(${
+                lib.concatStringsSep ")(" (map (n: "@scope/peer-${toString n}@1.0.0") (lib.range 1 12))
+              })";
+              names = map instanceName [
+                "lodash@4.17.21"
+                "@types/lodash@4.17.23"
+                "react-dom@18.2.0(react@18.2.0)"
+                "@testing-library/react@14.0.0(@types/react@18.2.0(react@18.2.0))(react@18.2.0)"
+                "react@18.2.0(patch_hash=abc123)"
+              ];
+              wantNames = [
+                "lodash@4.17.21"
+                "@types+lodash@4.17.23"
+                "react-dom@18.2.0_react@18.2.0"
+                "@testing-library+react@14.0.0_@types+react@18.2.0_react@18.2.0__react@18.2.0"
+                "react@18.2.0_patch_hash=abc123"
+              ];
+              hashed = instanceName long;
+              edges = {
+                a = [ "b" ];
+                b = [ "c" ];
+                c = [
+                  "a"
+                  "d"
+                ];
+                d = [ ];
+                e = [ "e" ];
+                f = [
+                  "a"
+                  "g"
+                ];
+                g = [ "f" ];
+              };
+              components = lib.sort (x: y: lib.head x < lib.head y) (
+                stronglyConnected (lib.attrNames edges) (n: edges.${n})
+              );
+            in
+            assert lib.assertMsg (names == wantNames) "js instance names: ${builtins.toJSON names}";
+            assert lib.assertMsg (
+              builtins.stringLength hashed == 240 && instanceName (long + "x") != hashed
+            ) "js instance names: a long name hashes to ${hashed}";
+            assert lib.assertMsg (
+              components == [
+                [
+                  "a"
+                  "b"
+                  "c"
+                ]
+                [ "d" ]
+                [ "e" ]
+                [
+                  "f"
+                  "g"
+                ]
+              ]
+            ) "js instance graph: components ${builtins.toJSON components}";
+            pkgs.runCommand "js-instance-graph-check" { } "touch $out";
+
           # A Nix-built Rust tool is built from its workspace projection
           # (nix/lib/cargo.nix), so a workspace change its members don't
           # reach leaves its source and lock alone: an unreachable package's
@@ -1658,6 +1788,9 @@
               javascript = {
                 enable = true;
                 depsFile = ./js-deps.toml; # npm package dependencies
+                # @types packages are devDependencies: [direct] needs them
+                # for the examples' jsdeps//:@types/... labels
+                includeDevDependencies = true;
               };
 
               # Solidity dependencies

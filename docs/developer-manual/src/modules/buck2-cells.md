@@ -295,6 +295,70 @@ A bump rebuilds the bumped package's derivation and the index. Every
 Solidity action stages the whole `bundle`, so they all re-run, and no
 action of another language does.
 
+## JavaScript Dependency Cell
+
+Built by the JavaScript adapter, `nix/lib/deps-cell/adapters/javascript.nix`,
+as a write-once cell that separates a package's contents from where it sits
+in the graph
+([ADR 0012](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0012-jsdeps-separates-package-contents-from-the-instance-graph.md)).
+
+### Cell Structure
+
+```
+.turnkey/jsdeps/
+├── .buckconfig
+├── .deps-file-sha256                 # the js-deps.toml it was built from
+├── rules.star                        # the instance graph, from the index's root
+├── _store/
+│   └── <hash>-dep-js-micromatch-4.0.8 -> /nix/store/<hash>-dep-js-micromatch-4.0.8
+│       └── rules.star                # files: a filegroup of the package
+└── vendor/
+    └── micromatch@4.0.8/
+        └── rules.star                # alias files -> //_store/<hash>-dep-js-micromatch-4.0.8:files
+```
+
+The root `rules.star` loads `@prelude//typescript:npm.bzl`
+(`nix/buck2/prelude-extensions/typescript/npm.bzl`). The rules live in the
+prelude, not in the cell: a transitive set's type must be defined once.
+
+- `npm_instance`, one per `[[instance]]`, named after pnpm's
+  `node_modules/.pnpm` directory for its key (`micromatch@4.0.8`,
+  `react-dom@18.2.0_react@18.2.0`), cut and hashed past 240 bytes. Its
+  `deps` are by import name, and its optional deps that install on some
+  platforms only are a `select()`.
+- `npm_component`, one per dependency cycle (a strongly connected
+  component of instances, computed at evaluation), and an `npm_member`
+  forwarding to it per instance in the cycle.
+- `alias`, one per `[direct]` entry, named by the npm name
+  (`@types/micromatch`). Instances are private to the cell's root package.
+
+An instance's action copies its `files` with every link dereferenced into
+`node_modules/<name>/`, and links each dependency beside it, relative to
+its own output, into the dependency's. The output has no content-based
+path, and the links are passed with `ignore_artifacts`, so a link is keyed
+by its path: a dependency's content change re-runs only what copies it.
+`NpmPackageInfo` carries the package directory and the transitive set of
+instance outputs. `typescript_library` and `typescript_binary` link their
+`npm_deps` into a `symlinked_dir` `node_modules` and carry that set as
+hidden inputs (`compile.bzl`).
+
+### Process
+
+1. `tk sync` runs jsdeps-gen, which writes `[[package]]` (one per
+   `name@version`), `[[instance]]` (one per pnpm snapshot, with its
+   dependencies resolved to instance keys) and `[direct]`.
+2. Nix builds one package per `[[package]]` (`mkJsDepPackage`): the npm
+   tarball (or the project's own copy, `buck2.javascript.tarballs`), its
+   fixup, its user patches
+   (`.turnkey/patches/jsdeps/vendor/<name>@<version>/`), and its
+   `rules.star`. Its `targets` output lists `files`.
+3. `mkCellIndex` builds the cell index: one package per `[[package]]` at
+   `vendor/<name>@<version>`, and `root`, the instance graph.
+4. The shell runs `tk materialize` with the index.
+
+A bump rebuilds the bumped package's derivation and the index, and re-runs
+the instances that link it, transitively, and their consumers.
+
 ## Cell Configuration
 
 Each cell gets a `.buckconfig`:

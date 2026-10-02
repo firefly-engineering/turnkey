@@ -132,6 +132,19 @@ repository's local, exact-version workarounds.
   - A patch file left directly under `soldeps/`, from before this layout,
     or in a directory that is no package's, fails evaluation: move it into
     its package's directory, or regenerate it with `tk compose patch`.
+- **JavaScript cell:** each patch goes in its package's directory,
+  `.turnkey/patches/jsdeps/vendor/<name>@<version>/` (for a scoped package,
+  `vendor/@<scope>/<name>@<version>/`), and applies in that package's own
+  derivation, after its fixup, so to every instance of it. Changing a patch
+  rebuilds only that package.
+  - A directory may also be named after a direct dependency alone
+    (`vendor/lodash/`); it then goes to the version the root `package.json`
+    resolves it to.
+  - A patch that doesn't apply exactly, with no fuzz, fails the build and
+    names the package.
+  - A patch file left directly under `jsdeps/`, from before this layout,
+    or in a directory that is no package's, fails evaluation: move it into
+    its package's directory, or regenerate it with `tk compose patch`.
 - **Other cells:** patches apply last, to the assembled cell.
 
 ## When sets disagree

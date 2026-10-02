@@ -360,6 +360,35 @@ fn apply_deps_to_other_attribute() {
     assert_eq!(target.get_deps(), ["//lib:lib"]);
 }
 
+/// The jsdeps cell's labels before ADR 0012 named a package with "@"
+/// dropped and "/" as "_": syncing writes the npm names in their place.
+#[test]
+fn apply_deps_rewrites_sanitized_npm_labels() {
+    let mut target = parse_target(
+        r#"typescript_binary(
+    name = "app",
+    npm_deps = [
+        "jsdeps//:lodash",
+        "jsdeps//:types_lodash",
+    ],
+)
+"#,
+    );
+    let mut result = SyncResult::default();
+    assert!(apply_deps(
+        &mut result,
+        &mut target,
+        "npm_deps",
+        &["jsdeps//:@types/lodash", "jsdeps//:lodash"],
+        &[],
+        &[]
+    ));
+    assert_eq!(
+        target.get_labels("npm_deps"),
+        ["jsdeps//:@types/lodash", "jsdeps//:lodash"]
+    );
+}
+
 /// In one file, an ordinary target is synced, a target opted out with
 /// "# turnkey:no-sync" is left alone and reported as opted out, and one
 /// whose deps sync can't read is reported as unreadable.

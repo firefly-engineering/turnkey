@@ -5,14 +5,15 @@
 
 """TypeScript binary rule implementation."""
 
+load("@prelude//test_caching:test_caching.bzl", "test_caching_kwargs")
 load("@prelude//utils:utils.bzl", "flatten")
+load(":compile.bzl", "compile_with_npm_deps")
+load(":npm.bzl", "NpmPackageInfo")
 load(":providers.bzl", "TypeScriptLibraryInfo", "TypeScriptToolchainInfo")
 
-def _typescript_binary_impl(ctx: AnalysisContext) -> list[Provider]:
-    """Implementation of typescript_binary rule.
-
-    Compiles TypeScript sources and creates a runnable script.
-    """
+def _binary(ctx: AnalysisContext) -> (DefaultInfo, RunInfo):
+    """Compiles TypeScript sources and creates a runnable script: the
+    providers typescript_binary and typescript_test share."""
     toolchain = ctx.attrs._typescript_toolchain[TypeScriptToolchainInfo]
 
     # Declare output directory for compiled JS
@@ -26,20 +27,11 @@ def _typescript_binary_impl(ctx: AnalysisContext) -> list[Provider]:
             if dep_info.output_dir:
                 dep_outputs.append(dep_info.output_dir)
 
-    # Collect npm dependency artifacts
-    npm_dep_artifacts = []
-    for npm_dep in ctx.attrs.npm_deps:
-        default_info = npm_dep[DefaultInfo]
-        if default_info.default_outputs:
-            for output in default_info.default_outputs:
-                npm_dep_artifacts.append(output)
-
-    # If we have npm deps, use a wrapper script to set up node_modules
-    if npm_dep_artifacts:
-        # Create build script
-        build_script = ctx.actions.declare_output("build.sh")
-
-        # Collect tsc flags
+    # With npm deps, tsc compiles next to a node_modules of their package
+    # directories, and the output gets a node_modules link of its own, for
+    # node to resolve them from the compiled code's realpath (compile.bzl)
+    npm_hidden = []
+    if ctx.attrs.npm_deps:
         tsc_flags = list(toolchain.tsc_flags)
         tsc_flags.append("--outDir")
         tsc_flags.append("$OUT_DIR")
@@ -53,103 +45,8 @@ def _typescript_binary_impl(ctx: AnalysisContext) -> list[Provider]:
                 "--strict",
             ])
 
-        tsc_flags_str = " ".join(['"{}"'.format(f) for f in tsc_flags])
-
-        script_content = """#!/usr/bin/env bash
-set -euo pipefail
-
-# toolchain.tsc.args expands to: tsc_path
-TSC="$1"
-OUT_DIR="$2"
-shift 2
-
-# Create temporary working directory
-WORK_DIR=$(mktemp -d)
-trap 'rm -rf "$WORK_DIR"' EXIT
-
-# Set up node_modules from npm deps
-mkdir -p "$WORK_DIR/node_modules"
-for npm_pkg in "$@"; do
-    if [[ "$npm_pkg" == "--srcs" ]]; then
-        break
-    fi
-    # Extract package name from package.json if it exists
-    if [[ -f "$npm_pkg/package.json" ]]; then
-        PKG_NAME=$(grep -o '"name"[[:space:]]*:[[:space:]]*"[^"]*"' "$npm_pkg/package.json" | head -1 | sed 's/.*"name"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/')
-        if [[ -n "$PKG_NAME" ]]; then
-            # Handle scoped packages (@scope/name)
-            if [[ "$PKG_NAME" == @* ]]; then
-                SCOPE_DIR="$WORK_DIR/node_modules/${PKG_NAME%/*}"
-                mkdir -p "$SCOPE_DIR"
-            fi
-            # Use absolute path for symlink to work from any location
-            ABS_PKG=$(cd "$(dirname "$npm_pkg")" && pwd)/$(basename "$npm_pkg")
-            ln -s "$ABS_PKG" "$WORK_DIR/node_modules/$PKG_NAME"
-        fi
-    fi
-done
-
-# Skip npm deps and get source files
-SRCS=()
-FOUND_SRCS=0
-for arg in "$@"; do
-    if [[ "$FOUND_SRCS" == "1" ]]; then
-        SRCS+=("$arg")
-    elif [[ "$arg" == "--srcs" ]]; then
-        FOUND_SRCS=1
-    fi
-done
-
-# Compile inside WORK_DIR, next to its node_modules: tsc looks for packages
-# in a node_modules above the sources, and the action's working directory
-# (the project root) is shared with every compile running at the same time.
-# The sources (and a tsconfig) are copied in at their relative paths, so tsc
-# lays the output out as it would have; copies, not symlinks, since tsc
-# resolves modules from a symlink's target.
-# A relative path, made absolute before leaving the working directory; a
-# bare command name stays one
-abs() { if [[ "$1" == */* && "$1" != /* ]]; then echo "$PWD/$1"; else echo "$1"; fi; }
-TSC=$(abs "$TSC")
-mkdir -p "$OUT_DIR"
-OUT_DIR="$(cd "$OUT_DIR" && pwd)"
-for arg in "${SRCS[@]}"; do
-    if [[ -f "$arg" && "$arg" != /* ]]; then
-        mkdir -p "$WORK_DIR/$(dirname "$arg")"
-        cp "$arg" "$WORK_DIR/$arg"
-    fi
-done
-cd "$WORK_DIR"
-
-"$TSC" """ + tsc_flags_str + """ "${SRCS[@]}"
-"""
-
-        ctx.actions.write(
-            build_script,
-            script_content,
-            is_executable = True,
-        )
-
-        # Build command: script tsc out_dir npm_deps... --srcs srcs...
-        build_cmd = cmd_args(build_script)
-        build_cmd.add(toolchain.tsc.args)
-        build_cmd.add(out_dir.as_output())
-
-        for artifact in npm_dep_artifacts:
-            build_cmd.add(artifact)
-
-        build_cmd.add("--srcs")
-        for src in ctx.attrs.srcs:
-            build_cmd.add(src)
-
-        if ctx.attrs.tsconfig:
-            build_cmd.add("--project")
-            build_cmd.add(ctx.attrs.tsconfig)
-
-        ctx.actions.run(
-            cmd_args(build_cmd, hidden = flatten([ctx.attrs.srcs, dep_outputs, npm_dep_artifacts])),
-            category = "typescript_compile",
-            identifier = ctx.label.name,
-        )
+        _, npm_hidden = compile_with_npm_deps(ctx, toolchain.tsc, tsc_flags, out_dir, dep_outputs, link_node_modules = True)
+        npm_hidden = [npm_hidden]
     else:
         # No npm deps - use direct tsc invocation (original behavior)
         tsc_cmd = cmd_args(toolchain.tsc.args)
@@ -177,136 +74,118 @@ cd "$WORK_DIR"
             identifier = ctx.label.name,
         )
 
-    # Determine the main JS file path
-    # Convert main.ts to main.js
+    # Determine the main JS file path: tsc writes a .ts or .tsx file's
+    # code to .js, a .mts file's (ESM) to .mjs and a .cts file's (CommonJS)
+    # to .cjs
     main_ts = ctx.attrs.main.short_path
-    if main_ts.endswith(".ts"):
-        main_js = main_ts[:-3] + ".js"
-    elif main_ts.endswith(".tsx"):
-        main_js = main_ts[:-4] + ".js"
-    else:
-        main_js = main_ts
+    main_js = main_ts
+    for ext, js in [(".ts", ".js"), (".tsx", ".js"), (".mts", ".mjs"), (".cts", ".cjs")]:
+        if main_ts.endswith(ext):
+            main_js = main_ts[:-len(ext)] + js
+            break
 
-    # Create a run script that sets up node_modules and executes the main file
+    # Create a run script that executes the main file. Its npm packages
+    # resolve from the node_modules link in the output, which needs the
+    # instance closure (npm_hidden) materialized.
     run_script = ctx.actions.declare_output("run.sh")
+    run_script_content = cmd_args(
+        "#!/bin/bash",
+        "exec",
+        toolchain.node.args,
+        cmd_args(out_dir, format = "{}/{}".format("{}", main_js)),
+        '"$@"',
+        delimiter = " ",
+    )
 
-    if npm_dep_artifacts:
-        # Build a run script that sets up node_modules at runtime
-        npm_setup_lines = []
-        npm_setup_lines.append("# Set up node_modules for runtime")
-        npm_setup_lines.append('WORK_DIR=$(mktemp -d)')
-        npm_setup_lines.append('trap \'rm -rf "$WORK_DIR"\' EXIT')
-        npm_setup_lines.append('mkdir -p "$WORK_DIR/node_modules"')
+    ctx.actions.write(
+        run_script,
+        run_script_content,
+        is_executable = True,
+    )
 
-        # We'll pass npm package paths as arguments to the run script
-        run_script_header = """#!/usr/bin/env bash
-set -euo pipefail
-
-NODE="$1"
-DIST_DIR="$2"
-MAIN_JS="$3"
-shift 3
-
-# Set up node_modules from npm deps
-WORK_DIR=$(mktemp -d)
-trap 'rm -rf "$WORK_DIR"' EXIT
-mkdir -p "$WORK_DIR/node_modules"
-
-for npm_pkg in "$@"; do
-    if [[ -f "$npm_pkg/package.json" ]]; then
-        PKG_NAME=$(grep -o '"name"[[:space:]]*:[[:space:]]*"[^"]*"' "$npm_pkg/package.json" | head -1 | sed 's/.*"name"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/')
-        if [[ -n "$PKG_NAME" ]]; then
-            if [[ "$PKG_NAME" == @* ]]; then
-                SCOPE_DIR="$WORK_DIR/node_modules/${PKG_NAME%/*}"
-                mkdir -p "$SCOPE_DIR"
-            fi
-            ln -s "$npm_pkg" "$WORK_DIR/node_modules/$PKG_NAME"
-        fi
-    fi
-done
-
-# Run node with node_modules in path
-NODE_PATH="$WORK_DIR/node_modules" exec "$NODE" "$DIST_DIR/$MAIN_JS"
-"""
-        ctx.actions.write(
-            run_script,
-            run_script_header,
-            is_executable = True,
-        )
-
-        # RunInfo with npm deps
-        run_cmd = cmd_args(run_script)
-        run_cmd.add(toolchain.node.args)
-        run_cmd.add(out_dir)
-        run_cmd.add(main_js)
-        for artifact in npm_dep_artifacts:
-            run_cmd.add(artifact)
-
-        run_info = RunInfo(args = run_cmd)
-    else:
-        # Simple run script without npm deps
-        run_script_content = cmd_args(
-            "#!/bin/bash",
-            "exec",
+    run_info = RunInfo(
+        args = cmd_args(
             toolchain.node.args,
             cmd_args(out_dir, format = "{}/{}".format("{}", main_js)),
-            '"$@"',
-            delimiter = " ",
-        )
-
-        ctx.actions.write(
-            run_script,
-            run_script_content,
-            is_executable = True,
-        )
-
-        run_info = RunInfo(
-            args = cmd_args(
-                toolchain.node.args,
-                cmd_args(out_dir, format = "{}/{}".format("{}", main_js)),
-            ),
-        )
-
-    return [
-        DefaultInfo(
-            default_output = out_dir,
-            sub_targets = {
-                "run": [DefaultInfo(default_output = run_script), run_info],
-            },
+            hidden = npm_hidden,
         ),
+    )
+
+    default_info = DefaultInfo(
+        default_output = out_dir,
+        other_outputs = npm_hidden,
+        sub_targets = {
+            "run": [DefaultInfo(default_output = run_script, other_outputs = npm_hidden), run_info],
+        },
+    )
+    return default_info, run_info
+
+def _typescript_binary_impl(ctx: AnalysisContext) -> list[Provider]:
+    """Implementation of typescript_binary rule."""
+    default_info, run_info = _binary(ctx)
+    return [default_info, run_info]
+
+def _typescript_test_impl(ctx: AnalysisContext) -> list[Provider]:
+    """Implementation of typescript_test rule: the binary, run as the test,
+    which passes when it exits 0."""
+    default_info, run_info = _binary(ctx)
+    return [
+        default_info,
         run_info,
+        # Cacheable: the test reads only the compiled code and the npm
+        # instances it links, all hidden inputs of its command, and runs
+        # the toolchain's node.
+        ExternalRunnerTestInfo(**test_caching_kwargs({
+            "type": "typescript",
+            "command": [run_info.args],
+            "labels": ctx.attrs.labels,
+        })),
     ]
+
+_BINARY_ATTRS = {
+    "main": attrs.source(
+        doc = "The main TypeScript entry point file",
+    ),
+    "srcs": attrs.list(
+        attrs.source(),
+        default = [],
+        doc = "TypeScript source files to compile",
+    ),
+    "deps": attrs.list(
+        attrs.dep(),
+        default = [],
+        doc = "Dependencies (typescript_library targets)",
+    ),
+    "npm_deps": attrs.list(
+        attrs.dep(providers = [NpmPackageInfo]),
+        default = [],
+        doc = "npm packages from the jsdeps cell, by their npm name (e.g., jsdeps//:@types/lodash)",
+    ),
+    "tsconfig": attrs.option(
+        attrs.source(),
+        default = None,
+        doc = "Path to tsconfig.json",
+    ),
+    "_typescript_toolchain": attrs.toolchain_dep(
+        default = "toolchains//:typescript",
+        providers = [TypeScriptToolchainInfo],
+    ),
+}
 
 typescript_binary = rule(
     impl = _typescript_binary_impl,
-    attrs = {
-        "main": attrs.source(
-            doc = "The main TypeScript entry point file",
-        ),
-        "srcs": attrs.list(
-            attrs.source(),
+    attrs = _BINARY_ATTRS,
+    doc = "Compiles TypeScript and creates a runnable Node.js application.",
+)
+
+typescript_test = rule(
+    impl = _typescript_test_impl,
+    attrs = _BINARY_ATTRS | {
+        "labels": attrs.list(
+            attrs.string(),
             default = [],
-            doc = "TypeScript source files to compile",
-        ),
-        "deps": attrs.list(
-            attrs.dep(),
-            default = [],
-            doc = "Dependencies (typescript_library targets)",
-        ),
-        "npm_deps": attrs.list(
-            attrs.dep(),
-            default = [],
-            doc = "npm package dependencies from jsdeps cell (e.g., //jsdeps:lodash)",
-        ),
-        "tsconfig": attrs.option(
-            attrs.source(),
-            default = None,
-            doc = "Path to tsconfig.json",
-        ),
-        "_typescript_toolchain": attrs.toolchain_dep(
-            default = "toolchains//:typescript",
-            providers = [TypeScriptToolchainInfo],
+            doc = "Target labels. `no-test-cache` keeps the test out of turnkey's test result caching.",
         ),
     },
-    doc = "Compiles TypeScript and creates a runnable Node.js application.",
+    doc = "Compiles TypeScript and runs it with Node.js as a test, which passes when it exits 0.",
 )

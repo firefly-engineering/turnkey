@@ -52,6 +52,7 @@ declare -A TESTS=(
   ["error-recovery"]="08-error-recovery.sh"
   ["rules-star-sync"]="09-rules-star-sync.sh"
   ["go-coverage"]="10-go-coverage.sh"
+  ["jsdeps-graph"]="11-jsdeps-graph.sh"
 )
 
 usage() {

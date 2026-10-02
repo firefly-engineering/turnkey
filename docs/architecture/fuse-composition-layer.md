@@ -582,13 +582,15 @@ root Rust targets re-ran all 1184 actions after a one-crate bump
 `buck2` callers get no check at all, and can build against a retargeted
 cell's stale inputs.
 
-The Go, Rust and Solidity cells no longer need this: they are write-once
+The Go, Rust, Solidity and JavaScript cells no longer need this: they are write-once
 cells ([ADR 0004](../adr/0004-deps-cells-are-write-once-directories.md)),
 whose store links are never retargeted, so a bump recompiles only the
 changed module's or crate's dependents (every Solidity action, for a
-Solidity package: [ADR 0011](../adr/0011-soldeps-stores-one-package-per-store-link.md)),
-with no kill, and plain `buck2` reads them correctly. The other deps cells
-are still symlinks and still rely on `cellfresh`.
+Solidity package: [ADR 0011](../adr/0011-soldeps-stores-one-package-per-store-link.md);
+the npm instances depending on an npm package:
+[ADR 0012](../adr/0012-jsdeps-separates-package-contents-from-the-instance-graph.md)),
+with no kill, and plain `buck2` reads them correctly. The other deps cell,
+`pydeps`, is still a symlink and still relies on `cellfresh`.
 
 #### Strategy 2: Sideband journal API (recommended, EdenFS pattern)
 

@@ -2,6 +2,44 @@
 
 What changes when a project moves to a newer turnkey, and what to do about it.
 
+## The JavaScript cell's package graph
+
+The JavaScript dependency cell now holds each locked package once, at
+`vendor/<name>@<version>`, and one target per pnpm snapshot, laid out as
+pnpm lays out `node_modules/.pnpm`
+([ADR 0012](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0012-jsdeps-separates-package-contents-from-the-instance-graph.md)).
+A package's own dependencies resolve without the consumer declaring them,
+two versions of one name and peer resolutions coexist, and dependency
+cycles build. `tk materialize` lays the cell out as a real directory,
+`.turnkey/jsdeps`, so a package bump re-runs only what depends on it, with
+no daemon restart, and plain `buck2` reads the new version.
+
+### Switching over
+
+- **Labels are npm names.** `jsdeps//:types_lodash` is now
+  `jsdeps//:@types/lodash`. Rules sync rewrites the labels it manages;
+  change those in a `turnkey:preserve` section, or in a target sync doesn't
+  manage, by hand.
+- **Only direct dependencies have labels**: the root `package.json`'s
+  (`js-deps.toml`'s `[direct]`). A target that listed a package only some
+  dependency needs drops it. `@types/...` packages are usually
+  `devDependencies`: set `buck2.javascript.includeDevDependencies = true`.
+- **Regenerate `js-deps.toml`** with `tk sync`: the cell needs its
+  `[[instance]]` and `[direct]` tables, which need a pnpm 9 lockfile.
+- **The first shell load** replaces the `.turnkey/jsdeps` symlink with the
+  directory. `tk` restarts the buck2 daemon once, and the next build is a
+  full one.
+- **User patches move** under
+  `.turnkey/patches/jsdeps/vendor/<name>@<version>/`. A patch file directly
+  under `.turnkey/patches/jsdeps/` fails evaluation. See
+  [Dependency Fixups](../workflows/fixups.md).
+
+### Rolling back
+
+```bash
+rm -rf .turnkey/jsdeps .turnkey/jsdeps.lock .turnkey/gcroots/jsdeps
+```
+
 ## The per-package Solidity cell
 
 The Solidity dependency cell is now built one package per Solidity package,
