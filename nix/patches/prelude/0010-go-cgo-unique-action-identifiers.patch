@@ -1,0 +1,47 @@
+go: give each package's cgo output directory a path of its own.
+
+cgo writes a package's generated files into one directory, cgo_gen_tmp,
+and cxx names each C compile action after its source's path, so the
+generated _cgo_export.c compiled as "c_compile cgo_gen_tmp/_cgo_export.c"
+in every cgo package. go_stdlib builds the whole standard library in one
+target (prelude//go/tools:stdlib), and four of its packages use cgo
+(runtime/cgo, plugin, net/internal/cgotest, internal/runtime/cgobench),
+so four actions of that target had the same category and identifier.
+
+buck2 requires category and identifier to be unique for a target, and
+keys its local action cache (the in-memory dep-file state) by exactly
+that. The four compiles overwrote each other's entry. Whenever the
+daemon dropped DICE but kept that state (the notify watcher reporting
+dropped events), each compile found another package's entry or none,
+and ran again with an unchanged command line.
+
+The directory cgo writes into is now cgo_gen_pkg/<import path>
+(cgo_gen_pkg for a package at the root of a cell, whose import path is
+empty), so the identifier is "cgo_gen_pkg/<import path>/_cgo_export.c".
+It is deliberately not under cgo_gen_tmp: content-based paths give the
+old and the new directory the same hash prefix, and in a buck-out that
+still held the old directory, an output nested inside it came out empty.
+The deeper directory leaves source positions alone: before Go 1.27 cgo's
+//line paths are trimmed to the project root, and from 1.27 they are
+relative to this directory, which the Go compiler resolves them against.
+A package without cgo files still gets an empty cgo_gen_tmp: nothing is
+compiled out of it, so its name doesn't matter.
+
+--- a/go/cgo_builder.bzl
++++ b/go/cgo_builder.bzl
+@@ -96,7 +96,14 @@
+     """
+     Run `cgo` on `.go` sources to generate Go, C, and C-Header sources.
+     """
+-    gen_dir = actions.declare_output("cgo_gen_tmp", dir = True, has_content_based_path = True)
++    # cxx names each C compile action after its source's path, and buck2 needs
++    # action identifiers unique within a target. go_stdlib builds every
++    # standard package in one target, so the path holds the import path (empty
++    # for a package at the root of the cell). It is not under "cgo_gen_tmp",
++    # which an older buck-out may still hold: an output nested in another
++    # output's directory there comes out empty.
++    gen_dir_path = paths.join("cgo_gen_pkg", pkg_import_path) if pkg_import_path else "cgo_gen_pkg"
++    gen_dir = actions.declare_output(gen_dir_path, dir = True, has_content_based_path = True)
+ 
+     # Return a `cmd_args` to use as the generated sources.
+ 
