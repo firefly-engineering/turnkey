@@ -24,8 +24,8 @@ source "${LIB_DIR}/setup.sh"
 
 section "Test: Adopt existing project (brownfield)"
 
-# Get turnkey root for flake reference
-TURNKEY_ROOT=$(get_turnkey_root)
+# The flake reference to this turnkey checkout
+TURNKEY_URL=$(turnkey_flake_url)
 
 # Step 1: Create a "brownfield" project directory
 step "Creating brownfield Go project (simulating existing project)"
@@ -99,7 +99,7 @@ cat > flake.nix << EOF
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
     devenv.url = "github:cachix/devenv";
-    turnkey.url = "git+file://${TURNKEY_ROOT}";
+    turnkey.url = "${TURNKEY_URL}";
   };
 
   outputs = inputs@{ flake-parts, ... }:

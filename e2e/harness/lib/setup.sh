@@ -11,6 +11,20 @@ get_turnkey_root() {
   echo "$dir"
 }
 
+# The flake URL of this turnkey checkout: git+file when it is a git work
+# tree, otherwise path (a secondary jj workspace has no .git of its own,
+# and Nix can't fetch git+file from it)
+# Usage: turnkey_url=$(turnkey_flake_url)
+turnkey_flake_url() {
+  local turnkey_root
+  turnkey_root="$(get_turnkey_root)"
+  if [[ "$(git -C "${turnkey_root}" rev-parse --show-toplevel 2>/dev/null)" == "${turnkey_root}" ]]; then
+    echo "git+file://${turnkey_root}"
+  else
+    echo "path:${turnkey_root}"
+  fi
+}
+
 # Create a fresh test project directory with git initialized
 # Usage: PROJECT_DIR=$(setup_test_project "my-test")
 setup_test_project() {
@@ -61,16 +75,9 @@ init_from_template() {
   # Copy template files directly (more reliable for testing)
   cp -r "${template_dir}/." .
 
-  # Update flake.nix to use local turnkey path for testing
-  # Replace github:firefly-engineering/turnkey with a reference to this
-  # checkout: a git+file URL when it is a git work tree, otherwise a path
-  # (a secondary jj workspace has no .git of its own)
+  # Point flake.nix at this checkout instead of github:firefly-engineering/turnkey
   if [[ -f flake.nix ]]; then
-    local turnkey_url="path:${turnkey_root}"
-    if [[ "$(git -C "${turnkey_root}" rev-parse --show-toplevel 2>/dev/null)" == "${turnkey_root}" ]]; then
-      turnkey_url="git+file://${turnkey_root}"
-    fi
-    sed -i "s|github:firefly-engineering/turnkey|${turnkey_url}|g" flake.nix
+    sed -i "s|github:firefly-engineering/turnkey|$(turnkey_flake_url)|g" flake.nix
   fi
 
   echo "Initialized from template: ${template}"
