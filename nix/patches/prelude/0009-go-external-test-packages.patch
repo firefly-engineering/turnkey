@@ -21,12 +21,103 @@ go_test now does the same:
   lister (TPX_LIST_TESTS_COMMAND) reads them too.
 - A test files argsfile with no files is empty instead of a blank line,
   which the generator and the lister would read as a file name.
+- The external tests may import a package that imports the package under
+  test, directly or not (a testutil package, say). go test builds every
+  such package again for the test binary, against the package with its
+  internal tests (recompileForTest), so the binary holds one copy of it.
+  go_test does the same: go_library provides how it builds its package
+  (GoPkgBuild, in a GoPkgBuildInfo tset over its deps), and go_test builds
+  each such package again from it, deps first, under its own
+  recompiled_for_test/<import path> (declare_package_build's new
+  output_prefix). The external test package compiles against these, and
+  link's new replaced_pkgs puts them in place of the deps' copies. A test
+  without such a dep builds exactly as before. Only go_library deps can be
+  built again: another rule's package that imports the package under test
+  still conflicts with it (merge_pkgs).
 
 The external test package is never coverage-instrumented, as with go test.
-A dep that itself depends on the package under test would conflict with
-the internal test package (merge_pkgs); go test recompiles such deps, and
-this doesn't.
 
+--- a/go/go_library.bzl
++++ b/go/go_library.bzl
+@@ -41,10 +41,10 @@
+     "map_idx",
+ )
+ load(":cgo_builder.bzl", "get_cgo_build_context")
+-load(":compile.bzl", "GoPkgCompileInfo", "GoTestInfo")
++load(":compile.bzl", "GoPkgCompileInfo", "GoTestInfo", "get_inherited_compile_pkgs")
+ load(":coverage.bzl", "GoCoverageMode")
+ load(":link.bzl", "GoPkgLinkInfo", "get_inherited_link_pkgs")
+-load(":package_builder.bzl", "GoBuildConfig", "GoSourceInputs", "declare_package_build")
++load(":package_builder.bzl", "GoBuildConfig", "GoPkgBuild", "GoPkgBuildInfo", "GoSourceInputs", "declare_package_build", "go_pkg_builds")
+ load(":packages.bzl", "cgo_exported_preprocessor", "go_attr_pkg_name", "merge_pkgs")
+ load(":toolchain.bzl", "GoToolchainInfo", "evaluate_cgo_enabled", "get_toolchain_env_vars")
+ 
+@@ -54,27 +54,44 @@
+     coverage_mode = GoCoverageMode(ctx.attrs._coverage_mode) if ctx.attrs._coverage_mode else None
+     cgo_build_context = get_cgo_build_context(ctx)
+ 
++    sources = GoSourceInputs(
++        srcs = ctx.attrs.srcs + ctx.attrs.headers,
++        embed_srcs = from_named_set(ctx.attrs.embed_srcs),
++        package_root = ctx.attrs.package_root,
++    )
++    config = GoBuildConfig(
++        compiler_flags = ctx.attrs.compiler_flags,
++        assembler_flags = ctx.attrs.assembler_flags,
++        build_tags = ctx.attrs._build_tags,
++        coverage_enabled = ctx.attrs.coverage_enabled,
++        coverage_mode = coverage_mode,
++        cgo_enabled = evaluate_cgo_enabled(ctx.attrs._cgo_enabled, ctx.attrs.override_cgo_enabled),
++    )
+     pkg, pkg_info, _ = declare_package_build(
+         ctx = ctx,
+         pkg_import_path = pkg_import_path,
+         main = False,
+-        sources = GoSourceInputs(
+-            srcs = ctx.attrs.srcs + ctx.attrs.headers,
+-            embed_srcs = from_named_set(ctx.attrs.embed_srcs),
+-            package_root = ctx.attrs.package_root,
+-        ),
++        sources = sources,
+         cgo_build_context = cgo_build_context,
+-        config = GoBuildConfig(
+-            compiler_flags = ctx.attrs.compiler_flags,
+-            assembler_flags = ctx.attrs.assembler_flags,
+-            build_tags = ctx.attrs._build_tags,
+-            coverage_enabled = ctx.attrs.coverage_enabled,
+-            coverage_mode = coverage_mode,
+-            cgo_enabled = evaluate_cgo_enabled(ctx.attrs._cgo_enabled, ctx.attrs.override_cgo_enabled),
+-        ),
++        config = config,
+         deps = ctx.attrs.deps,
+     )
+ 
++    # A go_test that depends on this package builds it again if it imports
++    # the package under test, directly or not
++    pkg_build_info = GoPkgBuildInfo(builds = go_pkg_builds(
++        ctx.actions,
++        ctx.attrs.deps,
++        GoPkgBuild(
++            pkg_import_path = pkg_import_path,
++            sources = sources,
++            cgo_build_context = cgo_build_context,
++            config = config,
++            go_list_out = pkg_info.go_list_out,
++            deps = get_inherited_compile_pkgs(ctx.attrs.deps).keys(),
++        ),
++    ))
++
+     default_output = _combine_package(ctx, pkg_import_path, pkg.archive_file, pkg.export_file)
+     pkgs = {
+         pkg_import_path: pkg,
+@@ -85,6 +102,7 @@
+     return [
+         DefaultInfo(default_output = default_output),
+         GoPkgCompileInfo(pkgs = pkgs),
++        pkg_build_info,
+         GoPkgLinkInfo(
+             pkgs = merge_pkgs([
+                 pkgs,
 --- a/go/go_list.bzl
 +++ b/go/go_list.bzl
 @@ -18,6 +18,7 @@
@@ -75,6 +166,21 @@ this doesn't.
  
 --- a/go/go_test.bzl
 +++ b/go/go_test.bzl
+@@ -23,11 +23,11 @@
+     "value_or",
+ )
+ load(":cgo_builder.bzl", "get_cgo_build_context")
+-load(":compile.bzl", "GoTestInfo")
++load(":compile.bzl", "GoTestInfo", "get_inherited_compile_pkgs")
+ load(":coverage.bzl", "GoCoverageMode")
+ load(":link.bzl", "GoBuildMode", "get_inherited_link_pkgs", "link")
+-load(":package_builder.bzl", "GoBuildConfig", "GoSourceInputs", "declare_package_build")
+-load(":packages.bzl", "go_attr_pkg_name")
++load(":package_builder.bzl", "GoBuildConfig", "GoPkgBuild", "GoSourceInputs", "declare_package_build", "go_pkg_builds")
++load(":packages.bzl", "GoPkg", "go_attr_pkg_name", "merge_pkgs", "replace_pkgs")
+ load(":toolchain.bzl", "GoToolchainInfo", "evaluate_cgo_enabled")
+ 
+ def _gen_test_main(
 @@ -36,6 +36,7 @@
      coverage_mode: [GoCoverageMode, None],
      cover_packages: list[str],  # packages those are included for coverage
@@ -83,7 +189,7 @@ this doesn't.
  ) -> Artifact:
      """
      Generate a `main.go` which calls tests from the given sources.
-@@ -53,6 +54,7 @@
+@@ -53,10 +54,56 @@
          cover_pkgs_argsfile = ctx.actions.declare_output("cover_pkgs_argsfile", has_content_based_path = True)
          ctx.actions.write(cover_pkgs_argsfile, [["--cover-pkgs", pkg] for pkg in cover_packages])
          cmd.append(cmd_args(cover_pkgs_argsfile, format = "@{}"))
@@ -91,10 +197,64 @@ this doesn't.
      cmd.append(cmd_args(test_go_files_argsfile, format = "@{}"))
      ctx.actions.run(cmd_args(cmd), category = "go_test_main_gen", allow_cache_upload = ctx.attrs._go_toolchain[GoToolchainInfo].allow_cache_upload)
      return output
-@@ -122,9 +124,35 @@
+ 
++def _imports_any(build: GoPkgBuild, pkgs: dict[str, GoPkg]) -> bool:
++    for dep in build.deps:
++        if dep in pkgs:
++            return True
++    return False
++
++def _recompile_for_test(
++    ctx: AnalysisContext,
++    pkg_import_path: str,
++    tests: GoPkg,
++    deps: list[Dependency],
++) -> dict[str, GoPkg]:
++    """
++    Build again, for this test binary only, every package of the deps that
++    imports the package under test, directly or not, against the package as
++    built with its internal tests (tests), as go test does
++    (cmd/go/internal/load/test.go, recompileForTest). Only the external tests
++    can import such a package: the internal ones would be an import cycle.
++
++    Returns the packages the test binary has instead of its deps' ones, by
++    import path: the package under test, and the packages built again.
++    """
++    replaced_pkgs = {pkg_import_path: tests}
++    deps_pkgs = get_inherited_link_pkgs(deps)
++
++    # Postorder: a package comes after the packages it imports, which are
++    # then built again first
++    for build in go_pkg_builds(ctx.actions, deps).traverse(ordering = "postorder"):
++        if build.pkg_import_path in replaced_pkgs or not _imports_any(build, replaced_pkgs):
++            continue
++        pkg, _, _ = declare_package_build(
++            ctx = ctx,
++            pkg_import_path = build.pkg_import_path,
++            main = False,
++            sources = build.sources,
++            cgo_build_context = build.cgo_build_context,
++            config = build.config,
++            pkgs = {d: replaced_pkgs.get(d, deps_pkgs[d]) for d in build.deps},
++            go_list_out = build.go_list_out,
++            output_prefix = "recompiled_for_test/" + build.pkg_import_path,
++        )
++        replaced_pkgs[build.pkg_import_path] = pkg
++
++    return replaced_pkgs
++
+ def is_subpackage_of(other_pkg_import_path: str, pkg_import_path: str) -> bool:
+     return pkg_import_path == other_pkg_import_path or other_pkg_import_path.startswith(pkg_import_path + "/")
+ 
+@@ -122,9 +169,39 @@
  
      pkgs[pkg_import_path] = tests
  
++    # The external tests may import packages that import the package under
++    # test: they are built again against tests, for this test binary only
++    replaced_pkgs = _recompile_for_test(ctx, pkg_import_path, tests, deps)
++    x_test_deps_pkgs = replace_pkgs(get_inherited_compile_pkgs(deps), replaced_pkgs)
++
 +    # Compile the external tests (package <name>_test) into a package of their
 +    # own, against the package with its internal tests, as go test does.
 +    # Without external test files it is empty, and the test main doesn't
@@ -114,8 +274,7 @@ this doesn't.
 +            build_tags = ctx.attrs._build_tags,
 +            x_test = True,
 +        ),
-+        pkgs = pkgs,
-+        deps = deps,
++        pkgs = merge_pkgs([pkgs, x_test_deps_pkgs]),
 +        cgo_gen_dir_name = "cgo_gen_x_test",
 +        go_list_out = tests_pkg_info.go_list_out,
 +    )
@@ -128,7 +287,15 @@ this doesn't.
      main, _, _ = declare_package_build(
          ctx = ctx,
          pkg_import_path = pkg_import_path + ".test",
-@@ -173,6 +201,7 @@
+@@ -152,6 +229,7 @@
+         build_mode = GoBuildMode(value_or(ctx.attrs.build_mode, "exe")),
+         linker_flags = ctx.attrs.linker_flags,
+         external_linker_flags = ctx.attrs.external_linker_flags,
++        replaced_pkgs = replaced_pkgs,
+     )
+ 
+     # As per v1, copy in resources next to binary.
+@@ -173,6 +251,7 @@
          [ctx.attrs._list_tests[RunInfo]],
          "-match=^Test.*",
          cmd_args(test_go_files_argsfile, format = "@{}"),
@@ -136,6 +303,35 @@ this doesn't.
      )
  
      return inject_test_run_info(
+--- a/go/link.bzl
++++ b/go/link.bzl
+@@ -40,6 +40,7 @@
+     "GoStdlibDynamicValue",
+     "make_link_importcfg",
+     "merge_pkgs",
++    "replace_pkgs",
+ )
+ load(":toolchain.bzl", "GoToolchainInfo", "get_toolchain_env_vars")
+ 
+@@ -108,6 +109,9 @@
+     link_style: LinkStyle = LinkStyle("static"),
+     linker_flags: list[typing.Any] = [],
+     external_linker_flags: list[typing.Any] = [],
++    # Packages that this binary builds again for itself, by import path: they
++    # replace the ones of the same path that deps link in (see go_test)
++    replaced_pkgs: dict[str, GoPkg] = {},
+ ):
+     go_toolchain = ctx.attrs._go_toolchain[GoToolchainInfo]
+ 
+@@ -172,7 +176,7 @@
+     # Add inherited Go pkgs to library search path.
+     all_pkgs = merge_pkgs([
+         pkgs,
+-        get_inherited_link_pkgs(deps),
++        replace_pkgs(get_inherited_link_pkgs(deps), replaced_pkgs),
+     ])
+ 
+     identifier_prefix = ctx.label.name + "_" + _build_mode_param(build_mode)
 --- a/go/package_builder.bzl
 +++ b/go/package_builder.bzl
 @@ -32,6 +32,9 @@
@@ -148,15 +344,77 @@ this doesn't.
  )
  
  GoSourceInputs = record(
-@@ -50,6 +53,7 @@
+@@ -40,6 +43,36 @@
+     package_root = field(str | None, None),
+ )
+ 
++# How a go_library builds its package: what a go_test needs to build it
++# again, against the package under test as built with its internal tests, as
++# go test does (cmd/go/internal/load/test.go, recompileForTest)
++GoPkgBuild = record(
++    pkg_import_path = field(str),
++    sources = field(GoSourceInputs),
++    cgo_build_context = field(CGoBuildContext | None),
++    config = field(GoBuildConfig),
++    # The library's go list, reused rather than listing the sources again
++    go_list_out = field(Artifact),
++    # The import paths of its deps' packages (their GoPkgCompileInfo)
++    deps = field(list[str]),
++)
++
++GoPkgBuildTSet = transitive_set()
++
++# The GoPkgBuild of a library and of every library it depends on
++GoPkgBuildInfo = provider(
++    fields = {
++        "builds": provider_field(GoPkgBuildTSet),
++    },
++)
++
++# The GoPkgBuild of every library in deps, and of build when given
++def go_pkg_builds(actions: AnalysisActions, deps: list[Dependency], build: GoPkgBuild | None = None) -> GoPkgBuildTSet:
++    children = [d[GoPkgBuildInfo].builds for d in deps if GoPkgBuildInfo in d]
++    if build == None:
++        return actions.tset(GoPkgBuildTSet, children = children)
++    return actions.tset(GoPkgBuildTSet, value = build, children = children)
++
+ def declare_package_build(
+     ctx: AnalysisContext,
+     pkg_import_path: str,
+@@ -50,6 +83,8 @@
      pkgs: dict[str, GoPkg] = {},
      deps: list[Dependency] = [],
      cgo_gen_dir_name: str = "cgo_gen",
 +    go_list_out: Artifact | None = None,
++    output_prefix: str | None = None,
  ) -> (GoPkg, GoPackageInfo, Artifact):
      actions = ctx.actions
      target_label = ctx.label
-@@ -76,7 +80,10 @@
+@@ -64,21 +99,31 @@
+     if race and config.coverage_mode not in [None, GoCoverageMode("atomic")]:
+         fail("`coverage_mode` must be `atomic` when `race=True`")
+ 
+-    out_x = actions.declare_output(paths.basename(pkg_import_path) + "_non-shared.x", has_content_based_path = True)
+-    out_a = actions.declare_output(paths.basename(pkg_import_path) + "_non-shared.a", has_content_based_path = True)
++    # A go_test builds some of its deps' packages again, for itself: their
++    # outputs go under output_prefix, apart from its own packages'
++    def declare_output(name: str, dir: bool = False) -> Artifact:
++        if output_prefix == None:
++            return actions.declare_output(name, dir = dir, has_content_based_path = True)
++        return actions.declare_output(output_prefix, name, dir = dir, has_content_based_path = True)
++
++    out_x = declare_output(paths.basename(pkg_import_path) + "_non-shared.x")
++    out_a = declare_output(paths.basename(pkg_import_path) + "_non-shared.a")
+ 
+-    out_shared_x = actions.declare_output(paths.basename(pkg_import_path) + "_shared.x", has_content_based_path = True)
+-    out_shared_a = actions.declare_output(paths.basename(pkg_import_path) + "_shared.a", has_content_based_path = True)
++    out_shared_x = declare_output(paths.basename(pkg_import_path) + "_shared.x")
++    out_shared_a = declare_output(paths.basename(pkg_import_path) + "_shared.a")
+ 
+-    cgo_gen_dir = actions.declare_output(cgo_gen_dir_name, dir = True, has_content_based_path = True)
++    cgo_gen_dir = declare_output(cgo_gen_dir_name, dir = True)
+ 
+     srcs = dedupe_by_value(sources.srcs)
  
      package_root = sources.package_root if sources.package_root != None else infer_package_root(srcs)
  
@@ -166,9 +424,12 @@ this doesn't.
 +    if go_list_out == None:
 +        go_list_out = go_list(actions, go_toolchain, pkg_import_path, srcs, package_root, config.build_tags, config.cgo_enabled, with_tests = config.with_tests)
  
-     test_go_files_argsfile = actions.declare_output(paths.basename(pkg_import_path) + "_test_go_files.go_package_argsfile", has_content_based_path = True)
+-    test_go_files_argsfile = actions.declare_output(paths.basename(pkg_import_path) + "_test_go_files.go_package_argsfile", has_content_based_path = True)
++    test_go_files_argsfile = declare_output(paths.basename(pkg_import_path) + "_test_go_files.go_package_argsfile")
  
-@@ -152,8 +159,14 @@
+     all_pkgs = merge_pkgs([
+         pkgs,
+@@ -152,8 +197,14 @@
      if go_list.error != None:
          fail("Invalid go package: {}", go_list.error.err)
  
@@ -185,7 +446,7 @@ this doesn't.
  
      go_stdlib_value = go_stdlib_value.providers[GoStdlibDynamicValue]
  
-@@ -162,7 +175,7 @@
+@@ -162,7 +213,7 @@
          target_label = target_label,
          go_toolchain = go_toolchain,
          cgo_build_context = cgo_build_context,
@@ -194,7 +455,7 @@ this doesn't.
          params = BuildPackageParams(
              main = main,
              standard = False,
-@@ -178,7 +191,9 @@
+@@ -178,7 +229,9 @@
          ),
      )
  
@@ -205,7 +466,7 @@ this doesn't.
      actions.copy_dir(cgo_gen_dir, result.cgo_gen_dir)
  
      actions.copy_file(out_x, result.x_file)
-@@ -249,6 +264,24 @@
+@@ -249,6 +302,24 @@
          cgo_cppflags = go_list_out.cgo_cppflags,
      )
  
@@ -230,6 +491,22 @@ this doesn't.
  BuildPackageParams = record(
      main = field(bool),
      standard = field(bool),
+--- a/go/packages.bzl
++++ b/go/packages.bzl
+@@ -78,6 +78,13 @@
+ 
+     return all_pkgs
+ 
++def replace_pkgs(pkgs: dict[str, GoPkg], replacements: dict[str, GoPkg]) -> dict[str, GoPkg]:
++    """
++    Return pkgs, with the packages of the paths in replacements replaced.
++    Without such a path it is the same mapping, in the same order.
++    """
++    return {name: replacements.get(name, pkg) for name, pkg in pkgs.items()}
++
+ def pkg_artifacts(pkgs: dict[str, GoPkg], shared: bool) -> dict[str, Artifact]:
+     """
+     Return a map package name to a `shared` or `static` package artifact.
 --- a/go/tools/pkg_analyzer.go
 +++ b/go/tools/pkg_analyzer.go
 @@ -32,24 +32,25 @@

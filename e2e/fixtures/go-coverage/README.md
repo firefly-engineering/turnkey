@@ -18,6 +18,7 @@ go.work                  use ./app ./lib
 lib/                     module example.com/lib (no third-party deps)
   text/                  library
   greet/                 library importing text; go_test with embed_srcs, resources and an external test package
+    greettest/           test helpers importing greet, imported by the external test package
 app/                     module example.com/app
   config/                BurntSushi/toml
   cache/                 golang-lru/v2 (lru and simplelru); go_test
@@ -43,6 +44,7 @@ The root `flake.nix`, `toolchain.toml` and `rules.star` come from
 | `embed_srcs` and `//go:embed` | `lib/greet/greet_test.go` embeds `testdata/cases.txt` |
 | testdata as `resources` | `lib/greet/greet_test.go` reads `testdata/golden.txt` next to the test binary |
 | An external `_test` package | `lib/greet/greet_external_test.go` (`package greet_test`) |
+| An external test's dep that imports the package under test, which `go_test` builds again against the package with its internal tests, as `go test` does ([#226](https://github.com/firefly-engineering/turnkey/issues/226)) | `lib/greet/greettest`, imported by `lib/greet/greet_external_test.go` |
 | Test result caching | the test runs `tk test //...` twice; the second run must reuse every result |
 | A direct import also reachable through a dep's own deps ([#201](https://github.com/firefly-engineering/turnkey/issues/201)) | `app/cache` imports `simplelru` directly and through `lru`: rules sync must declare it |
 

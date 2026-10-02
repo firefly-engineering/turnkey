@@ -10,9 +10,11 @@
 #    dependency's own deps
 # 4. Build everything and run the binary
 # 5. Run the tests twice: the second run reuses every recorded result
-# 6. Run the external test package's test from the test binary
+# 6. Run the external test package's tests from the test binary, one of
+#    them through a dep that imports the package under test
 #
-# Issue: https://github.com/firefly-engineering/turnkey/issues/208
+# Issues: https://github.com/firefly-engineering/turnkey/issues/208,
+# https://github.com/firefly-engineering/turnkey/issues/226
 set -euo pipefail
 
 source "${LIB_DIR}/assertions.sh"
@@ -83,6 +85,10 @@ assert_file_contains "app/cache/rules.star" '"godeps//vendor/github.com/hashicor
 # The external test package's imports are the test's deps; its import of
 # the package under test is the target_under_test, not a dep
 assert_file_not_contains "lib/greet/rules.star" '"//lib/greet:greet"' || exit 1
+# A test dep that imports the package under test
+# (https://github.com/firefly-engineering/turnkey/issues/226)
+assert_file_contains "lib/greet/rules.star" '"//lib/greet/greettest:greettest"' || exit 1
+assert_file_contains "lib/greet/greettest/rules.star" '"//lib/greet:greet"' || exit 1
 echo "rules.star deps synced from the imports"
 
 step "Committing the synced state"
@@ -112,7 +118,7 @@ run_output=$(run_in_devshell_script_capture << 'PHASE2'
   echo ""
   echo "=== external test package ==="
   # The test binary runs the external package's tests too
-  "$(buck2 build //lib/greet:greet_test --show-full-simple-output)" -test.v -test.run 'TestHelloShouts$'
+  "$(buck2 build //lib/greet:greet_test --show-full-simple-output)" -test.v -test.run 'TestHelloShouts$|TestHelloThroughHelper$'
 PHASE2
 ) || {
   echo "$run_output" | tail -60
@@ -126,6 +132,10 @@ assert_output_contains 'printf "%s\n" "$run_output"' 'Name: (string) (len=7) "tu
 
 step "Verifying the external test package ran"
 assert_output_contains 'printf "%s\n" "$run_output"' "^--- PASS: TestHelloShouts" || exit 1
+# Through greettest, a dep that imports greet: go_test recompiles it against
+# greet as built with its internal tests
+# (https://github.com/firefly-engineering/turnkey/issues/226)
+assert_output_contains 'printf "%s\n" "$run_output"' "^--- PASS: TestHelloThroughHelper" || exit 1
 
 step "Verifying both test runs"
 # Two go_test targets, run by the first run and reused by the second
