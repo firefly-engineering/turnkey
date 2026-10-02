@@ -65,8 +65,12 @@ The Nix-built list of a deps cell's locked packages: each one's store path and t
 _Avoid_: manifest, cell derivation
 
 **Locked package**:
-The unit a deps generator locks at one version, and a deps cell stores behind one store link: a crate, a Go module, a Python distribution, a Solidity package (an npm package or a git dependency). For Rust, Python and Solidity it is also one buck2 package. A Go module holds many Go packages, each its own buck2 package.
+The unit a deps generator locks at one version, and a deps cell stores behind one store link: a crate, a Go module, a Python distribution, a Solidity package (an npm package or a git dependency), an npm package at one version. For Rust, Python and Solidity it is also one buck2 package. A Go module holds many Go packages, each its own buck2 package. An npm package's store link holds only its contents; its place in the dependency graph is its package instances'.
 _Avoid_: dependency (which also names the edge), module (outside Go)
+
+**Package instance**:
+One installation of an npm locked package: the package at its version together with the exact instance of each dependency it sees, peers included. The lock file resolves them, and they are the dependency graph's nodes. One locked package can have several instances, one per peer resolution. First-party code addresses, by the package's bare name, the instance the root `package.json` resolves to; a package it doesn't depend on directly has no such name.
+_Avoid_: snapshot (pnpm's name for it), virtual package
 
 **Store link**:
 A symlink in a deps cell to one locked package's store path, named after that store path. It is only ever created or deleted, never retargeted.
