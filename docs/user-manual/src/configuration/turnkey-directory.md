@@ -36,6 +36,12 @@ This means Go won't try to compile generated Buck2 cells, Cargo won't discover t
 │   ├── _store/<store path name>  # one symlink per package, never retargeted
 │   └── vendor/<name>@<version>/rules.star  # an alias package per package
 ├── jsdeps.lock      # held while tk materialize runs
+├── pydeps/          # Real directory: the write-once Python cell (tk materialize)
+│   ├── .buckconfig
+│   ├── .deps-file-sha256   # the python-deps.toml it was built from
+│   ├── _store/<store path name>  # one symlink per distribution, never retargeted
+│   └── vendor/<name>/rules.star  # an alias package per distribution
+├── pydeps.lock      # held while tk materialize runs
 ├── rustdeps/        # Real directory: the write-once Rust cell (tk materialize)
 │   ├── .buckconfig
 │   ├── .deps-file-sha256   # the rust-deps.toml it was built from
@@ -50,21 +56,87 @@ This means Go won't try to compile generated Buck2 cells, Cargo won't discover t
 │   └── vendor/<name>/rules.star  # an alias package per package, beside
 │                                 # links to its files for native forge
 ├── soldeps.lock     # held while tk materialize runs
-├── gcroots/godeps, gcroots/rustdeps, gcroots/soldeps, gcroots/jsdeps # GC roots for the cells' current indexes
+├── gcroots/godeps, gcroots/jsdeps, gcroots/pydeps, gcroots/rustdeps, gcroots/soldeps # GC roots for the cells' current indexes
+├── .cell-targets    # the store symlinks' targets, for tk's cell-freshness check
 ├── edits/, patches/ # tk compose's edits and generated patches
 └── sync.toml        # Symlink to the rules tk sync follows
 ```
 
-Most cells are symlinks to Nix store paths containing the generated Buck2
-cells. The Go, Rust, Solidity and JavaScript cells are real directories that
-`tk materialize`, run by the shell, keeps in line with the cell index Nix
-builds: a dependency change rewrites only the entries for the modules,
-crates or packages that changed
+The prelude and toolchains cells are symlinks to Nix store paths containing
+the generated Buck2 cells. The Go, Rust, Python, Solidity and JavaScript
+cells are real directories that `tk materialize`, run by the shell, keeps in
+line with the cell index Nix builds: a dependency change rewrites only the
+entries for the modules, crates, distributions or packages that changed
 ([ADR 0004](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0004-deps-cells-are-write-once-directories.md),
 [ADR 0008](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0008-godeps-stores-one-module-per-store-link.md),
+[ADR 0010](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0010-pydeps-stores-one-distribution-per-store-link.md),
 [ADR 0011](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0011-soldeps-stores-one-package-per-store-link.md),
 [ADR 0012](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0012-jsdeps-separates-package-contents-from-the-instance-graph.md)).
 Don't edit it; the shell rewrites it on every load.
+
+## Symlinked Cells and Plain buck2
+
+Two cells are symlinks into the Nix store, repointed when the shell builds
+a new one:
+
+- `.turnkey/prelude`, the prelude;
+- `.turnkey/toolchains`, the toolchains cell.
+
+`.buckconfig` and `.turnkey/sync.toml` are store symlinks too. They stay
+symlinks: they change only when the shell is rebuilt (a turnkey upgrade, a
+`nix flake update`, a `toolchain.toml` or `flake.nix` edit), which reloads
+it.
+
+The deps cells, `rustdeps`, `godeps`, `pydeps`, `jsdeps` and `soldeps`, are
+the write-once directories above, which moved off symlinks in
+[#234](https://github.com/firefly-engineering/turnkey/issues/234): a
+dependency change never repoints a link, so any caller, plain `buck2`
+included, reads the new version. A deps cell you set yourself with
+`buck2.<language>.cell`, a derivation without a cell index, is still a
+symlink.
+
+**A running daemon doesn't notice a repointed symlink.** It keeps the build
+files and sources it already read through the old target, and reads the
+packages it hadn't loaded from the new one. A build can then mix the old and
+the new cell, with no error.
+
+**`tk` checks for it.** Before each command it syncs for (every buck2
+command but the [pass-through ones](../reference/cli.md#tk-buildruntest-buck2-passthrough)),
+`tk` reads the targets of `.buckconfig` and of every entry of `.turnkey/`
+that is a symlink into the store, and compares them with those it saved in
+`.turnkey/.cell-targets`. When one was added, removed or repointed, it
+prints `tk: cell symlink changed, restarting buck2 daemon` (unless
+`--quiet`), runs `buck2 kill`, and saves the new targets. The first run only saves them. The new
+daemon starts without the old one's state, so the next build re-runs its
+actions.
+
+The check doesn't cover:
+
+- **plain `buck2`**: a script, a tool that runs `buck2` itself, or a shell
+  with `TURNKEY_NO_ALIAS=1`. The shell's `buck2` alias for `tk` only applies
+  to the interactive shell;
+- **`tk --no-sync`**, which skips it with the sync;
+- **another isolation directory's daemon**: `tk` runs `buck2 kill` without
+  `--isolation-dir`, then saves the new targets, so a later
+  `tk --isolation-dir=ci build` finds nothing changed and keeps its daemon.
+
+So after the shell is rebuilt, before a plain `buck2` call, either:
+
+- run a `tk` command that syncs, such as `tk build`, which restarts the
+  daemon if a symlink changed; or
+- run `buck2 kill`, with the same `--isolation-dir` as the call.
+
+In turnkey's own repository, these run plain `buck2`:
+
+- the e2e tests (`e2e/tests/`), which call `buck2 build`, `test` and `run`
+  in a fixture project's shell;
+- `scripts/ci-smoke.sh`, whose integration level builds and tests each
+  language's example;
+- `check-test-caching` (`src/cmd/check-test-caching/__main__.py`), which
+  runs `buck2 bxl`;
+- the `starlark-lint` git hook, `buck2 --isolation-dir .turnkey-lint
+  starlark lint`. It has a daemon of its own, which `tk` never restarts:
+  after a turnkey upgrade, run `buck2 --isolation-dir .turnkey-lint kill`.
 
 ## Buck2 Configuration
 

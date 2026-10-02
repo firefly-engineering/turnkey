@@ -101,7 +101,7 @@ The cell contains:
 │                        Buck2 Cells (in .turnkey/)                       │
 │                                                                         │
 │   .turnkey/godeps/           .turnkey/rustdeps/       .turnkey/pydeps/  │
-│   (symlinks to Nix store)                                               │
+│   (directories of links into the Nix store)                             │
 │                                                                         │
 │   Contains: source files, rules.star files, cell config                 │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -371,7 +371,7 @@ If Buck2 can't find a dependency:
    tk sync
    ```
 
-2. Verify the cell symlink exists:
+2. Verify the cell exists:
    ```bash
    ls -la .turnkey/godeps
    ```
@@ -404,10 +404,13 @@ If you get hash mismatch errors when building:
 
 If dependency changes aren't picked up:
 
-1. Kill the Buck2 daemon:
+1. Kill the Buck2 daemon, if you build with plain `buck2`:
    ```bash
    buck2 kill
    ```
+   A running daemon keeps what it read through a repointed symlink
+   ([Symlinked Cells and Plain buck2](../configuration/turnkey-directory.md#symlinked-cells-and-plain-buck2));
+   `tk` restarts it itself.
 
 2. Force a full sync:
    ```bash

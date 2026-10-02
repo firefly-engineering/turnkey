@@ -7,6 +7,8 @@ Turnkey integrates with Buck2 for building projects.
 Use `tk` instead of `buck2` directly. It provides:
 
 - Automatic dependency sync before builds
+- A daemon restart when a symlinked cell changed
+  ([Symlinked Cells and Plain buck2](../configuration/turnkey-directory.md#symlinked-cells-and-plain-buck2))
 - Consistent behavior across the team
 
 ```bash

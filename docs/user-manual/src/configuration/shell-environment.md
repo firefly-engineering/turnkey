@@ -23,7 +23,7 @@ Turnkey performs these actions on shell entry:
 
 1. Symlinks `.turnkey/prelude` to the prelude cell
 2. Symlinks `.turnkey/toolchains` to the generated toolchains
-3. Updates dependency cell symlinks if configured
+3. Brings the dependency cells' directories in line with their cell indexes (`tk materialize`)
 4. Displays welcome message (if configured)
 
 ## Verbose Mode

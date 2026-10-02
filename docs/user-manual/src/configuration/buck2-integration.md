@@ -97,6 +97,10 @@ and CPU with each allowed tag, set (`linux-x86_64-integration`) or unset
 
 The Buck2 prelude is provided via Nix at `.turnkey/prelude/`: the prelude built with turnkey's pinned buck2 release, with turnkey's patches and extensions applied.
 
+The prelude and toolchains cells are symlinks into the Nix store. After
+either changes, a plain `buck2` call needs a `tk` call or a `buck2 kill`
+first: see [Symlinked Cells and Plain buck2](turnkey-directory.md#symlinked-cells-and-plain-buck2).
+
 ## A Prelude of Your Own
 
 `prelude.path` replaces turnkey's prelude with a derivation or a path. It is
@@ -125,7 +129,9 @@ turnkey.toolchains.buck2.ignore = [ "e2e/fixtures" ];
 ```
 
 Buck2 reads `project.ignore` when its daemon starts, so a change takes effect
-after `buck2 kill`.
+once the daemon restarts. `.buckconfig` is a store symlink, so `tk` restarts
+it on its next command; plain `buck2` needs a `buck2 kill` first
+([Symlinked Cells and Plain buck2](turnkey-directory.md#symlinked-cells-and-plain-buck2)).
 
 ## Dependency Cells
 
@@ -134,5 +140,10 @@ Language-specific dependency cells are generated when configured:
 - `godeps//` - Go dependencies from go-deps.toml
 - `rustdeps//` - Rust dependencies from rust-deps.toml
 - `pydeps//` - Python dependencies from python-deps.toml
+- `jsdeps//` - JavaScript dependencies from js-deps.toml
+- `soldeps//` - Solidity dependencies from solidity-deps.toml
+
+They are write-once directories, which plain `buck2` reads without a daemon
+restart.
 
 See [Managing Dependencies](../workflows/dependencies.md) for configuration details.

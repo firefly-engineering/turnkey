@@ -184,7 +184,7 @@ Flags must come before the subcommand:
 
 | Flag | Description |
 |------|-------------|
-| `--no-sync` | Skip sync, run Buck2 directly |
+| `--no-sync` | Skip sync and the [cell-freshness check](../configuration/turnkey-directory.md#symlinked-cells-and-plain-buck2), run Buck2 directly |
 | `--no-local` | Skip local target overrides from `.turnkey/local.toml` |
 | `--verbose`, `-v` | Show what tk is doing |
 | `--dry-run`, `-n` | Show what would be synced without doing it |
