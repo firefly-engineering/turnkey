@@ -4,7 +4,7 @@
 #   - github: GitHub repositories
 #   - git: Generic git repositories (for Foundry deps, etc.)
 #   - cratesio: Rust crates from crates.io
-#   - pypi: Python packages from PyPI
+#   - pypi: Python packages' pure wheels from PyPI
 #   - goproxy: Go modules from proxy.golang.org
 #   - url/npm: Direct URL download (for npm tarballs, etc.)
 #   - zip: Unpacked archive download (for prefetched git archives, etc.)
@@ -64,14 +64,19 @@ rec {
       extension = "tar.gz";
     };
 
-  # Fetch from PyPI
+  # Fetch a pure wheel from PyPI, unpacked (ADR 0013)
   # fetchSpec: { type, url, sha256 }
+  # A .whl is a zip that unpack doesn't know by its extension, so it is
+  # named one. Its root is the installed layout, several entries side by
+  # side (the packages and their *.dist-info), so it is kept as it is:
+  # the hash is pydeps-gen's nix-prefetch-url --unpack of the same URL.
   fetchPyPI =
     fetchSpec:
     pkgs.fetchzip {
       inherit (fetchSpec) url;
       sha256 = fetchSpec.sha256;
-      extension = "tar.gz";
+      extension = "zip";
+      stripRoot = false;
     };
 
   # Fetch from a URL (for npm packages and other tarballs)

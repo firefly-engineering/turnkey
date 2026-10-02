@@ -15,6 +15,7 @@ rust_binary(
         "rustdeps//vendor/serde_json:serde_json",
         "rustdeps//vendor/toml:toml",
         "rustdeps//vendor/ureq:ureq",
+        "rustdeps//vendor/url:url",
         # turnkey:auto-end
         # turnkey:preserve-start
         "rustdeps//vendor/ring@0.17.14:ring_core_0_17_14__",
@@ -38,6 +39,7 @@ rust_test(
         "rustdeps//vendor/serde_json:serde_json",
         "rustdeps//vendor/toml:toml",
         "rustdeps//vendor/ureq:ureq",
+        "rustdeps//vendor/url:url",
         # turnkey:auto-end
         # turnkey:preserve-start
         "rustdeps//vendor/ring@0.17.14:ring_core_0_17_14__",

@@ -1,5 +1,9 @@
 //! A vendored Python package's rules.star, with its dependencies
 //!
+//! The package is the distribution's unpacked pure wheel (ADR 0013), so its
+//! library holds every file the wheel installs: modules as srcs, the rest
+//! (dist-info included) as resources.
+//!
 //! A package's dependencies come from python-deps.toml (pydeps-gen records
 //! them from uv.lock): its own, and those of the extras some package or
 //! workspace member asks it for. The Python adapter hands them over as the
@@ -108,7 +112,12 @@ pub fn render(name: &str, pkg: &Package, cfg: &Config) -> Result<String> {
     out.push('\n');
     out.push_str("python_library(\n");
     out.push_str(&format!("    name = {},\n", quote(name)));
+    // The distribution's store link holds its unpacked wheel (ADR 0013),
+    // the layout an installer puts in site-packages: every file in it is
+    // installed, so what isn't a module (dist-info, data files) is a
+    // resource. The rules.star this writes is the one file that isn't.
     out.push_str("    srcs = glob([\"**/*.py\"]),\n");
+    out.push_str("    resources = glob([\"**\"], exclude = [\"**/*.py\", \"rules.star\"]),\n");
     out.push_str("    base_module = \"\",\n");
     if let Some(value) = value {
         out.push_str(&format!(
@@ -233,6 +242,9 @@ other = [{ name = "xmlschema" }]
         }
     }
 
+    /// A distribution's library is its whole installed wheel: its .py files
+    /// as srcs, and every other file (dist-info, data files such as
+    /// certifi's cacert.pem) as resources, but not the rules.star itself
     #[test]
     fn render_without_deps() {
         let got = rendered("iniconfig", &cfg()).unwrap();
@@ -244,6 +256,7 @@ load("@prelude//:rules.bzl", "python_library")
 python_library(
     name = "iniconfig",
     srcs = glob(["**/*.py"]),
+    resources = glob(["**"], exclude = ["**/*.py", "rules.star"]),
     base_module = "",
     visibility = ["PUBLIC"],
 )

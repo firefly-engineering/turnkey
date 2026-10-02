@@ -130,6 +130,10 @@ repository's local, exact-version workarounds.
   distribution's own derivation, after its fixup and before its
   `rules.star` is written. Changing a patch rebuilds only that distribution
   and what depends on it.
+  - Patches apply to the distribution's unpacked wheel, the installed
+    layout, not its sdist. A patch written against sdist paths (such as
+    `vendor/requests/src/requests/...`) doesn't apply: regenerate it with
+    `tk compose patch`.
   - A patch that doesn't apply exactly, with no fuzz, fails the build and
     names the distribution.
   - A patch file left directly under `pydeps/`, from before this layout,

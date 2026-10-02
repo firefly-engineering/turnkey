@@ -1029,7 +1029,8 @@
           # (nix/lib/deps-cell/adapters/python.nix's userPatchesOf), routed by
           # its directory, vendor/<name>/, and applies there: six built with
           # the fixture patch has the line it adds, and its rules.star and
-          # target. A flat patch file, from the cell that was one store path,
+          # target, and is its locked wheel's installed layout (ADR 0013).
+          # A flat patch file, from the cell that was one store path,
           # and a directory naming no locked distribution both fail
           # evaluation.
           checks.python-user-patches =
@@ -1052,8 +1053,8 @@
               six = depsCell.mkPythonDepPackage {
                 name = "six";
                 version = "1.17.0";
-                sha256 = "sha256-S8IT/6DLDC/sE233C6V/PW4rIMlUM/qfkvsiW/tO2N4=";
-                url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz";
+                sha256 = "sha256-D48q9oGU8W9av7f06wJAtI3tpSTY9bJYfhwzLgZEakY=";
+                url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl";
                 slice = { };
                 conditions = (import ./nix/buck2/platforms.nix { inherit lib; }).conditions [ system ];
                 pydepsCell = import ./nix/packages/pydeps-cell.nix { inherit pkgs lib; };
@@ -1073,6 +1074,60 @@
               grep -qx '__patched__ = "python-user-patches"' ${six}/six.py
               grep -q 'name = "six"' ${six}/rules.star
               [ "$(cat ${six.targets})" = six ]
+
+              # It is the locked wheel, the installed layout (ADR 0013): its
+              # dist-info, a resource of its library, and no sdist build file
+              [ -f ${six}/six-1.17.0.dist-info/METADATA ]
+              [ ! -e ${six}/setup.py ] && [ ! -e ${six}/test_six.py ]
+              grep -qF 'resources = glob(["**"], exclude = ["**/*.py", "rules.star"])' ${six}/rules.star
+              touch $out
+            '';
+
+          # A pydeps wheel is installed as an installer would (ADR 0013,
+          # python.nix's installWheel): its <name>.data/purelib and platlib
+          # are merged into the root and the rest of <name>.data dropped,
+          # while a package directory merely ending in .data stays. A
+          # python-deps.toml from before schema 3, whose sources are sdists,
+          # fails evaluation.
+          checks.python-wheels =
+            let
+              depsCell = import ./nix/lib/deps-cell { inherit pkgs lib; };
+              # An unpacked wheel with every <name>.data scheme
+              wheel = pkgs.runCommand "fake-wheel" { } ''
+                mkdir -p $out/pkg $out/pkg-1.0.dist-info $out/pkg-1.0.data/{purelib/pure,platlib/plat,scripts,data} $out/keep.data
+                touch $out/keep.data/kept.txt
+                touch $out/pkg/__init__.py $out/pkg-1.0.dist-info/METADATA
+                touch $out/pkg-1.0.data/purelib/pure/__init__.py $out/pkg-1.0.data/platlib/plat/__init__.py
+                touch $out/pkg-1.0.data/scripts/tool $out/pkg-1.0.data/data/share.txt
+              '';
+              installed = pkgs.runCommand "installed-wheel" {
+                src = wheel;
+              } depsCell.adapters.python.installWheel;
+              v2 =
+                builtins.tryEval
+                  (depsCell.mkPythonDepsCell {
+                    cellName = "pydeps";
+                    depsFile = builtins.toFile "python-deps.toml" ''
+                      schema_version = 2
+
+                      [deps.six]
+                      version = "1.17.0"
+                      hash = "sha256-S8IT/6DLDC/sE233C6V/PW4rIMlUM/qfkvsiW/tO2N4="
+                      url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz"
+                    '';
+                    conditions = (import ./nix/buck2/platforms.nix { inherit lib; }).conditions [ system ];
+                    pydepsCell = import ./nix/packages/pydeps-cell.nix { inherit pkgs lib; };
+                  }).depPackages;
+            in
+            assert lib.assertMsg (
+              !v2.success
+            ) "python wheels: a schema_version 2 python-deps.toml was accepted";
+            pkgs.runCommand "python-wheels-check" { } ''
+              cd ${installed}
+              [ -f pkg/__init__.py ] && [ -f pkg-1.0.dist-info/METADATA ]
+              [ -f pure/__init__.py ] && [ -f plat/__init__.py ]
+              [ ! -e pkg-1.0.data ] && [ ! -e tool ] && [ ! -e share.txt ]
+              [ -f keep.data/kept.txt ]
               touch $out
             '';
 

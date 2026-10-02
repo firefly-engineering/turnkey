@@ -2,6 +2,8 @@
 //!
 //! This tool reads Python dependency declarations and generates a python-deps.toml
 //! file with Nix-compatible SRI hashes for use with Buck2/Nix integration.
+//! Each distribution is recorded as its pure (`py3-none-any`) wheel, the
+//! layout an installer puts in site-packages (ADR 0013).
 //!
 //! Recommended workflow for reproducible builds:
 //!   1. uv lock                                    # Generate uv.lock from pyproject.toml
@@ -175,6 +177,10 @@ struct PyLockSdist {
 #[allow(dead_code)]
 struct PyLockWheel {
     url: String,
+    /// The wheel's filename; PEP 751 lets a lock leave it out when its URL
+    /// ends with it
+    #[serde(default)]
+    name: Option<String>,
     #[serde(default)]
     hashes: PyLockHashes,
 }
@@ -432,23 +438,36 @@ fn parse_pylock(
             }),
     )?;
 
+    // Each distribution with its pure wheel, chosen before anything is
+    // fetched so that every distribution without one is named at once.
+    // Workspace-member entries (editable directory installs) are skipped:
+    // they have no archive to fetch and shouldn't appear in the Nix cell.
+    let mut locked: Vec<(&PyLockPackage, &String, &str)> = Vec::new();
+    let mut unvendorable = Vec::new();
+    for pkg in pylock.packages.iter().filter(|pkg| pkg.directory.is_none()) {
+        let Some(version) = &pkg.version else {
+            eprintln!("  Warning: No version for {}, skipping", pkg.name);
+            continue;
+        };
+        match pure_wheel(pkg)? {
+            Ok(url) => locked.push((pkg, version, url)),
+            Err(why) => unvendorable.push(format!("  {} {version}: {why}", pkg.name)),
+        }
+    }
+    if !unvendorable.is_empty() {
+        bail!(
+            "pylock.toml locks distributions with no pure wheel ({PURE_WHEEL_TAG}), and \
+             the pydeps cell vendors each distribution as its locked pure wheel \
+             (docs/adr/0013-pydeps-distributions-are-their-locked-wheels.md):\n{}",
+            unvendorable.join("\n")
+        );
+    }
+
     let mut resolved = Vec::new();
 
-    for (i, pkg) in pylock.packages.iter().enumerate() {
-        // Skip workspace-member entries (editable directory installs); they
-        // have no archive to fetch and shouldn't appear in the Nix cell.
-        if pkg.directory.is_some() {
-            continue;
-        }
-
-        let version = match &pkg.version {
-            Some(v) => v.clone(),
-            None => {
-                eprintln!("  Warning: No version for {}, skipping", pkg.name);
-                continue;
-            }
-        };
-
+    for (i, (pkg, version, url)) in locked.into_iter().enumerate() {
+        let version = version.clone();
+        let url = url.to_string();
         eprintln!(
             "[{}/{}] Processing {} {}",
             i + 1,
@@ -457,20 +476,8 @@ fn parse_pylock(
             version
         );
 
-        // Prefer sdist (source distribution) for Nix builds
-        let (url, _archive_hash) = if let Some(sdist) = &pkg.sdist {
-            (sdist.url.clone(), sdist.hashes.sha256.clone())
-        } else if let Some(wheel) = pkg.wheels.first() {
-            // Fall back to wheel if no sdist
-            eprintln!("  Warning: No sdist for {}, using wheel", pkg.name);
-            (wheel.url.clone(), wheel.hashes.sha256.clone())
-        } else {
-            eprintln!("  Warning: No sdist or wheel for {}, skipping", pkg.name);
-            continue;
-        };
-
-        // Get the Nix hash (for unpacked content)
-        // Note: pylock.toml hash is for the archive file, but Nix needs hash of unpacked content
+        // The Nix hash of the unpacked wheel, as the pydeps cell's fetchzip
+        // checks it: pylock.toml's own hash is the archive file's
         let hash = match prefetcher.as_deref_mut() {
             None => PLACEHOLDER_HASH.to_string(),
             Some(prefetcher) => match prefetcher.prefetch(&url, true) {
@@ -496,6 +503,83 @@ fn parse_pylock(
     resolved.sort_by(|a, b| a.name.cmp(&b.name));
 
     Ok(resolved)
+}
+
+/// The compatibility tag of the wheels the pydeps cell vendors: pure Python
+/// 3, so one wheel serves every platform and Python 3 version
+/// (docs/adr/0013-pydeps-distributions-are-their-locked-wheels.md)
+const PURE_WHEEL_TAG: &str = "py3-none-any";
+
+/// Why a locked distribution has no pure wheel to vendor
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NoPureWheel {
+    PlatformWheelsOnly,
+    SdistOnly,
+    NoArchive,
+}
+
+impl std::fmt::Display for NoPureWheel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::PlatformWheelsOnly => {
+                "only platform-specific (or Python-version-specific) wheels, which \
+                 turnkey doesn't vendor yet \
+                 (https://github.com/firefly-engineering/turnkey/issues/248)"
+            }
+            Self::SdistOnly => "only an sdist, which turnkey doesn't build into a wheel",
+            Self::NoArchive => "no wheel and no sdist",
+        })
+    }
+}
+
+/// The URL of a locked distribution's pure wheel, or why it has none
+fn pure_wheel(pkg: &PyLockPackage) -> Result<std::result::Result<&str, NoPureWheel>> {
+    for wheel in &pkg.wheels {
+        let filename = wheel_filename(wheel).with_context(|| format!("a wheel of {}", pkg.name))?;
+        if is_pure_wheel(&filename) {
+            return Ok(Ok(&wheel.url));
+        }
+    }
+    Ok(Err(if !pkg.wheels.is_empty() {
+        NoPureWheel::PlatformWheelsOnly
+    } else if pkg.sdist.is_some() {
+        NoPureWheel::SdistOnly
+    } else {
+        NoPureWheel::NoArchive
+    }))
+}
+
+/// A pylock.toml wheel's filename: its `name`, or else its URL's last path
+/// segment, which PEP 751 has a lock leave it to
+fn wheel_filename(wheel: &PyLockWheel) -> Result<String> {
+    if let Some(name) = &wheel.name {
+        return Ok(name.clone());
+    }
+    let url = url::Url::parse(&wheel.url).with_context(|| format!("wheel URL {}", wheel.url))?;
+    url.path_segments()
+        .and_then(|mut segments| segments.next_back())
+        .filter(|segment| !segment.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| anyhow!("wheel URL {} names no file", wheel.url))
+}
+
+/// Whether a wheel's filename tags it PURE_WHEEL_TAG. A filename is
+/// `{name}-{version}(-{build})?-{python}-{abi}-{platform}.whl`, where no
+/// component holds a `-` and each tag may be a `.`-separated set
+/// (https://packaging.python.org/en/latest/specifications/binary-distribution-format/).
+fn is_pure_wheel(filename: &str) -> bool {
+    let Some(stem) = filename.strip_suffix(".whl") else {
+        return false;
+    };
+    let components: Vec<&str> = stem.split('-').collect();
+    // The last three components, after the name, version and optional build
+    let tags = match components.len() {
+        5 | 6 => &components[components.len() - 3..],
+        _ => return false,
+    };
+    tags.iter()
+        .zip(PURE_WHEEL_TAG.split('-'))
+        .all(|(set, wanted)| set.split('.').any(|tag| tag == wanted))
 }
 
 /// Add uv.lock's dependency graph to the resolved packages: each one's
@@ -632,23 +716,21 @@ fn resolve_single_dep(
         response.info.version.clone()
     };
 
-    // Find sdist (source distribution) URL for this version
     let releases = response
         .releases
         .get(&version)
         .ok_or_else(|| anyhow!("Version {} not found for {}", version, name))?;
 
-    // Prefer .tar.gz sdist
+    // The release's pure wheel, as for a lock (ADR 0013)
     let release = releases
         .iter()
-        .find(|r| r.packagetype == "sdist" && r.filename.ends_with(".tar.gz"))
-        .or_else(|| releases.iter().find(|r| r.packagetype == "sdist"))
-        .ok_or_else(|| anyhow!("No source distribution found for {} {}", name, version))?;
+        .find(|r| r.packagetype == "bdist_wheel" && is_pure_wheel(&r.filename))
+        .ok_or_else(|| anyhow!("No pure wheel ({PURE_WHEEL_TAG}) found for {name} {version}"))?;
 
     // Get hash
     let hash = match prefetcher {
         None => PLACEHOLDER_HASH.to_string(),
-        // Prefetch with nix to get correct hash for unpacked content
+        // The unpacked wheel's hash, as the pydeps cell's fetchzip checks it
         Some(prefetcher) => prefetcher.prefetch(&release.url, true)?,
     };
 
@@ -664,11 +746,16 @@ fn resolve_single_dep(
 /// The hash --no-prefetch writes: one no archive has
 const PLACEHOLDER_HASH: &str = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
+/// The python-deps.toml schema pydeps-gen writes, and the one Python
+/// adapter reads (nix/lib/deps-cell/adapters/python.nix)
+const PYTHON_DEPS_SCHEMA_VERSION: u32 = 3;
+
 /// python-deps.toml
 #[derive(Debug, Serialize)]
 struct PythonDeps {
     /// Schema version for forward compatibility: 2 records markers and
-    /// extras (docs/user-manual/src/languages/python.md)
+    /// extras, and 3 makes each url and hash a pure wheel's
+    /// (docs/user-manual/src/languages/python.md)
     schema_version: u32,
     /// Keyed by each package's name in the pydeps cell
     deps: BTreeMap<String, DepRecord>,
@@ -678,7 +765,9 @@ struct PythonDeps {
 #[derive(Debug, Serialize)]
 struct DepRecord {
     version: String,
+    /// The Nix hash of the unpacked wheel
     hash: String,
+    /// The distribution's pure wheel
     url: String,
     /// The lock's environment marker for installing the package at all
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -725,7 +814,7 @@ fn python_deps(source: &str, deps: &[PythonDep]) -> Result<PythonDeps> {
             .collect()
     };
     Ok(PythonDeps {
-        schema_version: 2,
+        schema_version: PYTHON_DEPS_SCHEMA_VERSION,
         deps: deps
             .iter()
             .map(|dep| {
@@ -836,7 +925,7 @@ socks = [{ name = "PySocks", marker = "python_version >= '3.8'" }]
         let mut resolved = vec![PythonDep {
             name: "requests".into(),
             version: "2.32.0".into(),
-            url: "https://example.com/requests.tar.gz".into(),
+            url: "https://example.com/requests-2.32.0-py3-none-any.whl".into(),
             hash: "sha256-x".into(),
             marker: Some("python_version >= \"3.8\"".into()),
             ..Default::default()
@@ -852,7 +941,7 @@ socks = [{ name = "PySocks", marker = "python_version >= '3.8'" }]
 
         let parsed: toml::Value = toml::from_str(&toml).unwrap();
         let requests = &parsed["deps"]["requests"];
-        assert_eq!(parsed["schema_version"].as_integer(), Some(2));
+        assert_eq!(parsed["schema_version"].as_integer(), Some(3));
         assert_eq!(
             requests["marker"].as_str(),
             Some(r#"python_version >= "3.8""#)
@@ -872,7 +961,7 @@ socks = [{ name = "PySocks", marker = "python_version >= '3.8'" }]
     }
 
     #[test]
-    fn prefetches_each_sdist_unpacked() {
+    fn prefetches_the_pure_wheel_unpacked_over_the_sdist() {
         let dir = std::env::temp_dir().join(format!("pydeps-gen-lock-{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join("pylock.toml");
@@ -885,6 +974,10 @@ lock-version = "1.0"
 name = "six"
 version = "1.17.0"
 sdist = { url = "https://example.com/six-1.17.0.tar.gz" }
+wheels = [
+    { url = "https://example.com/six-1.17.0-cp312-cp312-manylinux_2_17_x86_64.whl" },
+    { url = "https://example.com/six-1.17.0-py2.py3-none-any.whl" },
+]
 
 [[packages]]
 name = "member"
@@ -893,7 +986,7 @@ directory = { path = "." }
         )
         .unwrap();
         let mut fake = deps_gen_kit::MemoryPrefetcher::default().with(
-            "https://example.com/six-1.17.0.tar.gz",
+            "https://example.com/six-1.17.0-py2.py3-none-any.whl",
             true,
             "sha256-six",
         );
@@ -902,8 +995,108 @@ directory = { path = "." }
         fs::remove_dir_all(&dir).unwrap();
 
         assert_eq!(resolved.len(), 1);
+        assert_eq!(
+            resolved[0].url,
+            "https://example.com/six-1.17.0-py2.py3-none-any.whl"
+        );
         assert_eq!(resolved[0].hash, "sha256-six");
         assert_eq!(fake.calls.len(), 1);
+    }
+
+    #[test]
+    fn a_distribution_with_only_platform_wheels_fails_naming_it() {
+        let (resolved, fetched) = parse_lock(
+            r#"
+lock-version = "1.0"
+
+[[packages]]
+name = "six"
+version = "1.17.0"
+wheels = [{ url = "https://example.com/six-1.17.0-py2.py3-none-any.whl" }]
+
+[[packages]]
+name = "numpy"
+version = "2.1.0"
+sdist = { url = "https://example.com/numpy-2.1.0.tar.gz" }
+wheels = [
+    { url = "https://example.com/numpy-2.1.0-cp312-cp312-macosx_14_0_arm64.whl" },
+    { url = "https://example.com/numpy-2.1.0-cp312-abi3-any.whl" },
+]
+"#,
+            "platform",
+        );
+
+        let error = format!("{:#}", resolved.unwrap_err());
+        for expected in [
+            "numpy 2.1.0",
+            "only platform-specific (or Python-version-specific) wheels",
+            "py3-none-any",
+        ] {
+            assert!(error.contains(expected), "{expected:?} not in {error:?}");
+        }
+        assert!(!error.contains("six"), "{error:?}");
+        assert_eq!(
+            fetched, 0,
+            "a lock without a pure wheel fails before fetching"
+        );
+    }
+
+    #[test]
+    fn a_distribution_with_only_an_sdist_fails_naming_it() {
+        let (resolved, _) = parse_lock(
+            r#"
+lock-version = "1.0"
+
+[[packages]]
+name = "legacy"
+version = "0.1"
+sdist = { url = "https://example.com/legacy-0.1.tar.gz" }
+"#,
+            "sdist",
+        );
+
+        let error = format!("{:#}", resolved.unwrap_err());
+        for expected in ["legacy 0.1", "only an sdist", "py3-none-any"] {
+            assert!(error.contains(expected), "{expected:?} not in {error:?}");
+        }
+    }
+
+    #[test]
+    fn pure_wheels_are_the_py3_none_any_ones() {
+        for (filename, pure) in [
+            ("six-1.17.0-py2.py3-none-any.whl", true),
+            ("requests-2.32.0-py3-none-any.whl", true),
+            ("foo-1.0-1build-py3-none-any.whl", true),
+            ("foo-1.0-py2-none-any.whl", false),
+            ("foo-1.0-cp312-abi3-any.whl", false),
+            ("foo-1.0-py3-none-manylinux_2_17_x86_64.whl", false),
+            ("foo-1.0-cp312-cp312-macosx_14_0_arm64.whl", false),
+            ("foo-1.0.tar.gz", false),
+            ("not-a-wheel.whl", false),
+        ] {
+            assert_eq!(is_pure_wheel(filename), pure, "{filename}");
+        }
+    }
+
+    #[test]
+    fn a_wheels_filename_is_its_name_or_its_urls_last_segment() {
+        let wheel = |url: &str, name: Option<&str>| PyLockWheel {
+            url: url.into(),
+            name: name.map(Into::into),
+            ..Default::default()
+        };
+        assert_eq!(
+            wheel_filename(&wheel("https://e.com/a/b-1-py3-none-any.whl?x=1#y", None)).unwrap(),
+            "b-1-py3-none-any.whl"
+        );
+        assert_eq!(
+            wheel_filename(&wheel(
+                "https://e.com/download",
+                Some("b-1-py3-none-any.whl")
+            ))
+            .unwrap(),
+            "b-1-py3-none-any.whl"
+        );
     }
 
     /// parse_pylock's result for `lock`, with a prefetcher that knows no

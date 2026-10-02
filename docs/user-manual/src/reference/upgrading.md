@@ -2,6 +2,34 @@
 
 What changes when a project moves to a newer turnkey, and what to do about it.
 
+## Python distributions are their locked wheels
+
+Each pydeps distribution is now its locked pure (`py3-none-any`) wheel,
+unpacked, instead of its sdist
+([ADR 0013](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0013-pydeps-distributions-are-their-locked-wheels.md)).
+Its target holds what an installer would put in site-packages: no
+`setup.py` or sdist `tests/`, src-layout distributions such as `requests`
+import under their own name, and data files and `*.dist-info` are
+resources. Labels are unchanged.
+
+### Switching over
+
+- **Run `tk sync`.** `python-deps.toml` moves to `schema_version = 3`,
+  whose `url` and `hash` are the wheel's. A schema 2 file fails evaluation
+  and asks for `tk sync`.
+- **A distribution with no pure wheel fails `pydeps-gen`**, which names it:
+  one with only platform-specific wheels, or only an sdist. Such a
+  distribution can't be vendored until platform wheels are supported
+  ([#248](https://github.com/firefly-engineering/turnkey/issues/248)).
+- **User patches against the sdist layout must be regenerated.** Paths
+  change with the layout (`vendor/requests/src/requests/...` becomes
+  `vendor/requests/requests/...`), so such a patch no longer applies and
+  fails its distribution's build. Make the change again in the materialized
+  cell and write the patch with `tk compose patch`.
+- **Fixups apply to the installed tree.** Nothing runs an sdist build, so a
+  fixup that relied on one (or on the sdist's paths) needs rewriting against
+  the wheel's layout.
+
 ## The per-distribution Python cell
 
 The Python dependency cell is now built one package per distribution, and

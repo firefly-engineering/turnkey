@@ -97,6 +97,10 @@ pydeps-gen --lock pylock.toml -o python-deps.toml
 
 Reads: `pylock.toml`, `uv.lock`, or `requirements.txt`
 
+Records each distribution's pure (`py3-none-any`) wheel, hashed unpacked,
+and fails naming any distribution that has none
+([ADR 0013](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0013-pydeps-distributions-are-their-locked-wheels.md)).
+
 ## Go Dependency Handling
 
 ```

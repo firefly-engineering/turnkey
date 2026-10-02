@@ -252,6 +252,8 @@ one store link per distribution, and one alias package per distribution.
 ├── .deps-file-sha256                 # the python-deps.toml it was built from
 ├── _store/
 │   └── <hash>-dep-python-six-1.17.0 -> /nix/store/<hash>-dep-python-six-1.17.0
+│       ├── six.py                    # the unpacked wheel: .py files are srcs,
+│       ├── six-1.17.0.dist-info/     # every other file a resource
 │       └── rules.star                # python_library, generated in the distribution's derivation
 └── vendor/
     └── six/rules.star                # alias -> //_store/<hash>-dep-python-six-1.17.0:six
@@ -265,10 +267,15 @@ packages.
 ### Process
 
 1. `tk sync` runs pydeps-gen, which records each distribution's version,
-   URL and hash from `pylock.toml`, and its dependencies, markers and extras
-   from `uv.lock`.
+   and its pure (`py3-none-any`) wheel's URL and unpacked hash, from
+   `pylock.toml` (`python-deps.toml` schema 3), and its dependencies,
+   markers and extras from `uv.lock`. A distribution with no pure wheel
+   fails it
+   ([ADR 0013](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0013-pydeps-distributions-are-their-locked-wheels.md)).
 2. Nix builds one package per distribution (`mkPythonDepPackage`): its
-   source from PyPI, its fixup, its user patches
+   wheel from PyPI, unpacked and installed (`installWheel`: `<name>.data/`'s
+   `purelib` and `platlib` merged into the root, the rest dropped), its
+   fixup, its user patches
    (`.turnkey/patches/pydeps/vendor/<name>/`), and its `rules.star`, written
    by `pydeps-cell` from the distribution's package slice (its dependencies
    and its requested extras', narrowed by `sliceOf` to the distributions the

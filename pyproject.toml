@@ -22,6 +22,7 @@ requires-python = ">=3.11"
 dependencies = [
     "turnkey-example-python-hello",
     "turnkey-example-python-hello-deps",
+    "turnkey-example-python-requests",
 ]
 
 [dependency-groups]
@@ -37,11 +38,13 @@ dev = [
 members = [
     "src/examples/python-hello",
     "src/examples/python-hello-deps",
+    "src/examples/python-requests",
 ]
 
 [tool.uv.sources]
 turnkey-example-python-hello = { workspace = true }
 turnkey-example-python-hello-deps = { workspace = true }
+turnkey-example-python-requests = { workspace = true }
 
 [tool.uv]
 # The workspace root itself isn't a packaged project — it exists only to

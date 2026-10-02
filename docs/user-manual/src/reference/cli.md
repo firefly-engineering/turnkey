@@ -476,7 +476,10 @@ rustdeps-gen --cargo-lock rust/Cargo.lock -o rust-deps.toml
 
 ## pydeps-gen
 
-Generate `python-deps.toml` from Python dependency files.
+Generate `python-deps.toml` from Python dependency files. Each distribution
+is recorded as its pure (`py3-none-any`) wheel, hashed unpacked; a
+distribution with only platform-specific wheels, or only an sdist, fails
+with its name (see [Python](../languages/python.md#distributions-are-their-locked-wheels)).
 
 ### Usage
 

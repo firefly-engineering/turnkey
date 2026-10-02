@@ -8,8 +8,8 @@
 //! own inputs do (ADR 0004). It prints the rules.star, and writes its target
 //! name for the cell index.
 //!
-//! It was ported from Go (#212), and writes the bytes the Go version wrote
-//! for the distribution in the whole cell.
+//! It was ported from Go (#212). The library it writes holds the whole
+//! unpacked wheel, its non-Python files as resources (ADR 0013).
 
 mod cell;
 mod decode;

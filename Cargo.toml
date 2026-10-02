@@ -90,6 +90,8 @@ toml_edit = "0.25"
 # 0.1.1 is the crate's last Unicode 15.0 release). Bump the two together.
 unicode-properties = { version = "=0.1.1", default-features = false, features = ["general-category"] }
 ureq = { version = "2", features = ["json"] }
+# A pylock.toml wheel's filename, from its URL (pydeps-gen)
+url = "2"
 walkdir = "2.5"
 
 # gRPC and protobuf (turnkey-test-runner speaks buck2's test-runner protocol

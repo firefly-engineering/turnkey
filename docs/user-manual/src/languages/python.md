@@ -78,15 +78,18 @@ deps = [
 ### `python-deps.toml`
 
 `pydeps-gen` writes it from `pylock.toml` (what to fetch) and `uv.lock` (the
-dependency graph). Schema 2 records markers and extras:
+dependency graph). Schema 3 records each distribution's pure wheel, with
+markers and extras:
 
 ```toml
-schema_version = 2
+schema_version = 3
 
 [deps.requests]
 version = "2.32.3"
+# The Nix hash of the unpacked wheel
 hash = "sha256-..."
-url = "https://files.pythonhosted.org/..."
+# The locked py3-none-any wheel
+url = "https://files.pythonhosted.org/.../requests-2.32.3-py3-none-any.whl"
 # The lock's marker for installing the package at all, when it has one
 marker = "python_version >= '3.8'"
 # Its dependencies: each package's key, with its marker and the extras it
@@ -108,6 +111,35 @@ and on those of its requested extras, each where its marker holds. Markers
 are evaluated on every platform in `buck2.platforms`, for the Python
 toolchain's version: a dependency some platforms get is a `select()` on the
 platform, and one none gets is left out.
+
+A file from before schema 3 records sdists, and fails evaluation asking for
+`tk sync`, which regenerates it.
+
+### Distributions are their locked wheels
+
+The pydeps cell vendors each distribution as the pure (`py3-none-any`)
+wheel `uv` locked for it, unpacked: the layout an installer puts in
+site-packages
+([ADR 0013](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0013-pydeps-distributions-are-their-locked-wheels.md)).
+So `import requests` works although requests keeps its code under `src/` in
+its sdist, and an sdist's `setup.py`, `tests/` and docs are not in the
+target.
+
+- The wheel's `<name>.data/purelib` and `platlib` are merged into its root,
+  as an installer would; the rest of `<name>.data/` (scripts, headers, data)
+  is dropped. Fixups, then user patches, apply to that tree.
+- The distribution's `python_library` holds everything the wheel installs:
+  its `.py` files as `srcs`, and every other file as `resources`. That
+  includes data files (such as `certifi`'s `cacert.pem`) and the
+  `*.dist-info` directory, so `importlib.metadata.version("requests")` and
+  entry points work.
+- **A distribution with no pure wheel fails `pydeps-gen`**, which names it:
+  one with only platform-specific (compiled) wheels, and one with only an
+  sdist. turnkey doesn't build sdists into wheels, and doesn't vendor
+  platform wheels yet
+  ([#248](https://github.com/firefly-engineering/turnkey/issues/248)).
+
+`src/examples/python-requests` uses `requests` and `certifi` this way.
 
 ## Markers and Extras
 

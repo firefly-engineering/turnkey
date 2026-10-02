@@ -2,7 +2,8 @@
 #
 # Provides:
 #   - mkPythonDepPackage: Build a single Python distribution's package: its
-#     source with its fixup and user patches applied, and its own rules.star
+#     unpacked pure wheel with its fixup and user patches applied, and its
+#     own rules.star
 #   - mkPythonDepsCell: The Python dependency cell's cell index (ADR 0004)
 #
 # Python dependencies are fetched from PyPI. Each distribution's rules.star
@@ -27,13 +28,35 @@ rec {
   # Public API
   # ==========================================================================
 
+  # Shell commands that install the unpacked wheel at $src into $out as an
+  # installer would put it in site-packages: its <name>.data/purelib and
+  # platlib merged into the root, and the rest of <name>.data (scripts,
+  # headers, data) dropped (ADR 0013)
+  installWheel = ''
+    mkdir -p $out
+    cp -r $src/. $out/
+    chmod -R u+w $out
+    # A wheel's data directory is its dist-info's {name}-{version} with
+    # .data, so a package directory that merely ends in .data is left alone
+    for info in $out/*.dist-info; do
+      data="''${info%.dist-info}.data"
+      [ -d "$data" ] || continue
+      for scheme in purelib platlib; do
+        if [ -d "$data/$scheme" ]; then
+          cp -r "$data/$scheme/." $out/
+        fi
+      done
+      rm -rf "$data"
+    done
+  '';
+
   # Build a single Python distribution's package
   mkPythonDepPackage =
     {
       name, # The distribution's key in python-deps.toml (e.g., "requests")
       version, # Version string (e.g., "2.31.0")
-      sha256, # SRI hash of the source
-      url, # URL to fetch from
+      sha256, # SRI hash of the unpacked wheel
+      url, # URL of its pure (py3-none-any) wheel
 
       # Its package slice (mkPythonDepsCell's sliceOf): its dependencies,
       # its requested extras and theirs, narrowed to the distributions the
@@ -73,10 +96,8 @@ rec {
         passAsFile = [ "slice" ];
       }
       (
-        ''
-          mkdir -p $out
-          cp -r $src/* $out/
-          chmod -R u+w $out
+        installWheel
+        + ''
 
           # Apply fixup if provided
           cd $out
@@ -197,7 +218,16 @@ rec {
     }:
     let
       depsToml = builtins.fromTOML (builtins.readFile depsFile);
-      deps = depsToml.deps or { };
+      # Schema 3 records each distribution's pure wheel (ADR 0013); an
+      # older file's url and hash are its sdist's, which aren't a wheel.
+      # pydeps-gen writes it (its PYTHON_DEPS_SCHEMA_VERSION): bump the two
+      # together.
+      schemaVersion = depsToml.schema_version or 1;
+      deps =
+        if schemaVersion == 3 then
+          depsToml.deps or { }
+        else
+          throw "turnkey: ${toString depsFile} is python-deps.toml schema_version ${toString schemaVersion}, whose sources are sdists; this turnkey reads schema_version 3, each distribution's locked wheel. Run 'tk sync' to regenerate it.";
 
       # The locked distributions' fixups
       resolvedFixups = resolveFixups (
