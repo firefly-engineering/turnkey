@@ -1,0 +1,17 @@
+# The CI shell (devShells.ci): what `buck2 test //...` needs, for the
+# test-runner parity gate (.github/workflows/test-runner-parity.yaml).
+#
+# The language toolchains of every test under //..., plus the toolchains of
+# the other targets //... analyses: jsonnet's and mdbook's (the docs books).
+# Not the dev-only tools of ../toolchain.toml (jj, nix) nor turnkey-composed,
+# whose FUSE build fails on GitHub's runners. tk and buck2 come with the
+# Buck2 integration.
+
+[toolchains]
+rust-toolchain = { version = "2" }
+go-toolchain = { version = "3" }
+python-toolchain = { version = "3" }
+typescript-toolchain = { version = "1" }
+solidity-toolchain = { version = "2" }
+mdbook-toolchain = { version = "1" }
+jrsonnet = { version = "0.5.0-pre96-test" }

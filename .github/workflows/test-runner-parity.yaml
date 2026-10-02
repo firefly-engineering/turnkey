@@ -1,0 +1,67 @@
+name: Test-runner parity
+
+# The gate for a buck2 pin bump (nix/buck2/buck2-source.nix) and for changes
+# to turnkey's test runner: buck2 test //... must behave the same under
+# buck2's bundled runner and turnkey-test-runner
+# (src/cmd/check-test-runner-parity). Facts behind this job:
+# docs/research/parity-suite-ci-gate.md.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'nix/buck2/buck2-source.nix'
+      # toolbox's buck2 builds come through the lock
+      - 'flake.lock'
+      - 'nix/packages/turnkey-test-runner.nix'
+      - 'nix/packages/test-runner-protocol.nix'
+      - 'src/cmd/turnkey-test-runner/**'
+      - 'src/cmd/test-runner-codegen/**'
+      - 'src/rust/buck2-test-executor/**'
+      - 'src/cmd/check-test-runner-parity/**'
+      - '.github/toolchain.toml'
+      - '.github/workflows/test-runner-parity.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'nix/buck2/buck2-source.nix'
+      # toolbox's buck2 builds come through the lock
+      - 'flake.lock'
+      - 'nix/packages/turnkey-test-runner.nix'
+      - 'nix/packages/test-runner-protocol.nix'
+      - 'src/cmd/turnkey-test-runner/**'
+      - 'src/cmd/test-runner-codegen/**'
+      - 'src/rust/buck2-test-executor/**'
+      - 'src/cmd/check-test-runner-parity/**'
+      - '.github/toolchain.toml'
+      - '.github/workflows/test-runner-parity.yaml'
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  parity:
+    name: Test-runner parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+
+      # Pushes what the job builds, the CI shell's deps cells among it, so
+      # the next run finds them in the cache. Without the token (a fork's
+      # pull request) it only reads.
+      - uses: cachix/cachix-action@v16
+        with:
+          name: firefly-turnkey
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      # The CI shell (.github/toolchain.toml): the full dev shell is too big
+      # for the runner, and its turnkey-composed doesn't build here
+      - name: Run the parity suite
+        run: nix develop .#ci --impure -c python3 src/cmd/check-test-runner-parity/__main__.py

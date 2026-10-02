@@ -95,6 +95,12 @@ example:
 parity: 3/3 scenarios match on 30 targets (buck2 2026-09-14-6507dd157a6f81a810c48583edf1758dd0c337c5, arm64-darwin)
 ```
 
+CI runs the same suite on Linux for a pull request that changes the pin, the
+test runner or `flake.lock` (`.github/workflows/test-runner-parity.yaml`), in
+the slim `ci` shell (`nix develop .#ci --impure`, from
+`.github/toolchain.toml`). It doesn't replace the run above: CI covers
+`x86_64-linux` only, and the commit carries your summary line.
+
 ## 5. Check test result caching end to end
 
 ```bash

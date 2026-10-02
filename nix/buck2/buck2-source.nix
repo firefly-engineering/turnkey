@@ -11,7 +11,8 @@
 # is gated by the test-runner parity suite: with the new release in the dev
 # shell, run `python3 src/cmd/check-test-runner-parity/__main__.py`, require
 # it to report every scenario as matching, and put its summary line in the
-# commit that bumps the pin.
+# commit that bumps the pin. CI runs the suite too, on Linux, when this file
+# changes (.github/workflows/test-runner-parity.yaml).
 #
 # Callers get the pinned release through turnkey's flake lib,
 # `turnkeyLib.pinnedBuck2Release system`, which binds `registry` to turnkey's

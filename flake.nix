@@ -92,7 +92,9 @@
         # deliberately excluded:
         #   - Project-specific outputs (per-language *-cell derivations and
         #     the toolchain-profile buildEnv) — downstream consumers build
-        #     their own from their own toolchain.toml.
+        #     their own from their own toolchain.toml. turnkey's own cells
+        #     still reach the cache, through what the test-runner parity
+        #     job builds (.github/workflows/test-runner-parity.yaml).
         #   - turnkey-composed — a macFUSE daemon that needs the kext
         #     installed at build time. Linux runners lack pkg-config + the
         #     libfuse dev libs; macOS runners can't install macFUSE
@@ -1541,6 +1543,7 @@
             declarationFiles = {
               default = ./toolchain.toml; # Creates devShells.default with buck2 + nix + beads + go
               docs = ./docs/toolchain.toml; # Lightweight shell for building documentation
+              ci = ./.github/toolchain.toml; # What buck2 test //... needs, for the CI parity gate
             };
             # Extend registry with turnkey-specific tools
             # (tk is already a built-in extension provided by the turnkey module)
@@ -1561,6 +1564,11 @@
             # Enable Buck2 toolchain generation
             buck2 = {
               enable = true;
+              # The CI shell runs buck2 test //... too
+              shells = [
+                "default"
+                "ci"
+              ];
               # prelude.strategy defaults to "nix" - uses turnkey-prelude derivation
               welcomeMessage = "Welcome to turnkey dev shell";
 
