@@ -120,6 +120,11 @@ in
       };
 
       # Starlark syntax validation using Buck2
+      #
+      # In its own isolation dir: the hook runs with the committer's
+      # environment, which may hold another shell's BUCK_ISOLATION_DIR and
+      # PATH. Linting in .turnkey would start the build daemon with them, and
+      # every later build would take its PATH toolchains from there.
       starlark-lint = {
         enable = true;
         name = "starlark-lint";
@@ -127,7 +132,7 @@ in
         files = "(rules\\.star|BUCK|\\.bzl)$";
         pass_filenames = true;
         entry = ''
-          ${cfg.package}/bin/buck2 starlark lint
+          ${cfg.package}/bin/buck2 --isolation-dir .turnkey-lint starlark lint
         '';
       };
 
