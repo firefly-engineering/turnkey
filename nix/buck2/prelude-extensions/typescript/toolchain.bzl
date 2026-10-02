@@ -19,9 +19,10 @@ def _system_typescript_toolchain_impl(ctx: AnalysisContext) -> list[Provider]:
     # Create RunInfo for node
     node_run_info = RunInfo(args = cmd_args(node_path))
 
-    # Create RunInfo for tsc (runs via node)
-    # tsc is typically a JS script, so we run it with node
-    tsc_run_info = RunInfo(args = cmd_args(node_path, tsc_path))
+    # Create RunInfo for tsc, run as it is: TypeScript 7's tsc is a native
+    # binary, and an earlier package's tsc is a script that runs tsc.js
+    # under its own node
+    tsc_run_info = RunInfo(args = cmd_args(tsc_path))
 
     toolchain_info = TypeScriptToolchainInfo(
         node = node_run_info,
@@ -41,7 +42,7 @@ system_typescript_toolchain = rule(
             doc = "Path to the Node.js binary",
         ),
         "tsc_path": attrs.string(
-            doc = "Path to the TypeScript compiler (tsc) script",
+            doc = "Path to the TypeScript compiler (tsc) executable",
         ),
         "tsc_flags": attrs.list(
             attrs.string(),

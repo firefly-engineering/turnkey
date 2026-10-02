@@ -58,11 +58,10 @@ def _typescript_binary_impl(ctx: AnalysisContext) -> list[Provider]:
         script_content = """#!/usr/bin/env bash
 set -euo pipefail
 
-# toolchain.tsc.args expands to: node tsc_path
-NODE="$1"
-TSC="$2"
-OUT_DIR="$3"
-shift 3
+# toolchain.tsc.args expands to: tsc_path
+TSC="$1"
+OUT_DIR="$2"
+shift 2
 
 # Create temporary working directory
 WORK_DIR=$(mktemp -d)
@@ -110,7 +109,6 @@ done
 # A relative path, made absolute before leaving the working directory; a
 # bare command name stays one
 abs() { if [[ "$1" == */* && "$1" != /* ]]; then echo "$PWD/$1"; else echo "$1"; fi; }
-NODE=$(abs "$NODE")
 TSC=$(abs "$TSC")
 mkdir -p "$OUT_DIR"
 OUT_DIR="$(cd "$OUT_DIR" && pwd)"
@@ -122,7 +120,7 @@ for arg in "${SRCS[@]}"; do
 done
 cd "$WORK_DIR"
 
-"$NODE" "$TSC" """ + tsc_flags_str + """ "${SRCS[@]}"
+"$TSC" """ + tsc_flags_str + """ "${SRCS[@]}"
 """
 
         ctx.actions.write(

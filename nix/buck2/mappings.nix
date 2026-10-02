@@ -264,11 +264,12 @@ in
         load = "@prelude//typescript:toolchain.bzl";
         visibility = [ "PUBLIC" ];
         # Tools come from the declared typescript-toolchain meta-package, not
-        # the typescript/nodejs entries' defaults, which move independently
-        # (typescript's default became 7, the native compiler with no tsc.js).
+        # the typescript/nodejs entries' defaults, which move independently.
+        # tsc is the package's own entry point: a native binary from
+        # TypeScript 7, a script that runs tsc.js under node before it.
         dynamicAttrs = registry: {
           node_path = "${tool registry "typescript-toolchain"}/bin/node";
-          tsc_path = "${tool registry "typescript-toolchain"}/lib/node_modules/typescript/bin/tsc";
+          tsc_path = "${tool registry "typescript-toolchain"}/bin/tsc";
         };
       }
     ];
@@ -399,10 +400,11 @@ in
         rule = "system_typescript_toolchain";
         load = "@prelude//typescript:toolchain.bzl";
         visibility = [ "PUBLIC" ];
-        # Dynamic attrs resolved at build time from registry
+        # Dynamic attrs resolved at build time from registry. tsc is the
+        # package's own entry point, native from TypeScript 7.
         dynamicAttrs = registry: {
           node_path = "${tool registry "nodejs"}/bin/node";
-          tsc_path = "${tool registry "typescript"}/lib/node_modules/typescript/bin/tsc";
+          tsc_path = "${tool registry "typescript"}/bin/tsc";
         };
       }
     ];
