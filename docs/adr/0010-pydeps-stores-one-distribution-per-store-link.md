@@ -6,7 +6,7 @@ status: accepted
 
 The `pydeps` cell follows [ADR 0004](0004-deps-cells-are-write-once-directories.md): write-once store links and alias packages, kept in line with a cell index by the materializer. In Python, the **locked package** is a distribution, and it is also one buck2 package. So the Python cell is the Rust cell's shape with Go's single version:
 
-- **One derivation, and one store link, per distribution** at its locked version. Fixups already apply there, and they stand in for any build step an sdist would run.
+- **One derivation, and one store link, per distribution** at its locked version. Fixups already apply there. The store link holds the distribution's locked wheel, not its sdist ([ADR 0013](0013-pydeps-distributions-are-their-locked-wheels.md)).
 - **Each distribution's derivation writes its own `rules.star`** with `pydeps-cell`, from nothing but its **package slice**, the platforms' conditions and the Python toolchain's version. The slice's dependencies are already narrowed to those the cell holds when Nix evaluates, so no derivation reads the rest of the cell. Today's merge step, which rewrites every package's `rules.star` over the whole cell, goes away.
 - **Labels stay `pydeps//vendor/<name>:<name>`.** The materializer writes one alias package per distribution, at `vendor/<name>`, forwarding to `//_store/<store basename>:<name>`. A `rules.star` names its dependencies the same way, relative to the cell, so they resolve through the alias packages.
 - **One version per name, and only unversioned alias packages.** `pydeps-gen` fails when the lock holds several versions of one name (a uv forked resolution), and names the package and its markers.
