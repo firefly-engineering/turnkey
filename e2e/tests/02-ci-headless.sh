@@ -46,7 +46,7 @@ stage_for_flake
 step "Generating go-deps.toml"
 run_in_devshell_script << 'PHASE1'
   echo "Generating go-deps.toml..."
-  godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+  tk sync go
   echo "Generated go-deps.toml"
 PHASE1
 assert_file_exists "go-deps.toml" || exit 1

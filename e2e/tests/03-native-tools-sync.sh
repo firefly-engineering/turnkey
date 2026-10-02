@@ -41,7 +41,7 @@ stage_for_flake
 step "Generating initial deps and verifying build (batched)"
 run_in_devshell_script << 'PHASE1'
   echo "Generating go-deps.toml..."
-  godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+  tk sync go
 
   echo "Recording initial state..."
   sha256sum go-deps.toml > /tmp/initial-deps-hash.txt

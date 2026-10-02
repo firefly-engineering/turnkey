@@ -82,7 +82,7 @@ stage_for_flake
 step "Generating go-deps.toml for main branch"
 run_in_devshell_script << 'PHASE1'
   echo "Generating go-deps.toml for main branch..."
-  godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+  tk sync go
 PHASE1
 assert_file_exists "go-deps.toml" || exit 1
 assert_file_contains "go-deps.toml" "github.com/google/uuid" || exit 1
@@ -172,7 +172,7 @@ step "Regenerating deps for feature branch"
 stage_for_flake
 run_in_devshell_script << 'PHASE3'
   echo "Regenerating go-deps.toml for feature branch..."
-  godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+  tk sync go
 PHASE3
 
 # Verify new dependency is in deps file

@@ -47,7 +47,7 @@ stage_for_flake
 step "Generating deps and verifying initial build (batched)"
 run_in_devshell_script << 'PHASE1'
   echo "Generating initial go-deps.toml..."
-  godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+  tk sync go
 PHASE1
 assert_file_exists "go-deps.toml" || exit 1
 
@@ -78,7 +78,7 @@ require (
 )
 EOF
 
-# Add a fake entry to go.sum (godeps-gen will fail on prefetch)
+# Add a fake entry to go.sum (godeps-gen fails prefetching it)
 cat > go.sum << 'EOF'
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
@@ -91,7 +91,7 @@ step "Verifying clear error message for invalid dependency"
 stage_for_flake
 
 # godeps-gen should fail with a clear error message
-if run_in_devshell_script "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps-bad.toml" 2>&1; then
+if run_in_devshell_script "godeps-gen --go-mod go.mod --go-sum go.sum -o go-deps-bad.toml" 2>&1; then
   echo "ERROR: godeps-gen should have failed with invalid dependency" >&2
   exit 1
 fi
@@ -115,7 +115,7 @@ EOF
 # Step 9: Verify regeneration succeeds after fix
 step "Verifying regeneration succeeds after fix"
 stage_for_flake
-run_in_devshell_script "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml"
+run_in_devshell_script "tk sync go"
 assert_file_exists "go-deps.toml" || exit 1
 assert_file_contains "go-deps.toml" "github.com/google/uuid" || exit 1
 
@@ -128,7 +128,7 @@ git add -A
 
 # Step 11: Verify regeneration works
 step "Verifying deps file can be regenerated"
-run_in_devshell_script "godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml"
+run_in_devshell_script "tk sync go"
 assert_file_exists "go-deps.toml" || exit 1
 assert_file_contains "go-deps.toml" "github.com/google/uuid" || exit 1
 

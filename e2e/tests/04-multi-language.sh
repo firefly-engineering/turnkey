@@ -139,7 +139,7 @@ run_in_devshell_script << 'PHASE1'
 
   echo ""
   echo "Generating go-deps.toml..."
-  godeps-gen --go-mod go.mod --go-sum go.sum --prefetch -o go-deps.toml
+  tk sync go
   echo "Generated go-deps.toml"
 
   echo ""
