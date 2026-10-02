@@ -685,7 +685,7 @@ The goal is to make toolchain management in Nix flakes as simple as declaring wh
 
 ## Issue Tracking
 
-Work is tracked in [GitHub Issues](https://github.com/firefly-engineering/turnkey/issues), with priority (P0–P4) and status in the [turnkey org project](https://github.com/orgs/firefly-engineering/projects/3). Epics are issues labelled `epic` with sub-issues; blockers are GitHub issue dependencies. `docs/agents/issue-tracker.md` has the full command set.
+Work is tracked in [GitHub Issues](https://github.com/firefly-engineering/turnkey/issues), with priority (P0–P4) and status in the [turnkey org project](https://github.com/orgs/firefly-engineering/projects/3). Epics are issues of type `Epic` with sub-issues; blockers are GitHub issue dependencies. `docs/agents/issue-tracker.md` has the full command set.
 
 ```bash
 gh issue list --search "-is:blocked no:assignee"   # Ready work: open, unclaimed, unblocked

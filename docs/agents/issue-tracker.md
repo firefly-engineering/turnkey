@@ -8,8 +8,8 @@ Before 2026-09-26 the tracker was [beadwork](https://github.com/jallum/beadwork)
 
 | Concept | Where it lives |
 |---|---|
-| Kind | Issue **type** `Bug`, `Feature` or `Task` (org-level). Epics, questions and docs are `Task` plus the label `epic`, `question` or `documentation` |
-| Priority | Project field **Priority**: `P0` critical … `P4` backlog. Default `P2` |
+| Kind | Issue **type** `Bug`, `Feature`, `Task` or `Epic` (org-level). Questions and docs are `Task` plus the label `question` or `documentation` |
+| Priority | Project field **Priority** on the turnkey project: `P0` critical, `P1` high, `P2` normal (default), `P3` low, `P4` backlog. Not the org-level issue field also named Priority (`Urgent`…`Low`), which we don't use |
 | Status | Open/closed on the issue; in-progress is project field **Status** = `In Progress` plus an assignee |
 | Epic → child | GitHub **sub-issues** |
 | Blocker | GitHub **issue dependencies** ("blocked by") |
@@ -21,15 +21,16 @@ The snippets assume `R=firefly-engineering/turnkey`.
 - **Create an issue**:
   ```bash
   gh issue create -R $R --title "<title>" --body "<description>" --label <label> --project turnkey
-  gh api -X PATCH repos/$R/issues/<n> -f type=Bug     # Bug | Feature | Task
+  gh api -X PATCH repos/$R/issues/<n> -f type=Bug     # Bug | Feature | Task | Epic
+  set_field <n> Priority P2                           # P0 … P4, see below
   ```
-  Then set its priority (below). `gh issue create` has no flag for the type.
-- **Read an issue**: `gh issue view <n> --comments`. Sub-issues: `gh api repos/$R/issues/<n>/sub_issues --jq '.[]|"#\(.number) \(.state) \(.title)"'`. Blockers: `gh api repos/$R/issues/<n>/dependencies/blocked_by --jq '.[]|"#\(.number) \(.state) \(.title)"'`.
-- **List issues**: `gh issue list` (open). Filter with `--label`, `--search`, `--assignee`, `--state all`.
+  `gh issue create` has no flag for the type, and `--project` adds the issue with an empty Priority, so always set both.
+- **Read an issue**: `gh issue view <n> --comments`. Type: `gh api repos/$R/issues/<n> --jq .type.name`. Priority (`gh issue view` doesn't show it): `gh api graphql -f query='{repository(owner:"firefly-engineering",name:"turnkey"){issue(number:<n>){projectItems(first:5){nodes{project{number} fieldValueByName(name:"Priority"){... on ProjectV2ItemFieldSingleSelectValue{name}}}}}}}' --jq '.data.repository.issue.projectItems.nodes[]|select(.project.number==3).fieldValueByName.name'`. Sub-issues: `gh api repos/$R/issues/<n>/sub_issues --jq '.[]|"#\(.number) \(.state) \(.title)"'`. Blockers: `gh api repos/$R/issues/<n>/dependencies/blocked_by --jq '.[]|"#\(.number) \(.state) \(.title)"'`.
+- **List issues**: `gh issue list` (open). Filter with `--label`, `--search`, `--assignee`, `--state all`. By type: `--search "type:Epic"` (or `type:Bug`, …).
 - **Ready work** (open, unassigned, not blocked by an open issue): `gh issue list --search "-is:blocked no:assignee"`. `is:blocked`, `is:blocking` and `parent-issue:` only work in GitHub's advanced issue search, which `gh issue list` uses; the REST `search/issues` endpoint silently ignores them unless you pass `-f advanced_search=true`. By priority: `gh project item-list 3 --owner firefly-engineering --format json --limit 500 --jq '.items[]|select(.status=="Todo")|"\(.priority) #\(.content.number) \(.title)"' | sort`.
 - **Comment**: `gh issue comment <n> --body "<text>"`
 - **Labels**: `gh issue edit <n> --add-label <l> --remove-label <l>`. Give every issue at least one area label: `area:go`, `area:rust`, `area:solidity`, `area:rules-sync`, `area:fuse`, `area:buck2`, `area:tw`, `area:ci`, `area:remote-build` (or `documentation` for docs-only work); create a new `area:` label rather than stretching one that doesn't fit. Triage labels are in [triage-labels.md](triage-labels.md).
-- **Grouping**: put related issues under an `epic` as sub-issues rather than leaving them top-level; an epic can itself be a sub-issue. An epic's priority is the highest of its open sub-issues'.
+- **Grouping**: put related issues under an issue of type `Epic` as sub-issues rather than leaving them top-level; an epic can itself be a sub-issue. An epic's priority is the highest of its open sub-issues', so raise the epic when you raise a child.
 - **Start work**: check it has no open blockers, then `gh issue edit <n> --add-assignee @me` and set Status to `In Progress`.
 - **Close**: commit with `Fixes #<n>` so the merge closes it. To close without a commit: `gh issue close <n> --comment "<why>"` (add `--reason "not planned"` for wontfix).
 - **Sub-issue**: `gh api -X POST repos/$R/issues/<parent>/sub_issues -F sub_issue_id=$(gh api repos/$R/issues/<child> --jq .id)`
@@ -64,9 +65,9 @@ Run `gh issue view <n> --comments`.
 
 ## Wayfinding operations
 
-Used by `/wayfinder`. The **map** is an issue labelled `epic` and `wayfinder:map`, with **sub-issues** as tickets.
+Used by `/wayfinder`. The **map** is an issue of type `Epic` labelled `wayfinder:map`, with **sub-issues** as tickets.
 
-- **Map**: create it with body `Notes / Decisions-so-far / Fog`, labels `epic,wayfinder:map`, then set its Status to `In Progress`.
+- **Map**: create it with body `Notes / Decisions-so-far / Fog` and label `wayfinder:map`, set its type to `Epic`, then set its Status to `In Progress` and its Priority.
 - **Child ticket**: create it labelled `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`), then add it as a sub-issue of the map.
 - **Blocking**: add a "blocked by" dependency. A ticket is unblocked when every blocker is closed.
 - **Frontier query**: the map's open sub-issues that are unassigned and not blocked: `gh issue list --search "-is:blocked no:assignee parent-issue:firefly-engineering/turnkey#<map>"`. Lowest sub-issue order wins.
