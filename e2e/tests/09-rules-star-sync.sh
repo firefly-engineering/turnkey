@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 # E2E Test: rules.star sync
 #
-# Tests the automatic rules.star dependency synchronization:
+# Tests rules.star sync as a project changes (10-go-coverage covers the
+# first sync of a fresh project):
 # 1. Add new import to Go file
 # 2. Run tk rules check, verify staleness detected
 # 3. Run tk rules sync, verify deps updated
 # 4. Verify build still works
-# 5. Test preservation markers are respected
-# 6. Test unmapped import warnings
+# 5. Remove the import: sync drops the dep and keeps a preserved section
 #
-# Issue: turnkey-rlv3
+# The template leaves rules sync before builds off, so only tk rules
+# touches rules.star.
+#
+# Issues: turnkey-rlv3, https://github.com/firefly-engineering/turnkey/issues/225
 set -euo pipefail
 
 # Source test libraries
@@ -35,35 +38,17 @@ copy_fixture "greenfield-go"
 step "Staging files for Nix flake"
 stage_for_flake
 
-# Step 5: Enable rules sync and generate initial deps
-step "Enabling rules sync and generating deps"
-# Update sync.toml to enable rules sync
-cat > .turnkey/sync.toml << 'EOF'
-[rules]
-enabled = true
-auto_sync = false
-strict = false
-
-[rules.go]
-internal_prefix = "//src/go"
-external_cell = "godeps"
-
-[[deps]]
-name = "go"
-sources = ["go.mod", "go.sum"]
-target = "go-deps.toml"
-generator = ["godeps-gen", "--go-mod", "go.mod", "--go-sum", "go.sum"]
-EOF
-
+# Step 5: Generate initial deps
+step "Generating deps"
 run_in_devshell_script << 'INIT'
   echo "Generating initial go-deps.toml..."
-  godeps-gen --go-mod go.mod --go-sum go.sum -o go-deps.toml
+  tk sync go
 INIT
 
 # Step 6: Commit initial state
 step "Committing initial state"
 stage_for_flake
-commit_changes "Initial setup with rules sync enabled"
+commit_changes "Initial setup"
 
 # Step 7: Verify initial build
 step "Verifying initial build"
@@ -91,10 +76,13 @@ func main() {
 }
 EOF
 
-# Add fatih/color to go.mod
+# Add fatih/color to go.mod, and go-deps.toml with it: the commit's
+# pre-commit hook rejects a go-deps.toml older than go.mod
 run_in_devshell_script << 'GOGET'
   go get github.com/fatih/color@v1.16.0
+  tk sync go
 GOGET
+assert_file_contains "go-deps.toml" "github.com/fatih/color" || exit 1
 
 stage_for_flake
 commit_changes "Add fatih/color import"
@@ -141,7 +129,8 @@ BUILD2
 
 # Step 13: Test preservation markers
 step "Testing preservation markers"
-# Add a preserved section to rules.star
+# Add a preserved section holding a dep no import needs (go-isatty, which
+# go get brought in with fatih/color): sync keeps the deps in one
 cat > rules.star << 'EOF'
 # Auto-managed by turnkey. Hash: test123
 # Manual sections marked with turnkey:preserve-start/end are not modified.
@@ -155,8 +144,7 @@ go_binary(
         "godeps//vendor/github.com/google/uuid:uuid",
         # turnkey:auto-end
         # turnkey:preserve-start
-        # This is a manually preserved comment that should not be removed
-        # "//some/manual:dep",
+        "godeps//vendor/github.com/mattn/go-isatty:go-isatty",
         # turnkey:preserve-end
     ],
     visibility = ["PUBLIC"],
@@ -166,7 +154,7 @@ EOF
 stage_for_flake
 commit_changes "Add preservation markers"
 
-# Remove one import to trigger re-sync
+# Remove the fatih/color import: sync must drop its dep, and only that
 cat > main.go << 'EOF'
 package main
 
@@ -191,10 +179,11 @@ run_in_devshell_script << 'SYNC2'
   tk rules sync --force --verbose
 SYNC2
 
-# Verify preserved section is still there
+# Verify the dep went and the preserved section stayed, with its dep
 step "Verifying preserved section"
+assert_file_not_contains "rules.star" "fatih/color" || exit 1
 assert_file_contains "rules.star" "turnkey:preserve-start" || exit 1
-assert_file_contains "rules.star" "manually preserved comment" || exit 1
+assert_file_contains "rules.star" "mattn/go-isatty" || exit 1
 echo "Preservation markers respected"
 
 # Step 14: Verify final build

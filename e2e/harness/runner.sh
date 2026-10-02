@@ -50,6 +50,7 @@ declare -A TESTS=(
   ["git-workflow"]="06-git-workflow.sh"
   ["reproducibility"]="07-reproducibility.sh"
   ["error-recovery"]="08-error-recovery.sh"
+  ["rules-star-sync"]="09-rules-star-sync.sh"
   ["go-coverage"]="10-go-coverage.sh"
 )
 
