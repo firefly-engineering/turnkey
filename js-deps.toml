@@ -134,3 +134,99 @@ version = "5.0.1"
 url = "https://registry.npmjs.org/to-regex-range/-/to-regex-range-5.0.1.tgz"
 integrity = "sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ=="
 dependencies = ["is-number"]
+
+[[instance]]
+key = "@openzeppelin/contracts@5.4.0"
+
+[[instance]]
+key = "@types/lodash@4.17.23"
+
+[[instance]]
+key = "anymatch@3.1.3"
+
+[instance.dependencies]
+normalize-path = "normalize-path@3.0.0"
+picomatch = "picomatch@2.3.2"
+
+[[instance]]
+key = "binary-extensions@2.3.0"
+
+[[instance]]
+key = "braces@3.0.3"
+
+[instance.dependencies]
+fill-range = "fill-range@7.1.1"
+
+[[instance]]
+key = "chokidar@3.6.0"
+
+[instance.dependencies]
+anymatch = "anymatch@3.1.3"
+braces = "braces@3.0.3"
+glob-parent = "glob-parent@5.1.2"
+is-binary-path = "is-binary-path@2.1.0"
+is-glob = "is-glob@4.0.3"
+normalize-path = "normalize-path@3.0.0"
+readdirp = "readdirp@3.6.0"
+
+[instance.optional_dependencies]
+fsevents = "fsevents@2.3.3"
+
+[[instance]]
+key = "fill-range@7.1.1"
+
+[instance.dependencies]
+to-regex-range = "to-regex-range@5.0.1"
+
+[[instance]]
+key = "fsevents@2.3.3"
+
+[[instance]]
+key = "glob-parent@5.1.2"
+
+[instance.dependencies]
+is-glob = "is-glob@4.0.3"
+
+[[instance]]
+key = "is-binary-path@2.1.0"
+
+[instance.dependencies]
+binary-extensions = "binary-extensions@2.3.0"
+
+[[instance]]
+key = "is-extglob@2.1.1"
+
+[[instance]]
+key = "is-glob@4.0.3"
+
+[instance.dependencies]
+is-extglob = "is-extglob@2.1.1"
+
+[[instance]]
+key = "is-number@7.0.0"
+
+[[instance]]
+key = "lodash@4.17.21"
+
+[[instance]]
+key = "normalize-path@3.0.0"
+
+[[instance]]
+key = "picomatch@2.3.2"
+
+[[instance]]
+key = "readdirp@3.6.0"
+
+[instance.dependencies]
+picomatch = "picomatch@2.3.2"
+
+[[instance]]
+key = "to-regex-range@5.0.1"
+
+[instance.dependencies]
+is-number = "is-number@7.0.0"
+
+[direct]
+"@openzeppelin/contracts" = "@openzeppelin/contracts@5.4.0"
+chokidar = "chokidar@3.6.0"
+lodash = "lodash@4.17.21"
