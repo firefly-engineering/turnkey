@@ -88,8 +88,14 @@ let
   # target, so a regenerated deps file reloads the shell with its new cell
   watchFileDeclarations = ''
     _turnkey_watch_files() {
+      # ** only recurses with globstar, which direnv's bash leaves off; the
+      # caller's setting is restored after
+      local had_globstar=0
+      shopt -q globstar && had_globstar=1
+      shopt -s globstar
       watch_file nix/**/*.nix
       watch_file nix/**/*.patch
+      [[ "$had_globstar" == "1" ]] || shopt -u globstar
       ${lib.concatMapStringsSep "\n  " (file: "watch_file ${lib.escapeShellArg file}") (
         lib.unique (builtins.concatMap (rule: rule.sources ++ [ rule.target ]) syncRules)
       )}
