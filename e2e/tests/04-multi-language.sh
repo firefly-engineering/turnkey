@@ -61,24 +61,15 @@ cat > flake.nix << EOF
           enable = true;
           declarationFiles.default = ./toolchain.toml;
 
-          registry = {
-            nix = pkgs.nix;
-            go = pkgs.go;
-            rust = pkgs.rustc;
-            python = pkgs.python3;
-            uv = pkgs.uv;
-            clang = pkgs.llvmPackages.clang;
-            lld = pkgs.llvmPackages.lld;
-            nodejs = pkgs.nodejs;
-            typescript = pkgs.typescript;
-            godeps-gen = inputs.turnkey.packages.\${pkgs.system}.godeps-gen;
-            rustdeps-gen = inputs.turnkey.packages.\${pkgs.system}.rustdeps-gen;
-            pydeps-gen = inputs.turnkey.packages.\${pkgs.system}.pydeps-gen;
-            tk = inputs.turnkey.packages.\${pkgs.system}.tk;
-          };
-
+          # Toolchains resolve through turnkey's default registry, as in a
+          # project made from the template. Each buck2.<lang>.enable flag
+          # puts that language's deps generator on PATH.
           buck2 = {
             enable = true;
+
+            # The fixture's crates (serde, proc-macro2, ...) have build
+            # scripts; turnkey applies only the fixups a repository imports
+            fixups.imports = [ inputs.turnkey.modules.turnkeyFixups.default ];
 
             go = {
               enable = true;
@@ -109,13 +100,12 @@ step "Adding multi-language source code"
 copy_fixture "multi-language"
 
 # Step 5: Add rust, python, and typescript toolchains to toolchain.toml
+# (the deps generators come from the buck2.<lang>.enable flags)
 step "Adding rust, python, and typescript to toolchain.toml"
 cat >> toolchain.toml << 'EOF'
 rust = {}
-rustdeps-gen = {}
 python = {}
 uv = {}
-pydeps-gen = {}
 nodejs = {}
 typescript = {}
 EOF
