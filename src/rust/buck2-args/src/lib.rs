@@ -99,6 +99,28 @@ pub fn transform_isolation_dir<S: AsRef<str>>(args: &[S]) -> Vec<String> {
     result
 }
 
+/// The isolation directory `args` select, as tk passes it to buck2 (see
+/// [`transform_isolation_dir`]): the last `--isolation-dir` before `--`, or
+/// `None` without one, when buck2 takes it from `BUCK_ISOLATION_DIR`
+pub fn isolation_dir<S: AsRef<str>>(args: &[S]) -> Option<String> {
+    let mut dir = None;
+    let mut i = 0;
+    while i < args.len() {
+        let arg = args[i].as_ref();
+        if arg == "--" {
+            break;
+        }
+        if let Some(value) = arg.strip_prefix("--isolation-dir=") {
+            dir = Some(transform_isolation_dir_value(value));
+        } else if arg == "--isolation-dir" && i + 1 < args.len() {
+            dir = Some(transform_isolation_dir_value(args[i + 1].as_ref()));
+            i += 1; // the value, consumed
+        }
+        i += 1;
+    }
+    dir
+}
+
 /// An isolation directory's name, as tk passes it to buck2: unchanged when
 /// it starts with a dot, else prefixed with `.turnkey-`
 pub fn transform_isolation_dir_value(value: &str) -> String {
@@ -308,6 +330,28 @@ mod tests {
         ];
         for (input, want) in cases {
             assert_eq!(transform_isolation_dir(input), *want, "{input:?}");
+        }
+    }
+
+    #[test]
+    fn finds_the_isolation_dir() {
+        let cases: &[(&[&str], Option<&str>)] = &[
+            (&["build", "//foo"], None),
+            (&["--isolation-dir=ci", "build"], Some(".turnkey-ci")),
+            (&["--isolation-dir", ".custom", "build"], Some(".custom")),
+            (
+                &["build", "--isolation-dir=foo", "//t"],
+                Some(".turnkey-foo"),
+            ),
+            (
+                &["--isolation-dir=a", "--isolation-dir", "b", "build"],
+                Some(".turnkey-b"),
+            ),
+            (&["build", "--isolation-dir"], None),
+            (&["run", "//tool", "--", "--isolation-dir=y"], None),
+        ];
+        for (args, want) in cases {
+            assert_eq!(isolation_dir(args).as_deref(), *want, "{args:?}");
         }
     }
 

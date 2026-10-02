@@ -176,10 +176,16 @@ pub fn completion(args: &[String], env: &Env, stderr: &mut dyn Write) -> i32 {
     }
 }
 
-/// Kills the buck2 daemon (`buck2 kill`, its output on tk's stderr), so
-/// that it picks up new cells. Best effort.
-pub fn kill_daemon(env: &Env) {
-    let Ok(mut cmd) = env.launcher.command(OsStr::new("buck2"), &["kill"], None) else {
+/// Kills `isolation_dir`'s buck2 daemon (`buck2 --isolation-dir <dir>
+/// kill`, or `buck2 kill` for `None`, its output on tk's stderr), so that it
+/// picks up new cells. Best effort.
+pub fn kill_daemon(env: &Env, isolation_dir: Option<&str>) {
+    let mut args = Vec::new();
+    if let Some(dir) = isolation_dir {
+        args.extend(["--isolation-dir", dir]);
+    }
+    args.push("kill");
+    let Ok(mut cmd) = env.launcher.command(OsStr::new("buck2"), &args, None) else {
         return;
     };
     cmd.stdin(Stdio::null())

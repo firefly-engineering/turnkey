@@ -58,6 +58,7 @@ This means Go won't try to compile generated Buck2 cells, Cargo won't discover t
 ├── soldeps.lock     # held while tk materialize runs
 ├── gcroots/godeps, gcroots/jsdeps, gcroots/pydeps, gcroots/rustdeps, gcroots/soldeps # GC roots for the cells' current indexes
 ├── .cell-targets    # the store symlinks' targets, for tk's cell-freshness check
+├── .cell-targets.<isolation dir>  # the same, for another isolation directory's daemon
 ├── edits/, patches/ # tk compose's edits and generated patches
 └── sync.toml        # Symlink to the rules tk sync follows
 ```
@@ -110,15 +111,23 @@ prints `tk: cell symlink changed, restarting buck2 daemon` (unless
 daemon starts without the old one's state, so the next build re-runs its
 actions.
 
+Each isolation directory has a daemon of its own, so with
+`--isolation-dir`, `tk` checks against that directory's state file instead,
+`.turnkey/.cell-targets.<dir>` (`.cell-targets.turnkey-ci` for
+`tk --isolation-dir=ci`), and restarts that directory's daemon:
+`buck2 --isolation-dir .turnkey-ci kill`. A change one daemon was restarted
+for still restarts each other one the next time `tk` runs against it.
+
 The check doesn't cover:
 
 - **plain `buck2`**: a script, a tool that runs `buck2` itself, or a shell
   with `TURNKEY_NO_ALIAS=1`. The shell's `buck2` alias for `tk` only applies
   to the interactive shell;
 - **`tk --no-sync`**, which skips it with the sync;
-- **another isolation directory's daemon**: `tk` runs `buck2 kill` without
-  `--isolation-dir`, then saves the new targets, so a later
-  `tk --isolation-dir=ci build` finds nothing changed and keeps its daemon.
+- **an isolation directory set only through `BUCK_ISOLATION_DIR`**: without
+  `--isolation-dir`, `tk` restarts the daemon buck2 picks from the
+  environment, but checks it against `.turnkey/.cell-targets`, the state of
+  the shell's own `.turnkey` daemon. Pass `--isolation-dir` instead.
 
 So after the shell is rebuilt, before a plain `buck2` call, either:
 

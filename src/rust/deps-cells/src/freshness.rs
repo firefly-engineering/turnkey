@@ -5,7 +5,8 @@
 //! path. buck2's daemon doesn't notice: it caches the resolved cell
 //! contents from the old path. [`check`] compares the current symlink
 //! targets with those saved in a state file, and kills the daemon when any
-//! has changed.
+//! has changed. Each isolation directory has a daemon of its own, so each
+//! has its own state file.
 
 use std::collections::BTreeMap;
 use std::io::{self, Write};
@@ -18,15 +19,18 @@ const TURNKEY_DIR: &str = ".turnkey";
 const STATE_FILE_NAME: &str = ".cell-targets";
 const NIX_STORE_DIR: &str = "/nix/store/";
 
-/// Compares the cell symlinks' targets with the saved state. When any has
-/// changed, it calls `kill_daemon` (best-effort: it reports nothing back)
-/// and saves the new state. On the first run (no state file), it saves the
-/// state without killing.
+/// Compares the cell symlinks' targets with the state saved for
+/// `isolation_dir`'s daemon (`None` for the one buck2 picks without
+/// `--isolation-dir`). When any has changed, it calls `kill_daemon`, which
+/// must kill that daemon (best-effort: it reports nothing back), and saves
+/// the new state. On the first run (no state file), it saves the state
+/// without killing.
 ///
 /// `verbose` and `quiet` control what it writes to `w`. Errors are only
 /// for I/O failures, not for missing state.
 pub fn check(
     root: &Path,
+    isolation_dir: Option<&str>,
     verbose: bool,
     quiet: bool,
     w: &mut dyn Write,
@@ -43,7 +47,7 @@ pub fn check(
         return Ok(());
     }
 
-    let state_file = root.join(TURNKEY_DIR).join(STATE_FILE_NAME);
+    let state_file = root.join(TURNKEY_DIR).join(state_file_name(isolation_dir));
     let saved = match read_state_file(&state_file) {
         Ok(saved) => saved,
         Err(e) if e.kind() == io::ErrorKind::NotFound => {
@@ -77,6 +81,16 @@ pub fn check(
     kill_daemon();
 
     Ok(write_state_file(&state_file, &current)?)
+}
+
+/// The state file's name for `isolation_dir`'s daemon: `.cell-targets`
+/// without `--isolation-dir`, else `.cell-targets.<dir>`, the dir without
+/// its leading dot (`.cell-targets.turnkey-ci` for `.turnkey-ci`)
+fn state_file_name(isolation_dir: Option<&str>) -> String {
+    match isolation_dir {
+        None => STATE_FILE_NAME.to_string(),
+        Some(dir) => format!("{STATE_FILE_NAME}.{}", dir.trim_start_matches('.')),
+    }
 }
 
 /// The symlinks into the Nix store among `.buckconfig` and the entries of
@@ -305,7 +319,7 @@ mod tests {
     fn run_check(root: &Path) -> (String, usize) {
         let mut out = Vec::new();
         let mut kills = 0;
-        check(root, true, false, &mut out, &mut || kills += 1).unwrap();
+        check(root, None, true, false, &mut out, &mut || kills += 1).unwrap();
         (String::from_utf8(out).unwrap(), kills)
     }
 
@@ -343,9 +357,44 @@ mod tests {
         let root = project("/nix/store/new", Some("/nix/store/old"));
         let mut out = Vec::new();
         let mut kills = 0;
-        check(root.path(), false, true, &mut out, &mut || kills += 1).unwrap();
+        check(root.path(), None, false, true, &mut out, &mut || kills += 1).unwrap();
         assert!(out.is_empty());
         assert_eq!(kills, 1);
+    }
+
+    /// Runs check, quiet, for `isolation_dir`'s daemon, and returns how many
+    /// kills
+    fn kills_for(root: &Path, isolation_dir: Option<&str>) -> usize {
+        let mut kills = 0;
+        check(
+            root,
+            isolation_dir,
+            false,
+            true,
+            &mut Vec::new(),
+            &mut || kills += 1,
+        )
+        .unwrap();
+        kills
+    }
+
+    #[test]
+    fn each_isolation_dir_has_its_own_state() {
+        let root = project("/nix/store/abc123-godeps", None);
+        let tk = root.path().join(".turnkey");
+        // First runs: each daemon's targets recorded, nothing killed
+        assert_eq!(kills_for(root.path(), None), 0);
+        assert_eq!(kills_for(root.path(), Some(".turnkey-ci")), 0);
+        assert!(tk.join(".cell-targets.turnkey-ci").exists());
+
+        std::fs::remove_file(tk.join("godeps")).unwrap();
+        symlink("/nix/store/def456-godeps", tk.join("godeps")).unwrap();
+
+        // The default daemon's restart doesn't hide the change from ci's
+        assert_eq!(kills_for(root.path(), None), 1);
+        assert_eq!(kills_for(root.path(), Some(".turnkey-ci")), 1);
+        assert_eq!(kills_for(root.path(), Some(".turnkey-ci")), 0);
+        assert_eq!(kills_for(root.path(), None), 0);
     }
 
     #[test]

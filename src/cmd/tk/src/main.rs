@@ -218,23 +218,31 @@ fn run(args: &[String], env: &Env) -> i32 {
     // Whether cell symlinks changed (which kills the daemon), and whether a
     // materialized cell lags its deps file
     if needs_sync && !flags.no_sync {
-        check_cell_freshness(env, &flags, stderr);
+        check_cell_freshness(env, &flags, args, stderr);
         warn_stale_cells(env, &flags, stderr);
     }
 
     buck2::delegate(args, env, &flags)
 }
 
-/// Kills the buck2 daemon when the cells' symlinks changed, so it picks up
-/// the new store paths. Best effort.
-fn check_cell_freshness(env: &Env, flags: &Flags, stderr: &mut dyn Write) {
+/// Kills the daemon of the isolation directory buck2's `args` select when
+/// the cells' symlinks changed, so it picks up the new store paths. Best
+/// effort.
+fn check_cell_freshness(env: &Env, flags: &Flags, args: &[String], stderr: &mut dyn Write) {
     let Ok(root) = env.project_root() else {
         return;
     };
-    let mut kill = || buck2::kill_daemon(env);
-    if let Err(e) =
-        deps_cells::freshness::check(&root, flags.verbose, flags.quiet, stderr, &mut kill)
-        && flags.verbose
+    let isolation_dir = buck2_args::isolation_dir(args);
+    let isolation_dir = isolation_dir.as_deref();
+    let mut kill = || buck2::kill_daemon(env, isolation_dir);
+    if let Err(e) = deps_cells::freshness::check(
+        &root,
+        isolation_dir,
+        flags.verbose,
+        flags.quiet,
+        stderr,
+        &mut kill,
+    ) && flags.verbose
     {
         let _ = writeln!(stderr, "tk: cell freshness check failed: {e}");
     }
