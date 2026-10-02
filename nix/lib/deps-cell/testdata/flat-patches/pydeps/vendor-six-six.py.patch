@@ -1,0 +1,10 @@
+--- a/vendor/six/six.py
++++ b/vendor/six/six.py
+@@ -30,6 +30,7 @@
+ 
+ __author__ = "Benjamin Peterson <benjamin@python.org>"
+ __version__ = "1.17.0"
++__patched__ = "python-user-patches"
+ 
+ 
+ # Useful for very coarse version differentiation.

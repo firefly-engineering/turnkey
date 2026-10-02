@@ -1,26 +1,24 @@
-//! The rules.star files of the pydeps cell's vendored Python packages,
-//! with the dependencies between them
+//! A vendored Python package's rules.star, with its dependencies
 //!
 //! A package's dependencies come from python-deps.toml (pydeps-gen records
 //! them from uv.lock): its own, and those of the extras some package or
-//! workspace member asks it for. Each dependency's PEP 508 marker is
-//! evaluated on every platform turnkey builds for, for the Python
-//! toolchain's version: a dependency every platform gets is a plain dep,
-//! one some get is a select() keyed with the conditions crate's rules, and
-//! one none gets (or that isn't vendored) is left out.
+//! workspace member asks it for. The Python adapter hands them over as the
+//! package's slice, already narrowed to the packages the cell holds. Each
+//! dependency's PEP 508 marker is evaluated on every platform turnkey
+//! builds for, for the Python toolchain's version: a dependency every
+//! platform gets is a plain dep, one some get is a select() keyed with the
+//! conditions crate's rules, and one none gets is left out.
 
 use anyhow::{Context, Result, anyhow};
 use conditions::{Configuration, Platform, Space, conditional};
 use deps_gen_kit::starlark::render_indented;
 use gostd::strconv::quote;
 use pep508::{Marker, env_for, parse_marker};
+use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
-use std::fs;
-use std::io::Write;
-use std::os::unix::fs::OpenOptionsExt;
-use std::path::{Path, PathBuf};
 
-/// What the cell is built for (pydeps-cell.json)
+/// What the distribution is built for: the platforms' conditions, and the
+/// Python toolchain's version
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Config {
     /// The package of the combined config_settings
@@ -31,15 +29,10 @@ pub struct Config {
     pub python_version: String,
 }
 
-/// The part of python-deps.toml the cell reads
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct DepsFile {
-    /// The vendored packages, by key
-    pub deps: BTreeMap<String, Package>,
-}
-
-/// A vendored package's entry
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+/// A distribution's package slice: its python-deps.toml entry, narrowed to
+/// the distributions the cell holds and to the extras it is asked for
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default)]
 pub struct Package {
     /// Its own dependencies
     pub dependencies: Vec<Edge>,
@@ -50,7 +43,8 @@ pub struct Package {
 }
 
 /// A dependency: a package's key, and when it applies
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default)]
 pub struct Edge {
     /// The package's key
     pub name: String,
@@ -58,18 +52,8 @@ pub struct Edge {
     pub marker: String,
 }
 
-/// Reads python-deps.toml
-pub fn load_deps(path: &Path) -> Result<DepsFile> {
-    let content = fs::read(path).with_context(|| format!("open {}", path.display()))?;
-    let content =
-        std::str::from_utf8(&content).map_err(|e| anyhow!("parsing {}: {e}", path.display()))?;
-    toml::from_str(content).map_err(|e| anyhow!("parsing {}: {e}", path.display()))
-}
-
-/// The rules.star of the package keyed `name`
-pub fn render(name: &str, deps: &DepsFile, cfg: &Config) -> Result<String> {
-    let empty = Package::default();
-    let pkg = deps.deps.get(name).unwrap_or(&empty);
+/// The rules.star of the package keyed `name`, from its slice
+pub fn render(name: &str, pkg: &Package, cfg: &Config) -> Result<String> {
     let space = Space::new(&cfg.platforms, &cfg.settings);
 
     // The edges, each with the extra it's evaluated with and its marker
@@ -101,7 +85,7 @@ pub fn render(name: &str, deps: &DepsFile, cfg: &Config) -> Result<String> {
         let mut seen = HashSet::new();
         let mut labels = Vec::new();
         for (e, extra, marker) in &edges {
-            if !deps.deps.contains_key(&e.name) || e.name == name || seen.contains(&e.name) {
+            if e.name == name || seen.contains(&e.name) {
                 continue;
             }
             let env = env_for(config, &cfg.python_version, extra).expect("a known platform");
@@ -135,42 +119,6 @@ pub fn render(name: &str, deps: &DepsFile, cfg: &Config) -> Result<String> {
     out.push_str("    visibility = [\"PUBLIC\"],\n");
     out.push_str(")\n");
     Ok(out)
-}
-
-/// `cell_dir` joined with `elems`, cleaned as Go's filepath.Join cleans
-/// it when the path is UTF-8
-pub fn join(cell_dir: &Path, elems: &[&str]) -> PathBuf {
-    match cell_dir.to_str() {
-        Some(dir) => {
-            let mut all = vec![dir];
-            all.extend_from_slice(elems);
-            PathBuf::from(gostd::path::join(&all))
-        }
-        None => elems.iter().fold(cell_dir.to_path_buf(), |p, e| p.join(e)),
-    }
-}
-
-/// Writes the rules.star of every package in the cell's vendor directory
-/// that python-deps.toml has
-pub fn render_cell(cell_dir: &Path, deps: &DepsFile, cfg: &Config) -> Result<()> {
-    for name in deps.deps.keys() {
-        let dir = join(cell_dir, &["vendor", name]);
-        if fs::metadata(&dir).is_err() {
-            continue;
-        }
-        let rules = render(name, deps, cfg)?;
-        let path = join(&dir, &["rules.star"]);
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o644)
-            .open(&path)
-            .with_context(|| format!("open {}", path.display()))?;
-        file.write_all(rules.as_bytes())
-            .with_context(|| format!("write {}", path.display()))?;
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -219,9 +167,44 @@ other = [{ name = "xmlschema" }]
 [deps.xmlschema]
 "#;
 
+    /// The slice of the package keyed `name` in DEPS_TOML, narrowed as the
+    /// Python adapter narrows it: to the packages the file holds, and to the
+    /// extras the package is asked for
+    fn slice(name: &str) -> Package {
+        let deps: toml::Table = toml::from_str(DEPS_TOML).unwrap();
+        let deps = deps["deps"].as_table().unwrap();
+        let entry = deps[name].as_table().unwrap();
+        let edges = |list: Option<&toml::Value>| -> Vec<Edge> {
+            list.and_then(|l| l.as_array())
+                .into_iter()
+                .flatten()
+                .map(|e| Edge {
+                    name: e["name"].as_str().unwrap().into(),
+                    marker: e.get("marker").map_or("", |m| m.as_str().unwrap()).into(),
+                })
+                .filter(|e| deps.contains_key(&e.name))
+                .collect()
+        };
+        let requested_extras: Vec<String> = entry
+            .get("requested_extras")
+            .and_then(|r| r.as_array())
+            .into_iter()
+            .flatten()
+            .map(|x| x.as_str().unwrap().to_string())
+            .collect();
+        let extras = entry.get("extras").and_then(|x| x.as_table());
+        Package {
+            dependencies: edges(entry.get("dependencies")),
+            extras: requested_extras
+                .iter()
+                .filter_map(|x| Some((x.clone(), edges(Some(extras?.get(x)?)))))
+                .collect(),
+            requested_extras,
+        }
+    }
+
     fn rendered(name: &str, cfg: &Config) -> Result<String> {
-        let deps: DepsFile = toml::from_str(DEPS_TOML).unwrap();
-        render(name, &deps, cfg)
+        render(name, &slice(name), cfg)
     }
 
     /// Markers are evaluated per platform and for the toolchain's Python: a
@@ -279,10 +262,14 @@ python_library(
         });
         assert!(rendered("iniconfig", &windows).is_err());
 
-        let deps: DepsFile =
-            toml::from_str("[deps.a]\ndependencies = [{ name = \"b\", marker = \"nonsense\" }]\n")
-                .unwrap();
-        assert!(render("a", &deps, &cfg()).is_err());
+        let pkg = Package {
+            dependencies: vec![Edge {
+                name: "b".into(),
+                marker: "nonsense".into(),
+            }],
+            ..Package::default()
+        };
+        assert!(render("a", &pkg, &cfg()).is_err());
     }
 
     /// Without platforms, markers are evaluated for the Python version
@@ -302,15 +289,26 @@ python_library(
         ), "{got}");
     }
 
+    /// A slice is what the Python adapter writes with builtins.toJSON: a
+    /// marker or a list it has none of is absent, and a dependency on the
+    /// package itself is left out
     #[test]
-    fn joins_as_go_does() {
-        assert_eq!(
-            join(Path::new("cell/"), &["vendor", "a/../b"]),
-            Path::new("cell/vendor/b")
-        );
-        assert_eq!(
-            join(Path::new("cell"), &["vendor", ""]),
-            Path::new("cell/vendor")
-        );
+    fn render_reads_the_adapters_slice() {
+        let pkg: Package = serde_json::from_str(
+            r#"{"dependencies": [{"name": "a"}, {"name": "b", "marker": "sys_platform == 'darwin'"}],
+                "extras": {"x": [{"name": "c"}]}, "requested_extras": ["x"]}"#,
+        )
+        .unwrap();
+        let got = render("a", &pkg, &cfg()).unwrap();
+        let want = r#"    deps = ["//vendor/c:c"] + select({
+        "config//os:linux": [],
+        "config//os:macos": ["//vendor/b:b"],
+    }),
+"#;
+        assert!(got.contains(want), "rules.star:\n{got}\nwant deps:\n{want}");
+        assert!(!got.contains("//vendor/a:a"), "{got}");
+
+        let empty: Package = serde_json::from_str("{}").unwrap();
+        assert_eq!(empty, Package::default());
     }
 }

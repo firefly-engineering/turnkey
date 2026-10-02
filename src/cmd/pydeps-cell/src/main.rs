@@ -1,52 +1,67 @@
-//! pydeps-cell writes the rules.star files of the pydeps cell's vendored
-//! packages, with the dependencies between them evaluated per platform.
+//! pydeps-cell writes one vendored Python distribution's rules.star, with
+//! its dependencies evaluated per platform.
 //!
-//! It runs inside the Python deps-cell derivation
-//! (nix/lib/deps-cell/adapters/python.nix), once the packages are merged
-//! into the cell.
+//! It runs inside the distribution's own derivation
+//! (nix/lib/deps-cell/adapters/python.nix), and reads nothing of any other
+//! distribution: its package slice, the platforms and the Python toolchain's
+//! version (ADR 0010). So a distribution's store path changes only when its
+//! own inputs do (ADR 0004). It prints the rules.star, and writes its target
+//! name for the cell index.
 //!
-//! It was ported from Go (#212), and writes the bytes the Go version
-//! wrote.
-//!
-//! Usage:
-//!
-//! ```text
-//! pydeps-cell <cell-dir> <python-deps.toml>
-//! ```
-//!
-//! with the platforms and the Python version in
-//! `<cell-dir>/pydeps-cell.json`.
+//! It was ported from Go (#212), and writes the bytes the Go version wrote
+//! for the distribution in the whole cell.
 
 mod cell;
 mod decode;
 
-use std::ffi::OsString;
-use std::path::Path;
-use std::process::ExitCode;
+use anyhow::{Context, Result};
+use clap::Parser;
+use std::path::PathBuf;
 
-fn main() -> ExitCode {
-    let args: Vec<OsString> = std::env::args_os().collect();
-    if args.len() != 3 {
-        eprintln!("Usage: pydeps-cell <cell-dir> <python-deps.toml>");
-        return ExitCode::from(1);
-    }
-    let (cell_dir, deps_path) = (Path::new(&args[1]), Path::new(&args[2]));
-    // A Go panic exits 2: so does a panic here
-    match std::panic::catch_unwind(|| run(cell_dir, deps_path)) {
-        Ok(Ok(())) => ExitCode::SUCCESS,
-        Ok(Err(err)) => {
-            eprintln!("pydeps-cell: {err:#}");
-            ExitCode::from(1)
-        }
-        Err(_) => ExitCode::from(2),
-    }
+#[derive(Parser, Debug)]
+#[command(
+    name = "pydeps-cell",
+    about = "Write a vendored Python distribution's rules.star from its package slice"
+)]
+struct Args {
+    /// The distribution's key in python-deps.toml, and its target's name
+    #[arg(long)]
+    name: String,
+
+    /// The distribution's package slice, as JSON: its dependencies, the
+    /// extras some package or workspace member asks it for and those
+    /// extras' dependencies, each naming only distributions the cell holds
+    #[arg(long)]
+    slice: PathBuf,
+
+    /// The platforms, as nix/buck2/platforms.nix's conditions in JSON
+    #[arg(long)]
+    platforms: String,
+
+    /// The Python toolchain's full version the markers are evaluated for,
+    /// e.g. "3.13.12"
+    #[arg(long)]
+    python_version: String,
+
+    /// Where to write the target name
+    #[arg(long)]
+    targets_out: PathBuf,
 }
 
-fn run(cell_dir: &Path, deps_path: &Path) -> anyhow::Result<()> {
-    let path = cell::join(cell_dir, &["pydeps-cell.json"]);
-    let data = std::fs::read(&path).map_err(|e| anyhow::anyhow!("open {}: {e}", path.display()))?;
-    let cfg: cell::Config = serde_json::from_str(&deps_gen_kit::gojson::text(&data))
-        .map_err(|e| anyhow::anyhow!("parsing pydeps-cell.json: {e}"))?;
-    let deps = cell::load_deps(deps_path)?;
-    cell::render_cell(cell_dir, &deps, &cfg)
+fn main() -> Result<()> {
+    let args = Args::parse();
+    let mut cfg: cell::Config =
+        serde_json::from_str(&deps_gen_kit::gojson::text(args.platforms.as_bytes()))
+            .context("--platforms")?;
+    cfg.python_version = args.python_version;
+    let slice: cell::Package = serde_json::from_str(
+        &std::fs::read_to_string(&args.slice).context("Failed to read the slice")?,
+    )
+    .context("Failed to parse the slice")?;
+
+    let rules = cell::render(&args.name, &slice, &cfg)?;
+    std::fs::write(&args.targets_out, format!("{}\n", args.name))
+        .with_context(|| format!("write {}", args.targets_out.display()))?;
+    print!("{rules}");
+    Ok(())
 }

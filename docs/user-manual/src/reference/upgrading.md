@@ -2,6 +2,41 @@
 
 What changes when a project moves to a newer turnkey, and what to do about it.
 
+## The per-distribution Python cell
+
+The Python dependency cell is now built one package per distribution, and
+laid out by `tk materialize` as a real directory, `.turnkey/pydeps`, instead
+of one symlink to a merged cell
+([ADR 0004](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0004-deps-cells-are-write-once-directories.md),
+[ADR 0010](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0010-pydeps-stores-one-distribution-per-store-link.md)).
+Labels (`pydeps//vendor/<name>:<name>`) are unchanged. A distribution bump
+now rebuilds that distribution alone, plus those whose dependencies name it
+if theirs changed, and re-runs only its dependents' actions, with no daemon
+restart.
+
+### Switching over
+
+- **The first shell load** after upgrading replaces the `.turnkey/pydeps`
+  symlink with the directory. `tk` restarts the buck2 daemon once, and the
+  next build is a full one. Nothing else needs doing.
+- **A lock holding several versions of one distribution fails.** `pydeps-gen`
+  now rejects a uv resolution that forks on a marker, since the cell holds one
+  version per name: pin the dependency so the lock no longer forks (see
+  [Python Workspaces](../workflows/python-workspace.md#one-version-per-distribution)).
+- **User patches move.** They go under
+  `.turnkey/patches/pydeps/vendor/<name>/`, one directory per distribution,
+  and apply in that distribution's own derivation. A patch file directly
+  under `.turnkey/patches/pydeps/` fails evaluation with where to move it:
+  move it into the directory of the distribution whose files it changes,
+  keeping its content. A patch spanning two distributions is split into one
+  per distribution.
+
+### Rolling back
+
+```bash
+rm -rf .turnkey/pydeps .turnkey/pydeps.lock .turnkey/gcroots/pydeps
+```
+
 ## The JavaScript cell's package graph
 
 The JavaScript dependency cell now holds each locked package once, at

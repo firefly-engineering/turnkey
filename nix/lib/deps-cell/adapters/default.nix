@@ -5,7 +5,8 @@
 #   - mkXxxDepsCell: Build a complete dependency cell: its dep packages,
 #     handed to genericBuilder.genericMkDepsCell (../default.nix) with the
 #     language's vendor layout, merge commands and root rules.star; or, for
-#     a write-once cell (Go, Rust, Solidity: ADR 0004), its cell index
+#     a write-once cell (Go, Rust, Python, Solidity, JavaScript: ADR 0004),
+#     its cell index
 #     (genericBuilder.mkCellIndex), which tk materialize lays out
 #   - buildInputs: Build inputs for per-dependency builds
 #   - cellBuildInputs: Build inputs for cell builds (genericMkDepsCell's)

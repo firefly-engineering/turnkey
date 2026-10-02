@@ -238,13 +238,49 @@ See [Dependency Generators](../extending/dependency-generators.md) for handling 
 
 ## Python Dependency Cell
 
-Built by the Python adapter, `nix/lib/deps-cell/adapters/python.nix`.
+Built by the Python adapter, `nix/lib/deps-cell/adapters/python.nix`. Like
+the Rust and Go cells, it is a write-once cell
+([ADR 0004](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0004-deps-cells-are-write-once-directories.md),
+[ADR 0010](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0010-pydeps-stores-one-distribution-per-store-link.md)):
+one store link per distribution, and one alias package per distribution.
+
+### Cell Structure
+
+```
+.turnkey/pydeps/
+├── .buckconfig                       # Cell identity
+├── .deps-file-sha256                 # the python-deps.toml it was built from
+├── _store/
+│   └── <hash>-dep-python-six-1.17.0 -> /nix/store/<hash>-dep-python-six-1.17.0
+│       └── rules.star                # python_library, generated in the distribution's derivation
+└── vendor/
+    └── six/rules.star                # alias -> //_store/<hash>-dep-python-six-1.17.0:six
+```
+
+Labels are `pydeps//vendor/<name>:<name>`, with `<name>` the distribution's
+key in python-deps.toml. `python-deps.toml` holds one version per name
+(`pydeps-gen` fails on a forked lock), so there are no version alias
+packages.
 
 ### Process
 
-1. Reads python-deps.toml
-2. Fetches wheels from PyPI
-3. Generates rules.star per package
+1. `tk sync` runs pydeps-gen, which records each distribution's version,
+   URL and hash from `pylock.toml`, and its dependencies, markers and extras
+   from `uv.lock`.
+2. Nix builds one package per distribution (`mkPythonDepPackage`): its
+   source from PyPI, its fixup, its user patches
+   (`.turnkey/patches/pydeps/vendor/<name>/`), and its `rules.star`, written
+   by `pydeps-cell` from the distribution's package slice (its dependencies
+   and its requested extras', narrowed by `sliceOf` to the distributions the
+   cell holds), the platforms' conditions and the Python toolchain's
+   version. Its `targets` output holds its one target, `<name>`.
+3. `mkCellIndex` builds the cell index: one package per distribution, at
+   `vendor/<name>`, with its store path.
+4. The shell runs `tk materialize` with the index, as for the Rust cell.
+
+A version bump rebuilds that distribution's derivation, and those whose
+slice names it only if their slice changed; buck2 re-runs its reverse
+dependencies alone.
 
 ## Solidity Dependency Cell
 

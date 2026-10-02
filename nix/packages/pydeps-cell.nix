@@ -1,8 +1,8 @@
 # pydeps-cell Nix package
 #
-# Builds the tool that writes the pydeps cell's rules.star files, with the
-# dependencies between vendored Python packages evaluated per platform
-# (src/cmd/pydeps-cell). The Python cell adapter runs it at merge time.
+# Builds the tool that writes a vendored Python distribution's rules.star,
+# with its dependencies evaluated per platform (src/cmd/pydeps-cell). The
+# Python cell adapter runs it in each distribution's own derivation.
 # Written in Rust (ported from Go, #212), built from the workspace
 # projection like the other Rust tools.
 { pkgs, lib }:
@@ -40,7 +40,7 @@ pkgs.rustPlatform.buildRustPackage {
   ];
 
   meta = {
-    description = "Write the pydeps cell's rules.star files, with per-platform dependencies";
+    description = "Write a vendored Python distribution's rules.star, with per-platform dependencies";
     homepage = "https://github.com/firefly-engineering/turnkey";
     license = lib.licenses.mit;
     mainProgram = "pydeps-cell";

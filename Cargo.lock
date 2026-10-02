@@ -2413,6 +2413,7 @@ name = "pydeps-cell"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap",
  "conditions",
  "deps-gen-kit",
  "gostd",

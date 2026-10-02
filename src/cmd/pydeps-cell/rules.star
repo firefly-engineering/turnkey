@@ -1,5 +1,5 @@
-# pydeps-cell - the pydeps cell's rules.star files, with per-platform
-# dependencies
+# pydeps-cell - a vendored Python distribution's rules.star, with
+# per-platform dependencies
 load("@prelude//:rules.bzl", "rust_binary", "rust_test")
 
 rust_binary(
@@ -12,6 +12,7 @@ rust_binary(
         "//src/rust/gostd:gostd",
         "//src/rust/pep508:pep508",
         "rustdeps//vendor/anyhow:anyhow",
+        "rustdeps//vendor/clap:clap",
         "rustdeps//vendor/serde:serde",
         "rustdeps//vendor/serde_json:serde_json",
         "rustdeps//vendor/toml:toml",
@@ -29,6 +30,7 @@ rust_test(
         "//src/rust/gostd:gostd",
         "//src/rust/pep508:pep508",
         "rustdeps//vendor/anyhow:anyhow",
+        "rustdeps//vendor/clap:clap",
         "rustdeps//vendor/serde:serde",
         "rustdeps//vendor/serde_json:serde_json",
         "rustdeps//vendor/toml:toml",

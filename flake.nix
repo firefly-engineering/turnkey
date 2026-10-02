@@ -1027,6 +1027,57 @@
             ) "js instance graph: components ${builtins.toJSON components}";
             pkgs.runCommand "js-instance-graph-check" { } "touch $out";
 
+          # A Python user patch goes to its own distribution's derivation
+          # (nix/lib/deps-cell/adapters/python.nix's userPatchesOf), routed by
+          # its directory, vendor/<name>/, and applies there: six built with
+          # the fixture patch has the line it adds, and its rules.star and
+          # target. A flat patch file, from the cell that was one store path,
+          # and a directory naming no locked distribution both fail
+          # evaluation.
+          checks.python-user-patches =
+            let
+              depsCell = import ./nix/lib/deps-cell { inherit pkgs lib; };
+              routed =
+                dir:
+                depsCell.adapters.python.userPatchesOf {
+                  inherit dir;
+                  cellName = "pydeps";
+                  names = [
+                    "six"
+                    "requests"
+                  ];
+                };
+              patches = routed ./nix/lib/deps-cell/testdata/patches;
+              got = lib.mapAttrs (_: map baseNameOf) patches;
+              flat = builtins.tryEval (routed ./nix/lib/deps-cell/testdata/flat-patches);
+              unknown = builtins.tryEval (routed ./nix/lib/deps-cell/testdata/unknown-patches);
+              six = depsCell.mkPythonDepPackage {
+                name = "six";
+                version = "1.17.0";
+                sha256 = "sha256-S8IT/6DLDC/sE233C6V/PW4rIMlUM/qfkvsiW/tO2N4=";
+                url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz";
+                slice = { };
+                conditions = (import ./nix/buck2/platforms.nix { inherit lib; }).conditions [ system ];
+                pydepsCell = import ./nix/packages/pydeps-cell.nix { inherit pkgs lib; };
+                userPatches = patches.six;
+              };
+            in
+            assert lib.assertMsg (
+              got == {
+                "six" = [ "six.py.patch" ];
+              }
+            ) "python user patches: routed ${builtins.toJSON got}";
+            assert lib.assertMsg (!flat.success) "python user patches: a flat patch file was accepted";
+            assert lib.assertMsg (
+              !unknown.success
+            ) "python user patches: a directory naming no locked distribution was accepted";
+            pkgs.runCommand "python-user-patches-check" { } ''
+              grep -qx '__patched__ = "python-user-patches"' ${six}/six.py
+              grep -q 'name = "six"' ${six}/rules.star
+              [ "$(cat ${six.targets})" = six ]
+              touch $out
+            '';
+
           # A Nix-built Rust tool is built from its workspace projection
           # (nix/lib/cargo.nix), so a workspace change its members don't
           # reach leaves its source and lock alone: an unreachable package's

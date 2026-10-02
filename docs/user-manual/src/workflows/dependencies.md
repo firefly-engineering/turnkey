@@ -343,21 +343,22 @@ wrong.
 The hash should come from the source (e.g., GitHub tarball), not from
 transformed/vendored output.
 
-## The Go, Rust, Solidity and JavaScript Cells Are Real Directories
+## The Go, Rust, Python, Solidity and JavaScript Cells Are Real Directories
 
-`.turnkey/godeps`, `.turnkey/rustdeps`, `.turnkey/soldeps` and `.turnkey/jsdeps` are directories that `tk materialize` keeps in line with the cell index the shell builds ([ADR 0004](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0004-deps-cells-are-write-once-directories.md)). The other deps cell, `pydeps`, is still a symlink to one store path: a running buck2 daemon keeps what it read through the old target when one is repointed, so build it through `tk`, which restarts the daemon when a cell symlink changes, rather than with plain `buck2`.
+`.turnkey/godeps`, `.turnkey/rustdeps`, `.turnkey/pydeps`, `.turnkey/soldeps` and `.turnkey/jsdeps` are directories that `tk materialize` keeps in line with the cell index the shell builds ([ADR 0004](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0004-deps-cells-are-write-once-directories.md)).
 
-- **`_store/<store path name>`**: one symlink per crate, Go module or Solidity package, to its own store path. It is only ever created or deleted, never pointed elsewhere.
+- **`_store/<store path name>`**: one symlink per crate, Go module, Python distribution or Solidity package, to its own store path. It is only ever created or deleted, never pointed elsewhere.
 - **`vendor/<crate>@<version>/rules.star`** and **`vendor/<crate>/rules.star`**: `alias()` targets that forward to a store link's crate. Labels such as `rustdeps//vendor/anyhow:anyhow` are unchanged.
+- **`vendor/<name>/rules.star`**: one per Python distribution, forwarding to its store link ([ADR 0010](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0010-pydeps-stores-one-distribution-per-store-link.md)). Labels such as `pydeps//vendor/six:six` are unchanged.
 - **`vendor/<import path>/rules.star`**: one per Go package, forwarding to its package in its module's store link ([ADR 0008](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0008-godeps-stores-one-module-per-store-link.md)). Labels such as `godeps//vendor/golang.org/x/sys/unix:unix` are unchanged. Where a dependency imports a `go.work` member's package, its alias forwards to the member's target in the repo instead.
 - **`vendor/<name>@<version>/rules.star`**: one per npm package, forwarding to its files in its store link. The cell's root `rules.star`, which the index carries, declares the package graph over them: an instance per pnpm snapshot, and `jsdeps//:<npm name>` per direct dependency ([ADR 0012](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0012-jsdeps-separates-package-contents-from-the-instance-graph.md)).
 - **`vendor/<name>/rules.star`**: one per Solidity package, forwarding to its store link, beside links to the package's files, which native `forge` reads through the root `remappings.txt` ([ADR 0011](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0011-soldeps-stores-one-package-per-store-link.md)). Labels are unchanged: `soldeps//:<package>` and `soldeps//:bundle` come from the cell's root `rules.star`, which the index carries, and `soldeps//vendor/<name>:<package>` from the alias package.
 
-Only what a change touches is rewritten, so a dependency bump recompiles the bumped crate's or module's dependents and re-runs only their tests. An npm package bump re-runs the instances that depend on it and their consumers. A Solidity package bump re-runs every Solidity action, since each one stages the whole bundle, and nothing in another language. Everything else stays cached, with no daemon restart, and plain `buck2` reads the new version. Don't edit the directory: the shell rewrites it on every load.
+Only what a change touches is rewritten, so a dependency bump recompiles the bumped crate's, module's or distribution's dependents and re-runs only their tests. An npm package bump re-runs the instances that depend on it and their consumers. A Solidity package bump re-runs every Solidity action, since each one stages the whole bundle, and nothing in another language. Everything else stays cached, with no daemon restart, and plain `buck2` reads the new version. Don't edit the directory: the shell rewrites it on every load.
 
 - **Switching over:** the first shell load after upgrading turnkey replaces the old `.turnkey/<cell>` symlink with the directory. `tk` restarts the buck2 daemon once, and the next build is a full one.
 - **Going back to an older turnkey:** run `rm -rf .turnkey/<cell>`, then reload the shell.
-- **`tk: warning: the rustdeps cell was built from another rust-deps.toml`** (or `godeps` and `go-deps.toml`, `soldeps` and `solidity-deps.toml`, `jsdeps` and `js-deps.toml`): the deps file changed since the shell last loaded. Run `direnv reload`, or re-enter the shell, to rebuild the cell.
+- **`tk: warning: the rustdeps cell was built from another rust-deps.toml`** (or `godeps` and `go-deps.toml`, `pydeps` and `python-deps.toml`, `soldeps` and `solidity-deps.toml`, `jsdeps` and `js-deps.toml`): the deps file changed since the shell last loaded. Run `direnv reload`, or re-enter the shell, to rebuild the cell.
 
 ## Troubleshooting
 

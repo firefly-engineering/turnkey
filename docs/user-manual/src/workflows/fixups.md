@@ -122,6 +122,20 @@ repository's local, exact-version workarounds.
   - A patch file left directly under `rustdeps/`, from before this layout,
     fails evaluation: move it into its package's directory, or regenerate it
     with `tk compose patch`.
+- **Go cell:** each patch goes in its module's directory,
+  `.turnkey/patches/godeps/vendor/<module path>/`, and applies in that
+  module's own derivation, after its fixup.
+- **Python cell:** each patch goes in its distribution's directory,
+  `.turnkey/patches/pydeps/vendor/<name>/`, and applies in that
+  distribution's own derivation, after its fixup and before its
+  `rules.star` is written. Changing a patch rebuilds only that distribution
+  and what depends on it.
+  - A patch that doesn't apply exactly, with no fuzz, fails the build and
+    names the distribution.
+  - A patch file left directly under `pydeps/`, from before this layout,
+    fails evaluation: move it into its distribution's directory, or
+    regenerate it with `tk compose patch`. So does a directory naming a
+    distribution `python-deps.toml` doesn't hold.
 - **Solidity cell:** each patch goes in its package's directory,
   `.turnkey/patches/soldeps/vendor/<name>/` (for a scoped npm package,
   `vendor/@<scope>/<name>/`, such as `vendor/@openzeppelin/contracts/`), and
@@ -145,7 +159,6 @@ repository's local, exact-version workarounds.
   - A patch file left directly under `jsdeps/`, from before this layout,
     or in a directory that is no package's, fails evaluation: move it into
     its package's directory, or regenerate it with `tk compose patch`.
-- **Other cells:** patches apply last, to the assembled cell.
 
 ## When sets disagree
 
