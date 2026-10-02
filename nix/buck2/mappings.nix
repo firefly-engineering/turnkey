@@ -1,7 +1,7 @@
 # Buck2 toolchain mappings
 #
 # Maps turnkey toolchain names to Buck2 toolchain rule specifications.
-# Used by the buck2.nix module to generate the toolchains cell.
+# Used by toolchains-cell-package.nix to generate the toolchains cell.
 #
 # Each toolchain can specify:
 #   - targets: Buck2 toolchain rules to generate in the toolchains cell

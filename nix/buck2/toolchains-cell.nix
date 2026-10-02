@@ -2,8 +2,9 @@
 #
 # Pure: which Buck2 toolchains the cell defines (the declared ones with a
 # mapping, their implicit dependencies and the always-included ones), what
-# their actions need on PATH, and the cell's BUCK file. buck2.nix builds
-# the cell from it; checks.buck2-generators tests it.
+# their actions need on PATH, and the cell's BUCK file.
+# toolchains-cell-package.nix builds the cell from it;
+# checks.buck2-generators tests it.
 { lib }:
 
 {

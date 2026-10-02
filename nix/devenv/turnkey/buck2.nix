@@ -1,7 +1,8 @@
 # Buck2 toolchain generation module for devenv
 #
-# Generates a Buck2 toolchains cell from toolchain.toml declarations.
-# Creates a symlinked .buckconfig pointing to the Nix store.
+# Wires a shell's Buck2 integration: symlinks the toolchains cell the
+# flake-parts module built for its toolchain.toml declarations, the prelude
+# and the dependency cells, and a .buckconfig pointing to the Nix store.
 
 {
   lib,
@@ -14,23 +15,14 @@ let
   cfg = config.turnkey.buck2;
   turnkeyCfg = config.turnkey;
 
-  # Load the toolchain mappings
-  mappings = import ../../buck2/mappings.nix {
-    inherit lib;
-    mdbookPreprocessors = cfg.mdbook.preprocessors;
-  };
-
-  # Toolchain declarations (name -> spec, e.g. { version = "3"; }) from the declaration file
-  declaredToolchains =
-    if turnkeyCfg.declarationFile != null then
-      (import ../../lib/toolchain-declaration.nix { inherit lib; }).toolchains turnkeyCfg.declarationFile
-    else
-      { };
-
-  # What the toolchains cell holds (nix/buck2/toolchains-cell.nix)
-  toolchainsCellContent = import ../../buck2/toolchains-cell.nix { inherit lib; } {
-    inherit mappings declaredToolchains resolvedRegistry;
-  };
+  # The toolchains cell for this shell's declared toolchains, built by the
+  # flake-parts module (nix/buck2/toolchains-cell-package.nix), and what it
+  # was built from: the declared toolchains (name -> spec, e.g.
+  # { version = "3"; }), the registry resolved at their versions, and the
+  # cell's content (nix/buck2/toolchains-cell.nix)
+  toolchainsCell = cfg.toolchainsCell;
+  inherit (toolchainsCell) declaredToolchains resolvedRegistry;
+  toolchainsCellContent = toolchainsCell.content;
   finalToolchains = toolchainsCellContent.toolchains;
   inherit (toolchainsCellContent) runtimeDeps;
 
@@ -47,14 +39,6 @@ let
       if entry == null then null else turnkeyLib.resolveTool turnkeyCfg.registry name { }
     ) runtimeDeps
   );
-
-  # Create a resolved registry for dynamicAttrs (maps toolchain names to packages)
-  # This allows mappings.nix dynamicAttrs functions to use ${registry.clang}/bin/clang
-  # Declared toolchains resolve at their declared version, so a path baked into
-  # the toolchains cell is the same package the dev shell provides.
-  resolvedRegistry = builtins.mapAttrs (
-    name: entry: turnkeyLib.resolveTool turnkeyCfg.registry name (declaredToolchains.${name} or { })
-  ) turnkeyCfg.registry;
 
   # The languages turnkey manages dependencies for (nix/buck2/languages.nix)
   languages = import ../../buck2/languages.nix { inherit pkgs lib; };
@@ -82,38 +66,9 @@ let
     # Always include deps-extract (used by tk rules sync for all non-Go languages)
     ++ [ depsExtract ];
 
-  # The platforms the project builds for (nix/buck2/platforms.nix)
-  platforms = import ../../buck2/platforms.nix { inherit lib; };
-
-  # Toolchains cell derivation
-  toolchainsCell = pkgs.runCommand "turnkey-toolchains-cell" { } ''
-    mkdir -p $out
-
-    # Create BUCK file (Buck2's buildfile name setting only applies to root cell)
-    cat > $out/BUCK <<'BUCK'
-    ${toolchainsCellContent.buckFile}
-    BUCK
-
-    # The combined <os>-<cpu> config_settings rules sync's select()s use
-    # (nix/buck2/platforms.nix)
-    mkdir -p $out/conditions
-    cat > $out/conditions/BUCK <<'BUCK'
-    ${platforms.settingsBuckFile (map platforms.fromSystem cfg.platforms) (
-      lib.optionals cfg.go.enable cfg.go.allowedBuildTags
-    )}
-    BUCK
-
-    # Create cell identity .buckconfig
-    cat > $out/.buckconfig <<'BUCKCONFIG'
-    [cells]
-        toolchains = .
-        prelude = ${preludeCellPath}
-    BUCKCONFIG
-  '';
-
   # turnkey's prelude for the pinned buck2 release, or the consumer's own
-  # (prelude.path), symlinked at .turnkey/prelude
-  preludeCellPath = ".turnkey/prelude";
+  # (prelude.path), symlinked where the toolchains cell's .buckconfig names it
+  inherit (toolchainsCell) preludeCellPath;
   # Reading the removed options makes setting one an error.
   customPrelude =
     assert lib.all (value: value == null) [
@@ -348,6 +303,12 @@ in
               type = lib.types.package;
               internal = true;
               description = "turnkey's prelude for the pinned buck2 release.";
+            };
+
+            toolchainsCell = lib.mkOption {
+              type = lib.types.package;
+              internal = true;
+              description = "The toolchains cell for this shell's declared toolchains (nix/buck2/toolchains-cell-package.nix).";
             };
           };
         }

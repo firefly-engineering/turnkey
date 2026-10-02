@@ -370,6 +370,16 @@ in
         ) languages
       );
 
+      # The toolchains cell for a shell's declaration file
+      # (nix/buck2/toolchains-cell-package.nix)
+      toolchainsCellFor =
+        declarationFile:
+        import ../../buck2/toolchains-cell-package.nix { inherit pkgs lib; } {
+          inherit declarationFile registry;
+          tellerLib = turnkeyLib;
+          inherit (cfg) buck2;
+        };
+
       # Create a shell configuration for each declaration file
       mkShellConfig =
         shellName: declarationFile:
@@ -419,6 +429,7 @@ in
                 prelude = cfg.buck2.prelude // {
                   package = turnkeyPrelude;
                 };
+                toolchainsCell = toolchainsCellFor declarationFile;
               }
               // lib.mapAttrs (name: cell: cfg.buck2.${name} // { inherit cell; }) languageCells;
           };
@@ -457,6 +468,14 @@ in
         lib.mapAttrs' (
           name: drv: lib.nameValuePair "${name}-${if drv ? index then "index" else "cell"}" drv
         ) allCells
+        # The default shell's toolchains cell, when it has the Buck2
+        # integration: the cell the daemon serves as toolchains
+        //
+          lib.optionalAttrs
+            (cfg.buck2.enable && builtins.elem "default" cfg.buck2.shells && cfg.declarationFiles ? default)
+            {
+              toolchains-cell = toolchainsCellFor cfg.declarationFiles.default;
+            }
         // {
           # Combined toolchain profile with all tools in bin/
           # The daemon exposes this as a virtual bin/ directory at the mount root

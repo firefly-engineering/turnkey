@@ -15,6 +15,13 @@ All cells are built as Nix derivations and symlinked into `.turnkey/`.
 
 Located at `nix/buck2/toolchains-cell.nix`. Generated from `nix/buck2/mappings.nix`.
 
+`nix/buck2/toolchains-cell-package.nix` builds it for a shell's
+`toolchain.toml`. The flake-parts module builds one per shell, hands it to
+the shell (`turnkey.buck2.toolchainsCell`), which symlinks it at
+`.turnkey/toolchains`, and exposes the default shell's as the
+`toolchains-cell` package. The composition daemon builds that package like
+every other `*-cell`.
+
 ### Mapping Structure
 
 ```nix

@@ -114,18 +114,6 @@ pub fn build_and_configure(
     }
     config.toolchain_profile = toolchain_profile;
 
-    // Also discover the toolchains cell from .turnkey/toolchains symlink
-    // (built by devenv, not exposed as a flake package)
-    let toolchains_link = repo_root.join(".turnkey/toolchains");
-    if toolchains_link.is_symlink() {
-        if let Ok(target) = std::fs::read_link(&toolchains_link) {
-            if target.to_string_lossy().starts_with("/nix/store/") {
-                info!("Discovered toolchains cell from .turnkey/toolchains symlink");
-                config = config.with_cell(CellConfig::new("toolchains", &target));
-            }
-        }
-    }
-
     Ok(config)
 }
 
@@ -151,5 +139,57 @@ mod tests {
 
         assert_eq!(write_once_cells(repo.path()), vec!["rustdeps".to_string()]);
         assert!(write_once_cells(&repo.path().join("nowhere")).is_empty());
+    }
+
+    /// A flake whose packages are the given names, each building to
+    /// /nix/store/<name>
+    struct FakeNix(Vec<&'static str>);
+
+    impl NixClient for FakeNix {
+        fn list_packages(&self, _system: &str) -> Result<Vec<String>, nix_eval::NixError> {
+            Ok(self.0.iter().map(|s| s.to_string()).collect())
+        }
+
+        fn build(&self, packages: &[&str]) -> Result<HashMap<String, PathBuf>, nix_eval::NixError> {
+            Ok(packages
+                .iter()
+                .map(|p| (p.to_string(), PathBuf::from("/nix/store").join(p)))
+                .collect())
+        }
+
+        fn eval_json(&self, _expr: &str) -> Result<serde_json::Value, nix_eval::NixError> {
+            unimplemented!()
+        }
+    }
+
+    /// The toolchains cell is the flake's toolchains-cell package, like
+    /// every other cell: a .turnkey/toolchains symlink, the shell's, plays
+    /// no part
+    #[test]
+    fn toolchains_cell_comes_from_its_package() {
+        let repo = tempfile::TempDir::new().unwrap();
+        fs::create_dir_all(repo.path().join(".turnkey")).unwrap();
+        std::os::unix::fs::symlink(
+            "/nix/store/stale-toolchains",
+            repo.path().join(".turnkey/toolchains"),
+        )
+        .unwrap();
+        let nix = FakeNix(vec!["godeps-cell", "toolchains-cell", "tk"]);
+
+        let config = build_and_configure(&nix, Path::new("/mnt/repo"), repo.path()).unwrap();
+
+        let mut cells: Vec<(&str, &Path)> = config
+            .cells
+            .iter()
+            .map(|c| (c.name.as_str(), c.source_path.as_path()))
+            .collect();
+        cells.sort();
+        assert_eq!(
+            cells,
+            [
+                ("godeps", Path::new("/nix/store/godeps-cell")),
+                ("toolchains", Path::new("/nix/store/toolchains-cell")),
+            ]
+        );
     }
 }

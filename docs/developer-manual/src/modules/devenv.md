@@ -45,7 +45,8 @@ config.packages = resolvedPackages;
 
 The buck2.nix sub-module (`nix/devenv/turnkey/buck2.nix`) handles:
 
-- Toolchains cell generation
+- Toolchains cell symlink (the flake-parts module builds the cell, see
+  [Buck2 Cells](buck2-cells.md#toolchains-cell))
 - Prelude cell symlink
 - Dependency cell symlinks
 - Shell entry hooks
