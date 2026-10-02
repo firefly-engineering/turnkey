@@ -65,7 +65,7 @@ The Nix-built list of a deps cell's locked packages: each one's store path and t
 _Avoid_: manifest, cell derivation
 
 **Locked package**:
-The unit a deps generator locks at one version, and a deps cell stores behind one store link: a crate, a Go module, a Python distribution. For Rust it is also one buck2 package. A Go module holds many Go packages, each its own buck2 package.
+The unit a deps generator locks at one version, and a deps cell stores behind one store link: a crate, a Go module, a Python distribution, a Solidity package (an npm package or a git dependency). For Rust, Python and Solidity it is also one buck2 package. A Go module holds many Go packages, each its own buck2 package.
 _Avoid_: dependency (which also names the edge), module (outside Go)
 
 **Store link**:
@@ -73,8 +73,12 @@ A symlink in a deps cell to one locked package's store path, named after that st
 _Avoid_: crate symlink, vendor link
 
 **Alias package**:
-A package in a deps cell whose targets forward to the same-named targets of a buck2 package inside a store link: the store link's root for a crate or a Python distribution, a subdirectory for a Go package. Version names (`anyhow@1.0.100`) and unversioned names (`anyhow`, `github.com/spf13/cobra`) are alias packages. A Go module and a Python distribution each have one version, so Go and Python have only unversioned ones: one per Go package, one per distribution.
+A package in a deps cell whose targets forward to the same-named targets of a buck2 package inside a store link: the store link's root for a crate, a Python distribution or a Solidity package, a subdirectory for a Go package. Version names (`anyhow@1.0.100`) and unversioned names (`anyhow`, `github.com/spf13/cobra`) are alias packages. Go, Python and Solidity lock one version per name, so they have only unversioned ones: one per Go package, one per distribution, one per Solidity package.
 _Avoid_: alias symlink, version symlink
+
+**Root package**:
+The package at a deps cell's root, addressed as `<cell>//:<target>`. When a language has one (Solidity's per-package targets and its bundle), it names packages only through their alias packages, and it changes whenever the package list does. Rust and Go cells have none.
+_Avoid_: root BUCK, cell BUCK file
 
 **Package slice**:
 What one package's build file needs from the build's resolution of its lock file, on each platform the project builds for: its features and its dependencies resolved to exact versions, each with the platforms it applies on, and the name the package's code uses for each dependency where the package name wouldn't give it. "The build's resolution" is what the language's own build tool would compile for that platform. It is not the lock file's resolution, which can be larger: Cargo's lock file keeps optional dependencies that a weak dependency feature only names. A Python distribution's slice is its requirements and those of the extras something asks it for, each kept on the platforms its marker holds on for the toolchain's Python, and each one the deps cell holds. A package's store path depends on its own slice and on nothing global.
