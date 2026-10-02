@@ -8,9 +8,13 @@ import (
 	"golang.org/x/sys/cpu"
 )
 
+// greeting is the line main prints for a generated UUID.
+func greeting(id uuid.UUID) string {
+	return fmt.Sprintf("Hello from turnkey! Generated UUID: %s", id)
+}
+
 func main() {
-	id := uuid.New()
-	fmt.Printf("Hello from turnkey! Generated UUID: %s\n", id)
+	fmt.Println(greeting(uuid.New()))
 
 	// Use golang.org/x/sys/cpu to demonstrate assembly-based dependency
 	fmt.Printf("Running on %s/%s\n", runtime.GOOS, runtime.GOARCH)

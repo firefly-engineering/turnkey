@@ -12,3 +12,15 @@ go_binary(
     ],
     visibility = ["PUBLIC"],
 )
+
+go_test(
+    name = "go-hello-deps-test",
+    srcs = [
+        "main.go",
+        "main_test.go",
+    ],
+    deps = [
+        "godeps//vendor/github.com/google/uuid:uuid",
+        "godeps//vendor/golang.org/x/sys/cpu:cpu",
+    ],
+)
