@@ -209,6 +209,30 @@ The pylock rule exists when the flake sets `buck2.python.uvLockFile`
 (turnkey's own flake sets it to `uv.lock`) along with
 `buck2.python.lockFile`.
 
+### One Version per Distribution
+
+The `pydeps` cell holds one version of each distribution, at
+`pydeps//vendor/<name>:<name>`
+([ADR 0010](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0010-pydeps-stores-one-distribution-per-store-link.md)).
+uv can lock several: when the resolution *forks* on a marker, for example
+`numpy` 1.x for `python_version < '3.10'` and 2.x above, the lock holds one
+entry per fork. `pydeps-gen` then fails, writes nothing, and names the
+distribution with each locked version and its marker:
+
+```
+pylock.toml locks several versions of one distribution, and the pydeps cell holds one version per distribution.
+2 versions of numpy:
+  numpy 1.26.4 (python_full_version < '3.10')
+  numpy 2.1.0 (python_full_version >= '3.10')
+Pin it, in the pyproject.toml that depends on it, to a range one version satisfies on every Python the workspace allows, so the lock no longer forks; then run tk sync.
+```
+
+Pin the dependency so the lock no longer forks: constrain it, in the
+`pyproject.toml` of the member that depends on it, to a range one version
+satisfies for every Python the workspace allows (`numpy>=2.1`), or raise the
+workspace's `requires-python` so the fork's other branch can't happen. Then
+run `tk sync`, which relocks and regenerates `python-deps.toml`.
+
 ## Running Code
 
 | Task                            | uv track                                | Buck2 track                                       |

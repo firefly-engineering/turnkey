@@ -81,6 +81,8 @@ struct UvLock {
 struct UvPackage {
     name: String,
     #[serde(default)]
+    version: Option<String>,
+    #[serde(default)]
     dependencies: Vec<UvDep>,
     #[serde(default, rename = "optional-dependencies")]
     optional_dependencies: BTreeMap<String, Vec<UvDep>>,
@@ -233,9 +235,11 @@ fn main() -> Result<()> {
         }
 
         eprintln!("Found {} dependencies", resolved.len());
-        return args
-            .output
-            .write("pydeps-gen", "pylock.toml", &python_deps(&resolved));
+        return args.output.write(
+            "pydeps-gen",
+            "pylock.toml",
+            &python_deps("pylock.toml", &resolved)?,
+        );
     }
 
     // Parse dependencies from input file (legacy path - version ranges)
@@ -263,7 +267,7 @@ fn main() -> Result<()> {
         "requirements.txt"
     };
     args.output
-        .write("pydeps-gen", source, &python_deps(&resolved))
+        .write("pydeps-gen", source, &python_deps(source, &resolved)?)
 }
 
 /// Parse a dependency specifier (PEP 508) into (name, version_constraint).
@@ -412,6 +416,22 @@ fn parse_pylock(
 
     eprintln!("Parsed pylock.toml (lock-version: {})", pylock.lock_version);
 
+    // Before anything is fetched, so a forked lock fails fast
+    check_one_version_per_name(
+        "pylock.toml",
+        pylock
+            .packages
+            .iter()
+            .filter(|pkg| pkg.directory.is_none())
+            .filter_map(|pkg| {
+                Some((
+                    pkg.name.as_str(),
+                    pkg.version.as_deref()?,
+                    pkg.marker.as_deref(),
+                ))
+            }),
+    )?;
+
     let mut resolved = Vec::new();
 
     for (i, pkg) in pylock.packages.iter().enumerate() {
@@ -509,14 +529,34 @@ fn add_uv_graph(resolved: &mut [PythonDep], path: &PathBuf) -> Result<()> {
         }
     }
 
-    let graph: BTreeMap<String, &UvPackage> = lock
-        .package
-        .iter()
-        .map(|p| (normalize_name(&p.name), p))
-        .collect();
+    // A name uv.lock holds several versions of has one set of edges per
+    // version: merging them would be the same silent last-wins as a forked
+    // pylock.toml, so only names held once are read. The packages pylock.toml
+    // left out (dev tooling) may still fork.
+    let mut graph: BTreeMap<String, Vec<&UvPackage>> = BTreeMap::new();
+    for pkg in &lock.package {
+        graph
+            .entry(normalize_name(&pkg.name))
+            .or_default()
+            .push(pkg);
+    }
     for dep in resolved.iter_mut() {
         let name = normalize_name(&dep.name);
-        if let Some(pkg) = graph.get(&name) {
+        if let Some(versions) = graph.get(&name) {
+            let [pkg] = versions.as_slice() else {
+                bail!(
+                    "{} locks {} versions of {} (the pydeps cell holds one version per \
+                     distribution): {}",
+                    path.display(),
+                    versions.len(),
+                    dep.name,
+                    versions
+                        .iter()
+                        .map(|p| p.version.as_deref().unwrap_or("no version"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+            };
             dep.dependencies = pkg.dependencies.clone();
             dep.extras = pkg
                 .optional_dependencies
@@ -662,8 +702,19 @@ struct EdgeRecord {
     extras: Vec<String>,
 }
 
-/// The python-deps.toml record of the resolved packages
-fn python_deps(deps: &[PythonDep]) -> PythonDeps {
+/// The python-deps.toml record of the resolved packages. It holds one
+/// version per key, so it fails rather than keep one of several.
+fn python_deps(source: &str, deps: &[PythonDep]) -> Result<PythonDeps> {
+    check_one_version_per_name(
+        source,
+        deps.iter().map(|dep| {
+            (
+                dep.name.as_str(),
+                dep.version.as_str(),
+                dep.marker.as_deref(),
+            )
+        }),
+    )?;
     let edges = |deps: &[UvDep]| -> Vec<EdgeRecord> {
         deps.iter()
             .map(|d| EdgeRecord {
@@ -673,7 +724,7 @@ fn python_deps(deps: &[PythonDep]) -> PythonDeps {
             })
             .collect()
     };
-    PythonDeps {
+    Ok(PythonDeps {
         schema_version: 2,
         deps: deps
             .iter()
@@ -694,7 +745,54 @@ fn python_deps(deps: &[PythonDep]) -> PythonDeps {
                 (dep_key(&dep.name), record)
             })
             .collect(),
+    })
+}
+
+/// A distribution's name, version and marker, as a lock writes them
+type LockedVersion<'a> = (&'a str, &'a str, Option<&'a str>);
+
+/// Fail when `source` locks several versions of one distribution, naming
+/// each with its version and marker. The pydeps cell holds one version per
+/// distribution (docs/adr/0010-pydeps-stores-one-distribution-per-store-link.md),
+/// where a uv resolution that forks on a marker locks one per fork.
+/// Distributions are compared by key, so Foo-Bar and foo_bar are one.
+fn check_one_version_per_name<'a>(
+    source: &str,
+    packages: impl IntoIterator<Item = LockedVersion<'a>>,
+) -> Result<()> {
+    let mut by_key: BTreeMap<String, Vec<LockedVersion>> = BTreeMap::new();
+    for package in packages {
+        by_key.entry(dep_key(package.0)).or_default().push(package);
     }
+    let forks: Vec<String> = by_key
+        .values()
+        .filter(|entries| entries.len() > 1)
+        .map(|entries| {
+            let versions: Vec<String> = entries
+                .iter()
+                .map(|(name, version, marker)| {
+                    format!("  {name} {version} ({})", marker.unwrap_or("no marker"))
+                })
+                .collect();
+            format!(
+                "{} versions of {}:\n{}",
+                entries.len(),
+                entries[0].0,
+                versions.join("\n")
+            )
+        })
+        .collect();
+    if forks.is_empty() {
+        return Ok(());
+    }
+    bail!(
+        "{source} locks several versions of one distribution, and the pydeps cell \
+         holds one version per distribution.\n{}\n\
+         Pin it, in the pyproject.toml that depends on it, to a range one version \
+         satisfies on every Python the workspace allows, so the lock no longer \
+         forks; then run tk sync.",
+        forks.join("\n")
+    )
 }
 
 /// A package's key in python-deps.toml, and its name in the pydeps cell:
@@ -744,8 +842,12 @@ socks = [{ name = "PySocks", marker = "python_version >= '3.8'" }]
             ..Default::default()
         }];
         add_uv_graph(&mut resolved, &path).unwrap();
-        let toml =
-            deps_gen_kit::render("pydeps-gen", "pylock.toml", &python_deps(&resolved)).unwrap();
+        let toml = deps_gen_kit::render(
+            "pydeps-gen",
+            "pylock.toml",
+            &python_deps("pylock.toml", &resolved).unwrap(),
+        )
+        .unwrap();
         fs::remove_dir_all(&dir).unwrap();
 
         let parsed: toml::Value = toml::from_str(&toml).unwrap();
@@ -802,6 +904,154 @@ directory = { path = "." }
         assert_eq!(resolved.len(), 1);
         assert_eq!(resolved[0].hash, "sha256-six");
         assert_eq!(fake.calls.len(), 1);
+    }
+
+    /// parse_pylock's result for `lock`, with a prefetcher that knows no
+    /// archive, and the archives it was asked for
+    fn parse_lock(lock: &str, test: &str) -> (Result<Vec<PythonDep>>, usize) {
+        let dir = std::env::temp_dir().join(format!("pydeps-gen-{test}-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("pylock.toml");
+        fs::write(&path, lock).unwrap();
+        let mut fake = deps_gen_kit::MemoryPrefetcher::default();
+        let resolved = parse_pylock(&path, Some(&mut fake));
+        fs::remove_dir_all(&dir).unwrap();
+        (resolved, fake.calls.len())
+    }
+
+    #[test]
+    fn a_forked_lock_fails_naming_each_version_and_marker() {
+        let (resolved, fetched) = parse_lock(
+            r#"
+lock-version = "1.0"
+
+[[packages]]
+name = "numpy"
+version = "1.26.4"
+marker = "python_full_version < '3.10'"
+sdist = { url = "https://example.com/numpy-1.26.4.tar.gz" }
+
+[[packages]]
+name = "numpy"
+version = "2.1.0"
+marker = "python_full_version >= '3.10'"
+sdist = { url = "https://example.com/numpy-2.1.0.tar.gz" }
+
+[[packages]]
+name = "six"
+version = "1.17.0"
+sdist = { url = "https://example.com/six-1.17.0.tar.gz" }
+"#,
+            "fork",
+        );
+
+        let error = format!("{:#}", resolved.unwrap_err());
+        for expected in [
+            "2 versions of numpy",
+            "numpy 1.26.4 (python_full_version < '3.10')",
+            "numpy 2.1.0 (python_full_version >= '3.10')",
+            "one version per distribution",
+        ] {
+            assert!(error.contains(expected), "{expected:?} not in {error:?}");
+        }
+        assert!(!error.contains("six"), "{error:?}");
+        assert_eq!(fetched, 0, "a forked lock fails before fetching");
+    }
+
+    #[test]
+    fn names_differing_in_case_or_separators_are_one_distribution() {
+        let (resolved, _) = parse_lock(
+            r#"
+lock-version = "1.0"
+
+[[packages]]
+name = "Foo-Bar"
+version = "1.0"
+sdist = { url = "https://example.com/foo-bar-1.0.tar.gz" }
+
+[[packages]]
+name = "foo_bar"
+version = "2.0"
+marker = "sys_platform == 'linux'"
+sdist = { url = "https://example.com/foo_bar-2.0.tar.gz" }
+
+[[packages]]
+name = "foo.BAR"
+version = "3.0"
+sdist = { url = "https://example.com/foo.bar-3.0.tar.gz" }
+"#,
+            "names",
+        );
+
+        let error = format!("{:#}", resolved.unwrap_err());
+        for expected in [
+            "3 versions of Foo-Bar",
+            "Foo-Bar 1.0 (no marker)",
+            "foo_bar 2.0 (sys_platform == 'linux')",
+            "foo.BAR 3.0 (no marker)",
+        ] {
+            assert!(error.contains(expected), "{expected:?} not in {error:?}");
+        }
+    }
+
+    #[test]
+    fn the_record_holds_one_version_per_key() {
+        let dep = |name: &str, version: &str| PythonDep {
+            name: name.into(),
+            version: version.into(),
+            ..Default::default()
+        };
+        let error = python_deps(
+            "requirements.txt",
+            &[dep("Six", "1.16.0"), dep("six", "1.17.0")],
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("2 versions of Six"), "{error:?}");
+    }
+
+    #[test]
+    fn a_dependency_uv_lock_holds_twice_fails() {
+        let dir = std::env::temp_dir().join(format!("pydeps-gen-uvfork-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("uv.lock");
+        fs::write(
+            &path,
+            r#"
+version = 1
+
+[[package]]
+name = "numpy"
+version = "1.26.4"
+
+[[package]]
+name = "numpy"
+version = "2.1.0"
+
+[[package]]
+name = "pytest"
+version = "7.0"
+
+[[package]]
+name = "pytest"
+version = "8.0"
+"#,
+        )
+        .unwrap();
+
+        let dep = |name: &str| PythonDep {
+            name: name.into(),
+            version: "1.0".into(),
+            ..Default::default()
+        };
+        // pytest is dev tooling pylock.toml leaves out: its fork is not ours
+        let unforked = add_uv_graph(&mut [dep("six")], &path);
+        let forked = add_uv_graph(&mut [dep("numpy")], &path);
+        fs::remove_dir_all(&dir).unwrap();
+
+        unforked.unwrap();
+        let error = forked.unwrap_err().to_string();
+        assert!(error.contains("2 versions of numpy"), "{error:?}");
+        assert!(error.contains("1.26.4, 2.1.0"), "{error:?}");
     }
 
     #[test]
