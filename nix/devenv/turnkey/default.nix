@@ -47,6 +47,32 @@ in
       internal = true;
       description = "Teller library (injected by flake-parts module).";
     };
+
+    turnkeySources = lib.mkOption {
+      type = lib.types.listOf (
+        lib.types.submodule {
+          options = {
+            file = lib.mkOption {
+              type = lib.types.str;
+              description = "The source file, relative to the project root.";
+            };
+            hash = lib.mkOption {
+              type = lib.types.str;
+              description = "The SHA-256 of its content.";
+            };
+          };
+        }
+      );
+      default = [ ];
+      internal = true;
+      description = ''
+        turnkey's Nix sources the shell was built from, with their content
+        hashes (deps-freshness.nix's sourceEntries). The flake-parts module
+        sets them in turnkey's own repository only, for use_turnkey to
+        re-evaluate the flake when one changed on disk. Empty in a consumer
+        project, where turnkey's sources come from the flake input.
+      '';
+    };
   };
 
   config = lib.mkIf (cfg.enable && cfg.declarationFile != null) {

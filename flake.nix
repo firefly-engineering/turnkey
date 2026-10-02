@@ -131,13 +131,16 @@
 
       # Export the turnkey flake-parts module. We import it with
       # turnkeyLib = self.lib so the module can reach the bundled teller
-      # and toolbox helpers without re-importing turnkey's own flake.
+      # and toolbox helpers without re-importing turnkey's own flake, and
+      # with turnkeyFlake = self so it can tell turnkey's own repository
+      # from a consumer's.
       # Consumers don't need to do anything different — flakeModules.turnkey
       # is still the same value to import in their flake-parts setup.
       flake.flakeModules = {
         turnkey = import ./nix/flake-parts/turnkey {
           turnkeyLib = self.lib;
           devenvRoot = inputs.devenv-root;
+          turnkeyFlake = self;
         };
       };
 
@@ -169,6 +172,7 @@
         (import ./nix/flake-parts/turnkey {
           turnkeyLib = self.lib;
           devenvRoot = inputs.devenv-root;
+          turnkeyFlake = self;
         })
       ];
 
@@ -647,12 +651,6 @@
             ) "split vectors: ${lib.concatStringsSep "; " namingProblems}";
             pkgs.runCommand "split-vectors-check" { } "touch $out";
 
-          # use_turnkey re-evaluates the flake when a deps file no longer
-          # matches the one its cell was built from, and only then
-          # (nix/devenv/turnkey/deps-freshness.nix). The default shell records
-          # its deps files by content; a file the flake can't see is left out.
-          # A changed or missing file loads the .envrc once more, with
-          # nix-direnv's cached shell backdated; an unchanged one doesn't.
           # A Rust crate's package, rules.star included, is built from its
           # own data alone (ADR 0004): changing one crate's slice or hash in
           # rust-deps.toml changes that crate's derivation and no other's.
@@ -1168,6 +1166,15 @@
             ) "workspace projection: projecting onto every member doesn't give back Cargo.lock";
             pkgs.runCommand "workspace-projection-check" { } "touch $out";
 
+          # use_turnkey re-evaluates the flake when a file the shell was built
+          # from no longer matches, and only then
+          # (nix/devenv/turnkey/deps-freshness.nix): a deps file, or in
+          # turnkey's own repository one of turnkey's Nix sources. The default
+          # shell records its deps files and turnkey's sources by content; a
+          # deps file the flake can't see is left out, and a consumer project
+          # records no turnkey source. A changed or missing file loads the
+          # .envrc once more, with nix-direnv's cached shell backdated; an
+          # unchanged one doesn't.
           checks.deps-freshness =
             let
               depsFreshness = import ./nix/devenv/turnkey/deps-freshness.nix { inherit lib pkgs; };
@@ -1192,12 +1199,29 @@
                     ];
                   }).config;
               };
-              # Cells built from a rust-deps.toml holding "old"
+              # turnkey's sources, in turnkey's repository and in a consumer's
+              # (any other flake)
+              ownSources = depsFreshness.sourceEntries {
+                project = self;
+                turnkey = self;
+              };
+              consumerSources = depsFreshness.sourceEntries {
+                project = {
+                  outPath = "${./templates/default}";
+                };
+                turnkey = self;
+              };
+              # A shell built from a rust-deps.toml holding "old" and a
+              # nix/module.nix holding "old module"
               refresh = pkgs.writeText "deps-freshness.sh" (
                 depsFreshness.refresh [
                   {
                     file = "rust-deps.toml";
                     hash = builtins.hashString "sha256" "old\n";
+                  }
+                  {
+                    file = "nix/module.nix";
+                    hash = builtins.hashString "sha256" "old module\n";
                   }
                 ]
               );
@@ -1209,6 +1233,24 @@
             assert lib.assertMsg (
               stringEntries == [ ]
             ) "deps freshness: a deps file outside the flake is recorded";
+            assert lib.assertMsg (lib.elem {
+              file = "nix/devenv/turnkey/deps-freshness.nix";
+              hash = builtins.hashFile "sha256" ./nix/devenv/turnkey/deps-freshness.nix;
+            } ownSources) "deps freshness: turnkey's repository doesn't record its Nix sources";
+            assert lib.assertMsg (lib.any (
+              entry: lib.hasSuffix ".patch" entry.file
+            ) ownSources) "deps freshness: turnkey's repository doesn't record its patches";
+            assert lib.assertMsg (lib.all (
+              entry:
+              lib.hasPrefix "nix/" entry.file
+              && (lib.hasSuffix ".nix" entry.file || lib.hasSuffix ".patch" entry.file)
+            ) ownSources) "deps freshness: a recorded source isn't a .nix or .patch file under nix/";
+            assert lib.assertMsg (
+              consumerSources == [ ]
+            ) "deps freshness: a consumer project records turnkey's sources";
+            assert lib.assertMsg (
+              config.devenv.shells.default.turnkey.turnkeySources == ownSources
+            ) "deps freshness: the default shell doesn't record turnkey's sources";
             pkgs.runCommand "deps-freshness-check" { } ''
               mkdir layout project
               layout=$PWD/layout
@@ -1218,7 +1260,7 @@
               cat > .envrc <<'EOF'
               echo load >> loads
               source ${refresh}
-              if _turnkey_refresh_cells; then return 0; fi
+              if _turnkey_refresh_shell; then return 0; fi
               echo link >> loads
               EOF
               # direnv's functions, as far as the routine uses them
@@ -1235,19 +1277,34 @@
               }
               touch -t 202001010000 reference
               fail() { echo "deps freshness: $*" >&2; exit 1; }
+              # The files as the shell was built from them
+              unchanged() {
+                mkdir -p nix
+                printf 'old\n' > rust-deps.toml
+                printf 'old module\n' > nix/module.nix
+              }
 
-              printf 'old\n' > rust-deps.toml
+              unchanged
               load
-              [ "$(cat loads)" = "$(printf 'load\nlink')" ] || fail "unchanged file: loads were $(cat loads)"
-              [ ! -e log ] || fail "unchanged file: logged $(cat log)"
-              [ "$layout/flake-profile-x.rc" -nt reference ] || fail "unchanged file: cache backdated"
+              [ "$(cat loads)" = "$(printf 'load\nlink')" ] || fail "unchanged files: loads were $(cat loads)"
+              [ ! -e log ] || fail "unchanged files: logged $(cat log)"
+              [ "$layout/flake-profile-x.rc" -nt reference ] || fail "unchanged files: cache backdated"
 
-              for change in "printf 'new\n' > rust-deps.toml" "rm rust-deps.toml"; do
+              # Each change, to a deps file or a turnkey source, loads the
+              # .envrc exactly once more, even though the reloaded shell
+              # (this same library) still records the old content
+              for case in \
+                "rust-deps.toml:printf 'new\n' > rust-deps.toml" \
+                "rust-deps.toml:rm rust-deps.toml" \
+                "nix/module.nix:printf 'new module\n' > nix/module.nix" \
+                "nix/module.nix:rm nix/module.nix"; do
+                file=''${case%%:*} change=''${case#*:}
+                unchanged
                 eval "$change"
                 load
                 [ "$(cat loads)" = "$(printf 'load\nload\nlink')" ] || fail "$change: loads were $(cat loads)"
-                grep -q "re-evaluating the flake for rust-deps.toml" log || fail "$change: no re-evaluation logged"
-                grep -q "still don't match rust-deps.toml" log || fail "$change: second load didn't report"
+                grep -qxF "turnkey: re-evaluating the flake for $file" log || fail "$change: no re-evaluation logged"
+                grep -qxF "turnkey: the dev shell still doesn't match $file" log || fail "$change: second load didn't report"
                 [ reference -nt "$layout/flake-profile-x.rc" ] || fail "$change: cache not backdated"
               done
               touch $out

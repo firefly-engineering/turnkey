@@ -2,7 +2,8 @@
 #
 # This module creates a shell script containing the `use_turnkey` function
 # that handles dependency regeneration (tk sync), re-evaluating the flake
-# when a deps file changed (deps-freshness.nix), symlink syncing, and
+# when a deps file or one of turnkey's own sources changed
+# (deps-freshness.nix), symlink syncing, and
 # watch_file declarations for the shell's deps rules.
 
 {
@@ -59,14 +60,16 @@ let
     }
   '';
 
-  # The deps files the shell's cells were built from, and the routine that
-  # re-evaluates the flake when one changed
+  # The deps files the shell's cells were built from and, in turnkey's own
+  # repository, turnkey's Nix sources, and the routine that re-evaluates
+  # the flake when one changed
   depsFreshness = import ./deps-freshness.nix { inherit lib pkgs; };
   refreshFunction = depsFreshness.refresh (
     depsFreshness.entries {
       inherit languages;
       buck2 = buck2Cfg;
     }
+    ++ cfg.turnkeySources
   );
 
   # Symlink sync: the same links, maintained the same way, as enterShell
@@ -150,9 +153,10 @@ let
       fi
 
       # A deps file that changed since the flake was evaluated (just now, or
-      # by tk sync or tw before this load) means stale cells: evaluate the
+      # by tk sync or tw before this load) means stale cells, and a changed
+      # turnkey source (in turnkey's repository) a stale shell: evaluate the
       # flake again, through the .envrc, which runs use_turnkey again
-      if _turnkey_refresh_cells; then
+      if _turnkey_refresh_shell; then
         return 0
       fi
 

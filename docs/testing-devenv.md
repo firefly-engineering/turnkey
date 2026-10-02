@@ -132,12 +132,11 @@ The first `direnv exec .` after changes may take a few seconds to:
 
 ### 2. Nix Store Caching
 
-`direnv exec .` uses the cached Nix evaluation. If you modify Nix files that aren't watched by direnv, changes won't be picked up until you run `nix develop --impure` or touch a watched file.
+`direnv exec .` uses the cached Nix evaluation while the files it was built from are unchanged. nix-direnv itself re-evaluates when `flake.nix` or `flake.lock` changes. `use_turnkey` re-evaluates, once per load, when one of these no longer matches by content the file the shell was built from:
+- the `*-deps.toml` dependency files (go-deps.toml, rust-deps.toml, etc.)
+- turnkey's own Nix sources, `nix/**/*.nix` and `nix/**/*.patch` (in this repository only)
 
-Watched files include:
-- `flake.nix`, `flake.lock`
-- `*.toml` dependency files (go-deps.toml, rust-deps.toml, etc.)
-- Key Nix files in `nix/` directory
+The flake records those files' hashes in the direnv library (`nix/devenv/turnkey/deps-freshness.nix`). Other files the flake reads are not checked: after changing one, run `nix-direnv-reload` or `nix develop --impure`.
 
 ### 3. direnv Must Be Allowed
 

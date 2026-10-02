@@ -1,9 +1,16 @@
-{ turnkeyLib, devenvRoot }:
+{
+  turnkeyLib,
+  devenvRoot,
+  # turnkey's own flake, to tell whether the project being loaded is
+  # turnkey's repository (deps-freshness.nix's sourceEntries)
+  turnkeyFlake,
+}:
 
 {
   lib,
   flake-parts-lib,
   config,
+  self,
   ...
 }:
 
@@ -370,6 +377,15 @@ in
         ) languages
       );
 
+      # turnkey's Nix sources with their content hashes, when the project is
+      # turnkey's own repository; none in a consumer project
+      turnkeySources =
+        (import ../../devenv/turnkey/deps-freshness.nix { inherit lib pkgs; }).sourceEntries
+          {
+            project = self;
+            turnkey = turnkeyFlake;
+          };
+
       # The toolchains cell for a shell's declaration file
       # (nix/buck2/toolchains-cell-package.nix)
       toolchainsCellFor =
@@ -413,6 +429,7 @@ in
             registry = lib.mkDefault registry;
             declarationFile = declarationFile;
             tellerLib = lib.mkDefault turnkeyLib;
+            inherit turnkeySources;
 
             # The Buck2 options as the consumer set them (nix/buck2/options.nix),
             # plus what this module resolves: whether this shell gets Buck2,
