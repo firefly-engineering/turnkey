@@ -838,6 +838,65 @@
             ) "go user patches: a package directory was taken for a module";
             pkgs.runCommand "go-user-patches-check" { } "touch $out";
 
+          # A Solidity user patch goes to its own package's derivation
+          # (nix/lib/deps-cell/adapters/solidity.nix's userPatchesOf), routed
+          # by its directory, vendor/<name>/ (two segments for a scoped npm
+          # package), and applies there: the check builds forge-std and
+          # @openzeppelin/contracts, pinned as solidity-deps.toml pins them,
+          # with their patches. A flat patch file, from the cell before
+          # packages had directories, and a directory that is no package,
+          # both fail evaluation.
+          checks.solidity-user-patches =
+            let
+              depsCell = import ./nix/lib/deps-cell { inherit pkgs lib; };
+              inherit (depsCell.adapters.solidity) userPatchesOf mkSolDepPackage;
+              routed =
+                dir:
+                userPatchesOf {
+                  inherit dir;
+                  cellName = "soldeps";
+                  names = [
+                    "forge-std"
+                    "@openzeppelin/contracts"
+                  ];
+                };
+              patches = routed ./nix/lib/deps-cell/testdata/patches;
+              got = lib.mapAttrs (_: map baseNameOf) patches;
+              flat = builtins.tryEval (routed ./nix/lib/deps-cell/testdata/flat-patches);
+              unknown = builtins.tryEval (routed ./nix/lib/deps-cell/testdata/unknown-patches);
+              forgeStd = mkSolDepPackage {
+                name = "forge-std";
+                version = "1.8.0";
+                source = "git";
+                url = "https://github.com/foundry-rs/forge-std/archive/b6a506db2262cad5ff982a87789ee6d1558ec861.tar.gz";
+                hash = "sha256-C3TD7/jCXNZIYdXXMunVZZF1BaUIjbCOuPuD50mvh4s=";
+                userPatches = patches."forge-std";
+              };
+              openzeppelin = mkSolDepPackage {
+                name = "@openzeppelin/contracts";
+                version = "5.4.0";
+                source = "npm";
+                url = "https://registry.npmjs.org/@openzeppelin%2fcontracts/-/contracts-5.4.0.tgz";
+                integrity = "sha512-eCYgWnLg6WO+X52I16TZt8uEjbtdkgLC0SUX/xnAksjjrQI4Xfn4iBRoI5j55dmlOhDv1Y7BoR3cU7e3WWhC6A==";
+                userPatches = patches."@openzeppelin/contracts";
+              };
+            in
+            assert lib.assertMsg (
+              got == {
+                "forge-std" = [ "src-Test.sol.patch" ];
+                "@openzeppelin/contracts" = [ "token-ERC20-ERC20.sol.patch" ];
+              }
+            ) "solidity user patches: routed ${builtins.toJSON got}";
+            assert lib.assertMsg (!flat.success) "solidity user patches: a flat patch file was accepted";
+            assert lib.assertMsg (
+              !unknown.success
+            ) "solidity user patches: a directory that is no package was taken for one";
+            pkgs.runCommand "solidity-user-patches-check" { } ''
+              grep -qx '// Patched.' ${forgeStd}/src/Test.sol
+              grep -qx '// Patched.' ${openzeppelin}/token/ERC20/ERC20.sol
+              touch $out
+            '';
+
           # A Nix-built Rust tool is built from its workspace projection
           # (nix/lib/cargo.nix), so a workspace change its members don't
           # reach leaves its source and lock alone: an unreachable package's

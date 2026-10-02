@@ -11,7 +11,15 @@
 //! forwards to a label outside the cell instead (a go.work member's
 //! package). A store link is named after its target, so it is only ever
 //! created or deleted, never retargeted: everything that changes on a
-//! dependency bump is a real file, which buck2's file watcher sees.
+//! dependency bump is a real file, which buck2's file watcher sees. So is
+//! the cell root's build file, when the index has one (the Solidity cell's
+//! `bundle` and per-package aliases, ADR 0011).
+//!
+//! An exposed package (the Solidity cell's) also gets its store path's
+//! entries linked into its alias package, for native tools that read the
+//! cell in place (forge, through the root remappings.txt). Those links do
+//! change target on a bump; buck2 never reads through them, since the alias
+//! package's build file globs nothing.
 //!
 //! The shell builds the index with Nix; the materializer never runs Nix to
 //! build anything and never reads Starlark: target names come from the
@@ -59,6 +67,12 @@ pub struct Outcome {
     pub packages_gone: usize,
     /// Writes of the cell's .buckconfig
     pub buckconfig_writes: usize,
+    /// Writes of the cell root's rules.star
+    pub root_writes: usize,
+    /// The cell root's rules.star was removed: the index has none
+    pub root_gone: bool,
+    /// Links to exposed packages' store entries created or changed
+    pub entries_linked: usize,
     /// The index was rooted
     pub rooted: bool,
 }
@@ -72,7 +86,10 @@ impl Outcome {
                 + self.packages_written
                 + self.packages_gone
                 + self.buckconfig_writes
+                + self.root_writes
+                + self.entries_linked
                 > 0
+            || self.root_gone
             || self.rooted
     }
 }
@@ -100,6 +117,16 @@ pub fn materialize(mut opts: Options) -> Result<Outcome, Error> {
 
     if write_if_changed(&cell.join(".buckconfig"), index.buckconfig.as_bytes())? {
         outcome.buckconfig_writes += 1;
+    }
+    // The root package's build file, as the index spells it
+    let root_file = cell.join(BUILD_FILE);
+    if !index.root.is_empty() {
+        if write_if_changed(&root_file, index.root.as_bytes())? {
+            outcome.root_writes += 1;
+        }
+    } else if std::fs::symlink_metadata(&root_file).is_ok() {
+        std::fs::remove_file(&root_file)?;
+        outcome.root_gone = true;
     }
 
     // 1. Store links: added, never retargeted
@@ -145,11 +172,29 @@ pub fn materialize(mut opts: Options) -> Result<Outcome, Error> {
         }
     }
 
-    // 3. What the index no longer names
-    outcome.store_links_gone = remove_stale_store_links(&cell.join(STORE_DIR), &links)?;
-    outcome.packages_gone = remove_stale_packages(&cell_str, &packages)?;
+    // 3. Exposed packages' store entries, beside their alias package's
+    // build file
+    let mut entries = BTreeSet::new();
+    for (pkg_path, pkg) in index.packages.iter().filter(|(_, pkg)| pkg.expose) {
+        let store = path::join(&[&pkg.store, &pkg.subdir]);
+        for name in read_dir_names(Path::new(&store))? {
+            let name = name.to_string_lossy().into_owned();
+            if name == BUILD_FILE {
+                continue;
+            }
+            let link = path::join(&[&cell_str, pkg_path, &name]);
+            if ensure_entry_link(Path::new(&link), &path::join(&[&store, &name]))? {
+                outcome.entries_linked += 1;
+            }
+            entries.insert(link);
+        }
+    }
 
-    // 4. The GC root, for the current index
+    // 4. What the index no longer names
+    outcome.store_links_gone = remove_stale_store_links(&cell.join(STORE_DIR), &links)?;
+    outcome.packages_gone = remove_stale_packages(&cell_str, &packages, &entries)?;
+
+    // 5. The GC root, for the current index
     if let Some(add_root) = opts.add_root.as_mut() {
         let link = turnkey.join(GCROOTS_DIR).join(&index.cell);
         let current = std::fs::read_link(&link);
@@ -161,7 +206,7 @@ pub fn materialize(mut opts: Options) -> Result<Outcome, Error> {
         }
     }
 
-    // 5. The deps file's hash, which tk compares with the file on disk
+    // 6. The deps file's hash, which tk compares with the file on disk
     write_if_changed(
         &cell.join(MARKER_NAME),
         format!("{}\n", index.deps_file_sha256).as_bytes(),
@@ -247,6 +292,37 @@ fn ensure_store_link(link: &Path, store: &str) -> Result<bool, Error> {
     Ok(false)
 }
 
+/// Points `link` at `target`, replacing whatever is there with a symlink
+/// atomically (a temporary link beside it, then a rename). Unlike a store
+/// link, an exposed entry's link follows its package's store path. Whether
+/// it changed.
+fn ensure_entry_link(link: &Path, target: &str) -> Result<bool, Error> {
+    match std::fs::symlink_metadata(link) {
+        Ok(info) if info.file_type().is_symlink() => {
+            if std::fs::read_link(link)?.as_os_str() == target {
+                return Ok(false);
+            }
+        }
+        Ok(info) if info.is_dir() => std::fs::remove_dir_all(link)?,
+        Ok(_) => {}
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e.into()),
+    }
+    let dir = link.parent().unwrap_or(Path::new("."));
+    let base = link
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    tempfile::Builder::new()
+        .prefix(&format!(".tmp-{base}-"))
+        .rand_bytes(9)
+        .make_in(dir, |tmp| std::os::unix::fs::symlink(target, tmp))?
+        .into_temp_path()
+        .persist(link)
+        .map_err(|e| e.error)?;
+    Ok(true)
+}
+
 /// Makes `dir` a real directory: the old cell layout had symlinks where
 /// packages now are
 fn replace_symlink_with_dir(dir: &Path) -> io::Result<()> {
@@ -270,12 +346,17 @@ fn remove_stale_store_links(dir: &Path, wanted: &BTreeMap<String, &str>) -> Resu
 }
 
 /// Removes, under `vendor/`, everything but the wanted packages'
-/// rules.star files, and the directories left empty; how many rules.star
-/// were removed
-fn remove_stale_packages(cell: &str, wanted: &BTreeMap<String, Vec<u8>>) -> Result<usize, Error> {
+/// rules.star files and exposed entries' links, and the directories left
+/// empty; how many rules.star were removed
+fn remove_stale_packages(
+    cell: &str,
+    wanted: &BTreeMap<String, Vec<u8>>,
+    entries: &BTreeSet<String>,
+) -> Result<usize, Error> {
     let keep: BTreeSet<String> = wanted
         .keys()
         .map(|path| path::join(&[cell, path, BUILD_FILE]))
+        .chain(entries.iter().cloned())
         .collect();
     let vendor = path::join(&[cell, "vendor"]);
     let mut gone = 0;
@@ -413,6 +494,7 @@ mod tests {
                 .into(),
                 aliases: [("vendor/anyhow".to_string(), anyhow)].into(),
                 forwards: BTreeMap::new(),
+                root: String::new(),
             };
             self.write_index(&format!("index-{version}.json"), &index)
         }
@@ -455,8 +537,31 @@ mod tests {
                     "root//fork/pkg:pkg".to_string(),
                 )]
                 .into(),
+                root: String::new(),
             };
             self.write_index(&format!("go-index-{version}.json"), &index)
+        }
+
+        /// A Solidity cell index (ADR 0011): forge-std at `version`, whose
+        /// store path holds `src/Test.sol` and its own rules.star, exposed
+        /// at vendor/forge-std, with `root` as the root package's build file
+        fn sol_index(&self, version: &str, root: &str) -> String {
+            let store = self.store_path(&format!("eee-dep-sol-forge_std-{version}"));
+            std::fs::create_dir_all(Path::new(&store).join("src")).unwrap();
+            std::fs::write(Path::new(&store).join("src/Test.sol"), version).unwrap();
+            std::fs::write(Path::new(&store).join(BUILD_FILE), "filegroup()\n").unwrap();
+            let mut forge_std = package(&store, "", &["forge_std", "forge_std_all"]);
+            forge_std.expose = true;
+            let index = Index {
+                cell: "soldeps".into(),
+                deps_file_sha256: format!("sha-{version}"),
+                buckconfig: "[cells]\n    soldeps = .\n".into(),
+                packages: [("vendor/forge-std".to_string(), forge_std)].into(),
+                aliases: BTreeMap::new(),
+                forwards: BTreeMap::new(),
+                root: root.into(),
+            };
+            self.write_index(&format!("sol-index-{version}-{}.json", root.len()), &index)
         }
 
         fn materialize(&self, index: &str) -> Outcome {
@@ -482,6 +587,7 @@ mod tests {
             store: store.into(),
             subdir: subdir.into(),
             targets: targets.iter().map(|t| t.to_string()).collect(),
+            expose: false,
         }
     }
 
@@ -509,6 +615,15 @@ mod tests {
             "[cells]\n    rustdeps = .\n"
         );
         assert_eq!(f.read("rustdeps", ".deps-file-sha256"), "sha-1.0.100\n");
+        // No root package, and nothing but alias packages' build files
+        // under vendor/
+        assert!(!f.cell("rustdeps", "rules.star").exists());
+        assert_eq!(
+            std::fs::read_dir(f.cell("rustdeps", "vendor/anyhow"))
+                .unwrap()
+                .count(),
+            1
+        );
     }
 
     #[test]
@@ -865,6 +980,96 @@ mod tests {
             err.to_string()
                 .contains("alias a forwards to b, which it doesn't list"),
             "{err}"
+        );
+    }
+
+    const ROOT: &str = "filegroup(name = \"bundle\")\n";
+
+    #[test]
+    fn writes_rewrites_and_removes_the_root_package() {
+        let f = Fixture::new();
+        let outcome = f.materialize(&f.sol_index("1.8.0", ROOT));
+        assert_eq!(outcome.root_writes, 1, "{outcome:?}");
+        assert_eq!(f.read("soldeps", "rules.star"), ROOT);
+
+        // Unchanged: not rewritten
+        let outcome = f.materialize(&f.sol_index("1.8.0", ROOT));
+        assert!(!outcome.changed(), "{outcome:?}");
+
+        let rewritten = format!("{ROOT}alias(name = \"forge_std\")\n");
+        let outcome = f.materialize(&f.sol_index("1.8.0", &rewritten));
+        assert_eq!(
+            (outcome.root_writes, outcome.root_gone),
+            (1, false),
+            "{outcome:?}"
+        );
+        assert_eq!(f.read("soldeps", "rules.star"), rewritten);
+
+        // An index without a root package removes it
+        let outcome = f.materialize(&f.sol_index("1.8.0", ""));
+        assert!(outcome.root_gone, "{outcome:?}");
+        assert!(!f.cell("soldeps", "rules.star").exists());
+        let outcome = f.materialize(&f.sol_index("1.8.0", ""));
+        assert!(!outcome.changed(), "{outcome:?}");
+    }
+
+    #[test]
+    fn links_an_exposed_packages_entries_beside_its_alias() {
+        let f = Fixture::new();
+        let outcome = f.materialize(&f.sol_index("1.8.0", ROOT));
+        assert_eq!(
+            (outcome.store_links_added, outcome.entries_linked),
+            (1, 1),
+            "{outcome:?}"
+        );
+        // The store path's own build file stays behind the alias package's
+        let want = format!(
+            "{GENERATED_HEADER}{}\n{}\n",
+            r#"alias(name = "forge_std", actual = "//_store/eee-dep-sol-forge_std-1.8.0:forge_std", visibility = ["PUBLIC"])"#,
+            r#"alias(name = "forge_std_all", actual = "//_store/eee-dep-sol-forge_std-1.8.0:forge_std_all", visibility = ["PUBLIC"])"#,
+        );
+        assert_eq!(f.read("soldeps", "vendor/forge-std/rules.star"), want);
+        assert_eq!(f.read("soldeps", "vendor/forge-std/src/Test.sol"), "1.8.0");
+
+        // A bump follows the new store path, and removes the old one's
+        // entries
+        let old = f.store.join("eee-dep-sol-forge_std-1.8.0");
+        std::fs::create_dir_all(old.join("gone")).unwrap();
+        f.materialize(&f.sol_index("1.8.0", ROOT));
+        assert!(f.cell("soldeps", "vendor/forge-std/gone").exists());
+        let new = f.sol_index("1.9.0", ROOT);
+        let outcome = f.materialize(&new);
+        assert_eq!(
+            (
+                outcome.store_links_added,
+                outcome.store_links_gone,
+                outcome.entries_linked
+            ),
+            (1, 1, 1),
+            "{outcome:?}"
+        );
+        assert_eq!(f.read("soldeps", "vendor/forge-std/src/Test.sol"), "1.9.0");
+        assert!(std::fs::symlink_metadata(f.cell("soldeps", "vendor/forge-std/gone")).is_err());
+        assert!(!f.materialize(&new).changed());
+    }
+
+    #[test]
+    fn a_path_at_the_cell_root_is_in_no_package() {
+        let f = Fixture::new();
+        let index = read_index(Path::new(&f.sol_index("1.8.0", ROOT))).unwrap();
+        assert_eq!(index.root, ROOT);
+        assert_eq!(
+            index.resolve("rules.star"),
+            Err(ResolveError::NotInCell {
+                path: "rules.star".into(),
+                cell: "soldeps".into(),
+            })
+        );
+        assert_eq!(
+            index
+                .resolve("vendor/forge-std/src/Test.sol")
+                .map(|r| r.root),
+            Ok("vendor/forge-std".to_string())
         );
     }
 }

@@ -305,7 +305,8 @@ Git-ignore forge's `/out/` and `/cache/`.
 
 Imports resolve through the root `remappings.txt` that `tk sync` generates
 (see [Remappings](#remappings)), into the `soldeps` cell's `vendor/` directory
-(`libs`). Automatic remapping detection is off, so forge does not guess
+(`libs`), where each package's files are linked beside its alias package
+(see [The Go, Rust and Solidity Cells Are Real Directories](../workflows/dependencies.md#the-go-rust-and-solidity-cells-are-real-directories)). Automatic remapping detection is off, so forge does not guess
 remappings of its own.
 
 **The compiler comes from the dev shell.** `foundry.toml` sets neither `solc`

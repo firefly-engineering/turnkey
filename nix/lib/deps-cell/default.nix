@@ -72,6 +72,12 @@ let
   # path. Each referenced import path a member (members: module path -> its
   # directory in the project) owns becomes a forwarding alias package, to
   # its package in rootCell.
+  #
+  # root, when set, is the text of the cell root package's build file,
+  # which the materializer writes as is (ADR 0011: the Solidity cell's
+  # bundle and per-package aliases). expose links each package's store
+  # entries into its alias package too, for native tools reading the cell
+  # in place (forge, through the root remappings.txt).
   mkCellIndex =
     {
       cellName,
@@ -81,6 +87,8 @@ let
       modules ? { },
       members ? { },
       rootCell ? null,
+      root ? null,
+      expose ? false,
     }:
     pkgs.runCommand "${cellName}-index.json"
       {
@@ -90,12 +98,17 @@ let
             cell = cellName;
             deps_file_sha256 = builtins.hashFile "sha256" depsFile;
             buckconfig = cellBuckconfig cellName;
-            packages = lib.mapAttrs (_: package: {
-              store = "${package}";
-              targets = "${package.targets}";
-            }) packages;
+            packages = lib.mapAttrs (
+              _: package:
+              {
+                store = "${package}";
+                targets = "${package.targets}";
+              }
+              // lib.optionalAttrs expose { expose = true; }
+            ) packages;
             inherit aliases;
           }
+          // lib.optionalAttrs (root != null) { inherit root; }
           // lib.optionalAttrs (modules != { }) {
             modules = lib.mapAttrs (_: module: {
               store = "${module}";

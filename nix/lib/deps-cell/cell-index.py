@@ -13,6 +13,10 @@ path that no package provides and a go.work member owns (members: module
 path -> directory) becomes a forwarding alias package, to the member's
 package in the root cell.
 
+A spec's root (the Solidity cell's, ADR 0011) is the cell root package's
+build file, and a package's expose links its store entries into its alias
+package; both are carried over as they are.
+
 Usage: cell-index.py <spec_json>   (the index is printed)
 """
 
@@ -83,7 +87,7 @@ def main() -> None:
     spec = json.loads(Path(sys.argv[1]).read_text())
     spec["packages"] = {
         path: {
-            "store": package["store"],
+            **package,
             "targets": sorted(Path(package["targets"]).read_text().split()),
         }
         for path, package in spec["packages"].items()

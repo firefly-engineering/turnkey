@@ -1,16 +1,25 @@
 # Solidity Language Adapter for Dependency Cells
 #
 # Provides:
-#   - mkSolDepPackage: Build a single Solidity dependency (npm or git)
-#   - mkSolDepsCell: Build a complete Solidity dependency cell
+#   - mkSolDepPackage: Build a single Solidity dependency (npm or git): its
+#     source with its fixup and user patches applied, and its own rules.star
+#   - mkSolDepsCell: The Solidity dependency cell's cell index (ADR 0004,
+#     ADR 0011)
 #
 # Solidity dependencies can come from:
 #   - npm: Packages like @openzeppelin/contracts
 #   - git: Foundry-style git dependencies (forge-std, solady, etc.)
 #
+# Each package is its own derivation; tk materialize lays them out as the
+# cell the index describes, one alias package per package at vendor/<name>
+# and the root package (`bundle` and an alias per package) from the index's
+# `root`.
+#
 # The cell writes no remappings: the Buck2 Solidity rules stage its `bundle`
 # at the cell link's path (.turnkey/soldeps) and read the repository's root
-# remappings.txt, whose targets point there, as native forge does.
+# remappings.txt, whose targets point there, as native forge does. Native
+# forge reads the cell in place, so each package's files are linked into
+# its alias package too (the index's `expose`).
 
 {
   pkgs,
@@ -20,14 +29,14 @@
 
 let
   fetchers = import ../fetchers.nix { inherit pkgs lib; };
-  inherit (genericBuilder) genericMkDepsCell;
+  inherit (genericBuilder) mkCellIndex;
+
+  # Sanitize name for Buck target (replace @ and / with _)
+  sanitizeName = name: lib.replaceStrings [ "@" "/" "-" ] [ "" "_" "_" ] name;
 in
 rec {
   # Build inputs for per-dependency builds
   buildInputs = [ ];
-
-  # Build inputs for cell builds
-  cellBuildInputs = [ ];
 
   # ==========================================================================
   # Public API
@@ -51,6 +60,11 @@ rec {
 
       # Optional
       fixup ? null, # Custom fixup commands
+
+      # The user's patches of this package (tk compose patch), in order. They
+      # name files as a/vendor/<name>/..., and apply after the fixup; one
+      # that doesn't apply fails the package.
+      userPatches ? [ ],
     }:
     let
       # Fetch spec based on source type
@@ -77,8 +91,11 @@ rec {
         else
           throw "Unknown source type: ${source}";
 
-      # Sanitize name for Buck target (replace @ and / with _)
-      targetName = lib.replaceStrings [ "@" "/" "-" ] [ "" "_" "_" ] name;
+      targetName = sanitizeName name;
+
+      # a/vendor/<name>/...: a/, vendor/ and the name's segments (a scoped
+      # npm package's name has two)
+      strip = 2 + lib.length (lib.splitString "/" name);
 
       # Generate BUCK file content
       buckContent = ''
@@ -101,8 +118,14 @@ rec {
     in
     pkgs.runCommand "dep-sol-${targetName}-${version}"
       {
-        nativeBuildInputs = buildInputs;
+        nativeBuildInputs = buildInputs ++ lib.optional (userPatches != [ ]) pkgs.patch;
         src = fetchers.fetch fetchSpec;
+        # The `targets` output lists the rules.star's target names, one per
+        # line, for the cell index
+        outputs = [
+          "out"
+          "targets"
+        ];
         passthru = {
           inherit
             name
@@ -111,30 +134,93 @@ rec {
             ;
         };
       }
-      ''
-        mkdir -p $out
+      (
+        ''
+          mkdir -p $out
 
-        # Handle different source types
-        if [[ -d $src ]]; then
-          # Git checkout - copy directly
-          cp -r $src/* $out/ 2>/dev/null || cp -r $src/. $out/
-        else
-          # npm tarball - extract with strip-components
-          tar -xzf $src --strip-components=1 -C $out 2>/dev/null || tar -xf $src --strip-components=1 -C $out
-        fi
-        chmod -R u+w $out
+          # Handle different source types
+          if [[ -d $src ]]; then
+            # Git checkout - copy directly
+            cp -r $src/* $out/ 2>/dev/null || cp -r $src/. $out/
+          else
+            # npm tarball - extract with strip-components
+            tar -xzf $src --strip-components=1 -C $out 2>/dev/null || tar -xf $src --strip-components=1 -C $out
+          fi
+          chmod -R u+w $out
 
-        # Apply fixup if provided
-        cd $out
-        ${if fixup != null then fixup else ""}
+          # Apply fixup if provided
+          cd $out
+          ${if fixup != null then fixup else ""}
+        ''
+        + lib.concatMapStrings (patchFile: ''
 
-        # Generate rules.star file
-        cat > $out/rules.star << 'RULES'
-        ${buckContent}
-        RULES
-      '';
+          # The user's patch ${baseNameOf patchFile}
+          patch -d $out -p${toString strip} --forward --fuzz=0 < ${patchFile} || {
+            echo "error: user patch ${baseNameOf patchFile} does not apply to ${name}@${version}"
+            echo "  (regenerate it with 'tk compose patch', or remove it)"
+            exit 1
+          }
+        '') userPatches
+        + ''
 
-  # Build a complete Solidity dependency cell
+          # Generate rules.star file
+          cat > $out/rules.star << 'RULES'
+          ${buckContent}
+          RULES
+          printf '%s\n' ${
+            lib.escapeShellArgs [
+              targetName
+              "${targetName}_all"
+            ]
+          } > $targets
+        ''
+      );
+
+  # The user's patches of each locked package, keyed by name, from
+  # <dir>/<cellName>/vendor/<name>/*.patch as tk compose patch writes them
+  # (in name order). A directory holding patches must be a locked
+  # package's: a scoped npm package's is vendor/@<scope>/<name>/.
+  userPatchesOf =
+    {
+      dir,
+      cellName,
+      names,
+    }:
+    let
+      cellDir = dir + "/${cellName}";
+      entries = if dir != null && builtins.pathExists cellDir then builtins.readDir cellDir else { };
+      flat = lib.filter (name: entries.${name} != "directory") (lib.attrNames entries);
+      # Each directory under vendor/ holding patches, by its path there
+      patchDirs =
+        rel: path:
+        let
+          dirEntries = builtins.readDir path;
+          patches = lib.sort (a: b: a < b) (
+            lib.attrNames (
+              lib.filterAttrs (name: type: type == "regular" && lib.hasSuffix ".patch" name) dirEntries
+            )
+          );
+          subdirs = lib.attrNames (lib.filterAttrs (_: type: type == "directory") dirEntries);
+        in
+        lib.optionalAttrs (patches != [ ]) { ${rel} = map (name: path + "/${name}") patches; }
+        // lib.foldl' (
+          acc: sub: acc // patchDirs (if rel == "" then sub else "${rel}/${sub}") (path + "/${sub}")
+        ) { } subdirs;
+      found = if (entries.vendor or null) == "directory" then patchDirs "" (cellDir + "/vendor") else { };
+      unknown = lib.filter (name: !builtins.elem name names) (lib.attrNames found);
+    in
+    if flat != [ ] then
+      throw "turnkey: user patches for ${cellName} go under ${cellName}/vendor/<name>/, one directory per package (tk compose patch writes them there); move or regenerate: ${lib.concatStringsSep ", " flat}"
+    else if unknown != [ ] then
+      throw "turnkey: user patches under ${cellName}/vendor/${lib.head unknown}/: ${cellName} locks no such package (patches go in their package's own directory, vendor/<name>/)"
+    else
+      found;
+
+  # Build the Solidity dependency cell (ADR 0004, ADR 0011): each locked
+  # package's own derivation (mkSolDepPackage), and the cell index that tk
+  # materialize keeps .turnkey/<cellName> in line with. The result is the
+  # index, with depPackages (each package's derivation, keyed by name) and
+  # index (itself) alongside.
   mkSolDepsCell =
     {
       cellName, # The cell's name (nix/buck2/languages.nix)
@@ -144,11 +230,17 @@ rec {
       # The locked dependencies' fixups: [ { key; name; version; } ] ->
       # { fixups = { <key> = { commands; }; }; } (nix/lib/fixups's resolve)
       resolveFixups ? (_: { fixups = { }; }),
-      userPatchesDir ? null, # Path to .turnkey/patches directory (from FUSE edit layer)
+      # The user's patches (tk compose patch): <dir>/<cellName>/vendor/<name>/
+      userPatchesDir ? null,
     }:
     let
       depsToml = builtins.fromTOML (builtins.readFile depsFile);
       packages = depsToml.package or [ ];
+
+      # The cell holds one version per name (ADR 0011; soldeps-gen writes
+      # one entry per name)
+      names = map (pkg: pkg.name) packages;
+      duplicates = lib.filter (name: lib.count (n: n == name) names > 1) (lib.unique names);
 
       # The locked packages' fixups
       resolvedFixups = resolveFixups (
@@ -159,6 +251,11 @@ rec {
       );
 
       fixups = resolvedFixups.fixups;
+
+      userPatches = userPatchesOf {
+        dir = userPatchesDir;
+        inherit cellName names;
+      };
 
       # Build individual dep packages
       depPackages = builtins.listToAttrs (
@@ -172,14 +269,12 @@ rec {
             rev = pkg.rev or null;
             hash = pkg.hash or null;
             fixup = fixups.${pkg.name}.commands or "";
+            userPatches = userPatches.${pkg.name} or [ ];
           };
         }) packages
       );
 
-      # Sanitize name for Buck target
-      sanitizeName = name: lib.replaceStrings [ "@" "/" "-" ] [ "" "_" "_" ] name;
-
-      # Generate root BUCK file for the cell
+      # The root package's rules.star, which the index carries
       #
       # `bundle` lays out every vendor package at its vendor/<name> path, as in
       # the cell. The Solidity rules stage it at the cell link's path, where the
@@ -213,16 +308,18 @@ rec {
           ''
         ) packages}
       '';
+
+      # Each package at vendor/<name>, unversioned, with its files linked
+      # beside its alias package for native forge
+      index = mkCellIndex {
+        inherit cellName depsFile;
+        packages = lib.mapAttrs' (name: lib.nameValuePair "vendor/${name}") depPackages;
+        aliases = { };
+        root = rootBuckContent;
+        expose = true;
+      };
     in
-    genericMkDepsCell {
-      inherit
-        cellName
-        depPackages
-        rootBuckContent
-        userPatchesDir
-        ;
-      # Packages live at vendor/<name>, unversioned, so no symlinks
-      keyToPath = name: name;
-      cellBuildInputs = cellBuildInputs;
-    };
+    assert lib.assertMsg (duplicates == [ ])
+      "turnkey: ${toString depsFile} declares more than one ${lib.concatStringsSep ", " duplicates}; the soldeps cell holds one version per name, regenerate it with tk sync";
+    index // { inherit depPackages index; };
 }

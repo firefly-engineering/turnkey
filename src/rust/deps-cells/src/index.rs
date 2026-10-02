@@ -34,6 +34,15 @@ pub struct Index {
         skip_serializing_if = "BTreeMap::is_empty"
     )]
     pub forwards: BTreeMap<String, String>,
+    /// The cell root package's build file, written as is; empty for a cell
+    /// with no root package. A path at the cell root is in no package to
+    /// compose.
+    #[serde(
+        default,
+        deserialize_with = "nullable",
+        skip_serializing_if = "String::is_empty"
+    )]
+    pub root: String,
 }
 
 /// One package of the cell
@@ -52,6 +61,19 @@ pub struct Package {
     /// Its targets
     #[serde(default, deserialize_with = "nullable")]
     pub targets: Vec<String>,
+    /// Whether its store path's entries are also linked into its alias
+    /// package, for tools that read the cell in place rather than through
+    /// buck2 (native forge, through the root remappings.txt)
+    #[serde(
+        default,
+        deserialize_with = "nullable",
+        skip_serializing_if = "is_false"
+    )]
+    pub expose: bool,
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
 }
 
 /// A `null` decodes as the zero value, as `encoding/json` decodes it into

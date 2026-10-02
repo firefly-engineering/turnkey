@@ -246,6 +246,55 @@ Built by the Python adapter, `nix/lib/deps-cell/adapters/python.nix`.
 2. Fetches wheels from PyPI
 3. Generates rules.star per package
 
+## Solidity Dependency Cell
+
+Built by the Solidity adapter, `nix/lib/deps-cell/adapters/solidity.nix`.
+Like the Go and Rust cells, it is a write-once cell
+([ADR 0004](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0004-deps-cells-are-write-once-directories.md),
+[ADR 0011](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0011-soldeps-stores-one-package-per-store-link.md)),
+and the first whose users address its root package.
+
+### Cell Structure
+
+```
+.turnkey/soldeps/
+├── .buckconfig
+├── .deps-file-sha256                 # the solidity-deps.toml it was built from
+├── rules.star                        # bundle and one alias per package, from the index's root
+├── _store/
+│   └── <hash>-dep-sol-forge_std-1.8.0 -> /nix/store/<hash>-dep-sol-forge_std-1.8.0
+│       └── rules.star                # forge_std (.sol files) and forge_std_all filegroups
+└── vendor/
+    └── forge-std/
+        ├── rules.star                # alias -> //_store/<hash>-dep-sol-forge_std-1.8.0:forge_std(_all)
+        └── src -> /nix/store/<hash>-dep-sol-forge_std-1.8.0/src   # for native forge
+```
+
+### Process
+
+1. `tk sync` runs soldeps-gen, which writes one `[[package]]` per name to
+   solidity-deps.toml (a name declared twice resolves to one package, or
+   fails), and the root `remappings.txt`.
+2. Nix builds one package per Solidity package (`mkSolDepPackage`): the npm
+   tarball or git archive, its fixup, its user patches
+   (`.turnkey/patches/soldeps/vendor/<name>/`), and its `rules.star`. Its
+   `targets` output lists `<target>` and `<target>_all`.
+3. `mkCellIndex` builds the cell index: one package per Solidity package at
+   `vendor/<name>`, with no version aliases, and `root`, the root
+   package's `rules.star`: `bundle`, which maps each `vendor/<name>` to
+   `//vendor/<name>:<target>_all`, and an alias per package. Packages are
+   `expose`d.
+4. The shell runs `tk materialize` with the index. It writes `root` as it
+   is, as it writes `.buckconfig`, and links each exposed package's store
+   entries beside its alias package's `rules.star`. Native forge reads the
+   cell in place through the root `remappings.txt`, so it needs the files
+   at `vendor/<name>/`. Those links follow a bump to the new store path;
+   buck2 never reads through them, since the alias package globs nothing.
+
+A bump rebuilds the bumped package's derivation and the index. Every
+Solidity action stages the whole `bundle`, so they all re-run, and no
+action of another language does.
+
 ## Cell Configuration
 
 Each cell gets a `.buckconfig`:

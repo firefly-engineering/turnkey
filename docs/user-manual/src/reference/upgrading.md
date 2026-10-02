@@ -2,6 +2,39 @@
 
 What changes when a project moves to a newer turnkey, and what to do about it.
 
+## The per-package Solidity cell
+
+The Solidity dependency cell is now built one package per Solidity package,
+and laid out by `tk materialize` as a real directory, `.turnkey/soldeps`,
+instead of one symlink to a merged cell
+([ADR 0004](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0004-deps-cells-are-write-once-directories.md),
+[ADR 0011](https://github.com/firefly-engineering/turnkey/blob/main/docs/adr/0011-soldeps-stores-one-package-per-store-link.md)).
+Labels (`soldeps//:<package>`, `soldeps//:bundle`), the root
+`remappings.txt` and native `forge` are unchanged. A package bump no longer
+restarts the buck2 daemon: it re-runs the Solidity actions, and nothing in
+another language. Plain `buck2` reads the new version.
+
+### Switching over
+
+- **The first shell load** after upgrading replaces the `.turnkey/soldeps`
+  symlink with the directory. `tk` restarts the buck2 daemon once, and the
+  next build is a full one. Nothing else needs doing.
+- **A name declared twice** (in `foundry.toml` and `package.json`, or in
+  both `dependencies` and `devDependencies`) must resolve to one package:
+  `tk sync` writes it once, or fails naming each declaration when they
+  differ. The cell holds one version per name.
+- **User patches move.** They go under
+  `.turnkey/patches/soldeps/vendor/<name>/`, one directory per package, and
+  apply in that package's own derivation. A patch file directly under
+  `.turnkey/patches/soldeps/` fails evaluation with where to move it. See
+  [Dependency Fixups](../workflows/fixups.md).
+
+### Rolling back
+
+```bash
+rm -rf .turnkey/soldeps .turnkey/soldeps.lock .turnkey/gcroots/soldeps
+```
+
 ## The per-module Go cell
 
 The Go dependency cell is now built one package per module, and laid out by

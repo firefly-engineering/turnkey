@@ -138,7 +138,7 @@ impl Layout for MyLayout {
 
 #### Write-once deps cells are served from the source pass-through
 
-A write-once deps cell ([ADR 0004](../adr/0004-deps-cells-are-write-once-directories.md)) is a real directory in the repo, `.turnkey/<cell>`, which `tk materialize` keeps in line with its cell index. Today those are the Go and Rust cells. The composition layer doesn't serve it from a store path:
+A write-once deps cell ([ADR 0004](../adr/0004-deps-cells-are-write-once-directories.md)) is a real directory in the repo, `.turnkey/<cell>`, which `tk materialize` keeps in line with its cell index. Today those are the Go, Rust and Solidity cells. The composition layer doesn't serve it from a store path:
 
 - **Discovery:** a `.turnkey/<cell>` that is a real directory holding the materializer's marker (`.deps-file-sha256`) counts as write-once. Its `<cell>-cell` flake export is neither built nor served.
 - **Layout:** `Buck2Layout` maps the cell into the source pass-through, `<cell> = root/.turnkey/<cell>`, rather than to `external/<cell>`. Its store links reach buck2 as absolute symlinks, as they do without the mount, so each package keeps its own key. On macOS the cell is a directory, never a symlink.
@@ -582,12 +582,13 @@ root Rust targets re-ran all 1184 actions after a one-crate bump
 `buck2` callers get no check at all, and can build against a retargeted
 cell's stale inputs.
 
-The Go and Rust cells no longer need this: they are write-once cells
-([ADR 0004](../adr/0004-deps-cells-are-write-once-directories.md)), whose
-store links are never retargeted, so a bump recompiles only the changed
-module's or crate's dependents, with no kill, and plain `buck2` reads them
-correctly. The other deps cells are still symlinks and still rely on
-`cellfresh`.
+The Go, Rust and Solidity cells no longer need this: they are write-once
+cells ([ADR 0004](../adr/0004-deps-cells-are-write-once-directories.md)),
+whose store links are never retargeted, so a bump recompiles only the
+changed module's or crate's dependents (every Solidity action, for a
+Solidity package: [ADR 0011](../adr/0011-soldeps-stores-one-package-per-store-link.md)),
+with no kill, and plain `buck2` reads them correctly. The other deps cells
+are still symlinks and still rely on `cellfresh`.
 
 #### Strategy 2: Sideband journal API (recommended, EdenFS pattern)
 

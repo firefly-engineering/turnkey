@@ -1,0 +1,6 @@
+--- a/vendor/forge-std/src/Test.sol
++++ b/vendor/forge-std/src/Test.sol
+@@ -1,2 +1,3 @@
+ // SPDX-License-Identifier: MIT
++// Patched.
+ pragma solidity >=0.6.2 <0.9.0;
