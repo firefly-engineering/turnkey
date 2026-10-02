@@ -146,35 +146,41 @@ assert_file_not_contains() {
 
 # Assert command output contains a pattern
 # Usage: assert_output_contains "command" "pattern" ["optional message"]
+#
+# The command is eval'd, so pass captured output unexpanded and let eval
+# expand it: assert_output_contains 'printf "%s\n" "$output"' "pattern".
+# Expanding it into the string first breaks on any quote it holds. The
+# locals are prefixed so they don't shadow the caller's variables in eval.
 assert_output_contains() {
-  local cmd="$1"
-  local pattern="$2"
-  local msg="${3:-Output of '$cmd' should contain: $pattern}"
-  local output
-  output=$(eval "$cmd" 2>&1) || true
-  if echo "$output" | grep -q "$pattern"; then
-    _assert_pass "$msg"
+  local _ao_cmd="$1"
+  local _ao_pattern="$2"
+  local _ao_msg="${3:-Output of '$_ao_cmd' should contain: $_ao_pattern}"
+  local _ao_output
+  _ao_output=$(eval "$_ao_cmd" 2>&1) || true
+  if printf '%s\n' "$_ao_output" | grep -q "$_ao_pattern"; then
+    _assert_pass "$_ao_msg"
     return 0
   else
-    _assert_fail "$msg"
+    _assert_fail "$_ao_msg"
     echo "Actual output:" >&2
-    echo "$output" | head -20 >&2
+    printf '%s\n' "$_ao_output" | head -20 >&2
     return 1
   fi
 }
 
 # Assert command output does NOT contain a pattern
+# Usage: as assert_output_contains
 assert_output_not_contains() {
-  local cmd="$1"
-  local pattern="$2"
-  local msg="${3:-Output of '$cmd' should not contain: $pattern}"
-  local output
-  output=$(eval "$cmd" 2>&1) || true
-  if echo "$output" | grep -q "$pattern"; then
-    _assert_fail "$msg"
+  local _ao_cmd="$1"
+  local _ao_pattern="$2"
+  local _ao_msg="${3:-Output of '$_ao_cmd' should not contain: $_ao_pattern}"
+  local _ao_output
+  _ao_output=$(eval "$_ao_cmd" 2>&1) || true
+  if printf '%s\n' "$_ao_output" | grep -q "$_ao_pattern"; then
+    _assert_fail "$_ao_msg"
     return 1
   else
-    _assert_pass "$msg"
+    _assert_pass "$_ao_msg"
     return 0
   fi
 }

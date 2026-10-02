@@ -148,6 +148,6 @@ output=$(run_in_devshell_script_capture << 'PHASE3'
 PHASE3
 )
 echo "$output" | tail -5
-assert_output_contains "echo '$output'" "Hello from turnkey" || exit 1
+assert_output_contains 'printf "%s\n" "$output"' "Hello from turnkey" || exit 1
 
 section "PASS: Language-native tools stay in sync"

@@ -208,8 +208,8 @@ PHASE3
 echo "$output" | tail -15
 
 # Verify outputs
-assert_output_contains "echo '$output'" "Go: Hello" || exit 1
-assert_output_contains "echo '$output'" "Python: Hello" || exit 1
-assert_output_contains "echo '$output'" "TypeScript: Hello" || exit 1
+assert_output_contains 'printf "%s\n" "$output"' "Go: Hello" || exit 1
+assert_output_contains 'printf "%s\n" "$output"' "Python: Hello" || exit 1
+assert_output_contains 'printf "%s\n" "$output"' "TypeScript: Hello" || exit 1
 
 section "PASS: Multi-language monorepo (Go + Rust + Python + TypeScript)"

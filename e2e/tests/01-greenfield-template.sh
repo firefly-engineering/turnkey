@@ -83,6 +83,6 @@ PHASE2
 echo "$output" | tail -5
 
 # Step 9: Verify output
-assert_output_contains "echo '$output'" "Hello from turnkey" || exit 1
+assert_output_contains 'printf "%s\n" "$output"' "Hello from turnkey" || exit 1
 
 section "PASS: Greenfield project from template"

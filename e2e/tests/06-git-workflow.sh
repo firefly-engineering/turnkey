@@ -104,7 +104,7 @@ output=$(run_in_devshell_script_capture << 'PHASE2'
 PHASE2
 )
 echo "$output" | tail -5
-assert_output_contains "echo '$output'" "UUID:" || exit 1
+assert_output_contains 'printf "%s\n" "$output"' "UUID:" || exit 1
 
 # Save main branch dep count for comparison
 main_deps_count=$(grep -c '^\[deps\.' go-deps.toml || echo 0)
