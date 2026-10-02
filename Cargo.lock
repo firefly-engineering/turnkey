@@ -3617,6 +3617,7 @@ dependencies = [
  "composition",
  "ctrlc",
  "env_logger",
+ "libc",
  "log",
  "nix-eval",
  "serde",

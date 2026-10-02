@@ -147,6 +147,11 @@ turnkey-composed uninstall
 # - Watches for config and manifest changes
 ```
 
+A buck2 daemon keeps the mount it started on. When `turnkey-composed`
+mounts with FUSE, it kills the buck2 daemons of the projects inside the
+mount point, so a restarted service needs no `buck2 kill`: the next buck2
+command starts a fresh daemon.
+
 ## How Cell Discovery Works
 
 On startup, `turnkey-composed`:

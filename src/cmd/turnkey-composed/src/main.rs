@@ -18,10 +18,11 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use composition::buckd;
 use composition::compose_config::ComposeFile;
 use composition::discover;
 use composition::watcher::{ManifestWatcher, WatcherConfig, WatcherEvent};
-use composition::{BackendType, CompositionConfig, create_backend};
+use composition::{BackendType, CompositionConfig, create_backend, select_backend};
 use log::{debug, error, info, warn};
 use nix_eval::CliNixClient;
 use serde::{Deserialize, Serialize};
@@ -375,6 +376,7 @@ fn run_serve(config_path: &Path) -> Result<()> {
         }
 
         // Create and mount backend
+        let backend_type = resolve_backend(backend_type);
         let mut backend = create_backend(backend_type, composition_config)
             .with_context(|| format!("Failed to create backend for {:?}", entry.repo))?;
 
@@ -387,6 +389,7 @@ fn run_serve(config_path: &Path) -> Result<()> {
             .with_context(|| format!("Mount timed out for {:?}", entry.mount_point))?;
 
         info!("Mounted {:?} at {:?}", entry.repo, entry.mount_point);
+        after_mount(backend_type, &entry.mount_point);
 
         let backend = Arc::new(std::sync::Mutex::new(backend));
         backends.push(backend.clone());
@@ -528,8 +531,10 @@ fn run_serve(config_path: &Path) -> Result<()> {
                                             entry.mount_point.display()
                                         );
 
-                                        let backend_type = BackendType::from_str(&entry.backend)
-                                            .unwrap_or(BackendType::Auto);
+                                        let backend_type = resolve_backend(
+                                            BackendType::from_str(&entry.backend)
+                                                .unwrap_or(BackendType::Auto),
+                                        );
 
                                         #[cfg(target_os = "macos")]
                                         if let Err(e) = composition::synthetic::ensure_mount_point(
@@ -564,6 +569,10 @@ fn run_serve(config_path: &Path) -> Result<()> {
                                                             info!(
                                                                 "Mounted new entry: {:?}",
                                                                 entry.mount_point
+                                                            );
+                                                            after_mount(
+                                                                backend_type,
+                                                                &entry.mount_point,
                                                             );
                                                             backends.push(Arc::new(
                                                                 std::sync::Mutex::new(backend),
@@ -619,6 +628,88 @@ fn run_serve(config_path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Where buck2 keeps its per-user state, buckd's records of its daemons
+/// among it (`~/.buck`); None without a home directory
+fn buck_home() -> Option<PathBuf> {
+    std::env::home_dir().map(|home| home.join(".buck"))
+}
+
+/// The backend create_backend makes for requested, Auto resolved
+fn resolve_backend(requested: BackendType) -> BackendType {
+    let selection = select_backend(requested);
+    info!("Backend selection: {}", selection.reason);
+    selection.backend_type
+}
+
+/// Called once a backend of backend_type is mounted at mount_point. A FUSE
+/// mount replaces whatever was mounted there before, and a buck2 daemon on
+/// a project inside it still holds that one: buck2 fails until the daemon
+/// is killed (#19). Kill it; the next buck2 command starts a fresh one.
+fn after_mount(backend_type: BackendType, mount_point: &Path) {
+    if backend_type != BackendType::Fuse {
+        return;
+    }
+    let Some(buck_home) = buck_home() else {
+        warn!(
+            "No home directory: not looking for buck2 daemons on {}",
+            mount_point.display()
+        );
+        return;
+    };
+    for daemon in buckd::daemons_under(&buck_home, mount_point) {
+        // The daemon may have exited, and its pid gone to another process
+        if !process_args(daemon.pid)
+            .is_some_and(|args| buckd::is_daemon_command(&args, &daemon.isolation))
+        {
+            debug!(
+                "buck2 daemon {} on {} is not running",
+                daemon.pid,
+                daemon.project_root.display()
+            );
+            continue;
+        }
+        let Ok(pid) = libc::pid_t::try_from(daemon.pid) else {
+            continue;
+        };
+        // SAFETY: kill(2) only sends a signal; pid is a buck2 daemon's
+        if unsafe { libc::kill(pid, libc::SIGKILL) } == 0 {
+            info!(
+                "Killed buck2 daemon {} on {}: it held the previous mount",
+                pid,
+                daemon.project_root.display()
+            );
+        } else {
+            warn!(
+                "Failed to kill buck2 daemon {} on {}: {}. Run `buck2 kill` there.",
+                pid,
+                daemon.project_root.display(),
+                std::io::Error::last_os_error()
+            );
+        }
+    }
+}
+
+/// A process's command line, its words separated by spaces; None when
+/// there is no such process
+fn process_args(pid: u32) -> Option<String> {
+    #[cfg(target_os = "linux")]
+    {
+        let cmdline = std::fs::read(format!("/proc/{pid}/cmdline")).ok()?;
+        Some(String::from_utf8_lossy(&cmdline).replace('\0', " "))
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let output = std::process::Command::new("/bin/ps")
+            .args(["-p", &pid.to_string(), "-o", "args="])
+            .output()
+            .ok()?;
+        output
+            .status
+            .success()
+            .then(|| String::from_utf8_lossy(&output.stdout).into_owned())
+    }
+}
+
 /// Run the daemon process (single mount)
 fn run_daemon(
     socket_path: &PathBuf,
@@ -663,6 +754,7 @@ fn run_daemon(
     );
 
     // Create backend using automatic selection
+    let backend_type = resolve_backend(backend_type);
     let mut backend =
         create_backend(backend_type, config).context("Failed to create composition backend")?;
 
@@ -677,6 +769,7 @@ fn run_daemon(
         .context("FUSE mount timed out")?;
 
     info!("FUSE filesystem mounted and ready");
+    after_mount(backend_type, &mount_point);
 
     // Set up manifest watcher if enabled
     let watcher = if enable_watch {

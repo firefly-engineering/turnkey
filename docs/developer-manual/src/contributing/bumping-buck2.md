@@ -106,7 +106,23 @@ tk test //...        # every test is reported as recorded (reused without runnin
 Check that recorded results also work from a second checkout of the same
 commit.
 
-## 6. Run the CI gates locally
+## 6. Check the daemon records turnkey-composed reads
+
+After a FUSE mount, `turnkey-composed` kills the buck2 daemons of the
+projects inside the mount point. It finds them from buck2's own records,
+not through buck2 (`src/rust/composition/src/buckd.rs`):
+`~/.buck/buckd/<project root>/<isolation dir>/buckd.info`, a JSON file
+holding the daemon's `pid`, and the daemon's command line,
+`--isolation-dir <dir> daemon`. Check that the new release still writes
+them so: `InvocationPaths::daemon_dir` in buck2's
+`app/buck2_common/src/invocation_paths.rs`, and with a daemon running,
+
+```bash
+cat ~/.buck/buckd$PWD/v2/buckd.info
+ps -p <pid> -o args=
+```
+
+## 7. Run the CI gates locally
 
 Run what `.github/workflows/ci.yaml`, `docs.yaml` and `cachix.yaml` run:
 
@@ -119,7 +135,7 @@ nix build --no-link --impure --expr '
   in map (n: p.${n}) f.lib.publicPackages'
 ```
 
-## 7. Commit
+## 8. Commit
 
 Put the whole bump in one commit: the toolbox update, the pinned record, the
 patch set and any fallout. Paste the parity summary line into the commit

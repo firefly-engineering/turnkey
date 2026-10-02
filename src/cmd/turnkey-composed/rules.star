@@ -16,6 +16,7 @@ rust_binary(
         "rustdeps//vendor/clap:clap",
         "rustdeps//vendor/ctrlc:ctrlc",
         "rustdeps//vendor/env_logger:env_logger",
+        "rustdeps//vendor/libc:libc",
         "rustdeps//vendor/log:log",
         "rustdeps//vendor/serde:serde",
         "rustdeps//vendor/serde_json:serde_json",
