@@ -25,7 +25,7 @@ This document provides comprehensive guidance for AI assistants working on the T
 ## Repository Structure
 
 ```
-/home/user/turnkey/
+./
 ├── .envrc                          # direnv configuration for automatic flake activation
 ├── .gitignore                      # Git ignore patterns
 ├── flake.nix                       # Main Nix flake configuration
@@ -36,8 +36,6 @@ This document provides comprehensive guidance for AI assistants working on the T
 └── src/                            # Source code
     ├── cmd/                        # CLI tools (tk, tw, godeps-gen, etc.)
     ├── examples/                   # Example projects
-    ├── go/                         # Go packages
-    ├── python/                     # Python packages
     ├── rust/                       # Rust crates
     └── testdata/                   # Test fixtures
 ```
@@ -49,28 +47,28 @@ This document provides comprehensive guidance for AI assistants working on the T
 
 ## Key Files
 
-### `/home/user/turnkey/flake.nix`
+### `flake.nix`
 **Primary flake configuration**
 - Exposes `flakeModules.turnkey` (flake-parts), the one entry point; it configures the devenv module (`nix/devenv/turnkey/`) for each shell
 - Supports 4 systems: x86_64-linux, aarch64-linux, x86_64-darwin, aarch64-darwin
 - Demonstrates self-usage with local `toolchain.toml`
-- Inputs: nixpkgs (unstable), flake-parts, devenv
+- Inputs: see the `inputs` block of `flake.nix` (nixpkgs, flake-parts, devenv, teller, toolbox, nix-pins, …)
 
-### `/home/user/turnkey/nix/flake-parts/turnkey/default.nix`
+### `nix/flake-parts/turnkey/default.nix`
 **Flake-parts integration module**
 - Provides perSystem-level integration
 - Configures the default devenv shell automatically
 - Exposes configuration options for toolchain management
 - Acts as a convenience layer over the devenv module
 
-### `/home/user/turnkey/nix/devenv/turnkey/default.nix`
+### `nix/devenv/turnkey/default.nix`
 **Devenv shell module**
 - Shell-specific configuration
 - Parses `toolchain.toml` to extract toolchain requirements
 - Resolves toolchain names to actual packages via registry
 - Adds resolved packages to the development shell
 
-### `/home/user/turnkey/toolchain.toml`
+### `toolchain.toml`
 **Example toolchain declaration**
 ```toml
 [toolchains]
@@ -79,8 +77,7 @@ nix = {}
 ```
 Simple TOML format for declaring which toolchains are needed.
 
-### `/home/user/turnkey/docs/buck2_cell_resolution.md`
-**Production-grade technical documentation** (325 lines)
+### `docs/developer-manual/src/architecture/buck2.md`
 - Comprehensive guide to Buck2 cell resolution
 - Includes source code references with exact file paths and line numbers
 - Provides working solutions to Buck2/Nix integration challenges
@@ -144,7 +141,7 @@ nixpkgs packages
 
 ### The Registry Pattern
 
-The default registry lives in [teller](https://github.com/firefly-engineering/teller), a standalone flake providing versioned toolchain registry library functions and a default set of standard nixpkgs toolchains. Turnkey-specific tools (tk, tw, jrsonnet) are added via `registryExtensions` in turnkey's `flake.nix`.
+The default registry lives in [teller](https://github.com/firefly-engineering/teller), a standalone flake providing versioned toolchain registry library functions and a default set of standard nixpkgs toolchains. Turnkey-specific tools (`tw`, `turnkey-composed`) are added via `registryExtensions` in turnkey's `flake.nix`; jrsonnet comes from the toolbox overlay.
 
 **Design principles**:
 - Versioned format with `versions` and `default` attributes
@@ -304,9 +301,9 @@ When incorporating external tools that need modifications, **never duplicate sou
 ```
 nix/
 ├── packages/
-│   └── jrsonnet.nix      # Package definition (fetches + patches)
+│   └── tool-name.nix     # Package definition (fetches + patches)
 └── patches/
-    └── jrsonnet/         # One directory per patched software
+    └── tool-name/        # One directory per patched software
         └── fix-something.patch
 ```
 
@@ -361,21 +358,9 @@ cd repo
 git diff > /path/to/turnkey/nix/patches/tool-name/description.patch
 ```
 
-### Example: jrsonnet
+### Example: the Buck2 prelude
 
-jrsonnet is fetched from CertainLach/jrsonnet and can be patched if needed:
-
-```nix
-# nix/packages/jrsonnet.nix
-src = pkgs.fetchFromGitHub {
-  owner = "CertainLach";
-  repo = "jrsonnet";
-  rev = "v0.5.0-pre9";
-  hash = "sha256-...";
-};
-
-# patches = [ ../patches/jrsonnet/fix-something.patch ];
-```
+`nix/buck2/prelude.nix` fetches the upstream Buck2 prelude and applies the patches in `nix/patches/prelude/`.
 
 This pattern keeps upstream as source of truth while allowing local modifications.
 
@@ -390,17 +375,13 @@ This pattern keeps upstream as source of truth while allowing local modification
 - Example: `feat: add support for cargo toolchain`
 
 **Branch Naming**:
-- Feature branches: `sigma/push-<randomid>` or descriptive names
-- Claude branches: `claude/claude-md-<sessionid>`
 - All changes go through pull requests
-
-**Current Branch**: `claude/claude-md-mi24hguxg9tt783j-012hJXSBmAEfcSKL2eTc48Wc`
 
 ### Development Environment
 
 **Using direnv** (recommended):
 ```bash
-cd /home/user/turnkey
+cd "$(jj root 2>/dev/null || git rev-parse --show-toplevel)"
 # Environment automatically activates via .envrc
 ```
 
@@ -442,17 +423,7 @@ How other projects use Turnkey:
 ## Testing
 
 ### Current State
-- **No testing infrastructure** currently exists
-- No CI/CD pipelines
-- No automated checks
-- This is early-stage infrastructure code
-
-### Future Testing Strategy
-When implementing tests, consider:
-1. **Nix evaluation tests** - Verify module system works correctly
-2. **Integration tests** - Ensure toolchains are properly resolved
-3. **Example project tests** - Test with real Buck2 projects
-4. **Cross-platform tests** - Verify all 4 supported systems work
+CI runs `.github/workflows/ci.yaml` (flake check, nix-format check, package builds). Locally, run `direnv exec . tk test //...`. See `docs/developer-manual/src/contributing/testing.md`.
 
 ### Manual Testing
 
@@ -495,7 +466,7 @@ description = "Path to toolchain.toml declaration file for the default shell (co
 ```
 
 ### External Documentation
-Follow the model of `docs/buck2_cell_resolution.md`:
+Follow the model of `docs/developer-manual/src/architecture/buck2.md`:
 - **Comprehensive**: Cover the topic thoroughly
 - **Source code references**: Include exact file paths and line numbers
 - **Working examples**: Provide copy-paste-able code
@@ -504,7 +475,6 @@ Follow the model of `docs/buck2_cell_resolution.md`:
 
 ### Missing Documentation
 Currently needed:
-- **README.md**: Project overview, quick start, usage examples
 - **CONTRIBUTING.md**: Guidelines for contributors
 - **LICENSE**: Legal terms (project appears to be open source)
 - **API documentation**: Detailed module option reference
@@ -557,7 +527,7 @@ Then test that everything still works.
 
 1. **Code documentation**: Add inline comments and option descriptions
 2. **Technical docs**: Create files in `docs/` directory
-3. **Follow existing patterns**: Match the quality of `buck2_cell_resolution.md`
+3. **Follow existing patterns**: Match the quality of `docs/developer-manual/src/architecture/buck2.md`
 4. **Include examples**: Always provide working code examples
 
 ## Dependencies
@@ -566,13 +536,6 @@ Then test that everything still works.
 - **nixpkgs** (github:NixOS/nixpkgs/nixos-unstable) - Base package collection
 - **flake-parts** (github:hercules-ci/flake-parts) - Modular flake organization
 - **devenv** (github:cachix/devenv) - Development environment management
-
-### Transitive Dependencies
-devenv brings in:
-- cachix (binary cache)
-- git-hooks (pre-commit hooks)
-- nix (custom version 2.30.6)
-- flake-compat
 
 ## Supported Systems
 
@@ -590,7 +553,7 @@ When adding functionality, ensure it works across all platforms.
 2. **Self-usage is the primary test** - The `flake.nix` uses itself as an example
 3. **Simplicity is a feature** - Don't over-engineer solutions
 4. **Buck2 integration is a key use case** - But the design is generic
-5. **Dependencies live in Nix, not the repo** - See `docs/dependency-management.md` for the core principles. Never vendor in-repo, always use per-module fetching with deterministic hashes.
+5. **Dependencies live in Nix, not the repo** - See `docs/user-manual/src/workflows/dependencies.md` for the core principles. Never vendor in-repo, always use per-module fetching with deterministic hashes.
 
 ### When Making Changes
 1. **Preserve the layered architecture** - Don't blur the lines between modules
@@ -608,36 +571,12 @@ When adding functionality, ensure it works across all platforms.
 3. **Lazy evaluation** - Use `lazyAttrsOf` for large attribute sets
 4. **Sensible defaults** - Always provide good defaults, allow overrides
 
-### Communication Style
-- **Be precise** - This is infrastructure code, accuracy matters
-- **Reference source** - When discussing Buck2 or Nix behavior, cite sources
-- **Explain rationale** - Don't just say what, explain why
-- **Provide examples** - Working code examples are essential
-
-## Project Maturity
-
-**Current State**: Early stage (5 commits total)
-- Core architecture established
-- Key modules implemented
-- Self-usage working
-- Excellent Buck2 documentation
-- No testing infrastructure yet
-- No README or general documentation yet
-
-**Next Steps** (likely):
-1. Add README.md with quick start guide
-2. Implement testing infrastructure
-3. Expand registry with more common toolchains
-4. Add CI/CD for automated checks
-5. Document the module API comprehensively
-6. Add example projects showing integration
-
 ## Related Resources
 
-- **Dependency Management**: See `docs/dependency-management.md` for core principles on how dependencies flow from language-native declarations through Nix to Buck2 cells. **Read this before working on any dependency-related code.**
+- **Dependency Management**: See `docs/user-manual/src/workflows/dependencies.md` for core principles on how dependencies flow from language-native declarations through Nix to Buck2 cells. **Read this before working on any dependency-related code.**
 - **Native Tool Wrappers**: See the `tw` section of `docs/user-manual/src/reference/cli.md` for how `go`, `cargo`, `uv` are transparently wrapped with auto-sync.
 - **Testing in Devenv**: See `docs/testing-devenv.md` for the standard `direnv exec . <command>` pattern used for all testing.
-- **Buck2 Cell Resolution**: See `docs/buck2_cell_resolution.md` for deep dive
+- **Buck2 Cell Resolution**: See `docs/developer-manual/src/architecture/buck2.md` for deep dive
 - **flake-parts**: https://flake.parts/
 - **devenv**: https://devenv.sh/
 - **Nix Flakes**: https://nixos.wiki/wiki/Flakes
@@ -652,22 +591,6 @@ When uncertain about how to proceed:
 4. **Is the documentation quality consistent with existing docs?**
 5. **Does the self-usage in flake.nix still work?**
 6. **Is this change simple enough, or am I over-engineering?**
-
-## Git Operations
-
-### Pushing Changes
-
-```bash
-# Develop on the designated branch
-git add .
-git commit -m "feat: descriptive message"
-
-# Push to the current branch
-git push -u origin claude/claude-md-mi24hguxg9tt783j-012hJXSBmAEfcSKL2eTc48Wc
-```
-
-### Network Retry Strategy
-If push fails due to network errors, retry up to 4 times with exponential backoff (2s, 4s, 8s, 16s).
 
 ## Summary
 

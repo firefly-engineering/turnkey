@@ -13,17 +13,17 @@ Nix package builds Go code and there is no `vendorHash` to update. The root
 `go.mod` serves the Go examples (`src/examples/go-*`), which Buck2 builds
 against the godeps cell.
 
-**CRITICAL: This project does NOT use `go mod vendor`. All vendoring happens through Nix cells.**
+This project does not use `go mod vendor`: vendoring happens through Nix cells.
 
 ```bash
 go get github.com/example/package
-go mod tidy  # ALWAYS run this to sync direct/indirect deps
+go mod tidy  # sync direct/indirect deps
 tk sync      # regenerates go-deps.toml
 ```
 
 ## Quality Gates
 
-**Before pushing any code changes**, you MUST run these checks in a fresh Nix devenv environment:
+Before pushing code changes, run these checks in a fresh Nix devenv environment:
 
 ```bash
 # Ensure fresh environment (especially after Nix changes)
@@ -42,7 +42,6 @@ tk test //...
 - After modifying any `.nix` files (especially `nix/buck2/languages.nix` and `nix/lib/deps-cell/`)
 - After modifying any Rust, Go, or Python code
 - After changing dependency declarations (`rust-deps.toml`, `go-deps.toml`, etc.)
-- Before pushing ANY code changes
 
 **If builds fail after Nix changes:**
 1. Try `direnv reload` to refresh the environment
@@ -52,26 +51,10 @@ tk test //...
 
 ## Landing the Plane (Session Completion)
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+A task is finished when its change is on the remote, because unpushed work is stranded locally:
 
-**MANDATORY WORKFLOW:**
-
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - See "Quality Gates" section below
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
-
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
-
+1. File issues for remaining follow-up work.
+2. Run the quality gates above if code changed.
+3. Close finished issues; update in-progress ones.
+4. Push, and confirm the remote has the change. If the push fails, resolve it and push again.
+5. Leave a short handoff note for the next session.
