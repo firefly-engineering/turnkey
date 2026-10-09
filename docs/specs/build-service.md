@@ -75,3 +75,21 @@ Incremental builds actually running for turnkey repos on GitHub. The **build ser
 | **Mitigations** | The signing key stays off the builder ([How can a client ask a remote service to build a derivation?](https://github.com/firefly-engineering/turnkey/issues/65)); `sandbox = true`, `sandbox-fallback = false`; the builder's identity can't write the cache (fixed-output derivations reach the network and metadata server); no `ca-derivations`; every build records who requested it, so outputs can be evicted after an advisory; Nix and gVisor are patched promptly. Instances are reused within a tier: no fresh VM per build. |
 
 **Cost.** Untrusted builds still reuse everything the trusted tier holds, so PRs start from trunk. What is lost is trunk reusing what a PR built: approved code is built once more in the merge queue, which is what a post-merge CI run costs today, and trunk then reuses the merge queue's results in full.
+
+## Result sharing
+
+*Source: [Which results are shared, and where do client-computed results go?](https://github.com/firefly-engineering/turnkey/issues/69). Builds on "Sandbox-escape risk and tiers" and the trust rule.*
+
+**Reading is harmless to others; only writing is policed.** Confidentiality is not a goal, so anyone who can read a repo may read any of its bubbles, and a build that reads a bad bubble hurts only itself. The client chooses its stack; the credential fixes where writes land.
+
+| Rule | Behaviour |
+|---|---|
+| **PR bubble** | One per PR, keyed by repo id and PR number, fork PRs included. Holds executor results for that PR's builds. |
+| **Developer bubble** | One per developer, keyed by GitHub user id. Holds executor results for builds the developer requests and their client-computed results. A push to a branch with no open PR builds in the pusher's developer bubble. There are no branch bubbles. |
+| **Stack chosen by the client** | The client names its stack at session start; the service only checks that it may read the repo. `tk`'s defaults: CI on a PR reads its PR bubble, then the bubbles of the PRs it is stacked on (base branch is another PR's head, recursively), then the trusted tier. A laptop reads its developer bubble, then the PR bubble of the checked-out branch if any, then the trusted tier. |
+| **Top layer fixed by the credential** | The executor writes into the requester's top layer: the PR bubble for a PR build (OIDC claims, or the client host's own trigger), the developer bubble for a developer's build (device-flow token), the trusted tier for a trusted build. |
+| **Client-computed results** | A client writes them only into its owner's developer bubble. CI runners never write client-computed results into a PR bubble, which reviewers and stacked PRs read. A runner's own cache (e.g. `actions/cache`) is a local cache as far as buck2 is concerned. |
+| **Mixed builds** | A local output feeding a remote action is uploaded as a hash-verified blob and its digest is in the remote action's key, so the executor's result is honest for anyone with those inputs, and it lands only in the requester's bubble. Nothing client-computed leaks into results others read; no extra rule is needed. |
+| **darwin before a darwin executor** | The trusted tier holds no darwin results. On a Mac laptop, darwin actions run locally and their results go into the developer bubble; Linux actions run remotely. On macOS CI runners, darwin actions run locally with no reuse from the service. |
+| **Lifetime** | A PR bubble is deleted a configurable time after its PR closes or merges (default 7 days). A developer bubble evicts entries untouched for a configurable time (default 30 days). Mechanics: garbage collection, still unspecified on the map. |
+| **Local test cache** | The per-user bazel-remote of [ADR 0001](../adr/0001-runner-recorded-native-test-caching.md) becomes an optional local proxy (offline, latency) in front of the service ([Tier the per-user bazel-remote in front of the shared cache (G8)](https://github.com/firefly-engineering/turnkey/issues/53)); recorded test passes go into the local cache and the owner's developer bubble. |
