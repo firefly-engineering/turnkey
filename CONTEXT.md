@@ -133,3 +133,16 @@ _Avoid_: dev shell (a superset with editors and linters), base image, execution 
 **Environment id**:
 The service's name for one realised build environment, returned when a client submits it and sent with every remote action. It routes actions to their environment and is never part of an action key.
 _Avoid_: environment hash, salt
+
+**Tier**:
+One of the build service's two integrity domains for results: the trusted tier, written only by builds of approved code, and the untrusted tier, holding everything else. Results never move from the untrusted tier to the trusted one.
+_Avoid_: scope, namespace, cache level
+
+**Bubble**:
+One untrusted domain's writable layer in the untrusted tier, such as a PR's or a developer's. It confines that domain's results; it is not an integrity boundary against another bubble.
+_Avoid_: scope, virtual bucket
+
+**Stack**:
+The ordered layers a build reads results from: its own bubble, any layers below it, and the trusted tier at the bottom. A trusted build's stack is the trusted tier alone.
+_Avoid_: lookup chain, overlay
+
