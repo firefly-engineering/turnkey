@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by ADR-0017
 ---
 
 # Results never move into the trusted tier

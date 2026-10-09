@@ -150,23 +150,31 @@ _Avoid_: dev shell (a superset with editors and linters), base image, execution 
 The service's name for one realised build environment, returned when a client submits it and sent with every remote action. It routes actions to their environment and is never part of an action key.
 _Avoid_: environment hash, salt
 
-**Tier**:
-One of the build service's two integrity domains for results: the trusted tier, written only by builds of approved code, and the untrusted tier, holding everything else. Results never move from the untrusted tier to the trusted one.
-_Avoid_: scope, namespace, cache level
+**Trust domain**:
+A set of builds, chosen by the consumer's policy, whose results go into one bubble. The build service enforces domains but never decides which builds are trusted.
+_Avoid_: tier, scope, trusted tier
 
 **Bubble**:
-One untrusted domain's writable layer in the untrusted tier, such as a PR's or a developer's. It confines that domain's results; it is not an integrity boundary against another bubble.
-_Avoid_: scope, virtual bucket
+The writable layer holding one trust domain's results. Nothing moves from one bubble to another.
+_Avoid_: scope, virtual bucket, namespace
+
+**Stack**:
+The ordered bubbles a build reads results from: its own domain's bubble on top, then those its domain is stacked on.
+_Avoid_: lookup chain, overlay
+
+**Isolated domain**:
+A trust domain whose builds run on machinery that never runs another domain's builds. Only an isolated domain is an integrity boundary against a sandbox escape.
+_Avoid_: trusted tier, secure domain
+
+**Mainline domain**:
+In turnkey's default policy, the isolated domain of merge-queue runs and pushes to protected branches, at the bottom of every stack.
+_Avoid_: trusted tier, landing build, trunk cache
 
 **PR bubble**:
-The bubble of one pull request, fork PRs included, holding the results the service computed for that PR's builds. Reviewers and PRs stacked on it may read it, so no client writes into it.
+In turnkey's default policy, the bubble of one pull request, fork PRs included, holding the results the service computed for that PR's builds. Reviewers and PRs stacked on it may read it, so no client writes into it.
 _Avoid_: branch bubble, PR cache
 
 **Developer bubble**:
-The bubble of one developer, holding the results the service computed for builds they asked for and their own client-computed results. Only that developer's builds write into it.
+In turnkey's default policy, the bubble of one developer, holding the results the service computed for builds they asked for and their own client-computed results. Only that developer's builds write into it.
 _Avoid_: user cache, personal scope
-
-**Stack**:
-The ordered layers a build reads results from: its own bubble, any layers below it, and the trusted tier at the bottom. A trusted build's stack is the trusted tier alone.
-_Avoid_: lookup chain, overlay
 
