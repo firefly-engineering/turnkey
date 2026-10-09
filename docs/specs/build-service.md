@@ -110,3 +110,61 @@ Incremental builds actually running for turnkey repos on GitHub. The **build ser
 **Default policy.** An isolated **mainline domain** for `merge_group` events and `push` to protected refs; a domain per PR (`pull_request`, and App events for fork PRs) stacked on mainline, whose bubble is the PR bubble; a domain per user for developer sessions stacked on mainline, whose bubble is the developer bubble.
 
 **Recommended CI setup** (documentation, not enforced): use a merge queue where the plan allows it, with CI on `merge_group` and `pull_request`; without one, also run CI on `push` to the default branch so the mainline domain is filled; protect the default branch, since mainline rules rest on it.
+
+## Building blocks
+
+*Source: [What are the building blocks, and where are their seams?](https://github.com/firefly-engineering/turnkey/issues/72). Reuse decision: [ADR 0018](../adr/0018-service-blocks-are-go-on-buildbarn.md).*
+
+```mermaid
+flowchart LR
+  subgraph client["Client (laptop, CI runner, client host)"]
+    kit["Client kit (tk)"]
+    buck2["buck2 daemon"]
+    nix["nix"]
+  end
+  subgraph deployment["Once per deployment"]
+    gate["Gatekeeper"]
+    front["Cache front"]
+    app["GitHub App"]
+    host["Client host"]
+    gc["Collector"]
+  end
+  subgraph domain["Per isolated domain (plus one shared set)"]
+    exec["Executor"]
+    real["Realiser"]
+    builder["Nix builder"]
+    bucket[("Bucket")]
+  end
+  kit -- token exchange --> gate
+  kit -- realise API --> real
+  buck2 -- "REAPI CAS/AC" --> front
+  buck2 -- "REAPI Execute" --> exec
+  nix -- binary-cache HTTP --> front
+  real --> builder
+  real --> bucket
+  exec --> bucket
+  front --> bucket
+  app --> host
+  gc --> bucket
+```
+
+| Block | Responsibility | Interface |
+|---|---|---|
+| **Cache front** | Every read and every content upload: REAPI CAS, AC, ByteStream and Capabilities, and the Nix binary-cache HTTP protocol. Reads walk the caller's stack; uploads are hash-checked; AC writes from clients are refused except into an owner-only bubble. | REAPI cache services and Nix substituter HTTP, behind a session credential |
+| **Executor** | REAPI `Execute` only (buck2's separate `engine_address`): build-environment cache per instance, one gVisor sandbox per action, results into the requester's bubble ("Executor contract"). | REAPI Execution |
+| **Realiser** | The realise API: hands derivations to the builder, verifies fixed-output hashes, signs with its domain's key, writes the Nix cache, returns environment ids. | gRPC: upload closure, Realise, Watch |
+| **Nix builder** | A disposable, stock, sandboxed `nix-daemon` with no identity that can write the cache; a Cloud Run job for builds over 60 minutes. | Internal, driven by the realiser |
+| **Gatekeeper** | Turns a GitHub OIDC token, an App event or a device-flow login into a session credential (a client certificate naming the build's domain and stack). The only block that knows GitHub identities and applies the trust-domain policy. | Token exchange |
+| **GitHub App** | Webhooks, the Checks API, fork-PR approval and service-side fill; starts the client host. | GitHub webhooks |
+| **Client host** | A Cloud Run job running `tk build` for fork PRs and service-side fill. | Internal, started by the App |
+| **Collector** | Garbage collection: bubble lifetimes, and blobs kept at least 12 h after buck2 last checked them. | Scheduled job |
+| **Client kit** | In `tk`: opens the session (credential, build-environment realise, stack) and configures buck2 (RE addresses, headers, certificate) and Nix (substituter, `netrc`). | `tk` commands; no new client protocol |
+
+| Rule | Behaviour |
+|---|---|
+| **Storage is a seam, not a block** | The blocks that touch storage do it through one internal interface with two adapters from the start: GCS, and local disk/in memory for tests and laptops. |
+| **Per isolated domain** | Each isolated domain has its own bucket, executor, builder and realiser (so its own signing key); one more set serves all non-isolated domains. The cache front, gatekeeper, App, client host and collector run once per deployment: they never run untrusted code. A client trusts the signing keys of the isolated domains in its stack. |
+| **No other provider seams** | Clients speak only REAPI, the Nix cache protocol, the realise API and token exchange, so the provider never reaches them. Compute (Cloud Run) and identity (GitHub) get no seam until a second adapter exists. |
+| **Build vs reuse** | Executor and cache front: Buildbarn's Go libraries with our own `Execute` handler and GCS layer ([#62](https://github.com/firefly-engineering/turnkey/issues/62)). Nix cache: no niks3; Nix's own S3 store writes it, the cache front reads it ([#64](https://github.com/firefly-engineering/turnkey/issues/64)). Builder: stock `nix-daemon` behind our realise API ([#65](https://github.com/firefly-engineering/turnkey/issues/65)). Service blocks are Go in the root module; the client kit is Rust in `tk`. |
+| **Scale to zero** | All compute is Cloud Run services and jobs. An idle deployment costs its stored bytes (buckets, images in Artifact Registry) plus a few cents of fixed fees: a Cloud KMS signing key per isolated domain (about USD 0.06 a month each) and a Cloud Scheduler job for the collector (free up to three). |
+| **Dogfood slice** | turnkey's own repo first assembles the cache front, executor, realiser and builder, the gatekeeper (OIDC for CI, device flow for laptops), the collector, the client kit and the default policy. The GitHub App and client host come later: fork PRs, rare on turnkey, keep plain CI meanwhile, and service-side fill waits with them. |
