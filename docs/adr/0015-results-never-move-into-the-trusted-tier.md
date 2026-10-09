@@ -2,9 +2,9 @@
 status: accepted
 ---
 
-# Results flow down from a trusted tier, never up
+# Results never move into the trusted tier
 
-The build service runs untrusted code (fork PRs, unapproved branches) in sandboxes, and a sandbox escape would let that code plant a wrong output under a key someone else looks up later; nothing checks an input-addressed output or an action result against its content. Rather than share every result across everyone and bet trunk's integrity on gVisor and the Nix sandbox, we split both caches into a **trusted tier**, written only by builds of approved code on machinery that never runs anything else, and an **untrusted tier** of **bubbles** stacked on top of it. Builds read down their **stack**; results never move up. A fixed-output derivation's output is the one exception, because the signer can verify it by its content hash.
+The build service runs untrusted code (fork PRs, unapproved branches) in sandboxes, and a sandbox escape would let that code plant a wrong output under a key someone else looks up later; nothing checks an input-addressed output or an action result against its content. Rather than share every result across everyone and bet trunk's integrity on gVisor and the Nix sandbox, we split both caches into a **trusted tier**, written only by builds of approved code on machinery that never runs anything else, and an **untrusted tier** of **bubbles** stacked on top of it. A build reads its **stack** from its own bubble down to the trusted tier at the bottom; results never move down it. A fixed-output derivation's output is the one exception, because the signer can verify it by its content hash.
 
 Decided in [Do we accept the sandbox-escape risk of sharing untrusted-built outputs?](https://github.com/firefly-engineering/turnkey/issues/75); rules in the "Sandbox-escape risk and tiers" section of [`docs/specs/build-service.md`](../specs/build-service.md).
 

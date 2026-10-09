@@ -53,7 +53,7 @@ Incremental builds actually running for turnkey repos on GitHub. The **build ser
 
 ## Sandbox-escape risk and tiers
 
-*Source: [Do we accept the sandbox-escape risk of sharing untrusted-built outputs?](https://github.com/firefly-engineering/turnkey/issues/75). Decision record: [ADR 0015](../adr/0015-results-flow-down-from-a-trusted-tier.md).*
+*Source: [Do we accept the sandbox-escape risk of sharing untrusted-built outputs?](https://github.com/firefly-engineering/turnkey/issues/75). Decision record: [ADR 0015](../adr/0015-results-never-move-into-the-trusted-tier.md).*
 
 **The risk.** Untrusted code runs on the service: actions under gVisor, one sandbox each; Nix builds in the stock Nix sandbox inside a Cloud Run microVM ([Do Cloud Run sandboxes isolate successive actions, and does the Nix sandbox run on Cloud Run?](https://github.com/firefly-engineering/turnkey/issues/76)). Whoever escapes either one controls an instance that serves later requests, and can have the service sign, or record in the action cache, a wrong output under a key someone else will look up. Nothing checks an input-addressed output or an action result against its content. So the service limits where an escape's output can travel instead of betting on the sandboxes.
 
