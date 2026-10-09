@@ -94,3 +94,19 @@ Incremental builds actually running for turnkey repos on GitHub. The **build ser
 | **darwin before a darwin executor** | The mainline domain holds no darwin results. On a Mac laptop, darwin actions run locally and their results go into the developer bubble; Linux actions run remotely. On macOS CI runners, darwin actions run locally with no reuse from the service. |
 | **Lifetime** | A PR bubble is deleted a configurable time after its PR closes or merges (default 7 days). A developer bubble evicts entries untouched for a configurable time (default 30 days). Mechanics: garbage collection, still unspecified on the map. |
 | **Local test cache** | The per-user bazel-remote of [ADR 0001](../adr/0001-runner-recorded-native-test-caching.md) becomes an optional local proxy (offline, latency) in front of the service ([Tier the per-user bazel-remote in front of the shared cache (G8)](https://github.com/firefly-engineering/turnkey/issues/53)); recorded test passes go into the local cache and the owner's developer bubble. |
+
+## Trust-domain policy
+
+*Source: [How does a consumer map builds to trust domains?](https://github.com/firefly-engineering/turnkey/issues/252). Mechanism: "Sandbox-escape risk and trust domains".*
+
+| Rule | Behaviour |
+|---|---|
+| **Lives with the service** | The policy is part of the deployment's configuration, one per repo the deployment serves. The trust root is the service and its operators, and the policy decides integrity, so it stays with them; it is never read from the repo, which a PR could edit. A repo without a policy gets turnkey's default policy. |
+| **Matches verified claims only** | Rules match a fixed vocabulary the service verifies itself: repository and owner by numeric id (never by name); the event (`push`, `pull_request`, `merge_group`, `workflow_dispatch`, a developer session); `ref`, and `ref_protected` when present; the PR number (from OIDC claims, or the App event for fork PRs); the GitHub user id for developer sessions. Claims any writer can forge (`workflow`, `workflow_ref`, `job_workflow_ref`, `environment`) are not in the vocabulary. A rule on `ref=refs/heads/main` is only as strong as the consumer's push rules for `main`; the service verifies the claim's authenticity, not its meaning. |
+| **Ordered rules, first match wins** | Each rule maps matching builds to a domain declared with a name, a key (fixed, per PR, or per user), a stack (the named domains below it) and an isolated flag. A build that matches no rule is refused, never defaulted. |
+| **Changes never move results** | A renamed or removed domain leaves its old bubble to garbage collection. A domain that becomes isolated starts with an empty bubble: results written on shared machinery are never inherited by an isolated domain. |
+| **Optional service-side fill** | A domain may opt in to being filled by the service itself: on matching App events (e.g. a push to `main`), the service's client host runs the build. Off by default; building is the consumer's CI's job, and an unrequested build costs the consumer compute. |
+
+**Default policy.** An isolated **mainline domain** for `merge_group` events and `push` to protected refs; a domain per PR (`pull_request`, and App events for fork PRs) stacked on mainline, whose bubble is the PR bubble; a domain per user for developer sessions stacked on mainline, whose bubble is the developer bubble.
+
+**Recommended CI setup** (documentation, not enforced): use a merge queue where the plan allows it, with CI on `merge_group` and `pull_request`; without one, also run CI on `push` to the default branch so the mainline domain is filled; protect the default branch, since mainline rules rest on it.

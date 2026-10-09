@@ -162,6 +162,10 @@ _Avoid_: scope, virtual bucket, namespace
 The ordered bubbles a build reads results from: its own domain's bubble on top, then those its domain is stacked on.
 _Avoid_: lookup chain, overlay
 
+**Trust-domain policy**:
+A consumer's ordered rules, kept in the build service's deployment, that attach each build to a trust domain from claims the service verifies, and declare each domain's key, stack and isolation. A build no rule matches is refused.
+_Avoid_: trust policy, CI policy, merge policy
+
 **Isolated domain**:
 A trust domain whose builds run on machinery that never runs another domain's builds. Only an isolated domain is an integrity boundary against a sandbox escape.
 _Avoid_: trusted tier, secure domain
