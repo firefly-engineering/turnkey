@@ -168,3 +168,26 @@ flowchart LR
 | **Build vs reuse** | Executor and cache front: Buildbarn's Go libraries with our own `Execute` handler and GCS layer ([#62](https://github.com/firefly-engineering/turnkey/issues/62)). Nix cache: no niks3; Nix's own S3 store writes it, the cache front reads it ([#64](https://github.com/firefly-engineering/turnkey/issues/64)). Builder: stock `nix-daemon` behind our realise API ([#65](https://github.com/firefly-engineering/turnkey/issues/65)). Service blocks are Go in the root module; the client kit is Rust in `tk`. |
 | **Scale to zero** | All compute is Cloud Run services and jobs. An idle deployment costs its stored bytes (buckets, images in Artifact Registry) plus a few cents of fixed fees: a Cloud KMS signing key per isolated domain (about USD 0.06 a month each) and a Cloud Scheduler job for the collector (free up to three). |
 | **Dogfood slice** | turnkey's own repo first assembles the cache front, executor, realiser and builder, the gatekeeper (OIDC for CI, device flow for laptops), the collector, the client kit and the default policy. The GitHub App and client host come later: fork PRs, rare on turnkey, keep plain CI meanwhile, and service-side fill waits with them. |
+
+## Deployment
+
+*Source: [How does a consumer deploy and assemble the blocks?](https://github.com/firefly-engineering/turnkey/issues/73).*
+
+| Rule | Behaviour |
+|---|---|
+| **OpenTofu generated from Nix** | turnkey ships a flake-parts module (e.g. `flakeModules.buildService`). A deployment flake imports it and sets typed options (project, region, repos served, each repo's trust-domain policy, isolated domains); the module emits, through terranix, the OpenTofu configuration for the per-deployment and per-domain resources of "Building blocks", and `tofu apply` deploys it. OpenTofu and the Google provider are pinned to exact versions in the flake. State lives in a GCS bucket made by a one-off bootstrap step. GCP is the only adapter. |
+| **Images built by turnkey's CI** | Each service image is built with `nix2container` in turnkey's CI, never locally, and published to `ghcr.io/firefly-engineering/…`, tagged by turnkey revision and referenced by digest. Cloud Run can't pull from ghcr, so apply copies each image by digest into the deployment's Artifact Registry. The digests come from the turnkey revision the deployment flake pins: service and module are pinned together and bumped together, as with buck2 ([ADR 0002](../adr/0002-turnkey-owns-the-buck2-version.md)). |
+| **The deployment is its own flake** | Policy belongs to the deployment and one deployment can serve several repos, so the deployment is a separate flake, typically in an org infrastructure repo. A consumer repo declares only `turnkey.buildService.endpoint`, which is not secret; signing keys, domain and stack are discovered when a session opens ([How do tk and nix on a client reach the build service?](https://github.com/firefly-engineering/turnkey/issues/74)). |
+| **No secrets to bootstrap** | The deployment repo applies from GitHub Actions authenticated to GCP by Workload Identity Federation; there are no long-lived keys. Signing keys live in Cloud KMS and are never exported. The GitHub App, when deployed, is created through GitHub's manifest flow, and its private key goes straight into Secret Manager, readable only by the App service. |
+| **Upgrades and version skew** | Upgrading is bumping the turnkey input in the deployment flake (new image digests) and applying. The gatekeeper advertises the client protocol versions it supports, and `tk` refuses with a clear error outside that range (cf. [tk version requirements](https://github.com/firefly-engineering/turnkey/issues/108)). |
+| **turnkey's own deployment** | Lives in the turnkey repo under `deploy/`, applied by CI on `main`, in a GCP project of the firefly-engineering org. Nothing in it is secret; it doubles as the reference assembly, so CI keeps the module honest. |
+
+**A new consumer, end to end** (for the user manual):
+
+1. Create a GCP project with billing.
+2. Create a deployment flake importing the module; set the project, the repos served and their policies (or leave turnkey's default policy).
+3. Run the bootstrap step once (state bucket, Workload Identity Federation).
+4. Apply from CI with `tofu apply`.
+5. In each consumer repo, set `turnkey.buildService.endpoint`, and grant CI jobs `permissions: id-token: write`.
+6. On each laptop, run `tk login` (device flow).
+7. Optionally, follow the recommended CI setup in "Trust-domain policy".
