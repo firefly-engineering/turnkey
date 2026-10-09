@@ -126,6 +126,22 @@ A test rule none of whose own behaviour lets a test read something outside its r
 
 ### Build service
 
+**Build service**:
+The service turnkey ships that executes actions and builds Nix derivations for a repo's clients, and stores the results they share. It is the trust root for every result anyone else reads.
+_Avoid_: remote cache, RBE, CI cache
+
+**Executor**:
+The part of the build service that runs one action in a sandbox and records its result. It is the only writer of action results that others read.
+_Avoid_: worker, runner, RBE
+
+**Client**:
+Anything that asks the build service for work: a buck2 daemon on a laptop or CI runner, or the service's own client host. Clients are never trusted with results that others read.
+_Avoid_: builder, worker
+
+**Client-computed result**:
+A result a client produced itself, such as a darwin action on a Mac or a `local_only` action. Only the client's own domain ever reads it.
+_Avoid_: local result, uploaded result
+
 **Build environment**:
 The Nix output of a repo's flake that holds everything buck2 actions can reach (toolchains cell, deps cells, prelude), instantiated by the build service before it runs any action. buck2 never sees it as such, only the store paths inside it.
 _Avoid_: dev shell (a superset with editors and linters), base image, execution environment

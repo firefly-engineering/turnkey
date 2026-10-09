@@ -8,6 +8,12 @@
 
 Incremental builds actually running for turnkey repos on GitHub. The **build service** turnkey ships as a product: building blocks that any turnkey-managed repo on GitHub assembles to get incremental builds and tests on every machine (CI, laptops) without trusting PRs or developer machines. The backend is one service with two faces over shared storage, REAPI (content store, action cache, Execute with a Nix-programmable base image) and a Nix binary cache, deployed on Cloud Run and scaling to zero.
 
+## Trust rule
+
+*Sources: [ADR 0016](../adr/0016-clients-never-write-results-that-anyone-else-reads.md) and [ADR 0015](../adr/0015-results-never-move-into-the-trusted-tier.md).*
+
+**Clients never write results that anyone else reads.** Clients upload hash-verified blobs and submit derivations; results others read come only from the executor and the Nix builder. A client may write only into a bubble its own domain reads. Results are tiered: see "Sandbox-escape risk and tiers".
+
 ## Client: local execution hygiene
 
 *Source: [Should tk own the buck2 daemon's environment?](https://github.com/firefly-engineering/turnkey/issues/68).*
