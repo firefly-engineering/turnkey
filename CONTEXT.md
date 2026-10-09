@@ -123,3 +123,13 @@ _Avoid_: cached pass, cache hit (buck2 uses that for build actions too)
 
 **Cache-safe rule**:
 A test rule none of whose own behaviour lets a test read something outside its result key. Only a cache-safe rule has its targets' results recorded. Hazards that belong to one target, not to the rule, are fixed in that target or opt it out, and never make the rule unsafe.
+
+### Build service
+
+**Build environment**:
+The Nix output of a repo's flake that holds everything buck2 actions can reach (toolchains cell, deps cells, prelude), instantiated by the build service before it runs any action. buck2 never sees it as such, only the store paths inside it.
+_Avoid_: dev shell (a superset with editors and linters), base image, execution environment
+
+**Environment id**:
+The service's name for one realised build environment, returned when a client submits it and sent with every remote action. It routes actions to their environment and is never part of an action key.
+_Avoid_: environment hash, salt
